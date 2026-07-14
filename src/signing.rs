@@ -8,6 +8,9 @@ pub const HEADER_SIGNATURE_BIN: &str = "x-heddle-sig-bin";
 pub const HEADER_TIMESTAMP: &str = "x-heddle-sig-ts";
 pub const HEADER_NONCE_BIN: &str = "x-heddle-sig-nonce-bin";
 pub const HEADER_IDENTITY: &str = "x-heddle-sig-identity";
+pub const HEADER_WEBAUTHN_CLIENT_DATA_BIN: &str = "x-heddle-sig-webauthn-client-data-bin";
+pub const HEADER_WEBAUTHN_AUTH_DATA_BIN: &str = "x-heddle-sig-webauthn-auth-data-bin";
+pub const HEADER_WEBAUTHN_USER_HANDLE_BIN: &str = "x-heddle-sig-webauthn-user-handle-bin";
 pub const HEADER_REQUIRED: &str = "x-heddle-sig-required";
 pub const HEADER_ACTION_URL: &str = "x-heddle-sig-action-url";
 

@@ -29,6 +29,39 @@ class SharedOperationContractTest(unittest.TestCase):
             source,
         )
 
+    def test_reconnect_is_snapshot_first_and_sequence_never_regresses(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        operation = message_body(source, "Operation")
+        checkpoint = message_body(source, "OperationWatchCheckpoint")
+        event = message_body(source, "OperationWatchEvent")
+
+        self.assertRegex(operation, r"\buint64\s+sequence\s*=")
+        self.assertRegex(checkpoint, r"\buint64\s+after_sequence\s*=")
+        self.assertRegex(event, r"\bOperation\s+operation\s*=")
+        self.assertRegex(event, r"\bbool\s+snapshot\s*=")
+        self.assertIn("Every connection is", source)
+        self.assertIn("snapshot-first", source)
+        self.assertIn("sequence >= the requested after_sequence", source)
+        self.assertIn("strictly larger sequences", source)
+
+    def test_import_and_gateway_do_not_define_a_second_operation_lifecycle(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        result = message_body(source, "OperationResult")
+        self.assertRegex(result, r"\bImportOperationResult\s+import_operation\s*=")
+        self.assertRegex(result, r"\bRemoteSyncOperationResult\s+remote_sync\s*=")
+
+        proto_sources = "\n".join(
+            path.read_text() for path in (ROOT / "proto/heddle/api/v1alpha1").glob("*.proto")
+        )
+        for removed in (
+            "CreateImportJob",
+            "StreamImportProgress",
+            "ImportProgressEvent",
+            "ImportJobSummary",
+            "message OperationReceipt",
+        ):
+            self.assertNotIn(removed, proto_sources)
+
 
 if __name__ == "__main__":
     unittest.main()

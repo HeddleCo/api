@@ -3,6 +3,7 @@ set -eu
 
 buf format -d --exit-code
 buf lint
+python3 -B -m unittest tests/test_operation_contract.py
 python3 tools/audit_contract.py
 cargo fmt --check
 cargo test --all-features

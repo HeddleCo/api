@@ -1,0 +1,358 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/registry.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+// The durable work classes supported by the shared lifecycle. A submission's
+// kind must match its details oneof. New domain work extends the details and
+// result oneofs instead of defining another status, progress, or watch model.
+enum OperationKind {
+  OPERATION_KIND_UNSPECIFIED = 0;
+  OPERATION_KIND_IMPORT = 1;
+  OPERATION_KIND_REMOTE_SYNC = 2;
+}
+
+// Canonical lifecycle. A terminal operation never changes state, sequence,
+// progress, error, or result. FAILED carries error; CANCELED means a prior
+// cancellation request succeeded and carries no error. COMPLETED carries the
+// result for its kind when that kind defines one.
+enum OperationState {
+  // Never valid in a persisted Operation snapshot.
+  OPERATION_STATE_UNSPECIFIED = 0 [(operation_state_contract) = {}];
+  // Accepted durably; may advance to RUNNING or a terminal state.
+  OPERATION_STATE_QUEUED = 1 [(operation_state_contract) = {}];
+  // Work is executing; may advance only to a terminal state.
+  OPERATION_STATE_RUNNING = 2 [(operation_state_contract) = {}];
+  // Terminal success.
+  OPERATION_STATE_COMPLETED = 3 [(operation_state_contract) = {terminal: true}];
+  // Terminal failure; Operation.error is required.
+  OPERATION_STATE_FAILED = 4 [(operation_state_contract) = {
+    terminal: true
+    error_required: true
+  }];
+  // Terminal confirmation that cancellation succeeded.
+  OPERATION_STATE_CANCELED = 5 [(operation_state_contract) = {
+    terminal: true
+    cancellation_succeeded: true
+  }];
+}
+
+// Cancellation capability is separate from lifecycle state. REQUESTED remains
+// non-terminal until the worker reports CANCELED, COMPLETED, or FAILED.
+enum OperationCancellation {
+  OPERATION_CANCELLATION_UNSPECIFIED = 0;
+  // This operation kind or instance cannot be canceled.
+  OPERATION_CANCELLATION_UNSUPPORTED = 1;
+  // CancelOperation may accept a cancellation request.
+  OPERATION_CANCELLATION_AVAILABLE = 2;
+  // Cancellation was accepted but has not yet reached a terminal state.
+  OPERATION_CANCELLATION_REQUESTED = 3;
+  // The operation is terminal, so cancellation is no longer possible.
+  OPERATION_CANCELLATION_CLOSED = 4;
+}
+
+enum ImportProvider {
+  IMPORT_PROVIDER_UNSPECIFIED = 0;
+  IMPORT_PROVIDER_GITHUB = 1;
+  IMPORT_PROVIDER_GITLAB = 2;
+}
+
+enum RemoteSyncDirection {
+  REMOTE_SYNC_DIRECTION_UNSPECIFIED = 0;
+  REMOTE_SYNC_DIRECTION_FETCH_FROM_REMOTE = 1;
+  REMOTE_SYNC_DIRECTION_PUSH_TO_REMOTE = 2;
+}
+
+message OperationSubject {
+  // Canonical authenticated-principal subject chosen by the server. Clients do
+  // not supply or override this value on submission.
+  string value = 1;
+}
+
+message GitHubAppImportSource {
+  int64 installation_id = 1;
+  int64 provider_repo_id = 2;
+  string full_name = 3;
+}
+
+message ProviderTokenImportSource {
+  ImportProvider provider = 1;
+  string full_name = 2;
+}
+
+message PublicUrlImportSource {
+  string url = 1;
+}
+
+message ImportOperationSpec {
+  oneof source {
+    GitHubAppImportSource github_app = 1;
+    ProviderTokenImportSource provider_token = 2;
+    PublicUrlImportSource public_url = 3;
+  }
+  SpoolVisibility requested_visibility = 4;
+  bool adopt_on_complete = 5;
+  string target_spool_path = 6;
+}
+
+message RemoteSyncOperationSpec {
+  RepositoryRef repository = 1;
+  RemoteSyncDirection direction = 2;
+}
+
+message SubmitOperationRequest {
+  OperationKind kind = 1;
+  // Stable across ambiguous-response retries. For a given authenticated
+  // subject and kind, this value identifies exactly one operation.
+  string client_operation_id = 2;
+  oneof details {
+    ImportOperationSpec import_operation = 3;
+    RemoteSyncOperationSpec remote_sync = 4;
+  }
+}
+
+message OperationProgress {
+  // Machine-readable phase within the operation kind, such as "cloning" or
+  // "indexing". It does not replace OperationState.
+  string phase = 1;
+  uint64 completed = 2;
+  optional uint64 total = 3;
+  // Unit for completed and total, such as "bytes", "objects", or "commits".
+  optional string unit = 4;
+  // Sanitized human-safe summary; clients must not parse it for state.
+  string summary = 5;
+}
+
+message OperationError {
+  // Stable machine-readable domain code.
+  string code = 1;
+  // Sanitized human-safe explanation.
+  string message = 2;
+  // True means the same details may be submitted as a new operation with a new
+  // client_operation_id. Reusing the old id returns the original failed one.
+  bool retryable = 3;
+  optional google.protobuf.Duration retry_after = 4;
+}
+
+message ImportOperationResult {
+  RepositoryRef repository = 1;
+  bool native = 2;
+}
+
+message RemoteSyncOperationResult {
+  RepositoryRef repository = 1;
+  string revision_address = 2;
+}
+
+message OperationResult {
+  oneof result {
+    ImportOperationResult import_operation = 1;
+    RemoteSyncOperationResult remote_sync = 2;
+  }
+}
+
+message Operation {
+  OperationId operation_id = 1;
+  optional OperationBatchId batch_id = 2;
+  OperationSubject subject = 3;
+  SubmitOperationRequest submission = 4;
+  OperationState state = 5;
+  OperationCancellation cancellation = 6;
+  // Per-operation durable sequence. It starts at one and strictly increases
+  // for every persisted state change, including the transition to a terminal
+  // state. The terminal snapshot is then frozen.
+  uint64 sequence = 7;
+  OperationProgress progress = 8;
+  // Present exactly when state is OPERATION_STATE_FAILED.
+  optional OperationError error = 9;
+  // Present only for a completed kind that defines a domain result.
+  optional OperationResult result = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message OperationBatch {
+  OperationBatchId batch_id = 1;
+  OperationSubject subject = 2;
+  string client_operation_id = 3;
+  repeated Operation operations = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message SubmitOperationResponse {
+  // Retrying the same subject, operation kind, and client_operation_id returns the same operation_id
+  // and current durable snapshot. Reusing that tuple with different details
+  // fails with ALREADY_EXISTS and never creates a second operation.
+  Operation operation = 1;
+}
+
+message SubmitOperationBatchRequest {
+  // Batch membership is committed atomically. Each entry must have a distinct
+  // client_operation_id within this authenticated subject and kind.
+  repeated SubmitOperationRequest operations = 1;
+  // Stable batch retry key within the authenticated subject.
+  string client_operation_id = 2;
+}
+
+message SubmitOperationBatchResponse {
+  // Retrying the subject and batch client_operation_id returns this same batch
+  // and the same member operation identities.
+  OperationBatch batch = 1;
+}
+
+message GetOperationRequest {
+  OperationId operation_id = 1;
+}
+
+message BatchGetOperationsRequest {
+  repeated OperationId operation_ids = 1;
+}
+
+message BatchGetOperationsResponse {
+  // Returned in request order. An inaccessible or unknown id fails the whole
+  // request so callers cannot use omissions as an existence oracle.
+  repeated Operation operations = 1;
+}
+
+message GetOperationBatchRequest {
+  OperationBatchId batch_id = 1;
+}
+
+message GetOperationBatchResponse {
+  OperationBatch batch = 1;
+}
+
+message ListOperationsRequest {
+  repeated OperationState states = 1;
+  repeated OperationKind kinds = 2;
+  optional OperationBatchId batch_id = 3;
+  uint32 page_size = 4;
+  string page_token = 5;
+}
+
+message ListOperationsResponse {
+  repeated Operation operations = 1;
+  string next_page_token = 2;
+}
+
+message OperationWatchCheckpoint {
+  OperationId operation_id = 1;
+  // Last sequence durably observed by the client. Zero means no prior state.
+  uint64 after_sequence = 2;
+}
+
+message WatchOperationsRequest {
+  // Watch explicit operations and/or every member of batch_id. An empty
+  // selection is invalid.
+  repeated OperationWatchCheckpoint checkpoints = 1;
+  optional OperationBatchId batch_id = 2;
+}
+
+message OperationWatchEvent {
+  Operation operation = 1;
+  // True for the first event for each selected operation. Every connection is
+  // snapshot-first: it emits the current durable snapshot, which must have
+  // sequence >= the requested after_sequence, before tailing updates with
+  // strictly larger sequences. A checkpoint ahead of durable state is invalid.
+  bool snapshot = 2;
+}
+
+message CancelOperationRequest {
+  OperationId operation_id = 1;
+  string client_operation_id = 2;
+}
+
+message CancelOperationResponse {
+  // Current durable snapshot. AVAILABLE becomes REQUESTED when accepted;
+  // REQUESTED is idempotent; UNSUPPORTED fails with FAILED_PRECONDITION. A
+  // terminal operation is returned unchanged with cancellation CLOSED.
+  Operation operation = 1;
+}
+
+// PLANNED: Weft adapters and durable storage land in coordinated consumer
+// changes. This repository defines the contract but does not ship a handler.
+service OperationService {
+  option (service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_PLANNED
+  };
+
+  rpc SubmitOperation(SubmitOperationRequest) returns (SubmitOperationResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc SubmitOperationBatch(SubmitOperationBatchRequest) returns (SubmitOperationBatchResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc GetOperation(GetOperationRequest) returns (Operation) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc BatchGetOperations(BatchGetOperationsRequest) returns (BatchGetOperationsResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc GetOperationBatch(GetOperationBatchRequest) returns (GetOperationBatchResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListOperations(ListOperationsRequest) returns (ListOperationsResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc WatchOperations(WatchOperationsRequest) returns (stream OperationWatchEvent) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
+      client_operation_id_required: false
+    };
+  }
+  rpc CancelOperation(CancelOperationRequest) returns (CancelOperationResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+}

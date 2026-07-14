@@ -68,6 +68,20 @@ impl heddle::api::v1alpha1::ChangeId {
     }
 }
 
+impl heddle::api::v1alpha1::OperationId {
+    /// Constructs a durable operation identifier from exactly 16 bytes.
+    pub fn from_bytes(value: impl AsRef<[u8]>) -> Result<Self, InvalidIdentifierLength> {
+        fixed_width("OperationId", 16, value.as_ref()).map(|value| Self { value })
+    }
+}
+
+impl heddle::api::v1alpha1::OperationBatchId {
+    /// Constructs a durable operation-batch identifier from exactly 16 bytes.
+    pub fn from_bytes(value: impl AsRef<[u8]>) -> Result<Self, InvalidIdentifierLength> {
+        fixed_width("OperationBatchId", 16, value.as_ref()).map(|value| Self { value })
+    }
+}
+
 impl heddle::api::v1alpha1::GitObjectId {
     /// Constructs and validates a Git object identifier for its hash algorithm.
     pub fn from_digest(
@@ -103,7 +117,9 @@ fn fixed_width(
 
 #[cfg(test)]
 mod tests {
-    use super::heddle::api::v1alpha1::{ChangeId, GitObjectAlgorithm, GitObjectId, StateId};
+    use super::heddle::api::v1alpha1::{
+        ChangeId, GitObjectAlgorithm, GitObjectId, OperationBatchId, OperationId, StateId,
+    };
 
     #[test]
     fn fixed_width_identifiers_reject_ambiguous_bytes() {
@@ -111,6 +127,10 @@ mod tests {
         assert!(StateId::from_bytes([0; 31]).is_err());
         assert!(ChangeId::from_bytes([0; 16]).is_ok());
         assert!(ChangeId::from_bytes([0; 17]).is_err());
+        assert!(OperationId::from_bytes([0; 16]).is_ok());
+        assert!(OperationId::from_bytes([0; 15]).is_err());
+        assert!(OperationBatchId::from_bytes([0; 16]).is_ok());
+        assert!(OperationBatchId::from_bytes([0; 17]).is_err());
         assert!(GitObjectId::from_digest(GitObjectAlgorithm::Sha1, [0; 20]).is_ok());
         assert!(GitObjectId::from_digest(GitObjectAlgorithm::Sha256, [0; 20]).is_err());
     }

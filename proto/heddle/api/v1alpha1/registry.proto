@@ -220,6 +220,9 @@ message SpoolSummary {
 // a UX label only (like SpoolSummary), never structural; `is_repo` is the
 // capability flag.
 message HostedSpool {
+  reserved 7;
+  reserved "latest_import_job";
+
   string spool_id = 1;
   string full_path = 2;
   string kind = 3; // UX label only: "namespace" | "repository" — NEVER structural
@@ -230,23 +233,10 @@ message HostedSpool {
   // The full spool settings (visibility, description, write_policy,
   // default_state_visibility, …). Reuses the existing SpoolSettings message.
   SpoolSettings settings = 6;
-  // The most recent import job targeting this spool (weft#490). Absent = the
-  // spool was never an import target. Lets the repo/overview page render
-  // "importing…" / "failed — retry" straight from the GetSpool cold-load, no
-  // second RPC and no StreamImportProgress subscription until the user watches.
-  ImportJobSummary latest_import_job = 7;
-}
-
-// Cold-load summary of a spool's most recent import job (weft#490). Populated
-// by the GetSpool handler from the latest `import_jobs` row for the spool,
-// gated to the same audience that can already read the spool.
-message ImportJobSummary {
-  string job_id = 1;
-  ImportPhase phase = 2; // reuses the common.proto enum
-  ImportErrorCode error_code = 3; // set when phase = FAILED; reuses common.proto
-  string error_message = 4; // sanitized
-  google.protobuf.Timestamp updated_at = 5;
-  google.protobuf.Timestamp last_synced_at = 6; // latest successful import/sync
+  // Most recent canonical import operation targeting this spool. Clients load
+  // its durable snapshot through OperationService; absent means no known
+  // import operation. Handler adoption is part of the planned cutover.
+  OperationId latest_import_operation_id = 8;
 }
 
 message GetSpoolRequest {

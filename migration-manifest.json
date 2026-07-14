@@ -728,13 +728,13 @@
       "old_rpc": "heddle.v1.ImportService/CreateImportJob",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/CreateImportJob"
+      "new_rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation"
     },
     {
       "old_rpc": "heddle.v1.ImportService/StreamImportProgress",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/StreamImportProgress"
+      "new_rpc": "heddle.api.v1alpha1.OperationService/WatchOperations"
     },
     {
       "old_rpc": "heddle.v1.OperationLogQueryService/QueryOperations",

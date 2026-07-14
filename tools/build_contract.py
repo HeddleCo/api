@@ -127,7 +127,9 @@ RETAINED = {
         "ListBookmarks", "UpsertBookmark", "DeleteBookmark", "AttachChild",
         "DetachChild", "ListChildren", "ResolveMonorepo",
     },
-    "ImportService": {"CreateImportJob", "StreamImportProgress"},
+    # Import lifecycle is replaced by the canonical OperationService below;
+    # do not regenerate its job-specific RPCs or messages.
+    "ImportService": set(),
     "RepoEventService": {"SubscribeRepoEvents"},
     "ReviewService": {
         "StartReviewAnalysis", "GetReviewAnalysisStatus", "GetReviewAnalysisResult",
@@ -149,6 +151,11 @@ WORKFLOW_HOSTED_METHODS = {
     "AddPolicyGroupRequirement", "RemovePolicyGroupRequirement",
 }
 RETAINED["HostedUserService"].update(WORKFLOW_HOSTED_METHODS)
+
+REPLACED_METHODS = {
+    ("ImportService", "CreateImportJob"): "OperationService/SubmitOperation",
+    ("ImportService", "StreamImportProgress"): "OperationService/WatchOperations",
+}
 
 SERVICE_TARGET = {
     "IdentityService": ["DEPLOYMENT_TARGET_WEFT"],
@@ -581,13 +588,13 @@ def main() -> None:
             "heddle/api/v1alpha1/repository.proto",
             "heddle/api/v1alpha1/state_review.proto",
         ],
-        "repository.proto": ["heddle/api/v1alpha1/registry.proto"],
         "repo_sync.proto": ["heddle/api/v1alpha1/workflow.proto"],
         "workflow.proto": ["heddle/api/v1alpha1/registry.proto"],
     }
     durable_requests: set[str] = set()
     manifest: list[dict[str, str]] = []
     retained_lookup = {(s, m) for s, methods in RETAINED.items() for m in methods}
+    retained_lookup.update(REPLACED_METHODS)
     for filename, (new_service, selected) in service_map.items():
         blocks = method_sources[filename]
         selected_blocks: dict[str, str] = {}
@@ -609,6 +616,14 @@ def main() -> None:
             text = make_sync_directional(text)
         text = type_identifiers(text)
         (output / filename).write_text(renumber_fields(normalize_enum_unspecified(text)))
+
+    for (old_service, method), new_rpc in REPLACED_METHODS.items():
+        manifest.append({
+            "old_rpc": f"heddle.v1.{old_service}/{method}",
+            "classification": "renamed",
+            "production_callsite": production_callsite(old_service, method),
+            "new_rpc": f"{PACKAGE}.{new_rpc}",
+        })
 
     prune_unreachable(output, ["types.proto", *service_map.keys()])
 

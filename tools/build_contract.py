@@ -420,7 +420,7 @@ def type_identifiers(text: str) -> str:
     qualifiers = r"(?P<qualifier>(?:optional|repeated)\s+)?"
     tag = r"(?P<tag>\s*=\s*\d+[^;]*;)"
     text = re.sub(
-        rf"(?m)^(?P<indent>\s*){qualifiers}(?:bytes|string)\s+(?P<name>\w*state_ids?){tag}",
+        rf"(?m)^(?P<indent>\s*){qualifiers}(?:bytes|string)\s+(?P<name>(?:\w*state_ids?|(?:source|target|local|remote|base|current|new)_state|exclude_states)){tag}",
         lambda m: f"{m['indent']}{m['qualifier'] or ''}StateId {m['name']}{m['tag']}",
         text,
     )

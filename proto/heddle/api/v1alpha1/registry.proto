@@ -311,7 +311,7 @@ message HostedGrant {
 message WorktreeSummary {
   string id = 1;
   string name = 2;
-  bytes base_state = 3;
+  StateId base_state = 3;
   optional string thread = 4;
   uint32 changes = 5;
   optional string session_id = 6;
@@ -769,7 +769,7 @@ message ThreadApproval {
   string target_thread = 4;
   // Change id at source thread's head when this approval was
   // recorded. Used for stale-on-update detection.
-  bytes source_state = 5;
+  StateId source_state = 5;
   string approver_user_id = 6;
   // Biscuit session id of the approver — full audit attribution.
   string approver_sid = 7;
@@ -783,7 +783,7 @@ message ApproveThreadRequest {
   RepositoryRef repo_path = 1;
   string source_thread = 2;
   string target_thread = 3;
-  bytes source_state = 4;
+  StateId source_state = 4;
   string note = 5;
   string client_operation_id = 6;
 }
@@ -812,7 +812,7 @@ message CheckMergeEligibilityRequest {
   RepositoryRef repo_path = 1;
   string source_thread = 2;
   string target_thread = 3;
-  bytes source_state = 4;
+  StateId source_state = 4;
   // 'merge' | 'force_push' | 'complete'. Defaults to 'merge' when empty.
   string gated_action = 5;
   // Paths touched by the source thread relative to the diff against

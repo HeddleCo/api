@@ -28,8 +28,8 @@ message ThreadState {
 
 message ThreadSummary {
   string name = 1;
-  optional bytes base_state = 2;
-  optional bytes current_state = 3;
+  optional StateId base_state = 2;
+  optional StateId current_state = 3;
   optional string path = 4;
   optional string provider = 5;
   optional string model = 6;
@@ -100,9 +100,9 @@ message ThreadMetadata {
   string thread_mode = 5;
   string thread_state = 6;
   string freshness = 7;
-  bytes base_state = 8;
+  StateId base_state = 8;
   bytes base_root = 9;
-  optional bytes current_state = 10;
+  optional StateId current_state = 10;
   optional bytes merged_state = 11;
   repeated string changed_paths = 12;
   repeated string impact_categories = 13;

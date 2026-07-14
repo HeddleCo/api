@@ -651,7 +651,7 @@ message RepoEvent {
   string ref_name = 5;
   bool is_thread = 6;
   string old_state = 7;
-  string new_state = 8;
+  StateId new_state = 8;
   string actor_subject = 9;
   string payload_json = 10;
   google.protobuf.Timestamp created_at = 11;

@@ -80,7 +80,7 @@ message ObjectDescriptor {
 
 message PushRequest {
   RepositoryRef repo_path = 1;
-  string local_state = 2;
+  StateId local_state = 2;
   string target_thread = 3;
   bool create_thread = 4;
   bool force = 5;
@@ -126,7 +126,7 @@ message PackChunk {
 
 message PushComplete {
   bool success = 1;
-  string new_state = 2;
+  StateId new_state = 2;
   string error = 3;
   TransferCheckpoint transfer = 4;
   string new_revision_address = 5;
@@ -210,9 +210,9 @@ message PullRequest {
   RepositoryRef repo_path = 1;
   string remote_thread = 2;
   string local_thread = 3;
-  string target_state = 4;
+  StateId target_state = 4;
   uint32 depth = 5;
-  repeated string exclude_states = 6;
+  repeated StateId exclude_states = 6;
   TransferCheckpoint transfer = 7;
   PartialFetchStatus partial_fetch_status = 8;
   bool allow_partial_fetch = 9;
@@ -223,7 +223,7 @@ message PullRequest {
 }
 
 message PullReady {
-  string remote_state = 1;
+  StateId remote_state = 1;
   repeated ObjectDescriptor objects_to_fetch = 2;
   TransferCheckpoint transfer = 3;
   PartialFetchStatus partial_fetch_status = 4;
@@ -241,7 +241,7 @@ message WantObjects {
 
 message PullComplete {
   bool success = 1;
-  string new_state = 2;
+  StateId new_state = 2;
   string error = 3;
   TransferCheckpoint transfer = 4;
   string new_revision_address = 5;

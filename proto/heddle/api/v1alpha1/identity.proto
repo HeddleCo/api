@@ -1,0 +1,897 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+message BeginWebAuthnRegistrationRequest {
+  string username = 1;
+  string display_name = 2;
+}
+
+message RegisterPublicKeyRequest {
+  string challenge_id = 1;
+  // Raw bytes per WebAuthn (clientDataJSON / attestationObject / authenticatorData
+  // / signature are passed verbatim; the WebAuthn lib base64url-decodes them
+  // off the wire).
+  bytes client_data_json = 2;
+  bytes attestation_object = 3;
+  string device_label = 4;
+  // Raw 32-byte Ed25519 public key the client commits to as the
+  // renewal anchor for this device. Distinct from the WebAuthn
+  // credential's attested public key (COSE-encoded, lives in
+  // `webauthn_credentials`): this key lives in `device_roots` and
+  // is the one `mint_biscuit_keypair` calls
+  // `Ed25519Signer::verify_with_public_key` against on every
+  // `KeypairProof` renewal. Leave empty for browser-only flows.
+  //
+  // When non-empty, MUST be accompanied by a binding signature
+  // (see the three `device_binding_*` fields). Closes
+  // HeddleCo/weft#131.
+  bytes device_public_key = 5;
+  string client_operation_id = 6;
+  // === Device-key binding proof (HeddleCo/weft#131) ===
+  // Required iff `device_public_key` is non-empty. Together these
+  // carry a WebAuthn assertion (`navigator.credentials.get()`
+  // produced immediately after `create()` succeeds, signed by the
+  // same authenticator) whose challenge is
+  //   base64url(SHA256("heddle-device-binding-v1" || 0x00 || device_public_key))
+  // The server verifies the assertion's signature using the COSE
+  // public key extracted from the attestation, then persists
+  // `device_public_key` as the device root. Binds the two keys
+  // cryptographically: the renewal-path public key is only
+  // accepted if the WebAuthn credential signs it.
+  bytes device_binding_client_data_json = 7;
+  bytes device_binding_authenticator_data = 8;
+  bytes device_binding_signature = 9;
+  // === Cross-device enrollment attestation (HeddleCo/weft#119) ===
+  // Set when this registration is being attested by an already-enrolled
+  // device (the OAuth-style localhost-loopback flow), rather than by a
+  // fresh WebAuthn `create()` on this device. Both fields are required
+  // together; both empty for the ordinary first-device / browser-only flow.
+  //
+  // `attesting_pubkey` is the raw Ed25519 public key of the existing,
+  // already-enrolled device that signed the attestation. The server
+  // verifies it chains to a known, non-revoked pubkey for the same
+  // identity and rejects unknown/revoked attesters.
+  //
+  // `cross_device_attestation` is the signature, produced by the key in
+  // `attesting_pubkey`, over the enrollment statement
+  // `enroll(new_pubkey, scope, expiry, nonce)`. The server enforces the
+  // bounded `scope` (read-only vs full), the `expiry` (max 7d on the
+  // attestation itself), and one-shot `nonce` (rejects replays). The
+  // resulting enrollment of `device_public_key` is permanent until
+  // revoked.
+  bytes attesting_pubkey = 10;
+  bytes cross_device_attestation = 11;
+}
+
+message BeginWebAuthnAuthenticationRequest {
+  string username = 1;
+}
+
+message FinishWebAuthnAuthenticationRequest {
+  string challenge_id = 1;
+  string credential_id = 2;
+  bytes client_data_json = 3;
+  bytes authenticator_data = 4;
+  bytes signature = 5;
+  bytes user_handle = 6;
+  // Client-side device pubkey the client wants the access token bound
+  // to. Server validates this against the user's active device_roots.
+  bytes device_public_key = 7;
+  string client_operation_id = 8;
+}
+
+message CreateDeviceAuthorizationRequest {
+  string device_name = 1;
+  bytes device_public_key = 2;
+  string scope = 3;
+  string client_operation_id = 4;
+}
+
+message ApproveDeviceAuthorizationRequest {
+  string user_code = 1;
+  string provider = 2;
+  string model = 3;
+  bool default_agent_policy = 4;
+  string client_operation_id = 5;
+}
+
+message ExchangeDeviceAuthorizationRequest {
+  string device_code = 1;
+  bytes device_public_key = 2;
+  // Raw signature bytes over `device:{device_code}` using the device key.
+  bytes proof = 3;
+}
+
+message WaitForDeviceAuthorizationRequest {
+  string device_code = 1;
+}
+
+message DeviceAuthorizationEvent {
+  string status = 1;
+}
+
+message RotateCredentialRequest {
+  string credential_id = 1;
+  bytes public_key = 2;
+  string client_operation_id = 3;
+}
+
+message RevokeCredentialRequest {
+  string credential_id = 1;
+  string reason = 2;
+  string client_operation_id = 3;
+}
+
+message RevokeCredentialResponse {
+  bool revoked = 1;
+}
+
+message CreateServiceAccountRequest {
+  string subject = 1;
+  string display_name = 2;
+  string scope = 3;
+  string client_operation_id = 4;
+}
+
+message IssueServiceAccountCredentialRequest {
+  string service_account_id = 1;
+  bytes public_key = 2;
+  string scope = 3;
+  // 0 = never expires. Otherwise the credential Biscuit's expiry and
+  // the `issued_credentials.expires_at` row are both set to now + ttl_secs.
+  google.protobuf.Duration ttl_secs = 4;
+  string client_operation_id = 5;
+}
+
+message AuthChallengeResponse {
+  string challenge_id = 1;
+  string challenge = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  string username = 4;
+  string rp_id = 5;
+  string rp_name = 6;
+  string user_id = 7;
+  string display_name = 8;
+  repeated string allow_credential_ids = 9;
+  string attestation = 10;
+  string user_verification = 11;
+}
+
+message DeviceAuthorizationResponse {
+  string device_code = 1;
+  string user_code = 2;
+  string verification_uri = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message AccessTokenResponse {
+  // The Biscuit (base64url-encoded). Goes in the `heddle_session`
+  // cookie for browser flows and in the CLI credentials store for
+  // device-bound flows.
+  string token = 1;
+  string subject = 2;
+  // Unix-seconds expiry. The Biscuit also carries this internally,
+  // but exposing it explicitly lets clients know when to renew
+  // without parsing the token.
+  google.protobuf.Timestamp expires_at = 3;
+  // The Biscuit's `session()` fact (also its revocation id). Stable
+  // public id surfaced in the Active Sessions UI; argument to
+  // `RevokeSession`.
+  string session_id = 4;
+  repeated string amr = 5;
+  // `issued_credentials.id` for tokens minted from a long-lived
+  // credential row (device, service-account, agent). Empty for
+  // browser sessions.
+  string credential_id = 6;
+  // Server-issued GrantEnvelope authenticating the client's pubkey +
+  // session for biscuit minting. Empty on legacy / unauthenticated
+  // responses.
+  bytes grant_envelope = 7;
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  repeated ActiveSession sessions = 1;
+}
+
+message ActiveSession {
+  // Public id of the refresh token (matches `auth_refresh_tokens.id`).
+  // Used by RevokeSession to identify which row to revoke.
+  string id = 1;
+  // True for the session this RPC was invoked on, so the UI can
+  // mark it "Current" and disable the revoke button (revoking
+  // yourself is just logout — the dedicated logout flow handles
+  // cookie cleanup correctly).
+  bool is_current = 2;
+  // Captured at issue time. Surfaced in the device list as a
+  // human-readable string ("Chrome on macOS", "Safari on iPhone").
+  // The web layer parses to that shape for display; the raw UA
+  // header is what's stored.
+  string user_agent = 3;
+  // Captured at issue time. Empty string when unknown.
+  string ip = 4;
+  google.protobuf.Timestamp issued_at = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  // Last time this token was rotated (i.e. the user actively used
+  // the app from this session). Zero when never rotated.
+  google.protobuf.Timestamp last_used_at = 7;
+}
+
+message RevokeSessionRequest {
+  // The session id to revoke (from ActiveSession.id).
+  string session_id = 1;
+  string client_operation_id = 2;
+}
+
+// Caller authenticates with their normal session bearer in the
+// `Authorization: Bearer ...` metadata (same path as every other
+// gRPC). No body fields — the response is purely a function of the
+// caller's identity and a fixed 5-minute TTL.
+message IssuePresenceTokenRequest {
+  string client_operation_id = 1;
+}
+
+message IssuePresenceTokenResponse {
+  // base64-encoded narrow Biscuit. Embed in the WS upgrade URL as
+  // `?token=<this>`. Disposable on the caller's side after the WS
+  // connection is established.
+  string token = 1;
+
+  // Unix-seconds wall-clock expiry. Always 5 minutes from issue.
+  // Surfacing it lets the client know when to re-mint without
+  // parsing the token.
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+// MintBiscuit is the unified renewal endpoint for long-lived
+// processes. The caller proves they're entitled to a fresh Biscuit
+// via one of the proof variants below. See `AuthService.MintBiscuit`
+// for the full semantic note.
+message MintBiscuitRequest {
+  // The principal subject that the new Biscuit should bind to. Must
+  // match the keypair's recorded subject (or the device_root's
+  // user). Server rejects mismatches as `permission_denied` rather
+  // than minting a token for an arbitrary subject.
+  string subject = 1;
+
+  // Attenuation hint: when set, the server intersects the requested
+  // scope with the keypair-owner's original grant. Empty == reuse
+  // the original scope.
+  string requested_scope = 2;
+
+  // UA / IP captured by the caller. Same shape and intent as
+  // `RefreshSessionRequest` had — usually empty (the web layer's
+  // `x-forwarded-*` metadata path is preferred), but kept available
+  // for direct CLI callers that don't speak the proxy convention.
+  string user_agent = 3;
+  string ip = 4;
+
+  oneof proof {
+    KeypairProof keypair = 5;
+    DeviceAuthProof device_auth = 6;
+    // OidcProof oidc = 12;  // Future: federated CI token exchange.
+  }
+
+  string client_operation_id = 7;
+}
+
+// Proof of possession via Ed25519 signature. The server looks up
+// `public_key_id` in `device_roots` first (CLI device flow) and then
+// in `issued_credentials` (service-account credential renewal). The
+// signature is over the canonical bytes
+// `f"{timestamp}\n{public_key_id}\n{requested_scope}"` (UTF-8). The
+// timestamp window is ±60s — replay attempts older than that are
+// rejected without touching the keypair lookup.
+message KeypairProof {
+  // Stable id of the public key. Matches `device_roots.id` or
+  // `issued_credentials.id`.
+  string public_key_id = 1;
+  // Unix-seconds when the signature was produced. Signed input.
+  uint64 timestamp = 2;
+  // Ed25519 signature over the canonical bytes.
+  bytes signature = 3;
+}
+
+// Proof that a user-approved device authorization completed. The
+// CLI presents the device_code returned by
+// `CreateDeviceAuthorization` plus a signature over `device:{code}`
+// using the device keypair generated locally. Server completes the
+// hand-off: registers the device_root row if not present, mints a
+// fresh Biscuit bound to the device pop key.
+message DeviceAuthProof {
+  string device_code = 1;
+  // Raw Ed25519 public-key bytes. Server stores it on first hand-off
+  // (`device_roots` row) and signs subsequent renewals against it via
+  // `KeypairProof`.
+  bytes device_public_key = 2;
+  // Signature over the bytes `device:{device_code}` using the
+  // device's private key. Replaces the old proof field on
+  // `ExchangeDeviceAuthorizationRequest`.
+  bytes signature = 3;
+}
+
+// Mint a fresh anonymous Biscuit. Unauthenticated; per-IP
+// rate-limited server-side (see `docs/auth/anon-biscuit-spike.md`
+// §7.1: 10/hour/IP). When `WEFT_MINT_TURNSTILE_REQUIRED=true` on
+// the server, `turnstile_token` MUST be a valid Cloudflare
+// Turnstile token; otherwise the field is ignored. See
+// HeddleCo/weft#189 and HeddleCo/weft#192.
+message MintAnonBiscuitRequest {
+  // Cloudflare Turnstile token captured by the caller's frontend.
+  // Required when the server has `WEFT_MINT_TURNSTILE_REQUIRED=true`
+  // (operator-flippable break-glass under coordinated abuse). Empty
+  // / omitted when the flag is off.
+  optional string turnstile_token = 1;
+  // Opaque long-lived continuity token from the browser's HttpOnly
+  // anon-continuity cookie. When present and valid, the server mints
+  // the new 24h anon biscuit for the same Anon(uuid) and rotates the
+  // continuity token. When absent or invalid, the server creates a
+  // fresh anon profile instead.
+  string anon_continuity_token = 2;
+  string client_operation_id = 3;
+}
+
+message MintAnonBiscuitResponse {
+  // Raw biscuit bytes carrying `subject_kind("anon")` + a fresh
+  // `Anon(uuid)` subject. The caller (tapestry's worker) base64-
+  // encodes these for the `weft_auth` cookie value. See
+  // `docs/auth/anon-biscuit-spike.md` §3.3 for the cookie shape.
+  bytes biscuit = 1;
+  // Hard expiry the biscuit was minted with. Same value as the
+  // biscuit's internal `expires_at` fact; surfaced so callers can
+  // set `Max-Age` on the cookie without parsing the token.
+  google.protobuf.Timestamp expires_at = 2;
+  // New opaque continuity token for the browser to store separately
+  // from the short-lived biscuit. It is not a bearer for normal RPCs;
+  // it can only be redeemed at MintAnonBiscuit to recover the same
+  // Anon(uuid) after the biscuit cookie expires.
+  string anon_continuity_token = 3;
+  // Expiry for `anon_continuity_token`.
+  google.protobuf.Timestamp continuity_expires_at = 4;
+  // Debug/audit surface for the anon profile id the biscuit carries.
+  // UI does not need to show this.
+  string anon_id = 5;
+}
+
+message IssuedCredentialResponse {
+  string credential_id = 1;
+  string token = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  string subject = 4;
+  optional string provider = 5;
+  optional string model = 6;
+  optional string device_id = 7;
+}
+
+message WhoAmIRequest {}
+
+message WhoAmIResponse {
+  string subject = 1;
+  // True when the bearer carries the operator (staff) marker. This is the
+  // Heddle-internal "operator" capability used to gate the intake page,
+  // email-template editor, and the global ListActors/ListWorktrees views.
+  // Distinct from the namespace-level `Role::Admin` grant that customers
+  // hold on their own resources.
+  bool is_staff = 2;
+  bool is_biscuit = 3;
+  string session_id = 4;
+  repeated string amr = 5;
+  string scope = 6;
+  string credential_id = 7;
+  optional string device_id = 8;
+  optional string agent_provider = 9;
+  optional string agent_model = 10;
+  string actor_subject = 11;
+  bool is_service_account = 12;
+  // Resource grants the caller holds directly. Does NOT include inherited
+  // roles — those are resolved server-side when enforcing per-RPC checks.
+  // Web clients may use `roles` for UI gating but MUST NOT rely on it for
+  // authorization decisions.
+  repeated ResourceRole roles = 13;
+  // Account-level billing entitlement for the caller's subject. Surfaced for
+  // UX affordances only — servers enforce the effective plan on the gated
+  // RPCs, never the client. Absent (default) ⇒ treat as the free plan.
+  Entitlement entitlement = 14;
+}
+
+// A single role grant held by the caller on a namespace or repository.
+message ResourceRole {
+  // Visible resource path, e.g. "heddle/core-services" or "heddle".
+  string resource_path = 1;
+  // "namespace" or "repository".
+  string resource_kind = 2;
+  // Role name: one of "reader", "developer", "maintainer", "admin", "owner".
+  HostedRole role = 3;
+}
+
+// Billing plan tier. `product_id → plan` is mapped server-side by weft from
+// checked-in, fail-closed config; clients never assert a Plan on writes.
+enum Plan {
+  PLAN_UNSPECIFIED = 0;
+  PLAN_FREE = 1;
+  PLAN_BASIC = 2;
+  PLAN_PRO = 3;
+  PLAN_ORG = 4;
+}
+
+// Subscription lifecycle state, mirroring the provider's authoritative state.
+enum SubscriptionStatus {
+  SUBSCRIPTION_STATUS_UNSPECIFIED = 0;
+  ACTIVE = 1;
+  PAST_DUE = 2;
+  CANCELED = 3;
+  INCOMPLETE = 4;
+}
+
+// The account-level entitlement applied for a subject.
+message Entitlement {
+  Plan plan = 1;
+  SubscriptionStatus status = 2;
+  google.protobuf.Timestamp current_period_end = 3;
+}
+
+// Records/updates a subject's paid entitlement. A privilege-granting write —
+// weft gates it on the billing service account's `billing:write` Right and
+// maps `product_id → plan` from checked-in, fail-closed config.
+
+message IntrospectCredentialRequest {
+  string credential_id = 1;
+}
+
+message CredentialInfo {
+  string credential_id = 1;
+  string subject = 2;
+  string kind = 3;
+  string scope = 4;
+  // Epoch seconds. 0 = never expires.
+  google.protobuf.Timestamp expires_at = 5;
+  bool revoked = 6;
+  optional string device_id = 7;
+  optional string provider = 8;
+  optional string model = 9;
+  // Epoch seconds, always populated.
+  google.protobuf.Timestamp created_at = 10;
+  // Epoch seconds. 0 = never used. Touched on every successful Biscuit validation.
+  google.protobuf.Timestamp last_used_at = 11;
+}
+
+message ServiceAccountResponse {
+  string service_account_id = 1;
+  string subject = 2;
+  string display_name = 3;
+  string scope = 4;
+}
+
+message RevokeServiceAccountRequest {
+  string service_account_id = 1;
+  string client_operation_id = 2;
+}
+
+message ListServiceAccountsRequest {}
+
+message ListServiceAccountsResponse {
+  repeated ServiceAccountWithCredentials service_accounts = 1;
+}
+
+message ServiceAccountWithCredentials {
+  string service_account_id = 1;
+  string subject = 2;
+  string display_name = 3;
+  string scope = 4;
+  repeated CredentialInfo credentials = 5;
+  bool revoked = 6;
+  // Epoch seconds, always populated.
+  google.protobuf.Timestamp created_at = 7;
+  // Username of the human who created this service account. Empty when
+  // the creator's user row has been deleted (ON DELETE SET NULL).
+  string created_by_subject = 8;
+}
+
+message ListScopeCapabilitiesRequest {}
+
+message ListScopeCapabilitiesResponse {
+  repeated ScopeCapability capabilities = 1;
+}
+
+message ScopeCapability {
+  // Canonical scope token, e.g. "repo:write", "agent:spawn".
+  string name = 1;
+  // Short human-readable description for the UI reference grid.
+  string description = 2;
+  // Coarse category for UI grouping: "repo", "thread", "agent", "grant",
+  // "namespace", "presence", "admin".
+  string category = 3;
+}
+
+// ── OAuth identity linking ──────────────────────────────────────────────────
+
+message LinkOAuthIdentityRequest {
+  // Which OAuth provider this proof is from. Used by the server to
+  // pick the correct ID-token verifier (JWKS for Google/Apple,
+  // /user + /user/emails API path for GitHub).
+  string provider = 1; // "google" | "apple" | "github"
+
+  // The provider's cryptographic proof of identity.
+  //   - Google / Apple: OIDC `id_token` (provider-signed JWT).
+  //   - GitHub: OAuth2 access token (server validates via /user +
+  //     /user/emails).
+  // Server validates this proof and extracts
+  // `(sub, email, email_verified)` from the verified result; the
+  // request itself carries NO user-identity claims the caller can
+  // forge. Closes the OAuth-link forge bypass surfaced on
+  // HeddleCo/weft#193 r2 (Codex cid 3294026240); design rationale
+  // in the HeddleCo/weft#195 spike amendment.
+  oneof oauth_proof {
+    string id_token = 2;
+    string access_token = 3;
+  }
+
+  // OPTIONAL: a fresh WebAuthn assertion proving ownership of the
+  // existing user account that this OAuth identity is being
+  // attached to. Required only when the OAuth-validated email
+  // collides with an existing user (per the email-collision passkey
+  // gate, weft spike §4.6); otherwise empty.
+  optional bytes webauthn_assertion = 4;
+  string client_operation_id = 5;
+}
+
+message StoreProviderTokenRequest {
+  string provider = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  string token_scope = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  string client_operation_id = 6;
+}
+
+message StoreProviderTokenResponse {}
+
+// ── Signup-email verification ───────────────────────────────────────────────
+
+message VerifySignupEmailRequest {
+  // The single-use token emailed to the signup address (opaque to
+  // clients — the server validates this against the pending
+  // signup_email_verification challenge row).
+  string verification_token = 1;
+  string client_operation_id = 2;
+}
+
+message VerifySignupEmailResponse {
+  // Opaque bootstrap-scope Biscuit the client presents on the
+  // subsequent `BeginWebAuthnRegistration` call. Empty on rejection
+  // (the RPC returns a non-OK status in that case; this field is
+  // populated only on success). Carrying the token as raw bytes lets
+  // future fields (expiry, refresh window) extend the response
+  // additively without breaking the wire format.
+  bytes bootstrap_token = 1;
+}
+
+// ── External diff analysis (for PR review packets) ──────────────────────────
+
+// Public invitation-summary lookup. Never throws — unknown/malformed
+// ids return `exists: false, valid: false`.
+message GetInvitationSummaryRequest {
+  string id = 1;
+}
+
+message InvitationSummary {
+  bool exists = 1;
+  bool valid = 2; // false if revoked, accepted, or expired
+  string namespace_path = 3;
+  string namespace_name = 4; // may be empty if metadata has no display name
+  HostedRole role = 5;
+  // Intentionally NO email or invited_by — don't leak PII.
+}
+
+// ── Account recovery (E2 self-sovereign-auth, weft#120 §8) ──────────────────
+//
+// Declaration phase (weft#182) — the generic dispatcher and per-kind requests
+// share one response. The persisted substrate is a `recovery_methods` row keyed
+// on `(user_id, kind)` with `kind_data jsonb`, `declared_at`, and `window_secs`.
+
+// Canonical recovery-method kinds. Mirrors the `recovery_methods.kind`
+// column. `RECOVERY_METHOD_KIND_UNSPECIFIED` is rejected by the server.
+
+// Generic declaration entry point. `kind` selects which `params` variant the
+// server reads; the body is identical to the per-kind RPC's request so a
+// caller can declare any method through this single endpoint. weft#182.
+
+// Shared response for all declaration RPCs. `bootstrap_promoted` is true when
+// this was the user's first declared method and the server promoted the
+// caller's bootstrap-scope Biscuit to full scope (weft#120 §Q2). When a
+// promotion occurs, `promoted_token` carries the newly-minted full-scope
+// Biscuit; empty otherwise.
+
+// Register a WebAuthn recovery credential (`kind=time_locked_webauthn`). The
+// WebAuthn attestation fields mirror RegisterPublicKeyRequest's first-enroll
+// shape — the recovery credential is a distinct authenticator the user
+// stashes for the lost-all-devices case. weft#182 §8-2.
+
+// Declare social guardians + an M-of-N threshold (`kind=social`). weft#185.
+
+// A single nominated guardian.
+
+// Declare a paper-code (mnemonic) recovery method (`kind=paper_code`). The
+// plaintext mnemonic is generated client-side and NEVER transmitted — only
+// the argon2id verifier, its salt, and the KDF params are sent. The server
+// MUST reject any request that carries plaintext mnemonic bytes. weft#186.
+
+// argon2id parameters. Stored per paper-code row so the verifier is
+// reproducible and the floor can be raised over time.
+
+// ── Recovery flow (weft#183/#185/#186) ──────────────────────────────────────
+
+// Start a recovery attempt for a username. weft#183 §8-3.
+
+// Salt + KDF params the recovering client uses to argon2id-hash the typed
+// mnemonic before SubmitRecoveryProof. Populated on BeginRecovery when
+// `kind=paper_code` (declared method material on real attempts; deterministic
+// synthetic material on decoy begins for anti-enumeration). weft#186.
+
+// Submit proof against the declared method for an in-flight attempt. The
+// proof variant must match the attempt's kind. weft#183/#185/#186.
+
+// WebAuthn assertion signed by the declared `time_locked_webauthn`
+// recovery credential. weft#183.
+
+// M-of-N guardian signatures over a recovery attestation. weft#185. Each
+// signature is over a canonical message that names `recovery_attempt_id`, so
+// the same N signatures cannot be replayed against a different attempt.
+
+// argon2id hash of the user-typed mnemonic, computed client-side over the
+// stored salt + params. The server compares against the stored verifier in
+// constant time. The plaintext mnemonic is NEVER sent. weft#186.
+
+// Cancel an in-flight recovery attempt from an existing device. weft#183.
+
+// Complete a recovery attempt after the window has elapsed without a veto.
+// Runs the credential-revocation cascade and returns an AccessToken bound to
+// the new device key from the accepted proof. weft#183 §8-3.
+
+service IdentityService {
+  option (heddle.api.v1alpha1.service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_SHIPPED
+  };
+  rpc ApproveDeviceAuthorization(ApproveDeviceAuthorizationRequest) returns (AccessTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc BeginWebAuthnAuthentication(BeginWebAuthnAuthenticationRequest) returns (AuthChallengeResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc BeginWebAuthnRegistration(BeginWebAuthnRegistrationRequest) returns (AuthChallengeResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc CreateDeviceAuthorization(CreateDeviceAuthorizationRequest) returns (DeviceAuthorizationResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc CreateServiceAccount(CreateServiceAccountRequest) returns (ServiceAccountResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc ExchangeDeviceAuthorization(ExchangeDeviceAuthorizationRequest) returns (AccessTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc FinishWebAuthnAuthentication(FinishWebAuthnAuthenticationRequest) returns (AccessTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc GetInvitationSummary(GetInvitationSummaryRequest) returns (InvitationSummary) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc IntrospectCredential(IntrospectCredentialRequest) returns (CredentialInfo) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc IssuePresenceToken(IssuePresenceTokenRequest) returns (IssuePresenceTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc IssueServiceAccountCredential(IssueServiceAccountCredentialRequest) returns (IssuedCredentialResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc LinkOAuthIdentity(LinkOAuthIdentityRequest) returns (AccessTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc ListScopeCapabilities(ListScopeCapabilitiesRequest) returns (ListScopeCapabilitiesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListServiceAccounts(ListServiceAccountsRequest) returns (ListServiceAccountsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc MintAnonBiscuit(MintAnonBiscuitRequest) returns (MintAnonBiscuitResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc MintBiscuit(MintBiscuitRequest) returns (AccessTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+    };
+  }
+  rpc RegisterPublicKey(RegisterPublicKeyRequest) returns (AccessTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc RevokeCredential(RevokeCredentialRequest) returns (RevokeCredentialResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc RevokeServiceAccount(RevokeServiceAccountRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc RevokeSession(RevokeSessionRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc RotateCredential(RotateCredentialRequest) returns (IssuedCredentialResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc StoreProviderToken(StoreProviderTokenRequest) returns (StoreProviderTokenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc VerifySignupEmail(VerifySignupEmailRequest) returns (VerifySignupEmailResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc WaitForDeviceAuthorization(WaitForDeviceAuthorizationRequest) returns (stream DeviceAuthorizationEvent) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+}

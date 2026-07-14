@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.71.0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: ./tools/verify.sh
+      - name: Verify deterministic generation
+        run: |
+          npm run generate
+          find build/typescript -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/first.sha256
+          npm run generate
+          find build/typescript -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/second.sha256
+          diff -u /tmp/first.sha256 /tmp/second.sha256
+      - name: Package fixtures
+        run: |
+          cargo package
+          npm pack --workspace @heddleco/api --pack-destination "$RUNNER_TEMP"

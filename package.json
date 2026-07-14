@@ -1,0 +1,20 @@
+{
+  "name": "heddle-api-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.4.2",
+  "scripts": {
+    "generate": "buf generate && node tools/generate-ts-exports.mjs",
+    "build": "npm run generate && tsc -p packages/typescript/tsconfig.json",
+    "typecheck": "tsc -p packages/typescript/tsconfig.json --noEmit",
+    "pack:api": "npm pack --workspace @heddleco/api"
+  },
+  "devDependencies": {
+    "@bufbuild/protobuf": "2.12.0",
+    "@bufbuild/protoc-gen-es": "2.12.0",
+    "typescript": "5.8.3"
+  },
+  "workspaces": [
+    "packages/typescript"
+  ]
+}

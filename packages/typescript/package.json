@@ -1,0 +1,35 @@
+{
+  "name": "@heddleco/api",
+  "version": "0.1.0",
+  "description": "Generated TypeScript types for the Heddle public API",
+  "license": "Apache-2.0",
+  "type": "module",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./dist/index.js",
+    "./shared": "./dist/shared.js",
+    "./signing": "./dist/signing.js",
+    "./identity": "./dist/identity_pb.js",
+    "./registry": "./dist/registry_pb.js",
+    "./repository": "./dist/repository_pb.js",
+    "./collaboration": "./dist/collaboration_pb.js",
+    "./state-review": "./dist/state_review_pb.js",
+    "./pull-request-review": "./dist/pull_request_review_pb.js",
+    "./workflow": "./dist/workflow_pb.js",
+    "./search": "./dist/search_pb.js",
+    "./attention": "./dist/attention_pb.js",
+    "./repo-sync": "./dist/repo_sync_pb.js",
+    "./agent-gateway": "./dist/agent_gateway_pb.js",
+    "./agent": "./dist/agent_pb.js"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.12.0"
+  }
+}

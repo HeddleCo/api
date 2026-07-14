@@ -1,0 +1,1199 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+// Namespace kinds in the hosted control plane. `USER` namespaces are
+// per-account and auto-created at first sign-in; `ORG` and `TEAM` are
+// explicit organisational containers.
+enum NamespaceKind {
+  NAMESPACE_KIND_UNSPECIFIED = 0;
+  NAMESPACE_KIND_USER = 1;
+  NAMESPACE_KIND_ORG = 2;
+  NAMESPACE_KIND_TEAM = 3;
+}
+
+enum SpoolVisibility {
+  SPOOL_VISIBILITY_UNSPECIFIED = 0;
+  SPOOL_VISIBILITY_PRIVATE = 1;
+  SPOOL_VISIBILITY_PUBLIC = 2;
+}
+
+enum SpoolStateVisibility {
+  SPOOL_STATE_VISIBILITY_UNSPECIFIED = 0;
+  SPOOL_STATE_VISIBILITY_PUBLIC = 1;
+  SPOOL_STATE_VISIBILITY_INTERNAL = 2;
+  SPOOL_STATE_VISIBILITY_PRIVATE = 3;
+}
+
+enum SpoolBootstrapKind {
+  SPOOL_BOOTSTRAP_KIND_UNSPECIFIED = 0;
+  SPOOL_BOOTSTRAP_KIND_EMPTY = 1;
+  SPOOL_BOOTSTRAP_KIND_GIT_REMOTE = 2;
+  SPOOL_BOOTSTRAP_KIND_TEMPLATE = 3;
+}
+
+enum SpoolBootstrapSyncDirection {
+  SPOOL_BOOTSTRAP_SYNC_DIRECTION_UNSPECIFIED = 0;
+  SPOOL_BOOTSTRAP_SYNC_DIRECTION_PULL = 1;
+  SPOOL_BOOTSTRAP_SYNC_DIRECTION_PUSH = 2;
+  SPOOL_BOOTSTRAP_SYNC_DIRECTION_BIDI = 3;
+}
+
+// Inheritable HOLD-verdict lifecycle policy (weft#481). A state's effective
+// lifecycle is the nearest ancestor spool that sets this explicitly (walking
+// `parent_spool_id` up); absence (`UNSPECIFIED`) inherits, and the built-in
+// root default is `EXPLICIT_SUPERSESSION` — so existing spools get the safe
+// behavior with no settings-value migration.
+enum SpoolHoldLifecycle {
+  SPOOL_HOLD_LIFECYCLE_UNSPECIFIED = 0; // inherit; root default = EXPLICIT_SUPERSESSION
+  SPOOL_HOLD_LIFECYCLE_EXPLICIT_SUPERSESSION = 1;
+  SPOOL_HOLD_LIFECYCLE_AUTO_CLEAR_ON_RESUBMIT = 2;
+}
+
+enum SpoolWritePolicy {
+  SPOOL_WRITE_POLICY_UNSPECIFIED = 0;
+  SPOOL_WRITE_POLICY_DEVELOPERS = 1;
+  SPOOL_WRITE_POLICY_MAINTAINERS = 2;
+  SPOOL_WRITE_POLICY_OWNER_ONLY = 3;
+}
+
+enum SpoolChildPolicy {
+  SPOOL_CHILD_POLICY_UNSPECIFIED = 0;
+  SPOOL_CHILD_POLICY_MAINTAINERS = 1;
+  SPOOL_CHILD_POLICY_DEVELOPERS = 2;
+  SPOOL_CHILD_POLICY_DISABLED = 3;
+}
+
+enum SpoolSyncBehavior {
+  SPOOL_SYNC_BEHAVIOR_UNSPECIFIED = 0;
+  SPOOL_SYNC_BEHAVIOR_MANUAL = 1;
+  SPOOL_SYNC_BEHAVIOR_HEDDLE_START = 2;
+  SPOOL_SYNC_BEHAVIOR_HEDDLE_START_WITH_PRESENCE = 3;
+}
+
+message SpoolInitialTooling {
+  bool readme = 1;
+  string license = 2;
+  string gitignore = 3;
+  string language_preset = 4;
+}
+
+message SpoolSettings {
+  SpoolVisibility visibility = 1;
+  SpoolStateVisibility default_state_visibility = 2;
+  SpoolBootstrapKind bootstrap_kind = 3;
+  string bootstrap_source = 4;
+  SpoolWritePolicy write_policy = 5;
+  SpoolChildPolicy child_policy = 6;
+  SpoolInitialTooling initial_tooling = 7;
+  SpoolSyncBehavior sync_behavior = 8;
+  SpoolBootstrapSyncDirection bootstrap_sync_direction = 9;
+  string description = 10;
+  SpoolHoldLifecycle hold_lifecycle = 11; // +weft#481: inheritable HOLD lifecycle policy
+}
+
+message GetCurrentUserNamespaceRequest {}
+
+message CreateNamespaceRequest {
+  NamespaceKind kind = 1;
+  string slug = 2;
+  string parent_path = 3;
+  string display_name = 4;
+  SpoolSettings settings = 5;
+  string client_operation_id = 6;
+}
+
+message UpdateNamespaceRequest {
+  string full_path = 1;
+  string new_slug = 2;
+  string display_name = 3;
+  bool clear_display_name = 4;
+  string client_operation_id = 5;
+}
+
+message SetNamespaceVisibilityRequest {
+  string full_path = 1;
+  SpoolVisibility visibility = 2;
+  string client_operation_id = 3;
+}
+
+message DeleteNamespaceRequest {
+  string full_path = 1;
+  string client_operation_id = 2;
+}
+
+message ListSpoolsRequest {
+  bool repos_only = 1; // when true, return only content-bearing (repo) spools
+}
+
+message CreateRepositoryRequest {
+  string namespace_path = 1;
+  string slug = 2;
+  string client_operation_id = 3;
+}
+
+message UpdateRepositoryRequest {
+  string full_path = 1;
+  string new_slug = 2;
+  string client_operation_id = 3;
+}
+
+message DeleteRepositoryRequest {
+  string full_path = 1;
+  string client_operation_id = 2;
+}
+
+message ListGrantsRequest {
+  string resource = 1;
+}
+
+message CreateGrantRequest {
+  string subject = 1;
+  HostedRole role = 2;
+  GrantTargetRef target = 3;
+  string client_operation_id = 4;
+}
+
+message UpdateGrantRequest {
+  string subject = 1;
+  HostedRole role = 2;
+  GrantTargetRef target = 3;
+  string client_operation_id = 4;
+}
+
+message DeleteGrantRequest {
+  string subject = 1;
+  GrantTargetRef target = 2;
+  string client_operation_id = 3;
+}
+
+message ListWorktreesRequest {}
+
+message HostedNamespace {
+  string namespace_id = 1;
+  NamespaceKind kind = 2;
+  string slug = 3;
+  string full_path = 4;
+  string parent_id = 5;
+  string display_name = 6;
+  SpoolSettings settings = 7;
+  // Current effective visibility of the namespace's spool. Mirrors
+  // `settings.visibility` for top-level reads; populated on every response
+  // builder so SetNamespaceVisibility callers see the applied value.
+  SpoolVisibility visibility = 8;
+}
+
+message HostedRepository {
+  string repo_id = 1;
+  string namespace_id = 2;
+  string slug = 3;
+  string path = 4;
+  string full_path = 5;
+  // Unset when the serving registry has no activity data; populated by weft
+  // from the refs/state tables (weft wiring is a separate weft-side change).
+  google.protobuf.Timestamp last_activity_at = 6;
+}
+
+message SpoolSummary {
+  string spool_id = 1;
+  string full_path = 2;
+  string kind = 3; // UX label only: "namespace" | "repository"/"project" — NEVER structural
+  bool is_repo = 4; // capability: content-bearing spool (pushable/pullable)
+  // Unset when the serving registry has no activity data; weft computes the
+  // value in the registry (weft#457) and populates it in the follow-on handler
+  // pass.
+  google.protobuf.Timestamp last_activity_at = 5;
+}
+
+// ── Unified spool settings (weft#472) ────────────────────────────────────────
+// One read + two writes for any spool (namespace or repo), keyed on
+// `full_path`. Reuse the existing SpoolSettings / SpoolVisibility / SpoolSummary
+// shapes — do not fork them. Handlers land in weft (a follow-up).
+
+// The unified settings-read result: SpoolSummary-style metadata plus the FULL
+// SpoolSettings, so Settings + Overview + Repos render from one call. `kind` is
+// a UX label only (like SpoolSummary), never structural; `is_repo` is the
+// capability flag.
+message HostedSpool {
+  string spool_id = 1;
+  string full_path = 2;
+  string kind = 3; // UX label only: "namespace" | "repository" — NEVER structural
+  bool is_repo = 4; // capability: content-bearing spool (pushable/pullable)
+  // Unset when the serving registry has no activity data (mirrors
+  // SpoolSummary.last_activity_at).
+  google.protobuf.Timestamp last_activity_at = 5;
+  // The full spool settings (visibility, description, write_policy,
+  // default_state_visibility, …). Reuses the existing SpoolSettings message.
+  SpoolSettings settings = 6;
+  // The most recent import job targeting this spool (weft#490). Absent = the
+  // spool was never an import target. Lets the repo/overview page render
+  // "importing…" / "failed — retry" straight from the GetSpool cold-load, no
+  // second RPC and no StreamImportProgress subscription until the user watches.
+  ImportJobSummary latest_import_job = 7;
+}
+
+// Cold-load summary of a spool's most recent import job (weft#490). Populated
+// by the GetSpool handler from the latest `import_jobs` row for the spool,
+// gated to the same audience that can already read the spool.
+message ImportJobSummary {
+  string job_id = 1;
+  ImportPhase phase = 2; // reuses the common.proto enum
+  ImportErrorCode error_code = 3; // set when phase = FAILED; reuses common.proto
+  string error_message = 4; // sanitized
+  google.protobuf.Timestamp updated_at = 5;
+  google.protobuf.Timestamp last_synced_at = 6; // latest successful import/sync
+}
+
+message GetSpoolRequest {
+  string full_path = 1;
+}
+
+// Unified visibility write (works for repos too). Mirrors
+// SetNamespaceVisibilityRequest but keyed on `full_path`.
+message SetSpoolVisibilityRequest {
+  string full_path = 1;
+  SpoolVisibility visibility = 2; // reuses the existing enum
+  string client_operation_id = 3;
+}
+
+// General settings write for any spool (description, etc.). Carries the whole
+// SpoolSettings for forward-compat; the server enforces which fields are
+// settable (e.g. description). Reuses the existing SpoolSettings message.
+message UpdateSpoolSettingsRequest {
+  string full_path = 1;
+  SpoolSettings settings = 2;
+  string client_operation_id = 3;
+}
+
+message Bookmark {
+  string id = 1;
+  // "repo" | "namespace" for the current web UI. Kept as a string so
+  // future bookmarkable resource kinds can ship without enum churn.
+  string resource_kind = 2;
+  string full_path = 3;
+  string name = 4;
+  string folder = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message ListBookmarksRequest {}
+
+message ListBookmarksResponse {
+  repeated Bookmark bookmarks = 1;
+}
+
+message UpsertBookmarkRequest {
+  string resource_kind = 1;
+  string full_path = 2;
+  string name = 3;
+  string folder = 4;
+  string client_operation_id = 5;
+}
+
+message DeleteBookmarkRequest {
+  string resource_kind = 1;
+  string full_path = 2;
+  string client_operation_id = 3;
+}
+
+message HostedGrant {
+  string subject = 1;
+  HostedRole role = 2;
+  GrantTargetRef target = 3;
+}
+
+message WorktreeSummary {
+  string id = 1;
+  string name = 2;
+  bytes base_state = 3;
+  optional string thread = 4;
+  uint32 changes = 5;
+  optional string session_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp modified_at = 8;
+  bool is_current = 9;
+}
+
+message ListWorktreesResponse {
+  repeated WorktreeSummary worktrees = 1;
+}
+
+// --- Invitations (Track D) -------------------------------------------------
+
+message Invitation {
+  string id = 1;
+  string email = 2;
+  string namespace_path = 3;
+  HostedRole role = 4;
+  string invited_by = 5;
+  google.protobuf.Timestamp created_at = 6; // unix seconds
+  google.protobuf.Timestamp expires_at = 7; // 0 if no expiry
+  google.protobuf.Timestamp accepted_at = 8; // 0 if pending
+  string accepted_by = 9; // "" if pending
+  string metadata = 10; // stringified JSON — small, avoids pulling in struct
+}
+
+message CreateInvitationRequest {
+  string email = 1;
+  string namespace_path = 2;
+  HostedRole role = 3;
+  google.protobuf.Timestamp expires_at = 4; // 0 = no expiry
+  string metadata = 5; // optional caller-supplied JSON; pass "{}" if none
+
+  string client_operation_id = 6;
+}
+
+message ListInvitationsRequest {
+  string namespace_path = 1;
+  bool include_accepted = 2; // default false = pending only
+}
+
+message ListInvitationsResponse {
+  repeated Invitation invitations = 1;
+}
+
+message RevokeInvitationRequest {
+  string id = 1;
+  string client_operation_id = 2;
+}
+
+// Members = direct grants + pending invitations for a namespace.
+message MemberEntry {
+  // Exactly one of these is populated.
+  oneof entry {
+    Grant grant = 1;
+    Invitation invitation = 2;
+  }
+  message Grant {
+    string subject = 1;
+    HostedRole role = 2;
+    string resource_path = 3;
+    string resource_kind = 4; // "namespace" or "repository"
+  }
+}
+
+message ListMembersRequest {
+  string namespace_path = 1;
+  bool include_descendants = 2; // include grants on child namespaces + repos
+}
+
+message ListMembersResponse {
+  repeated MemberEntry entries = 1;
+}
+
+message ListSpoolsResponse {
+  repeated SpoolSummary spools = 1;
+}
+
+message ListGrantsResponse {
+  repeated HostedGrant grants = 1;
+}
+
+// ── Subject resolution ──────────────────────────────────────────────────────
+// Batch subject→display-name resolution. The grant/member UIs hold opaque
+// subjects (from HostedGrant.subject / MemberEntry.Grant.subject) and today
+// render them raw; this lets a consumer enrich a whole grant/member list in a
+// single round trip. Backend impl is a weft follow-up.
+message ResolveSubjectsRequest {
+  // Opaque subjects, e.g. "user:<uuid>" / "ops-alice".
+  repeated string subjects = 1;
+}
+
+message ResolveSubjectsResponse {
+  repeated ResolvedPrincipal principals = 1;
+}
+
+message ResolvedPrincipal {
+  // Echo of the requested subject (the join key for the caller).
+  string subject = 1;
+  // Human display name; empty when unresolved.
+  string display_name = 2;
+  // Username / handle; empty when unresolved.
+  string handle = 3;
+  // False when the subject couldn't be resolved (display_name + handle empty).
+  bool resolved = 4;
+
+  // ---- Handle system (F0a foundation, weft#438) ----------------------------
+  // ADDITIVE. Defined here in F0a; POPULATED by the weft resolve handler in
+  // F0b. Until F0b lands these carry proto3 defaults (empty / false), so a
+  // consumer that reads them before F0b sees the same "unset" it would for any
+  // new field. Every display surface renders from these fields via the single
+  // resolveSubjects choke point.
+
+  // The primary handle's canonical textual form — the single token that is
+  // BOTH the authoritative text AND the URL path segment: `gh:torvalds`
+  // (GitHub), `gitlab.example.com:torvalds` (host-qualified GitLab), or the
+  // bare native name `torvalds`. Empty when unresolved.
+  string primary_handle = 5;
+  // Handle kind for the primary handle: "native" | "github" | "gitlab".
+  // Mirrors the weft `handles.kind` column. Empty when unresolved.
+  string kind = 6;
+  // True when the primary handle is provider-verified (OAuth-verified, or a
+  // future git proof). Native self-asserted handles are false.
+  bool verified = 7;
+  // Short subject-derived discriminator for an UNVERIFIED native handle,
+  // rendered Signal-style as `torvalds·a3f9` in trust-sensitive contexts.
+  // Empty for verified identities (they render bare). F0b computes it.
+  string discriminator = 8;
+}
+
+// ── Handle resolution (URL routing, weft#467) ────────────────────────────────
+// Resolve a bare handle name to its principal for `/gh:<name>` / `/<name>` /
+// `/u:<subject>` routing. Never-claimed → gRPC NotFound (frontend 404);
+// tombstoned/renamed-away → `tombstoned = true` (frontend 410 Gone).
+
+// ============================================================================
+// Spool child edges + monorepo resolution + facet history (Spool epic P8a,
+// weft#358). ADDITIVE. Message shapes mirror weft's registry return types so
+// the P8b handler phase maps 1:1. State/change ids are `bytes` (16-byte
+// ChangeId), matching the package-wide wire convention.
+// ============================================================================
+
+// Who committed a facet change (audit trail). Mirrors heddle's
+// `objects::Attribution { principal, agent: Option<Agent> }` — a human
+// principal plus an optional AI agent that performed the change on their
+// behalf.
+
+// Ff/divergence status of a child edge vs the child's latest content state
+// (moving-anchored-ff). Mirrors weft `children::ChildEdgeStatus`.
+enum ChildEdgeStatus {
+  CHILD_EDGE_STATUS_UNSPECIFIED = 0;
+  // The edge's anchor already equals the child's latest content state.
+  CHILD_EDGE_STATUS_UP_TO_DATE = 1;
+  // The child advanced linearly past the anchor (anchor is an ancestor of the
+  // child's latest state): the edge can fast-forward to it.
+  CHILD_EDGE_STATUS_FAST_FORWARDABLE = 2;
+  // The child's history diverged from the anchor (non-ff): the edge does not
+  // move; surfaced instead of silently advancing.
+  CHILD_EDGE_STATUS_DIVERGED = 3;
+  // The child has no content head yet (nothing to advance toward).
+  CHILD_EDGE_STATUS_NO_CHILD_HEAD = 4;
+}
+
+// One resolved child edge. Mirrors weft `children::ChildEdge`.
+message ChildEdge {
+  string parent_spool_id = 1;
+  string child_spool_id = 2;
+  string mount_name = 3;
+  // The child content state-id this edge is currently anchored to (16-byte
+  // ChangeId).
+  StateId anchored_state_id = 4;
+  // The child's latest content-facet head, if any (absent = child has no
+  // content head yet).
+  optional bytes child_head = 5;
+  // Moving-anchored-ff status of the anchor vs the child head.
+  ChildEdgeStatus status = 6;
+}
+
+message AttachChildRequest {
+  // The parent spool the child is mounted under.
+  string parent_path = 1;
+  // The child spool to attach.
+  string child_path = 2;
+  // The mount name of the child inside the parent (the SPOOLLINK entry name).
+  string mount_name = 3;
+  string client_operation_id = 4;
+}
+
+message DetachChildRequest {
+  string parent_path = 1;
+  string mount_name = 2;
+  string client_operation_id = 3;
+}
+
+message DetachChildResponse {
+  // True if an edge was present and removed; false if no such mount existed.
+  // Mirrors weft `children::detach_child_tx` -> bool.
+  bool removed = 1;
+}
+
+message ListChildrenRequest {
+  string parent_path = 1;
+}
+
+message ListChildrenResponse {
+  repeated ChildEdge children = 1;
+}
+
+// Why a child edge in a resolved monorepo was NOT descended into. A resolved
+// tree is always the caller's coherent visible slice: an omitted child is
+// recorded, never an error. Mirrors weft `children::EdgeSkip`.
+enum EdgeSkip {
+  EDGE_SKIP_UNSPECIFIED = 0;
+  // The caller cannot read the child spool (per-child visibility chain-walk
+  // failed): the edge is withheld from the caller's slice.
+  EDGE_SKIP_UNREADABLE = 1;
+  // The child was already visited on this walk (cycle guard, e.g. A->B->A):
+  // recorded but not re-descended, so the walk terminates.
+  EDGE_SKIP_CYCLE = 2;
+  // The child sits at MONOREPO_MAX_DEPTH: recorded but not descended.
+  EDGE_SKIP_DEPTH_BOUNDED = 3;
+}
+
+// One edge in a resolved monorepo tree: the anchored child + either the
+// recursively-resolved subtree (descended) or the reason it was not descended.
+// Mirrors weft `children::MonorepoEdge`.
+message MonorepoEdge {
+  // The mount name of this child inside its parent (the SPOOLLINK entry name).
+  string mount_name = 1;
+  // The child spool this edge points at.
+  string child_spool_id = 2;
+  // The child content state-id the edge is anchored to (moving-anchored-ff
+  // resolved — the state the caller would materialize for this child).
+  StateId anchored_state_id = 3;
+  // The child's current content head + ff/diverged status vs the anchor
+  // (reused from the ChildEdge resolution, not re-derived).
+  optional bytes child_head = 4;
+  ChildEdgeStatus status = 5;
+  // The recursively-resolved child subtree when descended; absent (with a
+  // `skipped` reason) when the edge was withheld/bounded/cycle-guarded.
+  optional MonorepoNode subtree = 6;
+  // The reason the edge was not descended; absent when `subtree` is present.
+  optional EdgeSkip skipped = 7;
+}
+
+// One spool in a resolved monorepo tree: its content state at the resolved
+// anchor plus its visible child edges. The caller reconstructs the whole
+// monorepo by materializing each node's content at `content_state` and
+// mounting each edge's subtree under its `mount_name`. Mirrors weft
+// `children::MonorepoNode`.
+message MonorepoNode {
+  string spool_id = 1;
+  // The content-facet state this spool is resolved at (absent = no content
+  // head). For the ROOT this is its own content head; for a descendant it is
+  // the anchored state the PARENT's edge pins.
+  optional bytes content_state = 2;
+  // The visible child edges of this spool (unreadable children are recorded
+  // with EDGE_SKIP_UNREADABLE, not silently dropped).
+  repeated MonorepoEdge edges = 3;
+}
+
+message ResolveMonorepoRequest {
+  string root_path = 1;
+  // Optional recursion depth bound; server clamps to MONOREPO_MAX_DEPTH.
+  optional uint32 max_depth = 2;
+}
+
+// One entry in a spool's governance-facet history — a governance commit and
+// the document it captured. Newest-first. Mirrors weft
+// `governance::GovernanceHistoryEntry`.
+
+// One grant record captured in a membership document — a `(subject, role)`
+// pair keyed on the immutable `subject_user_id` UUID. Mirrors weft
+// `membership::MembershipGrant`.
+
+// One entry in a spool's membership-facet history — a membership commit and
+// the document (full grant set) it captured. Newest-first. Mirrors weft
+// `membership::MembershipHistoryEntry`.
+
+// ============================================================================
+// Git-native identity proofs (Prove; wraps weft's F1a engine). ADDITIVE.
+// A caller proves control of an external-host repo by publishing a marker line
+// to a well-known path, then submitting the challenge for verification.
+// ============================================================================
+
+// Verification state of a git-native proof. Namespaced per the file's enum
+// convention.
+
+// One of the caller's own proofs.
+
+// ============================================================================
+// Handle / escrow (wraps weft's F3a engine). ADDITIVE. Availability lookup +
+// right-of-first-refusal escrow + verified-owner self-claim for native handles.
+// ============================================================================
+
+// Availability of a native handle. Namespaced per the file's enum convention.
+
+// ── Approval groups ─────────────────────────────────────────────────
+//
+// A reusable approver pool. Membership is computed lazily through the
+// grants graph (anyone with `required_role` on `namespace_path` is in
+// the group); these messages just hold the rules.
+
+message ApprovalGroup {
+  string id = 1; // UUID
+  RepositoryRef repo_path = 2;
+  string name = 3; // unique within (repo_path, name)
+  string description = 4;
+  google.protobuf.Timestamp created_at = 5; // unix seconds
+}
+
+message ApprovalGroupMember {
+  string id = 1;
+  string group_id = 2;
+  string namespace_path = 3;
+  // 'reader' | 'developer' | 'maintainer' | 'admin' | 'owner'
+  HostedRole required_role = 4;
+}
+
+message CreateApprovalGroupRequest {
+  RepositoryRef repo_path = 1;
+  string name = 2;
+  string description = 3;
+  string client_operation_id = 4;
+}
+
+message ListApprovalGroupsRequest {
+  RepositoryRef repo_path = 1;
+}
+
+message ListApprovalGroupsResponse {
+  repeated ApprovalGroup groups = 1;
+  // Members keyed by group id, surfaced inline so the UI doesn't
+  // have to N+1 query.
+  map<string, ApprovalGroupMembers> members_by_group = 2;
+}
+
+message ApprovalGroupMembers {
+  repeated ApprovalGroupMember members = 1;
+}
+
+message DeleteApprovalGroupRequest {
+  string id = 1;
+  string client_operation_id = 2;
+}
+
+message AddApprovalGroupMemberRequest {
+  string group_id = 1;
+  string namespace_path = 2;
+  HostedRole required_role = 3;
+  string client_operation_id = 4;
+}
+
+message RemoveApprovalGroupMemberRequest {
+  string id = 1;
+  string client_operation_id = 2;
+}
+
+// ── Thread policies (branch protection) ─────────────────────────────
+
+message ThreadPolicy {
+  string id = 1;
+  RepositoryRef repo_path = 2;
+  // Glob pattern: "main", "release/*", "*", etc.
+  string target_thread_pattern = 3;
+  // 'merge' | 'force_push' | 'complete'
+  string gated_action = 4;
+  // Flat-role requirement. `required_role` is one of
+  // 'reader' | 'developer' | 'maintainer' | 'admin' | 'owner'.
+  // When `required_approvals` == 0, the flat-role requirement is
+  // skipped (only group-based requirements apply).
+  uint32 required_approvals = 5;
+  HostedRole required_role = 6;
+  // CODEOWNERS-style: policy fires only when the diff intersects
+  // one of these globs. Empty = applies to every change.
+  repeated string required_paths = 7;
+  // Approver may not be the author of any state on the source thread.
+  // Only enforceable when the merge call passes `author_user_id`.
+  bool forbid_author_approval = 8;
+  bool stale_on_update = 9;
+  // Wall-clock approval expiry; 0 = no expiry.
+  google.protobuf.Duration approval_ttl_secs = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message PolicyGroupRequirement {
+  string id = 1;
+  string policy_id = 2;
+  string group_id = 3;
+  uint32 required_approvals = 4;
+  // Conditional trigger: requirement applies only when diff
+  // intersects one of these globs. Empty = always applies.
+  repeated string only_if_paths_match = 5;
+}
+
+message CreateThreadPolicyRequest {
+  RepositoryRef repo_path = 1;
+  string target_thread_pattern = 2;
+  string gated_action = 3;
+  uint32 required_approvals = 4; // 0 = skip flat-role check
+  HostedRole required_role = 5;
+  repeated string required_paths = 6;
+  bool forbid_author_approval = 7;
+  bool stale_on_update = 8;
+  google.protobuf.Duration approval_ttl_secs = 9; // 0 = no expiry
+  string client_operation_id = 10;
+}
+
+message ListThreadPoliciesRequest {
+  RepositoryRef repo_path = 1;
+}
+
+message ListThreadPoliciesResponse {
+  repeated ThreadPolicy policies = 1;
+  // Group requirements keyed by policy id.
+  map<string, PolicyGroupRequirements> requirements_by_policy = 2;
+}
+
+message PolicyGroupRequirements {
+  repeated PolicyGroupRequirement requirements = 1;
+}
+
+message DeleteThreadPolicyRequest {
+  string id = 1;
+  string client_operation_id = 2;
+}
+
+message AddPolicyGroupRequirementRequest {
+  string policy_id = 1;
+  string group_id = 2;
+  uint32 required_approvals = 3;
+  repeated string only_if_paths_match = 4;
+  string client_operation_id = 5;
+}
+
+message RemovePolicyGroupRequirementRequest {
+  string id = 1;
+  string client_operation_id = 2;
+}
+
+// ── Thread merge approvals ──────────────────────────────────────────
+//
+// An approval is a record that a particular user signed off on a
+// particular (source_thread → target_thread) merge at a specific
+// `source_state` (the state_id at the source's head). The merge
+// gate consumes these rows and matches them against every policy
+// whose target glob matches `target_thread`.
+
+message ThreadApproval {
+  string id = 1;
+  RepositoryRef repo_path = 2;
+  string source_thread = 3;
+  string target_thread = 4;
+  // Change id at source thread's head when this approval was
+  // recorded. Used for stale-on-update detection.
+  bytes source_state = 5;
+  string approver_user_id = 6;
+  // Biscuit session id of the approver — full audit attribution.
+  string approver_sid = 7;
+  string note = 8;
+  google.protobuf.Timestamp approved_at = 9;
+  // 0 when the policy did not specify a TTL.
+  google.protobuf.Timestamp expires_at = 10;
+}
+
+message ApproveThreadRequest {
+  RepositoryRef repo_path = 1;
+  string source_thread = 2;
+  string target_thread = 3;
+  bytes source_state = 4;
+  string note = 5;
+  string client_operation_id = 6;
+}
+
+message RevokeApprovalRequest {
+  string id = 1;
+  string client_operation_id = 2;
+}
+
+message ListThreadApprovalsRequest {
+  RepositoryRef repo_path = 1;
+  string source_thread = 2;
+  string target_thread = 3;
+}
+
+message ListThreadApprovalsResponse {
+  repeated ThreadApproval approvals = 1;
+}
+
+// Eligibility check: caller asks "can <source> merge into <target>
+// at <source_state>?" given the file paths the diff touches. The
+// server runs every matching policy and reports satisfied vs unmet
+// requirements without performing the merge.
+
+message CheckMergeEligibilityRequest {
+  RepositoryRef repo_path = 1;
+  string source_thread = 2;
+  string target_thread = 3;
+  bytes source_state = 4;
+  // 'merge' | 'force_push' | 'complete'. Defaults to 'merge' when empty.
+  string gated_action = 5;
+  // Paths touched by the source thread relative to the diff against
+  // target. Empty list = "we don't know" — every path-conditional
+  // requirement is treated as triggered (fail-closed).
+  repeated string changed_paths = 6;
+  // Optional: the user_id of the change author. Used for
+  // forbid_author_approval. Empty = unknown / not enforced.
+  string author_user_id = 7;
+}
+
+message CheckMergeEligibilityResponse {
+  bool allowed = 1;
+  // Each unmet requirement, with a human-readable reason. Empty
+  // when `allowed = true`.
+  repeated UnmetRequirement unmet = 2;
+  // Approvals the gate considered valid (matching state_id, not
+  // expired, not self-approval when forbidden, etc.).
+  repeated ThreadApproval valid_approvals = 3;
+}
+
+message UnmetRequirement {
+  // Policy id this requirement came from.
+  string policy_id = 1;
+  // 'flat_role' | 'group' — which kind of requirement is unmet.
+  string kind = 2;
+  // For 'group' requirements, the group id; empty otherwise.
+  string group_id = 3;
+  // Human-readable explanation: "needs 2 maintainer approvals on
+  // org/acme/heddle/threads/main; have 1".
+  string reason = 4;
+  uint32 needed = 5;
+  uint32 have = 6;
+}
+
+// ── Support access ────────────────────────────────────────────────────────────
+
+message GrantSupportAccessRequest {
+  // Heddle staff email — must already exist as a registered user with
+  // the `staff` scope marker. The grant is attached to that subject.
+  string operator_email = 1;
+  // Resource the grant covers. The oneof enforces "exactly one of
+  // namespace / repo" at the wire level.
+  GrantTargetRef target = 2;
+  // TTL in seconds. The audit row's `expires_at` is computed from this
+  // at grant time. Hard-capped server-side at 7 days.
+  google.protobuf.Duration ttl_seconds = 3;
+  // Free-form reason (incident id, ticket link, "fix p0 in deploy
+  // pipeline"). Required, non-empty. Surfaced in the audit listing.
+  string reason = 4;
+  string client_operation_id = 5;
+}
+
+message SupportAccessGrant {
+  string id = 1;
+  string operator_email = 2;
+  // Resource the grant covers.
+  GrantTargetRef target = 3;
+  // The role materialised on the underlying `hosted_grants` row.
+  // Always `admin` for support access today; carried as a string so
+  // future tiers (read-only support, redacted-data support) can ride
+  // the same RPC.
+  HostedRole role = 4;
+  string granted_by = 5;
+  google.protobuf.Timestamp granted_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  // 0 when the grant is still active.
+  google.protobuf.Timestamp revoked_at = 8;
+  string revoked_by = 9;
+  string reason = 10;
+}
+
+message ListSupportAccessGrantsRequest {
+  // Resource to list grants on. Caller must hold Admin on the named
+  // namespace, or on the repo's parent namespace.
+  GrantTargetRef target = 1;
+  // When true, includes grants whose audit row has been revoked or
+  // whose `expires_at` is in the past. Default is active-only.
+  bool include_inactive = 2;
+}
+
+message ListSupportAccessGrantsResponse {
+  repeated SupportAccessGrant grants = 1;
+}
+
+message RevokeSupportAccessRequest {
+  string id = 1;
+  string client_operation_id = 2;
+}
+
+service RegistryService {
+  option (heddle.api.v1alpha1.service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_SHIPPED
+  };
+  rpc AttachChild(AttachChildRequest) returns (ChildEdge) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc CreateGrant(CreateGrantRequest) returns (HostedGrant) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc CreateInvitation(CreateInvitationRequest) returns (Invitation) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc CreateNamespace(CreateNamespaceRequest) returns (HostedNamespace) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc CreateRepository(CreateRepositoryRequest) returns (HostedRepository) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc DeleteBookmark(DeleteBookmarkRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc DeleteGrant(DeleteGrantRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc DeleteRepository(DeleteRepositoryRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc DetachChild(DetachChildRequest) returns (DetachChildResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc GetCurrentUserNamespace(GetCurrentUserNamespaceRequest) returns (HostedNamespace) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc GetSpool(GetSpoolRequest) returns (HostedSpool) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc GrantSupportAccess(GrantSupportAccessRequest) returns (SupportAccessGrant) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc ListBookmarks(ListBookmarksRequest) returns (ListBookmarksResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListChildren(ListChildrenRequest) returns (ListChildrenResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListSpools(ListSpoolsRequest) returns (ListSpoolsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListSupportAccessGrants(ListSupportAccessGrantsRequest) returns (ListSupportAccessGrantsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ResolveMonorepo(ResolveMonorepoRequest) returns (MonorepoNode) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ResolveSubjects(ResolveSubjectsRequest) returns (ResolveSubjectsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc RevokeInvitation(RevokeInvitationRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc RevokeSupportAccess(RevokeSupportAccessRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc SetNamespaceVisibility(SetNamespaceVisibilityRequest) returns (HostedNamespace) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc SetSpoolVisibility(SetSpoolVisibilityRequest) returns (HostedSpool) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc UpdateGrant(UpdateGrantRequest) returns (HostedGrant) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc UpdateNamespace(UpdateNamespaceRequest) returns (HostedNamespace) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc UpdateRepository(UpdateRepositoryRequest) returns (HostedRepository) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc UpdateSpoolSettings(UpdateSpoolSettingsRequest) returns (HostedSpool) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc UpsertBookmark(UpsertBookmarkRequest) returns (Bookmark) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+}

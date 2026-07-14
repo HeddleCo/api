@@ -1,0 +1,1000 @@
+{
+  "legacy_package": "heddle.v1",
+  "methods": [
+    {
+      "old_rpc": "heddle.v1.AuthService/AnalyzeExternalDiff",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/ApproveDeviceAuthorization",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/ApproveDeviceAuthorization"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/BeginRecovery",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/BeginWebAuthnAuthentication",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/BeginWebAuthnRegistration",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnRegistration"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/CompleteRecovery",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/CreateDeviceAuthorization",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/CreateServiceAccount",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/CreateServiceAccount"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/DeclareHardwareKeyRecovery",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/DeclarePaperCode",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/DeclareRecoveryMethod",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/DeclareSocialGuardians",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/ExchangeDeviceAuthorization",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/ExchangeDeviceAuthorization"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/FinishWebAuthnAuthentication",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/FinishWebAuthnAuthentication"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/GetInvitationSummary",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/GetInvitationSummary"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/IntrospectCredential",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/IntrospectCredential"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/IssuePresenceToken",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/IssuePresenceToken"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/IssueServiceAccountCredential",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/IssueServiceAccountCredential"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/LinkOAuthIdentity",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/ListScopeCapabilities",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/ListServiceAccounts",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/ListServiceAccounts"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/ListSessions",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/ListSessions"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/MintAnonBiscuit",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/MintBiscuit",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/RecordSubscription",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/RegisterPublicKey",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/RevokeCredential",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/RevokeCredential"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/RevokeServiceAccount",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/RevokeServiceAccount"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/RevokeSession",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/RevokeSession"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/RotateCredential",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/RotateCredential"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/StoreProviderToken",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/SubmitRecoveryProof",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/VerifySignupEmail",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/VetoRecovery",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/WaitForDeviceAuthorization",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/WaitForDeviceAuthorization"
+    },
+    {
+      "old_rpc": "heddle.v1.AuthService/WhoAmI",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/WhoAmI"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetBlame",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetBlob",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetBlob"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetCompare",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetCompare"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetContextHistory",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetContextHistory"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetDiff",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetDiff"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetRefs",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetRefs"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetSemanticHotSpots",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetSemanticHotSpots"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetState",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetState"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/GetTree",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetTree"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/ListActions",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListActions"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/ListContext",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListContext"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/ListContextSuggestions",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListContextSuggestions"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/ListProvenanceSummaries",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListProvenanceSummaries"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/ListStates",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListStates"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/ReviseContext",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ReviseContext"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/SetContext",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/SetContext"
+    },
+    {
+      "old_rpc": "heddle.v1.ContentService/SupersedeContext",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/SupersedeContext"
+    },
+    {
+      "old_rpc": "heddle.v1.DiscussionService/AppendTurn",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn"
+    },
+    {
+      "old_rpc": "heddle.v1.DiscussionService/GetDiscussion",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.DiscussionService/ListByState",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.CollaborationService/ListByState"
+    },
+    {
+      "old_rpc": "heddle.v1.DiscussionService/ListBySymbol",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.CollaborationService/ListBySymbol"
+    },
+    {
+      "old_rpc": "heddle.v1.DiscussionService/OpenDiscussion",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion"
+    },
+    {
+      "old_rpc": "heddle.v1.DiscussionService/ResolveDiscussion",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion"
+    },
+    {
+      "old_rpc": "heddle.v1.FeedService/GetFeedSnapshot",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.AttentionService/GetFeedSnapshot"
+    },
+    {
+      "old_rpc": "heddle.v1.FeedService/RecordInteraction",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/routes/app/feed/interaction.json/+server.ts",
+      "new_rpc": "heddle.api.v1alpha1.AttentionService/RecordInteraction"
+    },
+    {
+      "old_rpc": "heddle.v1.FeedService/StreamFeed",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.AttentionService/StreamFeed"
+    },
+    {
+      "old_rpc": "heddle.v1.FeedService/UpdateFeedItem",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.AttentionService/UpdateFeedItem"
+    },
+    {
+      "old_rpc": "heddle.v1.HookService/DeregisterHook",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HookService/GetHookEventSchema",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HookService/ListHooks",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HookService/RegisterHook",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HookService/RespondToHook",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HookService/SubscribeHookEvents",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/AddApprovalGroupMember",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/AddApprovalGroupMember"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/AddPolicyGroupRequirement",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/AddPolicyGroupRequirement"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ApproveThread",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ApproveThread"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/AttachChild",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/AttachChild"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/CheckMergeEligibility",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/CheckMergeEligibility"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ClaimHandle",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/CreateApprovalGroup",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/CreateApprovalGroup"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/CreateGrant",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateGrant"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/CreateInvitation",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateInvitation"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/CreateNamespace",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/CreateRepository",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/CreateThreadPolicy",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/CreateThreadPolicy"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/DeleteApprovalGroup",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/DeleteApprovalGroup"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/DeleteBookmark",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/DeleteGrant",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteGrant"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/DeleteNamespace",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteNamespace"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/DeleteRepository",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteRepository"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/DeleteThreadPolicy",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/DeleteThreadPolicy"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/DetachChild",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/DetachChild"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/GetCurrentUserNamespace",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/GetGovernanceHistory",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/GetHandleStatus",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/GetMembershipHistory",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/GetSpool",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/GetSpool"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/GrantSupportAccess",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/GrantSupportAccess"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListActors",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListApprovalGroups",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListBookmarks",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListBookmarks"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListChildren",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListChildren"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListGrants",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListGrants"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListInvitations",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListInvitations"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListMembers",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListMembers"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListProofs",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListSpools",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListSpools"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListSupportAccessGrants",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListSupportAccessGrants"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListThreadApprovals",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadApprovals"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListThreadPolicies",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadPolicies"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ListWorktrees",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListWorktrees"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/RemoveApprovalGroupMember",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/RemoveApprovalGroupMember"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/RemovePolicyGroupRequirement",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/RemovePolicyGroupRequirement"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/RequestHeldName",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/RequestProofChallenge",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ResolveHandle",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ResolveMonorepo",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ResolveMonorepo"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/ResolveSubjects",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/ResolveSubjects"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/RevokeApproval",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/RevokeApproval"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/RevokeInvitation",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/RevokeInvitation"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/RevokeSupportAccess",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/RevokeSupportAccess"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/SetNamespaceVisibility",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/SetSpoolVisibility",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/SubmitProof",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/UpdateGrant",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateGrant"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/UpdateNamespace",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateNamespace"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/UpdateRepository",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateRepository"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/UpdateSpoolSettings",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpoolSettings"
+    },
+    {
+      "old_rpc": "heddle.v1.HostedUserService/UpsertBookmark",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpsertBookmark"
+    },
+    {
+      "old_rpc": "heddle.v1.ImportService/CreateImportJob",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/CreateImportJob"
+    },
+    {
+      "old_rpc": "heddle.v1.ImportService/StreamImportProgress",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/StreamImportProgress"
+    },
+    {
+      "old_rpc": "heddle.v1.OperationLogQueryService/QueryOperations",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.OperationLogQueryService/StreamOperations",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.RepoEventService/SubscribeRepoEvents",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/routes/app/events/+server.ts",
+      "new_rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents"
+    },
+    {
+      "old_rpc": "heddle.v1.RepoEventService/SubscribeRepoEventsMulti",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.RepoSyncService/ListRefs",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/heddle:crates/client/src/grpc_hosted/sync.rs",
+      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/ListRefs"
+    },
+    {
+      "old_rpc": "heddle.v1.RepoSyncService/Pull",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/heddle:crates/client/src/grpc_hosted/sync.rs",
+      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/Pull"
+    },
+    {
+      "old_rpc": "heddle.v1.RepoSyncService/Push",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/heddle:crates/client/src/grpc_hosted/sync.rs",
+      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/Push"
+    },
+    {
+      "old_rpc": "heddle.v1.RepoSyncService/UpdateRef",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/heddle:crates/client/src/grpc_hosted/sync.rs",
+      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/UpdateRef"
+    },
+    {
+      "old_rpc": "heddle.v1.ReviewService/GetReviewAnalysisResult",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/review-api.ts",
+      "new_rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult"
+    },
+    {
+      "old_rpc": "heddle.v1.ReviewService/GetReviewAnalysisStatus",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/review-api.ts",
+      "new_rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus"
+    },
+    {
+      "old_rpc": "heddle.v1.ReviewService/StartReviewAnalysis",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/review-api.ts",
+      "new_rpc": "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis"
+    },
+    {
+      "old_rpc": "heddle.v1.SearchService/Search",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.SearchService/Search"
+    },
+    {
+      "old_rpc": "heddle.v1.SignalService/ComputeStateSignals",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.SignalService/GetRepoSignalHealth",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.SignalService/SubscribeSignalUpdates",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.StateReviewService/GetReviewPayload",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/heddle:crates/cli/src/cli/commands/review.rs",
+      "new_rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload"
+    },
+    {
+      "old_rpc": "heddle.v1.StateReviewService/GetReviewProgress",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.StateReviewService/ListSignatures",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/heddle:crates/cli/src/cli/commands/review.rs",
+      "new_rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures"
+    },
+    {
+      "old_rpc": "heddle.v1.StateReviewService/RecordCheckAck",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.StateReviewService/RecordVerdict",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.StateReviewService/SignState",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/heddle:crates/cli/src/cli/commands/review.rs",
+      "new_rpc": "heddle.api.v1alpha1.StateReviewService/SignState"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/CaptureThread",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/CompleteThread",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/GetThread",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/GetWorkspaceSummary",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/ListThreads",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/StartThread",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/StreamWorkspaceSummary",
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "new_rpc": "heddle.api.v1alpha1.WorkflowService/StreamWorkspaceSummary"
+    },
+    {
+      "old_rpc": "heddle.v1.ThreadWorkflowService/WatchThreads",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/CreateTimelineBranch",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/ForkTimelineFromSelector",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/GetOperation",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/GetTimelineNavigation",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/GetTimelineStatus",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/ListTimelineSteps",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/MaterializeTimelineCursor",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/PreviewTimelineSeek",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/RecordOperation",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/RecoverTimelineMaterialization",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/RedoToolCall",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/ResetTimelineCursor",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/ResolveNativeToolCall",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/SeekToNativeToolCall",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/SeekToStep",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TimelineService/UndoToolCall",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TransactionService/AbortTransaction",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TransactionService/BeginTransaction",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TransactionService/CommitTransaction",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    },
+    {
+      "old_rpc": "heddle.v1.TransactionService/GetTransactionStatus",
+      "classification": "dropped",
+      "reason": "no reachable production caller in the coordinated cutover inventory"
+    }
+  ]
+}

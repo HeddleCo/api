@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/errors.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+service AgentGatewayService {
+  option (service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_PLANNED
+  };
+
+  rpc Connect(stream AgentDaemonFrame) returns (stream AgentGatewayFrame) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_STREAMING_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
+      client_operation_id_required: true
+    };
+  }
+}
+
+message AgentStreamOpen {
+  string stream_id = 1;
+  RepositoryRef repository = 2;
+  string resume_cursor = 3;
+  bytes capability_context = 4;
+  bytes signature = 5;
+}
+
+message CanonicalTimelineOperation {
+  TimelineOperationId operation_id = 1;
+  bytes canonical_envelope = 2;
+}
+
+message AgentRunUpdate {
+  AgentRunId run_id = 1;
+  AgentRunStatus status = 2;
+  string progress_summary = 3;
+  UsageUpdate usage = 4;
+  google.protobuf.Timestamp observed_at = 5;
+}
+
+message UsageUpdate {
+  uint64 input_tokens = 1;
+  uint64 output_tokens = 2;
+  uint64 cached_tokens = 3;
+  uint64 cost_microunits = 4;
+}
+
+message AgentHeartbeat {
+  google.protobuf.Timestamp observed_at = 1;
+  string local_high_water_cursor = 2;
+}
+
+message PermissionRequest {
+  PermissionId permission_id = 1;
+  string category = 2;
+  string summary = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message AgentCommandAcknowledgement {
+  AgentCommandId command_id = 1;
+  AgentCommandStatus status = 2;
+  string content_hash = 3;
+}
+
+message AgentCommandResult {
+  AgentCommandId command_id = 1;
+  AgentCommandStatus status = 2;
+  string summary = 3;
+}
+
+message DiagnosticUpload {
+  string artifact_id = 1;
+  bytes encrypted_artifact = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message AgentDaemonFrame {
+  oneof frame {
+    AgentStreamOpen open = 1;
+    CanonicalTimelineOperation operation = 2;
+    AgentRunUpdate run_update = 3;
+    AgentHeartbeat heartbeat = 4;
+    PermissionRequest permission_request = 5;
+    AgentCommandAcknowledgement command_acknowledgement = 6;
+    AgentCommandResult command_result = 7;
+    DiagnosticUpload diagnostic_upload = 8;
+  }
+  string client_operation_id = 9;
+}
+
+message AgentOpenAcknowledgement {
+  AgentRunId hosted_run_id = 1;
+  string hosted_high_water_cursor = 2;
+}
+
+enum OperationDisposition {
+  OPERATION_DISPOSITION_UNSPECIFIED = 0;
+  OPERATION_DISPOSITION_ACCEPTED = 1;
+  OPERATION_DISPOSITION_REJECTED = 2;
+  OPERATION_DISPOSITION_SUPPRESSED = 3;
+}
+
+message OperationReceipt {
+  TimelineOperationId operation_id = 1;
+  OperationDisposition disposition = 2;
+  string reason = 3;
+  string hosted_high_water_cursor = 4;
+}
+
+message AgentPolicySnapshot {
+  string policy_version = 1;
+  AgentVisibility visibility = 2;
+  StructuredRetention structured_retention = 3;
+  RawDiagnosticRetention raw_diagnostic_retention = 4;
+}
+
+message AgentCommandDelivery {
+  AgentCommandId command_id = 1;
+  AgentControlKind kind = 2;
+  bytes encrypted_steering_text = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message AgentResyncRequest {
+  string accepted_cursor = 1;
+}
+
+message AgentGatewayFrame {
+  oneof frame {
+    AgentOpenAcknowledgement open_acknowledgement = 1;
+    OperationReceipt operation_receipt = 2;
+    AgentPolicySnapshot policy_snapshot = 3;
+    AgentCommandDelivery command = 4;
+    AgentResyncRequest resync = 5;
+    StreamFailure failure = 6;
+  }
+}

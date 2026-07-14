@@ -1,0 +1,142 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/repository.proto";
+import "heddle/api/v1alpha1/state_review.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+// Discussion CRUD over the per-state `Discussion` blob.
+
+message OpenDiscussionRequest {
+  RepositoryRef repo_path = 1;
+  StateId state_id = 2;
+  PathSymbolRef anchor = 3;
+  string body = 4;
+  // Optional override; empty uses the configured discussion visibility policy.
+  string visibility = 5;
+  string thread_ref = 6;
+  string client_operation_id = 7;
+}
+
+message AppendTurnRequest {
+  RepositoryRef repo_path = 1;
+  string discussion_id = 2;
+  string body = 3;
+  string client_operation_id = 4;
+}
+
+message ResolveDiscussionRequest {
+  RepositoryRef repo_path = 1;
+  string discussion_id = 2;
+  // The resolution mode is a strict oneof — exactly one of the three
+  // shapes lands per request, and each shape carries the fields that
+  // are meaningful for it.
+  oneof resolution {
+    ResolveIntoAnnotation into_annotation = 3;
+    ResolveByEdit by_edit = 4;
+    ResolveDismissed dismissed = 5;
+  }
+  string client_operation_id = 6;
+
+  message ResolveIntoAnnotation {
+    ContextAnnotationKind kind = 1;
+    string content = 2;
+    repeated string tags = 3;
+  }
+  message ResolveByEdit {
+    // Optional pin to the state where the resolving edit landed; empty
+    // means "use the discussion's anchor state".
+    StateId state_id = 1;
+  }
+  message ResolveDismissed {
+    string reason = 1;
+  }
+}
+
+message Discussion {
+  string id = 1;
+  PathSymbolRef anchor = 2;
+  bytes opened_against_state = 3;
+  google.protobuf.Timestamp opened_at = 4;
+  string thread_ref = 5;
+  repeated DiscussionTurn turns = 6;
+  DiscussionResolution resolution = 7;
+  bool body_changed_since_open = 8;
+  bool orphaned = 9;
+  string visibility = 10;
+  string resolved_annotation_id = 11;
+}
+
+message ListDiscussionsByStateRequest {
+  RepositoryRef repo_path = 1;
+  StateId state_id = 2;
+  // "open" | "resolved" | "all" | "orphaned"
+  string status = 3;
+}
+
+message ListDiscussionsBySymbolRequest {
+  RepositoryRef repo_path = 1;
+  PathSymbolRef anchor = 2;
+  string status = 3;
+}
+
+message ListDiscussionsResponse {
+  repeated Discussion discussions = 1;
+}
+
+service CollaborationService {
+  option (heddle.api.v1alpha1.service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    deployment_targets: DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    maturity: SERVICE_MATURITY_SHIPPED
+  };
+  rpc AppendTurn(AppendTurnRequest) returns (Discussion) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc ListByState(ListDiscussionsByStateRequest) returns (ListDiscussionsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc ListBySymbol(ListDiscussionsBySymbolRequest) returns (ListDiscussionsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+    };
+  }
+  rpc OpenDiscussion(OpenDiscussionRequest) returns (Discussion) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc ResolveDiscussion(ResolveDiscussionRequest) returns (Discussion) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+}

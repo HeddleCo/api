@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "../../build/typescript/heddle/api/v1alpha1",
+    "strict": true,
+    "target": "ES2022"
+  },
+  "include": [
+    "../../build/typescript/heddle/api/v1alpha1/**/*.ts"
+  ]
+}

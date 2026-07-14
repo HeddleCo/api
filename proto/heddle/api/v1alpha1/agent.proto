@@ -1,0 +1,213 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/agent_gateway.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+service AgentService {
+  option (service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_PLANNED
+  };
+
+  rpc ListAgentRuns(ListAgentRunsRequest) returns (ListAgentRunsResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+    };
+  }
+  rpc GetAgentRun(GetAgentRunRequest) returns (AgentRun) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+    };
+  }
+  rpc ListAgentTimelineEvents(ListAgentTimelineEventsRequest) returns (ListAgentTimelineEventsResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+    };
+  }
+  rpc WatchAgentRun(WatchAgentRunRequest) returns (stream AgentTimelineEvent) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
+    };
+  }
+  rpc ControlAgent(ControlAgentRequest) returns (AgentCommandAudit) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc DecideAgentPermission(DecideAgentPermissionRequest) returns (PermissionDecision) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc GetAgentCommand(GetAgentCommandRequest) returns (AgentCommandAudit) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+    };
+  }
+  rpc GetAgentPolicy(GetAgentPolicyRequest) returns (AgentPolicySnapshot) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+    };
+  }
+  rpc UpdateAgentPolicy(UpdateAgentPolicyRequest) returns (AgentPolicySnapshot) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+  rpc ListHarnessPreferences(ListHarnessPreferencesRequest) returns (ListHarnessPreferencesResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+    };
+  }
+  rpc DeleteHarnessPreference(DeleteHarnessPreferenceRequest) returns (DeleteHarnessPreferenceResponse) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+    };
+  }
+}
+
+message ListAgentRunsRequest {
+  RepositoryRef repository = 1;
+  uint32 page_size = 2;
+  string page_cursor = 3;
+}
+message ListAgentRunsResponse {
+  repeated AgentRun runs = 1;
+  string next_page_cursor = 2;
+}
+message GetAgentRunRequest {
+  AgentRunId run_id = 1;
+}
+message AgentRun {
+  AgentRunId run_id = 1;
+  RepositoryRef repository = 2;
+  string initiating_human_subject = 3;
+  string service_account_subject = 4;
+  string provider = 5;
+  string model = 6;
+  string harness = 7;
+  AgentRunStatus status = 8;
+  AgentVisibility visibility = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp finished_at = 11;
+}
+message ListAgentTimelineEventsRequest {
+  AgentRunId run_id = 1;
+  uint32 page_size = 2;
+  string page_cursor = 3;
+}
+message ListAgentTimelineEventsResponse {
+  repeated AgentTimelineEvent events = 1;
+  string next_page_cursor = 2;
+}
+message WatchAgentRunRequest {
+  AgentRunId run_id = 1;
+  string resume_cursor = 2;
+}
+message AgentTimelineEvent {
+  string cursor = 1;
+  CanonicalTimelineOperation operation = 2;
+}
+message ControlAgentRequest {
+  AgentRunId run_id = 1;
+  AgentControlKind control = 2;
+  bytes encrypted_steering_text = 3;
+  string client_operation_id = 4;
+}
+message DecideAgentPermissionRequest {
+  AgentRunId run_id = 1;
+  PermissionId permission_id = 2;
+  PermissionDecisionKind decision = 3;
+  string client_operation_id = 4;
+}
+message PermissionDecision {
+  PermissionId permission_id = 1;
+  PermissionDecisionKind decision = 2;
+  string actor_subject = 3;
+  google.protobuf.Timestamp decided_at = 4;
+}
+message GetAgentCommandRequest {
+  AgentCommandId command_id = 1;
+}
+message AgentCommandAudit {
+  AgentCommandId command_id = 1;
+  AgentCommandStatus status = 2;
+  string actor_subject = 3;
+  string content_hash = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp completed_at = 6;
+}
+message GetAgentPolicyRequest {
+  RepositoryRef repository = 1;
+}
+message UpdateAgentPolicyRequest {
+  RepositoryRef repository = 1;
+  AgentVisibility visibility = 2;
+  StructuredRetention structured_retention = 3;
+  RawDiagnosticRetention raw_diagnostic_retention = 4;
+  string client_operation_id = 5;
+}
+message ListHarnessPreferencesRequest {
+  string harness = 1;
+  uint32 page_size = 2;
+  string page_cursor = 3;
+}
+message ListHarnessPreferencesResponse {
+  repeated HarnessPreference preferences = 1;
+  string next_page_cursor = 2;
+}
+message HarnessPreference {
+  string harness = 1;
+  string category = 2;
+  PermissionDecisionKind decision = 3;
+  google.protobuf.Timestamp verified_at = 4;
+}
+message DeleteHarnessPreferenceRequest {
+  string harness = 1;
+  string category = 2;
+  string client_operation_id = 3;
+}
+message DeleteHarnessPreferenceResponse {
+  bool deleted = 1;
+}

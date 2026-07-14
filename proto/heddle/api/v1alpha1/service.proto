@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import public "heddle/api/v1alpha1/agent.proto";
+import public "heddle/api/v1alpha1/agent_gateway.proto";
+import public "heddle/api/v1alpha1/attention.proto";
+import public "heddle/api/v1alpha1/collaboration.proto";
+import public "heddle/api/v1alpha1/contract.proto";
+import public "heddle/api/v1alpha1/errors.proto";
+import public "heddle/api/v1alpha1/identity.proto";
+import public "heddle/api/v1alpha1/pull_request_review.proto";
+import public "heddle/api/v1alpha1/registry.proto";
+import public "heddle/api/v1alpha1/repo_sync.proto";
+import public "heddle/api/v1alpha1/repository.proto";
+import public "heddle/api/v1alpha1/search.proto";
+import public "heddle/api/v1alpha1/state_review.proto";
+import public "heddle/api/v1alpha1/types.proto";
+import public "heddle/api/v1alpha1/workflow.proto";

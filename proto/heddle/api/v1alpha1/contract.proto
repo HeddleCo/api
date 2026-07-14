@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/descriptor.proto";
+
+enum DeploymentTarget {
+  DEPLOYMENT_TARGET_UNSPECIFIED = 0;
+  DEPLOYMENT_TARGET_WEFT = 1;
+  DEPLOYMENT_TARGET_HEDDLE_DAEMON = 2;
+}
+
+enum ServiceMaturity {
+  SERVICE_MATURITY_UNSPECIFIED = 0;
+  SERVICE_MATURITY_SHIPPED = 1;
+  SERVICE_MATURITY_PLANNED = 2;
+}
+
+enum StableSigningIdentity {
+  STABLE_SIGNING_IDENTITY_UNSPECIFIED = 0;
+  STABLE_SIGNING_IDENTITY_NONE = 1;
+  STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL = 2;
+}
+
+enum SigningTier {
+  SIGNING_TIER_UNSPECIFIED = 0;
+  SIGNING_TIER_NONE = 1;
+  SIGNING_TIER_PROOF_OF_POSSESSION = 2;
+  SIGNING_TIER_HUMAN_VERIFICATION = 3;
+  SIGNING_TIER_STREAMING_PROOF_OF_POSSESSION = 4;
+}
+
+enum RpcEffect {
+  RPC_EFFECT_UNSPECIFIED = 0;
+  RPC_EFFECT_READ_ONLY = 1;
+  RPC_EFFECT_TRANSIENT_WRITE = 2;
+  RPC_EFFECT_DURABLE_WRITE = 3;
+}
+
+enum RetryBehavior {
+  RETRY_BEHAVIOR_UNSPECIFIED = 0;
+  RETRY_BEHAVIOR_NEVER = 1;
+  RETRY_BEHAVIOR_SAFE = 2;
+  RETRY_BEHAVIOR_CLIENT_OPERATION_ID = 3;
+  RETRY_BEHAVIOR_RESUMABLE_STREAM = 4;
+}
+
+message ServiceContract {
+  repeated DeploymentTarget deployment_targets = 1;
+  ServiceMaturity maturity = 2;
+}
+
+message RpcContract {
+  StableSigningIdentity signing_identity = 1;
+  SigningTier signing_tier = 2;
+  RpcEffect effect = 3;
+  RetryBehavior retry_behavior = 4;
+  bool client_operation_id_required = 5;
+}
+
+extend google.protobuf.ServiceOptions {
+  ServiceContract service_contract = 50001;
+}
+
+extend google.protobuf.MethodOptions {
+  RpcContract rpc_contract = 50002;
+}

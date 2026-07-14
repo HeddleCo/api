@@ -40,7 +40,7 @@ message ThreadSummary {
   optional string parent_thread = 11;
   optional string task = 12;
   optional string thread_mode = 13;
-  optional StateId thread_state = 14;
+  optional string thread_state = 14;
   optional string freshness = 15;
   ThreadVerificationSummary verification_summary = 16;
   ThreadConfidenceSummary confidence_summary = 17;
@@ -98,7 +98,7 @@ message ThreadMetadata {
   optional string parent_thread = 3;
   optional string task = 4;
   string thread_mode = 5;
-  StateId thread_state = 6;
+  string thread_state = 6;
   string freshness = 7;
   StateId base_state = 8;
   bytes base_root = 9;

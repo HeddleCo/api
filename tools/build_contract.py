@@ -439,6 +439,14 @@ def type_identifiers(text: str) -> str:
         lambda m: f"{m['indent']}{m['qualifier'] or ''}GitObjectId {m['name']}{m['tag']}",
         text,
     )
+    # `thread_state` is the thread lifecycle label, not a content-addressed
+    # repository state. Its neighboring `thread_state_typed` enum is the typed
+    # lifecycle representation.
+    text = re.sub(
+        r"(?m)^(?P<indent>\s*)(?P<qualifier>optional\s+)?StateId\s+thread_state(?P<tag>\s*=\s*\d+[^;]*;)",
+        lambda m: f"{m['indent']}{m['qualifier'] or ''}string thread_state{m['tag']}",
+        text,
+    )
     return text
 
 

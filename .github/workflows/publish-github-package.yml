@@ -1,0 +1,36 @@
+name: Publish GitHub Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: GitHub Packages distribution tag
+        required: true
+        default: next
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.71.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: '@heddleco'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - run: node tools/verify-ts-vectors.mjs
+      - name: Publish @heddleco/api to GitHub Packages
+        run: npm publish --workspace @heddleco/api --tag "${{ inputs.dist_tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

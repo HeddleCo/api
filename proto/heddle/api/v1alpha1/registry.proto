@@ -486,7 +486,7 @@ message ChildEdge {
   StateId anchored_state_id = 4;
   // The child's latest content-facet head, if any (absent = child has no
   // content head yet).
-  optional bytes child_head = 5;
+  optional StateId child_head = 5;
   // Moving-anchored-ff status of the anchor vs the child head.
   ChildEdgeStatus status = 6;
 }
@@ -549,7 +549,7 @@ message MonorepoEdge {
   StateId anchored_state_id = 3;
   // The child's current content head + ff/diverged status vs the anchor
   // (reused from the ChildEdge resolution, not re-derived).
-  optional bytes child_head = 4;
+  optional StateId child_head = 4;
   ChildEdgeStatus status = 5;
   // The recursively-resolved child subtree when descended; absent (with a
   // `skipped` reason) when the edge was withheld/bounded/cycle-guarded.
@@ -568,7 +568,7 @@ message MonorepoNode {
   // The content-facet state this spool is resolved at (absent = no content
   // head). For the ROOT this is its own content head; for a descendant it is
   // the anchored state the PARENT's edge pins.
-  optional bytes content_state = 2;
+  optional StateId content_state = 2;
   // The visible child edges of this spool (unreadable children are recorded
   // with EDGE_SKIP_UNREADABLE, not silently dropped).
   repeated MonorepoEdge edges = 3;

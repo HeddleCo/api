@@ -4,7 +4,7 @@ package heddle.api.v1alpha1;
 
 message RefEntry {
   string name = 1;
-  bytes state_id = 2;
+  StateId state_id = 2;
   bool is_thread = 3;
   // Explicit revision address for two-lane storage. Native refs use
   // `heddle:<state_id>`; Git-overlay refs use `git:<commit_oid>`.
@@ -89,7 +89,7 @@ enum ImportErrorCode {
 message GrantTargetRef {
   oneof target {
     string namespace_path = 1;
-    string repo_path = 2;
+    RepositoryRef repo_path = 2;
   }
 }
 

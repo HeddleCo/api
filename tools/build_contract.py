@@ -420,7 +420,7 @@ def type_identifiers(text: str) -> str:
     qualifiers = r"(?P<qualifier>(?:optional|repeated)\s+)?"
     tag = r"(?P<tag>\s*=\s*\d+[^;]*;)"
     text = re.sub(
-        rf"(?m)^(?P<indent>\s*){qualifiers}(?:bytes|string)\s+(?P<name>(?:\w*state_ids?|(?:source|target|local|remote|base|current|new)_state|exclude_states)){tag}",
+        rf"(?m)^(?P<indent>\s*){qualifiers}(?:bytes|string)\s+(?P<name>(?:(?:\w+_)?state(?:_ids?)?|child_head|exclude_states)){tag}",
         lambda m: f"{m['indent']}{m['qualifier'] or ''}StateId {m['name']}{m['tag']}",
         text,
     )
@@ -439,6 +439,18 @@ def type_identifiers(text: str) -> str:
         lambda m: f"{m['indent']}{m['qualifier'] or ''}GitObjectId {m['name']}{m['tag']}",
         text,
     )
+    return text
+
+
+def normalize_enum_unspecified(text: str) -> str:
+    """Give every zero enum value the contract-wide UNSPECIFIED spelling."""
+    for enum_name in re.findall(r"(?m)^enum\s+(\w+)\s*\{", text):
+        block, _ = take_named_block(text, "enum", enum_name)
+        zero = re.search(r"(?m)^\s*(\w+)\s*=\s*0\s*;", block)
+        if zero and not zero.group(1).endswith("_UNSPECIFIED"):
+            prefix = re.sub(r"(?<!^)(?=[A-Z])", "_", enum_name).upper()
+            updated = block[:zero.start(1)] + f"{prefix}_UNSPECIFIED" + block[zero.end(1):]
+            text = text.replace(block, updated, 1)
     return text
 
 
@@ -525,7 +537,9 @@ def main() -> None:
         method_sources[filename] = methods
 
     common, _ = source_body(legacy / "common.proto", [])
-    (output / "types.proto").write_text(renumber_fields(header([]) + common + "\n\n" + EXTRA_TYPES))
+    (output / "types.proto").write_text(
+        renumber_fields(normalize_enum_unspecified(type_identifiers(header([]) + common + "\n\n" + EXTRA_TYPES)))
+    )
 
     service_map: dict[str, tuple[str, list[tuple[str, str]]]] = {
         "identity.proto": ("IdentityService", [("AuthService", m) for m in sorted(RETAINED["AuthService"])]),
@@ -586,7 +600,7 @@ def main() -> None:
         if filename == "repo_sync.proto":
             text = make_sync_directional(text)
         text = type_identifiers(text)
-        (output / filename).write_text(renumber_fields(text))
+        (output / filename).write_text(renumber_fields(normalize_enum_unspecified(text)))
 
     prune_unreachable(output, ["types.proto", *service_map.keys()])
 

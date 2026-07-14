@@ -175,7 +175,7 @@ message CompareResponse {
 message GetSemanticHotSpotsRequest {
   RepositoryRef repo_path = 1;
   // State to start the walk from. Empty = HEAD.
-  string from_state = 2;
+  StateId from_state = 2;
   // Walk at most this many state pairs. Default 200.
   uint32 limit_states = 3;
   // What to bucket on. "file" or "function" (case-insensitive).
@@ -221,8 +221,8 @@ message SemanticHotSpot {
 
 message ActionSummary {
   string id = 1;
-  optional string from_state = 2;
-  string to_state = 3;
+  optional StateId from_state = 2;
+  StateId to_state = 3;
   string operation_json = 4;
   string description = 5;
   repeated string semantic_changes_json = 6;
@@ -339,7 +339,7 @@ message ListProvenanceSummariesResponse {
 // ── Context / Annotation messages ────────────────────────
 
 enum StalenessStatus {
-  STALENESS_UNKNOWN = 0;
+  STALENESS_STATUS_UNSPECIFIED = 0;
   STALENESS_FRESH = 1;
   STALENESS_SOURCE_CHANGED = 2;
   STALENESS_SYMBOL_MISSING = 3;
@@ -372,7 +372,7 @@ message ContextAnnotation {
   string attribution = 5;
   google.protobuf.Timestamp created_at = 6;
   optional bytes source_hash = 7;
-  optional string created_at_state = 8;
+  optional StateId created_at_state = 8;
   StalenessStatus staleness = 9;
   ContextAnnotationStatus status = 10;
   ContextAnnotationKind kind = 11;
@@ -412,7 +412,7 @@ message ContextRevision {
   string attribution = 5;
   google.protobuf.Timestamp created_at = 6;
   optional bytes source_hash = 7;
-  optional string created_at_state = 8;
+  optional StateId created_at_state = 8;
 }
 
 message GetContextHistoryRequest {
@@ -443,7 +443,7 @@ message SetContextRequest {
 
 message SetContextResponse {
   // Newly-captured ChangeId carrying the annotation.
-  bytes state = 1;
+  StateId state = 1;
   uint32 annotations = 2;
 }
 
@@ -460,7 +460,7 @@ message ReviseContextRequest {
 
 message ReviseContextResponse {
   // Newly-captured ChangeId carrying the revision.
-  bytes state = 1;
+  StateId state = 1;
   uint32 revisions = 2;
 }
 
@@ -480,7 +480,7 @@ message SupersedeContextRequest {
 
 message SupersedeContextResponse {
   // Newly-captured ChangeId carrying the supersession.
-  bytes state = 1;
+  StateId state = 1;
   string new_annotation_id = 2;
   uint32 rewrite_pct = 3;
 }
@@ -650,7 +650,7 @@ message RepoEvent {
   string thread = 4;
   string ref_name = 5;
   bool is_thread = 6;
-  string old_state = 7;
+  StateId old_state = 7;
   StateId new_state = 8;
   string actor_subject = 9;
   string payload_json = 10;

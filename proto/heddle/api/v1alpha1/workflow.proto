@@ -40,7 +40,7 @@ message ThreadSummary {
   optional string parent_thread = 11;
   optional string task = 12;
   optional string thread_mode = 13;
-  optional string thread_state = 14;
+  optional StateId thread_state = 14;
   optional string freshness = 15;
   ThreadVerificationSummary verification_summary = 16;
   ThreadConfidenceSummary confidence_summary = 17;
@@ -49,7 +49,7 @@ message ThreadSummary {
   optional string thinking_level = 20;
   UsageSummary usage_summary = 21;
   optional google.protobuf.Timestamp last_progress_at = 22;
-  optional string report_flush_state = 23;
+  optional StateId report_flush_state = 23;
   optional string heddle_session_id = 24;
   optional string attach_reason = 25;
   optional string native_actor_key = 26;
@@ -98,12 +98,12 @@ message ThreadMetadata {
   optional string parent_thread = 3;
   optional string task = 4;
   string thread_mode = 5;
-  string thread_state = 6;
+  StateId thread_state = 6;
   string freshness = 7;
   StateId base_state = 8;
   bytes base_root = 9;
   optional StateId current_state = 10;
-  optional bytes merged_state = 11;
+  optional StateId merged_state = 11;
   repeated string changed_paths = 12;
   repeated string impact_categories = 13;
   repeated string heavy_impact_paths = 14;

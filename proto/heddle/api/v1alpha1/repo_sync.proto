@@ -14,7 +14,7 @@ message ListRefsRequest {
 
 message ListRefsResponse {
   string head_thread = 1;
-  bytes head_state = 2;
+  StateId head_state = 2;
   repeated RefEntry refs = 3;
 }
 

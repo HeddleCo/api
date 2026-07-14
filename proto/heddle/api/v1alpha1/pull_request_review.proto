@@ -69,7 +69,7 @@ message ReviewPrLabel {
 message ReviewPrMetadata {
   string title = 1;
   string body = 2;
-  string state = 3;
+  StateId state = 3;
   bool draft = 4;
   uint32 changed_files = 5;
   uint32 additions = 6;

@@ -68,6 +68,21 @@ def audit_new_descriptor(decoded: str) -> None:
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
 
+    byte_field_pattern = re.compile(
+        r"(?m)^\s*(?:optional |repeated )?bytes\s+(\w+)\s*="
+    )
+    allowed_byte_field = re.compile(
+        r"^(?:value|digest|hash|parent_id|parents|source_hash|base_root|"
+        r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
+        r"authenticator_data|user_handle|biscuit|bootstrap_token|grant_envelope|nonce)|"
+        r"checkpoint|data|redactions_blob|state_visibility_blob|pack_chunk|pack_id|"
+        r"capability_context|canonical_envelope|encrypted_.*)$"
+    )
+    unaudited_bytes = sorted(
+        name for name in byte_field_pattern.findall(proto_sources) if not allowed_byte_field.fullmatch(name)
+    )
+    assert not unaudited_bytes, f"unaudited bytes fields: {unaudited_bytes}"
+
     messages: dict[str, list[tuple[str, str]]] = {}
     for file_block in blocks(decoded.splitlines(), "file {"):
         package = re.search(r'^  package: "(.+)"$', "\n".join(file_block), re.MULTILINE)
@@ -75,20 +90,30 @@ def audit_new_descriptor(decoded: str) -> None:
             continue
         for message_block in blocks(file_block, "  message_type {"):
             name = re.search(r'^    name: "(.+)"$', "\n".join(message_block), re.MULTILINE).group(1)
-            fields: list[tuple[str, str]] = []
+            fields: list[tuple[str, str, int]] = []
             for field_block in blocks(message_block, "    field {"):
                 field_text = "\n".join(field_block)
                 field_name = re.search(r'^      name: "(.+)"$', field_text, re.MULTILINE).group(1)
                 label = re.search(r'^      label: (.+)$', field_text, re.MULTILINE)
-                fields.append((field_name, label.group(1) if label else "LABEL_OPTIONAL"))
+                number = int(re.search(r'^      number: (\d+)$', field_text, re.MULTILINE).group(1))
+                fields.append((field_name, label.group(1) if label else "LABEL_OPTIONAL", number))
+            assert sorted(field[2] for field in fields) == list(range(1, len(fields) + 1)), name
             messages[f".{PACKAGE}.{name}"] = fields
+        for enum_block in blocks(file_block, "  enum_type {"):
+            enum_text = "\n".join(enum_block)
+            first_value = next(iter(blocks(enum_block, "    value {")), None)
+            assert first_value is not None
+            first_text = "\n".join(first_value)
+            first_name = re.search(r'^      name: "(.+)"$', first_text, re.MULTILINE).group(1)
+            first_number = int(re.search(r'^      number: (\d+)$', first_text, re.MULTILINE).group(1))
+            assert first_number == 0 and first_name.endswith("_UNSPECIFIED"), enum_text
         for service_block in blocks(file_block, "  service {"):
             for method_block in blocks(service_block, "    method {"):
                 method_text = "\n".join(method_block)
                 if "effect: RPC_EFFECT_DURABLE_WRITE" not in method_text:
                     continue
                 input_type = re.search(r'^      input_type: "(.+)"$', method_text, re.MULTILINE).group(1)
-                retry_fields = [field for field in messages[input_type] if field[0] == "client_operation_id"]
+                retry_fields = [field[:2] for field in messages[input_type] if field[0] == "client_operation_id"]
                 assert retry_fields == [("client_operation_id", "LABEL_OPTIONAL")], input_type
 
 

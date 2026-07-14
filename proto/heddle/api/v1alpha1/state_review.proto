@@ -95,7 +95,7 @@ message SignalAnchor {
 message AnchoredDiscussion {
   string id = 1;
   PathSymbolRef anchor = 2;
-  bytes opened_against_state = 3;
+  StateId opened_against_state = 3;
   google.protobuf.Timestamp opened_at = 4;
   repeated DiscussionTurn turns = 5;
   DiscussionResolution resolution = 6;

@@ -78,7 +78,7 @@ message ThreadHit {
   string thread_id = 1;
   string title = 2;
   RepositoryRef repo_path = 3;
-  string state = 4;
+  StateId state = 4;
 }
 
 message FeedHit {

@@ -18,6 +18,18 @@ explicitly `PLANNED` for the first release.
 Consumers must exact-pin all `0.x` versions. Generated sources live only in
 ignored build staging and release artifacts.
 
+GitHub Packages requires authentication for npm installs. Configure the scope
+and provide a classic token with `read:packages` through `NODE_AUTH_TOKEN`:
+
+```ini
+@heddleco:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+```sh
+npm install --save-exact @heddleco/api@0.1.0
+```
+
 ## Verification
 
 ```sh

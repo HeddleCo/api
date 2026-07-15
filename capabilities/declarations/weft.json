@@ -1,23 +1,16 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "consumer": "weft",
-  "source_repository": "HeddleCo/weft",
   "rpc_mappings": [
     {
       "rpc": "heddle.api.v1alpha1.AgentGatewayService/Connect",
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -26,16 +19,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -44,16 +31,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -62,16 +43,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -80,16 +55,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -98,16 +67,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -116,16 +79,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -134,16 +91,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -152,16 +103,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -170,16 +115,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -188,16 +127,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -206,16 +139,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         },
         "registration": {
-          "status": "planned",
-          "evidence": [],
-          "follow_up": null,
-          "reason": "The descriptor marks this service planned."
+          "status": "planned"
         }
       }
     },
@@ -224,18 +151,10 @@
       "capability": "attention feed",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/feed.rs:GetFeedSnapshot"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:FeedServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -244,18 +163,10 @@
       "capability": "attention feed",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/feed.rs:RecordInteraction"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:FeedServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -264,18 +175,10 @@
       "capability": "attention feed",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/feed.rs:StreamFeed"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:FeedServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -284,18 +187,10 @@
       "capability": "attention feed",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/feed.rs:UpdateFeedItem"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:FeedServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -304,18 +199,10 @@
       "capability": "collaboration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/discussion.rs:AppendTurn"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:DiscussionServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -324,18 +211,10 @@
       "capability": "collaboration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/discussion.rs:ListByState"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:DiscussionServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -344,18 +223,10 @@
       "capability": "collaboration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/discussion.rs:ListBySymbol"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:DiscussionServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -364,18 +235,10 @@
       "capability": "collaboration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/discussion.rs:OpenDiscussion"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:DiscussionServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -384,18 +247,10 @@
       "capability": "collaboration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/discussion.rs:ResolveDiscussion"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:DiscussionServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -404,18 +259,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:ApproveDeviceAuthorization"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -424,18 +271,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:BeginWebAuthnAuthentication"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -444,18 +283,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:BeginWebAuthnRegistration"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -464,18 +295,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:CreateDeviceAuthorization"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -484,18 +307,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:CreateServiceAccount"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -504,18 +319,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:ExchangeDeviceAuthorization"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -524,18 +331,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:FinishWebAuthnAuthentication"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -544,18 +343,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:GetInvitationSummary"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -564,18 +355,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:IntrospectCredential"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -584,18 +367,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:IssuePresenceToken"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -604,18 +379,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:IssueServiceAccountCredential"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -624,18 +391,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:LinkOAuthIdentity"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -644,18 +403,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:ListScopeCapabilities"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -664,18 +415,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:ListServiceAccounts"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -684,18 +427,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:ListSessions"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -704,18 +439,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:MintAnonBiscuit"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -724,18 +451,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:MintBiscuit"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -744,18 +463,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:RegisterPublicKey"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -764,18 +475,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:RevokeCredential"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -784,18 +487,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:RevokeServiceAccount"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -804,18 +499,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:RevokeSession"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -824,18 +511,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:RotateCredential"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -844,18 +523,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:StoreProviderToken"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -864,18 +535,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:VerifySignupEmail"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -884,18 +547,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:WaitForDeviceAuthorization"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -904,18 +559,10 @@
       "capability": "identity and credentials",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/auth.rs:WhoAmI"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:AuthServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -924,18 +571,10 @@
       "capability": "pull request review",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/review.rs:GetReviewAnalysisResult"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ReviewServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -944,18 +583,10 @@
       "capability": "pull request review",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/review.rs:GetReviewAnalysisStatus"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ReviewServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -964,18 +595,10 @@
       "capability": "pull request review",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/review.rs:StartReviewAnalysis"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ReviewServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -984,18 +607,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:AttachChild"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1004,18 +619,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:CreateGrant"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1024,18 +631,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:CreateInvitation"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1044,18 +643,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:CreateNamespace"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1064,18 +655,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:CreateRepository"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1084,18 +667,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:DeleteBookmark"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1104,18 +679,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:DeleteGrant"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1124,18 +691,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:DeleteNamespace"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1144,18 +703,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:DeleteRepository"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1164,18 +715,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:DetachChild"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1184,18 +727,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:GetCurrentUserNamespace"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1204,18 +739,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:GetSpool"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1224,18 +751,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:GrantSupportAccess"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1244,18 +763,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListBookmarks"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1264,18 +775,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListChildren"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1284,18 +787,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListGrants"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1304,18 +799,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListInvitations"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1324,18 +811,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListMembers"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1344,18 +823,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListSpools"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1364,18 +835,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListSupportAccessGrants"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1384,18 +847,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListWorktrees"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1404,18 +859,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ResolveMonorepo"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1424,18 +871,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ResolveSubjects"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1444,18 +883,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:RevokeInvitation"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1464,18 +895,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:RevokeSupportAccess"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1484,18 +907,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:SetNamespaceVisibility"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1504,18 +919,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:SetSpoolVisibility"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1524,18 +931,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:UpdateGrant"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1544,18 +943,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:UpdateNamespace"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1564,18 +955,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:UpdateRepository"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1584,18 +967,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:UpdateSpoolSettings"
-          ],
-          "follow_up": null
+          "status": "partial"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1604,18 +979,10 @@
       "capability": "spool administration",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:UpsertBookmark"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1624,18 +991,10 @@
       "capability": "synchronization",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/sync.rs:ListRefs"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:RepoSyncServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1644,18 +1003,10 @@
       "capability": "synchronization",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/sync.rs:Pull"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:RepoSyncServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1664,18 +1015,10 @@
       "capability": "synchronization",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/sync.rs:Push"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:RepoSyncServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1684,18 +1027,10 @@
       "capability": "synchronization",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/sync.rs:UpdateRef"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:RepoSyncServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1704,18 +1039,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/import.rs:CreateImportJob"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ImportServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1724,18 +1051,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetBlame"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1744,18 +1063,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetBlob"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1764,18 +1075,10 @@
       "capability": "state comparison",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetCompare"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1784,18 +1087,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetContextHistory"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1804,18 +1099,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetDiff"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1824,18 +1111,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetRefs"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1844,18 +1123,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetSemanticHotSpots"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1864,18 +1135,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetState"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1884,18 +1147,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:GetTree"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1904,18 +1159,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:ListActions"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1924,18 +1171,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:ListContext"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1944,18 +1183,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:ListContextSuggestions"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1964,18 +1195,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:ListProvenanceSummaries"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -1984,18 +1207,10 @@
       "capability": "run history/details",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:ListStates"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2004,18 +1219,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:ReviseContext"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2024,18 +1231,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:SetContext"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2044,18 +1243,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/import.rs:StreamImportProgress"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ImportServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2064,18 +1255,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/events.rs:SubscribeRepoEvents"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:RepoEventServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2084,18 +1267,10 @@
       "capability": "repository inspection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/content.rs:SupersedeContext"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ContentServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2104,18 +1279,10 @@
       "capability": "search",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/search.rs:Search"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:SearchServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2124,18 +1291,10 @@
       "capability": "review decisions",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/state_review.rs:GetReviewPayload"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:StateReviewServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2144,18 +1303,10 @@
       "capability": "review decisions",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/state_review.rs:ListSignatures"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:StateReviewServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2164,18 +1315,10 @@
       "capability": "review decisions",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/state_review.rs:SignState"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:StateReviewServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2184,18 +1327,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:AddApprovalGroupMember"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2204,18 +1339,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:AddPolicyGroupRequirement"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2224,18 +1351,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ApproveThread"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2244,18 +1363,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:CheckMergeEligibility"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2264,18 +1375,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:CreateApprovalGroup"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2284,18 +1387,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:CreateThreadPolicy"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2304,18 +1399,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:DeleteApprovalGroup"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2324,18 +1411,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:DeleteThreadPolicy"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2344,18 +1423,10 @@
       "capability": "workspace management",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/workflow.rs:GetWorkspaceSummary"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ThreadWorkflowServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2364,18 +1435,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListApprovalGroups"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2384,18 +1447,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListThreadApprovals"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2404,18 +1459,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:ListThreadPolicies"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2424,18 +1471,10 @@
       "capability": "workspace management",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/workflow.rs:ListThreads"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ThreadWorkflowServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2444,18 +1483,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:RemoveApprovalGroupMember"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2464,18 +1495,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:RemovePolicyGroupRequirement"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2484,18 +1507,10 @@
       "capability": "branch protection",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/user.rs:RevokeApproval"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:HostedUserServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     },
@@ -2504,18 +1519,10 @@
       "capability": "workspace management",
       "layers": {
         "implementation": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/server/grpc_hosted_impl/workflow.rs:StreamWorkspaceSummary"
-          ],
-          "follow_up": null
+          "status": "shipped"
         },
         "registration": {
-          "status": "shipped",
-          "evidence": [
-            "crates/weft-server/src/serve.rs:ThreadWorkflowServiceServer::new"
-          ],
-          "follow_up": null
+          "status": "shipped"
         }
       }
     }

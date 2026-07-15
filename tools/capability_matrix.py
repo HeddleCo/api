@@ -21,7 +21,14 @@ LAYERS = {
     "tapestry": ("server_adapter", "ui"),
     "weft": ("implementation", "registration"),
 }
-STATUSES = {"shipped", "planned", "unsupported", "blocked"}
+STATUSES = {
+    "shipped",
+    "partial",
+    "planned",
+    "intentionally-unsupported",
+    "blocked",
+}
+AUTHORIZATION_METADATA = "unavailable (no descriptor authorization role/scope option)"
 
 
 class AuditError(ValueError):
@@ -145,6 +152,26 @@ def descriptor_inventory(descriptor: Path) -> dict[str, dict[str, object]]:
     return dict(sorted(inventory.items()))
 
 
+def audit_authorization_metadata_absence(contract: Path) -> None:
+    """Keep the report's unavailable label tied to the actual option schema."""
+    blocks = _blocks(contract.read_text().splitlines(), "message RpcContract {")
+    if len(blocks) != 1:
+        raise AuditError("could not locate the RpcContract definition")
+    field_names = {
+        match.group(1)
+        for line in blocks[0]
+        if (match := re.search(r"\b([a-z][a-z0-9_]*)\s*=\s*\d+\s*;", line))
+    }
+    if any(
+        token in field
+        for field in field_names
+        for token in ("authorization", "role", "scope")
+    ):
+        raise AuditError(
+            "authorization role/scope metadata now exists; update the matrix renderer"
+        )
+
+
 def load_declarations(directory: Path) -> dict[str, dict[str, object]]:
     declarations: dict[str, dict[str, object]] = {}
     for consumer in CONSUMERS:
@@ -157,28 +184,28 @@ def load_declarations(directory: Path) -> dict[str, dict[str, object]]:
 
 def audit_provenance(directory: Path, manifest_path: Path) -> None:
     manifest = json.loads(manifest_path.read_text())
-    if manifest.get("schema_version") != 1:
+    if manifest.get("schema_version") != 2 or set(manifest) != {
+        "schema_version",
+        "attestations",
+    }:
         raise AuditError("unsupported provenance schema")
-    sources = manifest.get("sources")
+    sources = manifest.get("attestations")
     if not isinstance(sources, dict) or set(sources) != set(CONSUMERS):
         raise AuditError("provenance consumer set mismatch")
     for consumer in CONSUMERS:
         source = sources[consumer]
         expected = {
-            "repository": f"HeddleCo/{consumer}",
-            "path": f"api-capabilities/{consumer}.json",
+            "kind": "consumer-derived-sanitized-declaration",
+            "snapshot": f"capabilities/declarations/{consumer}.json",
         }
-        if not isinstance(source, dict) or any(
+        if not isinstance(source, dict) or set(source) != set(expected) | {"sha256"} or any(
             source.get(key) != value for key, value in expected.items()
         ):
-            raise AuditError(f"provenance source mismatch for {consumer}")
-        revision = source.get("revision")
-        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
-            raise AuditError(f"invalid provenance revision for {consumer}")
+            raise AuditError(f"public attestation mismatch for {consumer}")
         content_hash = source.get("sha256")
         actual = hashlib.sha256((directory / f"{consumer}.json").read_bytes()).hexdigest()
         if content_hash != actual:
-            raise AuditError(f"provenance content hash mismatch for {consumer}")
+            raise AuditError(f"attested content hash mismatch for {consumer}")
 
 
 def audit_declarations(
@@ -192,18 +219,24 @@ def audit_declarations(
         declaration = declarations.get(consumer)
         if not isinstance(declaration, dict):
             raise AuditError(f"missing declaration for {consumer}")
-        if declaration.get("schema_version") != 1:
+        if declaration.get("schema_version") != 2 or set(declaration) != {
+            "schema_version",
+            "consumer",
+            "rpc_mappings",
+        }:
             raise AuditError(f"unsupported declaration schema for {consumer}")
         if declaration.get("consumer") != consumer:
             raise AuditError(f"consumer name mismatch for {consumer}")
-        if declaration.get("source_repository") != f"HeddleCo/{consumer}":
-            raise AuditError(f"source repository mismatch for {consumer}")
         rows = declaration.get("rpc_mappings")
         if not isinstance(rows, list):
             raise AuditError(f"rpc_mappings must be a list for {consumer}")
         by_rpc: dict[str, dict[str, object]] = {}
         for row in rows:
-            if not isinstance(row, dict) or not isinstance(row.get("rpc"), str):
+            if (
+                not isinstance(row, dict)
+                or set(row) != {"rpc", "capability", "layers"}
+                or not isinstance(row.get("rpc"), str)
+            ):
                 raise AuditError(f"invalid mapping row for {consumer}")
             rpc = str(row["rpc"])
             if rpc in by_rpc:
@@ -218,7 +251,7 @@ def audit_declarations(
                 raise AuditError(f"layer set mismatch for {consumer}: {rpc}")
             for layer_name in LAYERS[consumer]:
                 layer = layers[layer_name]
-                if not isinstance(layer, dict):
+                if not isinstance(layer, dict) or set(layer) != {"status"}:
                     raise AuditError(f"invalid {consumer} {layer_name} layer: {rpc}")
                 status = layer.get("status")
                 if status == "" or status is None:
@@ -226,25 +259,6 @@ def audit_declarations(
                 if status not in STATUSES:
                     raise AuditError(
                         f"invalid status for {consumer} {layer_name}: {rpc}: {status}"
-                    )
-                evidence = layer.get("evidence")
-                if not isinstance(evidence, list) or any(
-                    not isinstance(item, str) or not item.strip() for item in evidence
-                ):
-                    raise AuditError(f"invalid evidence for {consumer} {layer_name}: {rpc}")
-                if status == "shipped" and not evidence:
-                    if consumer == "weft" and layer_name == "registration":
-                        raise AuditError(f"missing Weft registration for shipped RPC: {rpc}")
-                    raise AuditError(
-                        f"shipped mapping lacks evidence for {consumer} {layer_name}: {rpc}"
-                    )
-                follow_up = layer.get("follow_up")
-                if follow_up is not None and not re.fullmatch(
-                    r"https://github\.com/HeddleCo/[a-z-]+/issues/[1-9][0-9]*",
-                    str(follow_up),
-                ):
-                    raise AuditError(
-                        f"invalid follow-up URL for {consumer} {layer_name}: {rpc}"
                     )
             by_rpc[rpc] = row
         missing = descriptor_rpcs - set(by_rpc)
@@ -263,7 +277,7 @@ def audit_declarations(
         ]:
             continue
         layers = audited["weft"][rpc]["layers"]
-        if layers["implementation"]["status"] != "shipped":
+        if layers["implementation"]["status"] not in {"shipped", "partial"}:
             raise AuditError(f"shipped descriptor RPC lacks Weft implementation: {rpc}")
         if layers["registration"]["status"] != "shipped":
             raise AuditError(f"shipped descriptor RPC lacks Weft registration: {rpc}")
@@ -271,11 +285,7 @@ def audit_declarations(
 
 
 def _cell(layer: dict[str, object]) -> str:
-    status = str(layer["status"])
-    follow_up = layer.get("follow_up")
-    if follow_up:
-        return f"{status} ([follow-up]({follow_up}))"
-    return status
+    return str(layer["status"])
 
 
 def render_report(
@@ -284,13 +294,15 @@ def render_report(
 ) -> str:
     """Render a stable report; all contract metadata comes from the descriptor."""
     lines = [
-        "# Generated capability and authorization parity matrix",
+        "# Generated capability, signing, and authorization-metadata parity matrix",
         "",
         "Generated by `tools/capability_matrix.py` from the compiled descriptor and the checked-in consumer declarations. Do not edit this report by hand.",
         "",
         f"Descriptor inventory: {len(inventory)} RPCs across {len({row['service'] for row in inventory.values()})} services.",
         "",
-        "Status vocabulary: `shipped` has grounded layer evidence; `planned` is future work (linked when it is an accidental gap); `unsupported` is an intentional layer boundary; `blocked` names an external prerequisite.",
+        "Status vocabulary: `shipped` is fully supported; `partial` implements only part of the contract; `planned` tracks future work; `intentionally-unsupported` is an explicit layer boundary; `blocked` names an external prerequisite. Detailed evidence and follow-up links remain in each owning consumer repository.",
+        "",
+        "Signing identity/tier is descriptor metadata. Authorization role/scope metadata is rendered separately and is currently unavailable because `RpcContract` defines no authorization role/scope option; signing is not authorization.",
         "",
     ]
     capabilities = sorted(
@@ -308,20 +320,24 @@ def render_report(
             [
                 f"## {capability}",
                 "",
-                "| RPC | Target / maturity | Authorization and retry contract | Heddle client | Heddle CLI | Tapestry adapter | Tapestry UI | Weft implementation | Weft registration |",
-                "|---|---|---|---|---|---|---|---|---|",
+                "| RPC | Target / maturity | Signing contract | Authorization contract metadata | Effect / retry contract | Heddle client | Heddle CLI | Tapestry adapter | Tapestry UI | Weft implementation | Weft registration |",
+                "|---|---|---|---|---|---|---|---|---|---|---|",
             ]
         )
         for rpc in rpcs:
             contract = inventory[rpc]
             target = f"{', '.join(contract['deployment_targets'])} / {contract['maturity']}"
-            authorization = (
-                f"{contract['signing_identity']} / {contract['signing_tier']}; "
+            signing = f"{contract['signing_identity']} / {contract['signing_tier']}"
+            retry = (
                 f"{contract['effect']}; {contract['retry_behavior']}; "
                 f"client operation id: {'required' if contract['client_operation_id_required'] else 'not required'}"
             )
             lines.append(
-                "| `" + rpc + "` | " + target + " | " + authorization + " | "
+                "| `" + rpc + "` | " + target + " | " + signing + " | "
+                + AUTHORIZATION_METADATA
+                + " | "
+                + retry
+                + " | "
                 + " | ".join(
                     _cell(audited[name][rpc]["layers"][layer])
                     for name in CONSUMERS
@@ -339,6 +355,9 @@ def check_report(path: Path, rendered: str) -> None:
 
 
 def build_inventory() -> dict[str, dict[str, object]]:
+    audit_authorization_metadata_absence(
+        ROOT / "proto/heddle/api/v1alpha1/contract.proto"
+    )
     with tempfile.TemporaryDirectory() as directory:
         descriptor = Path(directory) / "api.binpb"
         _run("buf", "build", "-o", str(descriptor))

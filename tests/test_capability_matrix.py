@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Failure-mode tests for the descriptor-derived capability matrix."""
+"""Failure-mode tests for the public descriptor-derived capability matrix."""
 
 from __future__ import annotations
 
-import json
 import copy
 import hashlib
+import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
 
 from tools.capability_matrix import (
     AuditError,
+    audit_authorization_metadata_absence,
     audit_declarations,
     audit_provenance,
     check_report,
@@ -19,90 +21,63 @@ from tools.capability_matrix import (
 )
 
 
+ROOT = Path(__file__).resolve().parent.parent
 RPC = "heddle.api.v1alpha1.RepositoryService/GetCompare"
 PLANNED_RPC = "heddle.api.v1alpha1.AgentService/GetAgentRun"
 
 
 def inventory() -> dict[str, dict[str, object]]:
+    common = {
+        "service": "heddle.api.v1alpha1.RepositoryService",
+        "deployment_targets": ["WEFT"],
+        "signing_identity": "AUTHENTICATED_PRINCIPAL",
+        "signing_tier": "NONE",
+        "effect": "READ_ONLY",
+        "retry_behavior": "SAFE",
+        "client_operation_id_required": False,
+    }
     return {
-        RPC: {
-            "rpc": RPC,
-            "service": "heddle.api.v1alpha1.RepositoryService",
-            "method": "GetCompare",
-            "deployment_targets": ["WEFT"],
-            "maturity": "SHIPPED",
-            "signing_identity": "NONE",
-            "signing_tier": "NONE",
-            "effect": "READ_ONLY",
-            "retry_behavior": "SAFE",
-            "client_operation_id_required": False,
-        },
+        RPC: {**common, "rpc": RPC, "method": "GetCompare", "maturity": "SHIPPED"},
         PLANNED_RPC: {
+            **common,
             "rpc": PLANNED_RPC,
             "service": "heddle.api.v1alpha1.AgentService",
             "method": "GetAgentRun",
-            "deployment_targets": ["WEFT"],
             "maturity": "PLANNED",
-            "signing_identity": "NONE",
-            "signing_tier": "NONE",
-            "effect": "READ_ONLY",
-            "retry_behavior": "SAFE",
-            "client_operation_id_required": False,
         },
     }
 
 
-def row(rpc: str, status: str, **extra: object) -> dict[str, object]:
-    layer = {"status": status, "evidence": ["path/to/source.rs:handler"], "follow_up": None}
-    result: dict[str, object] = {
+def row(rpc: str, status: str) -> dict[str, object]:
+    return {
         "rpc": rpc,
         "capability": "state comparison" if rpc == RPC else "run history/details",
-        "layers": {"first": dict(layer), "second": dict(layer)},
+        "layers": {"first": {"status": status}, "second": {"status": status}},
     }
-    result.update(extra)
-    return result
 
 
 def declarations() -> dict[str, dict[str, object]]:
-    return with_layer_names({
-        "heddle": {
-            "schema_version": 1,
-            "consumer": "heddle",
-            "source_repository": "HeddleCo/heddle",
-            "rpc_mappings": [row(RPC, "unsupported"), row(PLANNED_RPC, "planned")],
-        },
-        "tapestry": {
-            "schema_version": 1,
-            "consumer": "tapestry",
-            "source_repository": "HeddleCo/tapestry",
+    result = {
+        name: {
+            "schema_version": 2,
+            "consumer": name,
             "rpc_mappings": [row(RPC, "shipped"), row(PLANNED_RPC, "planned")],
-        },
-        "weft": {
-            "schema_version": 1,
-            "consumer": "weft",
-            "source_repository": "HeddleCo/weft",
-            "rpc_mappings": [
-                row(RPC, "shipped"),
-                row(PLANNED_RPC, "planned"),
-            ],
-        },
-    })
-
-
-def with_layer_names(data: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
+        }
+        for name in ("heddle", "tapestry", "weft")
+    }
     names = {
         "heddle": ("client", "cli"),
         "tapestry": ("server_adapter", "ui"),
         "weft": ("implementation", "registration"),
     }
     for consumer, layer_names in names.items():
-        for mapping in data[consumer]["rpc_mappings"]:  # type: ignore[index,union-attr]
-            layers = mapping["layers"]
-            mapping["layers"] = {
-                layer_names[0]: layers["first"],
-                layer_names[1]: layers["second"],
+        for mapping in result[consumer]["rpc_mappings"]:  # type: ignore[index]
+            layers = mapping["layers"]  # type: ignore[index]
+            mapping["layers"] = {  # type: ignore[index]
+                layer_names[0]: layers["first"],  # type: ignore[index]
+                layer_names[1]: layers["second"],  # type: ignore[index]
             }
-    return data
+    return result
 
 
 class CapabilityMatrixAuditTests(unittest.TestCase):
@@ -122,29 +97,35 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         data["tapestry"]["rpc_mappings"].append(missing)  # type: ignore[index,union-attr]
         self.assert_audit_fails(data, "nonexistent RPC")
 
-    def test_missing_weft_registration_on_shipped_rpc_fails(self) -> None:
+    def test_missing_weft_registration_status_fails(self) -> None:
         data = declarations()
-        data["weft"]["rpc_mappings"][0]["layers"]["registration"]["evidence"] = []  # type: ignore[index,union-attr]
-        self.assert_audit_fails(data, "missing Weft registration")
+        data["weft"]["rpc_mappings"][0]["layers"]["registration"]["status"] = "planned"  # type: ignore[index]
+        self.assert_audit_fails(data, "lacks Weft registration")
 
-    def test_duplicate_mapping_fails(self) -> None:
+    def test_partial_weft_implementation_is_explicitly_valid(self) -> None:
         data = declarations()
-        data["heddle"]["rpc_mappings"].append(  # type: ignore[index,union-attr]
-            copy.deepcopy(data["heddle"]["rpc_mappings"][0])  # type: ignore[index]
-        )
-        self.assert_audit_fails(data, "duplicate mapping")
+        data["weft"]["rpc_mappings"][0]["layers"]["implementation"]["status"] = "partial"  # type: ignore[index]
+        audit_declarations(inventory(), data)
 
-    def test_blank_status_fails(self) -> None:
+    def test_private_evidence_field_fails_public_schema(self) -> None:
         data = declarations()
-        data["heddle"]["rpc_mappings"][0]["layers"]["client"]["status"] = ""  # type: ignore[index,union-attr]
-        self.assert_audit_fails(data, "blank status")
+        data["weft"]["rpc_mappings"][0]["layers"]["implementation"]["evidence"] = [  # type: ignore[index]
+            "private/path.rs:handler"
+        ]
+        self.assert_audit_fails(data, "invalid weft implementation layer")
 
     def test_capability_mismatch_fails(self) -> None:
         data = declarations()
-        data["heddle"]["rpc_mappings"][0]["capability"] = "different"  # type: ignore[index,union-attr]
+        data["heddle"]["rpc_mappings"][0]["capability"] = "different"  # type: ignore[index]
         self.assert_audit_fails(data, "capability mismatch")
 
-    def test_generated_report_detects_metadata_drift(self) -> None:
+    def test_report_separates_signing_from_unavailable_authorization(self) -> None:
+        rendered = render_report(inventory(), audit_declarations(inventory(), declarations()))
+        self.assertIn("| Signing contract | Authorization contract metadata |", rendered)
+        self.assertIn("signing is not authorization", rendered)
+        self.assertIn("unavailable (no descriptor authorization role/scope option)", rendered)
+
+    def test_report_detects_descriptor_metadata_drift(self) -> None:
         checked = render_report(inventory(), audit_declarations(inventory(), declarations()))
         changed = inventory()
         changed[RPC]["signing_tier"] = "PROOF_OF_POSSESSION"
@@ -155,42 +136,51 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(AuditError, "generated report drift"):
                 check_report(path, regenerated)
 
-    def test_checked_in_report_is_exact_deterministic_output(self) -> None:
-        audited = audit_declarations(inventory(), declarations())
-        first = render_report(inventory(), audited)
-        second = render_report(inventory(), audited)
-        self.assertEqual(first, second)
+    def test_authorization_unavailable_claim_is_tied_to_option_absence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "report.md"
-            path.write_text(first)
-            self.assertEqual(path.read_text(), second)
+            contract = Path(directory) / "contract.proto"
+            contract.write_text("message RpcContract {\n  string authorization_scope = 1;\n}\n")
+            with self.assertRaisesRegex(AuditError, "metadata now exists"):
+                audit_authorization_metadata_absence(contract)
 
-    def test_json_round_trip_does_not_change_report(self) -> None:
-        data = json.loads(json.dumps(declarations(), sort_keys=True))
-        self.assertEqual(
-            render_report(inventory(), audit_declarations(inventory(), declarations())),
-            render_report(inventory(), audit_declarations(inventory(), data)),
-        )
-
-    def test_consumer_snapshot_provenance_detects_content_drift(self) -> None:
+    def test_public_attestation_detects_content_drift_and_has_no_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            sources: dict[str, object] = {"schema_version": 1, "sources": {}}
+            attestations: dict[str, object] = {}
             for consumer in ("heddle", "tapestry", "weft"):
                 content = json.dumps(declarations()[consumer], sort_keys=True).encode()
                 (root / f"{consumer}.json").write_bytes(content)
-                sources["sources"][consumer] = {  # type: ignore[index]
-                    "repository": f"HeddleCo/{consumer}",
-                    "revision": "a" * 40,
-                    "path": f"api-capabilities/{consumer}.json",
+                attestations[consumer] = {
+                    "kind": "consumer-derived-sanitized-declaration",
+                    "snapshot": f"capabilities/declarations/{consumer}.json",
                     "sha256": hashlib.sha256(content).hexdigest(),
                 }
             manifest = root / "sources.json"
-            manifest.write_text(json.dumps(sources))
+            manifest.write_text(json.dumps({"schema_version": 2, "attestations": attestations}))
             audit_provenance(root, manifest)
-            (root / "heddle.json").write_text("{}")
-            with self.assertRaisesRegex(AuditError, "content hash mismatch"):
+            manifest_data = json.loads(manifest.read_text())
+            manifest_data["attestations"]["weft"]["revision"] = "a" * 40
+            manifest.write_text(json.dumps(manifest_data))
+            with self.assertRaisesRegex(AuditError, "public attestation mismatch"):
                 audit_provenance(root, manifest)
+
+    def test_checked_in_public_artifacts_do_not_leak_private_details(self) -> None:
+        files = [
+            *sorted((ROOT / "capabilities/declarations").glob("*.json")),
+            ROOT / "capabilities/sources.json",
+            ROOT / "capabilities/MATRIX.md",
+        ]
+        text = "\n".join(path.read_text() for path in files)
+        for forbidden in (
+            '"evidence"',
+            '"follow_up"',
+            '"revision"',
+            "HeddleCo/weft/issues/",
+            "HeddleCo/tapestry/issues/",
+            "crates/weft-server/",
+            "src/routes/",
+        ):
+            self.assertNotIn(forbidden, text)
 
 
 if __name__ == "__main__":

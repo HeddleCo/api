@@ -1,23 +1,20 @@
 {
-  "schema_version": 1,
-  "sources": {
+  "schema_version": 2,
+  "attestations": {
     "heddle": {
-      "repository": "HeddleCo/heddle",
-      "revision": "03117ec3f7c03b4e8056658bce19df0562ca086b",
-      "path": "api-capabilities/heddle.json",
-      "sha256": "dcd25c792698e2df7bb7ba09c281085e3a7a03e046df4e503f844cc39deb8e31"
-    },
-    "tapestry": {
-      "repository": "HeddleCo/tapestry",
-      "revision": "a40ab23e746ac12235ecbc93390ef2eae252061a",
-      "path": "api-capabilities/tapestry.json",
-      "sha256": "f13e77643e87ef30e7564aac94c6fe31df14ed14c029e3c4eeb3153a85d3181d"
+      "kind": "consumer-derived-sanitized-declaration",
+      "snapshot": "capabilities/declarations/heddle.json",
+      "sha256": "824ec657929ec8a2e17c13df5389886d89d493c90d69460a00adee398689be5c"
     },
     "weft": {
-      "repository": "HeddleCo/weft",
-      "revision": "98b09845502dbd814b11b0662fc91c79696c9327",
-      "path": "api-capabilities/weft.json",
-      "sha256": "115107736089348431529eec5a4c7a5ac76d5002db7eea012860581865e52d11"
+      "kind": "consumer-derived-sanitized-declaration",
+      "snapshot": "capabilities/declarations/weft.json",
+      "sha256": "e8399a572b54997163f45644bad6e03187bea6f4f648f1dd524e07f11dd98667"
+    },
+    "tapestry": {
+      "kind": "consumer-derived-sanitized-declaration",
+      "snapshot": "capabilities/declarations/tapestry.json",
+      "sha256": "1b6934aa921680c97e001f2de09b1bffe00b2d1571943c74cc57dd5072537c13"
     }
   }
 }

@@ -1,0 +1,67 @@
+{
+  "available_native_paths": {
+    "caller_owned_hold": [
+      "ClaimHandle"
+    ],
+    "genuinely_free_new_account": [
+      "BeginWebAuthnRegistration",
+      "RegisterPublicKey"
+    ]
+  },
+  "availability_next_operations": {
+    "AVAILABLE": [
+      "BeginWebAuthnRegistration",
+      "RegisterPublicKey",
+      "ClaimHandle"
+    ],
+    "CONFUSABLE": [
+      "ClaimHandle",
+      "GetHandleStatus"
+    ],
+    "HELD": [
+      "RequestHeldName"
+    ],
+    "RESERVED": [
+      "GetHandleStatus"
+    ],
+    "TAKEN": [
+      "ResolveHandle"
+    ],
+    "UNSPECIFIED": [
+      "GetHandleStatus"
+    ]
+  },
+  "expected_public_principal": {
+    "displayName": "Ada",
+    "discriminator": "a3f9",
+    "handle": "ada",
+    "kind": "native",
+    "primaryHandle": "ada",
+    "resolved": true,
+    "verified": true
+  },
+  "legacy_resolved_principal_hex": "0a0b757365723a73656372657412034164611a0361646120012a0361646132066e61746976653801420461336639",
+  "public_field_tags": {
+    "display_name": 2,
+    "discriminator": 8,
+    "handle": 3,
+    "kind": 6,
+    "primary_handle": 5,
+    "resolved": 4,
+    "verified": 7
+  },
+  "request_forms": [
+    "gh:torvalds",
+    "torvalds",
+    "/u:user:<uuid>"
+  ],
+  "reserved_legacy_field": {
+    "name": "subject",
+    "tag": 1
+  },
+  "states_without_current_candidate_mutation": [
+    "RESERVED",
+    "TAKEN",
+    "UNSPECIFIED"
+  ]
+}

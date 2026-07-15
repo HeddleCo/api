@@ -655,6 +655,116 @@ message InvitationSummary {
 // Runs the credential-revocation cascade and returns an AccessToken bound to
 // the new device key from the accepted proof. weft#183 §8-3.
 
+// ── Handle directory and native-name escrow ────────────────────────────────
+
+// Availability of a native handle after normalization and classification.
+// RESERVED represents an explicit policy reservation; implementations MUST NOT
+// infer it merely because a name is otherwise unavailable.
+enum HandleAvailability {
+  // No usable classification was produced. The caller may retry the safe
+  // GetHandleStatus read; it MUST NOT infer that a mutation is allowed.
+  HANDLE_AVAILABILITY_UNSPECIFIED = 0;
+  // No other-owner hold, active native handle, or confusable collision blocks
+  // this caller. `held_for_verified_owner = false` means a genuinely free name:
+  // a new account claims it through BeginWebAuthnRegistration followed by
+  // RegisterPublicKey. `held_for_verified_owner = true` means the caller may
+  // own the nonblocking verified-owner hold; ClaimHandle is the authoritative
+  // self-claim check.
+  HANDLE_AVAILABILITY_AVAILABLE = 1;
+  // A verified-owner hold for another subject blocks this caller. The only
+  // mutation offered to the caller is RequestHeldName, which starts the
+  // right-of-first-refusal window without exposing the owner.
+  HANDLE_AVAILABILITY_HELD = 2;
+  // An active native handle already owns this name. ResolveHandle can read the
+  // public subject-free projection; no claim or escrow mutation is available.
+  HANDLE_AVAILABILITY_TAKEN = 3;
+  // Explicit policy reservation. No handle mutation is available for this
+  // candidate; choose another candidate and call GetHandleStatus again.
+  HANDLE_AVAILABILITY_RESERVED = 4;
+  // The candidate conflicts with a trust-bearing handle under the confusable
+  // classifier, so no free-name registration mutation is available; choose
+  // another candidate and call GetHandleStatus again. ClaimHandle remains only
+  // for a previously earned caller-owned verified-owner hold and is the
+  // authoritative check for that hidden ownership fact.
+  HANDLE_AVAILABILITY_CONFUSABLE = 5;
+}
+
+message GetHandleStatusRequest {
+  string name = 1;
+}
+
+message GetHandleStatusResponse {
+  HandleAvailability availability = 1;
+  // True whenever the normalized name has an active verified-owner hold. A
+  // blocking other-owner hold reports HELD; a nonblocking caller-owned hold
+  // reports AVAILABLE, but ClaimHandle remains the authoritative ownership
+  // check. The response MUST NOT expose the holder subject.
+  bool held_for_verified_owner = 2;
+}
+
+message RequestHeldNameRequest {
+  string name = 1;
+  // Stable retry key in the namespace of the authenticated subject and this
+  // RPC. A retry with the same authenticated subject, RPC, and client_operation_id
+  // and normalized name returns the same response without repeating the mutation.
+  // Key reuse with a different normalized name MUST fail with FAILED_PRECONDITION.
+  string client_operation_id = 2;
+}
+
+message RequestHeldNameResponse {
+  // Deadline of the right-of-first-refusal window. The current implementation
+  // creates a 30-day window.
+  google.protobuf.Timestamp rfr_deadline = 1;
+}
+
+message ClaimHandleRequest {
+  string name = 1;
+  // Stable retry key in the namespace of the authenticated subject and this
+  // RPC. A retry with the same authenticated subject, RPC, and client_operation_id
+  // and normalized name returns the same response without repeating the mutation.
+  // Key reuse with a different normalized name MUST fail with FAILED_PRECONDITION.
+  string client_operation_id = 2;
+}
+
+message ClaimHandleResponse {
+  bool claimed = 1;
+  // Canonical textual form of the claimed native handle.
+  string canonical_handle = 2;
+}
+
+message ResolveHandleRequest {
+  // Canonical handle text, a bare native name, or the legacy subject-route
+  // form, for example `gh:torvalds`, `torvalds`, or `/u:user:<uuid>`.
+  // Implementations MUST preserve `/u:<subject>` request lookup compatibility;
+  // the response remains the subject-free HandlePrincipal projection.
+  string name = 1;
+}
+
+// Public handle-directory projection. There is deliberately no subject field:
+// resolving a name MUST NOT expose an underlying subject. `primary_handle` is
+// the canonical URL/display token for the active principal.
+message HandlePrincipal {
+  // Legacy ResolvedPrincipal.subject occupied tag 1. Reserving both its tag and
+  // name prevents legacy response bytes from decoding into any public field.
+  reserved 1;
+  reserved "subject";
+  string display_name = 2;
+  string handle = 3;
+  bool resolved = 4;
+  string primary_handle = 5;
+  string kind = 6;
+  bool verified = 7;
+  string discriminator = 8;
+}
+
+message ResolveHandleResponse {
+  // Populated for an active name. Absent for a tombstoned name.
+  optional HandlePrincipal principal = 1;
+  // True when the name existed but was renamed away. Never-claimed names
+  // return NOT_FOUND instead of this response.
+  bool tombstoned = 2;
+}
+
 service IdentityService {
   option (heddle.api.v1alpha1.service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
@@ -687,6 +797,23 @@ service IdentityService {
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+    };
+  }
+  // Claims only a verified-owner hold belonging to the authenticated subject.
+  // ClaimHandle is the successful path for AVAILABLE with
+  // `held_for_verified_owner = true`; genuinely free AVAILABLE names are
+  // claimed only during new-account registration through
+  // BeginWebAuthnRegistration followed by RegisterPublicKey. A free name, a
+  // name held for another subject, or a name already active for another subject
+  // returns the same NOT_FOUND status and public error shape.
+  rpc ClaimHandle(ClaimHandleRequest) returns (ClaimHandleResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
     };
   }
@@ -731,6 +858,18 @@ service IdentityService {
     };
   }
   rpc GetInvitationSummary(GetInvitationSummaryRequest) returns (InvitationSummary) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+    };
+  }
+  // Authenticated availability lookup. The response is intentionally limited
+  // to the public classification and holder-presence boolean.
+  rpc GetHandleStatus(GetHandleStatusRequest) returns (GetHandleStatusResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
@@ -837,6 +976,34 @@ service IdentityService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+    };
+  }
+  // Starts right-of-first-refusal only for a name held by another verified
+  // owner. No hold and caller-owned hold return the same NOT_FOUND status and
+  // public error shape, so the RPC does not reveal which condition applied.
+  rpc RequestHeldName(RequestHeldNameRequest) returns (RequestHeldNameResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+    };
+  }
+  // Directory lookup requires a valid bearer but is not gated by the caller's
+  // readable-resource set. Canonical handles, bare native names, and legacy
+  // `/u:<subject>` request routes return the same subject-free projection;
+  // tombstoned names return `tombstoned = true`; never-claimed names return
+  // NOT_FOUND.
+  rpc ResolveHandle(ResolveHandleRequest) returns (ResolveHandleResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
     };
   }

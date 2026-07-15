@@ -1,0 +1,41 @@
+{
+  "ClaimHandle": {
+    "client_operation_id_required": true,
+    "effect": "DURABLE_WRITE",
+    "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+    "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+    "request": "ClaimHandleRequest",
+    "response": "ClaimHandleResponse",
+    "retry_behavior": "CLIENT_OPERATION_ID",
+    "signing_tier": "PROOF_OF_POSSESSION"
+  },
+  "GetHandleStatus": {
+    "client_operation_id_required": false,
+    "effect": "READ_ONLY",
+    "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+    "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+    "request": "GetHandleStatusRequest",
+    "response": "GetHandleStatusResponse",
+    "retry_behavior": "SAFE",
+    "signing_tier": "NONE"
+  },
+  "RequestHeldName": {
+    "client_operation_id_required": true,
+    "effect": "DURABLE_WRITE",
+    "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+    "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+    "request": "RequestHeldNameRequest",
+    "response": "RequestHeldNameResponse",
+    "retry_behavior": "CLIENT_OPERATION_ID",
+    "signing_tier": "PROOF_OF_POSSESSION"
+  },
+  "ResolveHandle": {
+    "client_operation_id_required": false,
+    "effect": "READ_ONLY",
+    "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+    "request": "ResolveHandleRequest",
+    "response": "ResolveHandleResponse",
+    "retry_behavior": "SAFE",
+    "signing_tier": "NONE"
+  }
+}

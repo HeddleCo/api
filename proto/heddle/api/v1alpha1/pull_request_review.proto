@@ -174,6 +174,10 @@ service PullRequestReviewService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_PULL_REQUEST_REVIEW
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc GetReviewAnalysisStatus(GetReviewAnalysisStatusRequest) returns (GetReviewAnalysisStatusResponse) {
@@ -184,6 +188,10 @@ service PullRequestReviewService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_PULL_REQUEST_REVIEW
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc StartReviewAnalysis(StartReviewAnalysisRequest) returns (StartReviewAnalysisResponse) {
@@ -194,6 +202,10 @@ service PullRequestReviewService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_PULL_REQUEST_REVIEW
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
 }

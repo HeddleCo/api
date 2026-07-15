@@ -234,6 +234,10 @@ service StateReviewService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListSignatures(ListSignaturesRequest) returns (ListSignaturesResponse) {
@@ -244,6 +248,10 @@ service StateReviewService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc SignState(SignStateRequest) returns (SignStateResponse) {
@@ -254,6 +262,10 @@ service StateReviewService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
 }

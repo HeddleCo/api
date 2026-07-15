@@ -26,9 +26,6 @@ STATUSES = {
     "intentionally-unsupported",
     "blocked",
 }
-AUTHORIZATION_METADATA = "unavailable (no descriptor authorization role/scope option)"
-
-
 class AuditError(ValueError):
     """A declaration or generated artifact drifted from the descriptor."""
 
@@ -173,7 +170,7 @@ def render_report(
         "",
         "Status vocabulary: `shipped` is fully supported; `partial` implements only part of the contract; `planned` tracks future work; `intentionally-unsupported` is an explicit layer boundary; `blocked` names an external prerequisite. Detailed evidence and follow-up links remain in each owning consumer repository.",
         "",
-        "Signing identity/tier is descriptor metadata. Authorization role/scope metadata is rendered separately and is currently unavailable because `RpcContract` defines no authorization role/scope option; signing is not authorization.",
+        "Signing identity/tier and authorization access/role/scope/existence are independent descriptor metadata; signing is not authorization. These declarations describe the canonical contract and do not by themselves prove producer enforcement.",
         "",
     ]
     capabilities = sorted(
@@ -199,13 +196,17 @@ def render_report(
             contract = inventory[rpc]
             target = f"{', '.join(contract['deployment_targets'])} / {contract['maturity']}"
             signing = f"{contract['signing_identity']} / {contract['signing_tier']}"
+            authorization = (
+                f"{contract['authorization_access']} / {contract['authorization_role']} / "
+                f"{contract['authorization_scope_source']} / {contract['authorization_existence']}"
+            )
             retry = (
                 f"{contract['effect']}; {contract['retry_behavior']}; "
                 f"client operation id: {'required' if contract['client_operation_id_required'] else 'not required'}"
             )
             lines.append(
                 "| `" + rpc + "` | " + target + " | " + signing + " | "
-                + AUTHORIZATION_METADATA
+                + authorization
                 + " | "
                 + retry
                 + " | "

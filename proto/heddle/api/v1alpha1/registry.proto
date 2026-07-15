@@ -906,6 +906,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc CreateGrant(CreateGrantRequest) returns (HostedGrant) {
@@ -916,6 +920,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc CreateInvitation(CreateInvitationRequest) returns (Invitation) {
@@ -926,6 +934,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc CreateNamespace(CreateNamespaceRequest) returns (HostedNamespace) {
@@ -936,6 +948,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc CreateRepository(CreateRepositoryRequest) returns (HostedRepository) {
@@ -946,6 +962,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc DeleteBookmark(DeleteBookmarkRequest) returns (DeleteResponse) {
@@ -956,6 +976,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc DeleteGrant(DeleteGrantRequest) returns (DeleteResponse) {
@@ -966,6 +990,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteResponse) {
@@ -976,6 +1004,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc DeleteRepository(DeleteRepositoryRequest) returns (DeleteResponse) {
@@ -986,6 +1018,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc DetachChild(DetachChildRequest) returns (DetachChildResponse) {
@@ -996,6 +1032,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc GetCurrentUserNamespace(GetCurrentUserNamespaceRequest) returns (HostedNamespace) {
@@ -1006,6 +1046,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc GetSpool(GetSpoolRequest) returns (HostedSpool) {
@@ -1016,6 +1060,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc GrantSupportAccess(GrantSupportAccessRequest) returns (SupportAccessGrant) {
@@ -1026,6 +1074,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListBookmarks(ListBookmarksRequest) returns (ListBookmarksResponse) {
@@ -1036,6 +1088,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListChildren(ListChildrenRequest) returns (ListChildrenResponse) {
@@ -1046,6 +1102,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse) {
@@ -1056,6 +1116,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
@@ -1066,6 +1130,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListMembers(ListMembersRequest) returns (ListMembersResponse) {
@@ -1076,6 +1144,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListSpools(ListSpoolsRequest) returns (ListSpoolsResponse) {
@@ -1086,6 +1158,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListSupportAccessGrants(ListSupportAccessGrantsRequest) returns (ListSupportAccessGrantsResponse) {
@@ -1096,6 +1172,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse) {
@@ -1106,6 +1186,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ResolveMonorepo(ResolveMonorepoRequest) returns (MonorepoNode) {
@@ -1116,6 +1200,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ResolveSubjects(ResolveSubjectsRequest) returns (ResolveSubjectsResponse) {
@@ -1126,6 +1214,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc RevokeInvitation(RevokeInvitationRequest) returns (DeleteResponse) {
@@ -1136,6 +1228,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc RevokeSupportAccess(RevokeSupportAccessRequest) returns (DeleteResponse) {
@@ -1146,6 +1242,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc SetNamespaceVisibility(SetNamespaceVisibilityRequest) returns (HostedNamespace) {
@@ -1156,6 +1256,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc SetSpoolVisibility(SetSpoolVisibilityRequest) returns (HostedSpool) {
@@ -1166,6 +1270,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc UpdateGrant(UpdateGrantRequest) returns (HostedGrant) {
@@ -1176,6 +1284,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc UpdateNamespace(UpdateNamespaceRequest) returns (HostedNamespace) {
@@ -1186,6 +1298,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc UpdateRepository(UpdateRepositoryRequest) returns (HostedRepository) {
@@ -1196,6 +1312,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc UpdateSpoolSettings(UpdateSpoolSettingsRequest) returns (HostedSpool) {
@@ -1206,6 +1326,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc UpsertBookmark(UpsertBookmarkRequest) returns (Bookmark) {
@@ -1216,6 +1340,10 @@ service RegistryService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
 }

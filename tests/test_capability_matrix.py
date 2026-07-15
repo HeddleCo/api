@@ -17,6 +17,7 @@ from tools.capability_matrix import (
     AuditError,
     audit_declarations,
     audit_provenance,
+    build_inventory,
     check_report,
     descriptor_inventory,
     render_report,
@@ -166,6 +167,83 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             baseline[RPC]["authorization_role"], changed[RPC]["authorization_role"]
         )
 
+    def test_descriptor_keeps_signing_and_authorization_orthogonal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/repository.proto"
+            original = source.read_text()
+            baseline_descriptor = root / "baseline.binpb"
+            self.build_descriptor(root, baseline_descriptor)
+            baseline = descriptor_inventory(baseline_descriptor)[RPC]
+
+            role_changed, count = re.subn(
+                r"(rpc GetCompare\b.*?authorization_role:) AUTHORIZATION_ROLE_RESOURCE_READER",
+                r"\1 AUTHORIZATION_ROLE_RESOURCE_WRITER",
+                original,
+                count=1,
+                flags=re.DOTALL,
+            )
+            self.assertEqual(count, 1)
+            source.write_text(role_changed)
+            role_descriptor = root / "role.binpb"
+            self.build_descriptor(root, role_descriptor)
+            role_contract = descriptor_inventory(role_descriptor)[RPC]
+            self.assertEqual(
+                (baseline["signing_identity"], baseline["signing_tier"]),
+                (role_contract["signing_identity"], role_contract["signing_tier"]),
+            )
+
+            signing_changed, count = re.subn(
+                r"(rpc GetCompare\b.*?signing_tier:) SIGNING_TIER_NONE",
+                r"\1 SIGNING_TIER_PROOF_OF_POSSESSION",
+                original,
+                count=1,
+                flags=re.DOTALL,
+            )
+            self.assertEqual(count, 1)
+            source.write_text(signing_changed)
+            signing_descriptor = root / "signing.binpb"
+            self.build_descriptor(root, signing_descriptor)
+            signing_contract = descriptor_inventory(signing_descriptor)[RPC]
+            self.assertEqual(
+                (
+                    baseline["authorization_access"],
+                    baseline["authorization_role"],
+                    baseline["authorization_scope_source"],
+                    baseline["authorization_existence"],
+                ),
+                (
+                    signing_contract["authorization_access"],
+                    signing_contract["authorization_role"],
+                    signing_contract["authorization_scope_source"],
+                    signing_contract["authorization_existence"],
+                ),
+            )
+
+    def test_shipped_authorization_is_total_and_planned_is_explicitly_unspecified(self) -> None:
+        actual = build_inventory()
+        shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
+        planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
+        self.assertEqual(len(shipped), 117)
+        self.assertEqual(len(planned), 20)
+        authorization_fields = (
+            "authorization_access",
+            "authorization_role",
+            "authorization_scope_source",
+            "authorization_existence",
+        )
+        for contract in shipped:
+            self.assertNotIn(
+                "UNSPECIFIED", [contract[field] for field in authorization_fields]
+            )
+        for contract in planned:
+            self.assertEqual(
+                [contract[field] for field in authorization_fields],
+                ["UNSPECIFIED"] * len(authorization_fields),
+            )
+
     def test_report_detects_descriptor_metadata_drift(self) -> None:
         checked = render_report(inventory(), audit_declarations(inventory(), declarations()))
         changed = inventory()
@@ -261,6 +339,26 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(AuditError, "invalid authorization combination"):
                 descriptor_inventory(descriptor)
 
+    def test_descriptor_inventory_rejects_unknown_authorization_enum_value(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/repository.proto"
+            text = source.read_text()
+            changed, count = re.subn(
+                r"authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER",
+                "authorization_role: 99",
+                text,
+                count=1,
+            )
+            self.assertEqual(count, 1)
+            source.write_text(changed)
+            descriptor = root / "unknown-authz.binpb"
+            self.build_descriptor(root, descriptor)
+            with self.assertRaisesRegex(AuditError, "unknown authorization role"):
+                descriptor_inventory(descriptor)
+
     def test_descriptor_inventory_fails_closed_when_rpc_contract_schema_changes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -269,8 +367,8 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             source = root / "proto/heddle/api/v1alpha1/contract.proto"
             text = source.read_text()
             changed, count = re.subn(
-                r"(\n  CapabilityArea capability = 6;)",
-                r"\1\n  string required_permission = 7;",
+                r"(\n  AuthorizationExistence authorization_existence = 10;)",
+                r"\1\n  string required_permission = 11;",
                 text,
                 count=1,
             )

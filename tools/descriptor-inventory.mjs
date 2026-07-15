@@ -33,6 +33,10 @@ const RPC_CONTRACT_FIELDS = new Set([
   "retry_behavior",
   "client_operation_id_required",
   "capability",
+  "authorization_access",
+  "authorization_role",
+  "authorization_scope_source",
+  "authorization_existence",
 ]);
 
 function required(registry, kind, name) {
@@ -51,6 +55,57 @@ function enumLocal(enumDescriptor, number, context) {
     throw new Error(`descriptor metadata missing ${context}`);
   }
   return value.localName;
+}
+
+function enumLocalIncludingUnspecified(enumDescriptor, number, context) {
+  const value = enumDescriptor.values.find(
+    (candidate) => candidate.number === number,
+  );
+  if (value === undefined) {
+    throw new Error(`descriptor metadata has unknown ${context}`);
+  }
+  return value.localName;
+}
+
+function validateAuthorization(metadata, maturity, rpc) {
+  const values = [
+    metadata.authorization_access,
+    metadata.authorization_role,
+    metadata.authorization_scope_source,
+    metadata.authorization_existence,
+  ];
+  const unspecified = values.filter((value) => value === "UNSPECIFIED").length;
+  if (unspecified !== 0) {
+    if (maturity !== "PLANNED" || unspecified !== values.length) {
+      throw new Error(`descriptor metadata missing authorization access/role/scope/existence: ${rpc}`);
+    }
+    return;
+  }
+
+  const { authorization_access: access, authorization_role: role } = metadata;
+  const scope = metadata.authorization_scope_source;
+  const existence = metadata.authorization_existence;
+  const resourceRoles = new Set([
+    "RESOURCE_READER",
+    "RESOURCE_WRITER",
+    "RESOURCE_ADMINISTRATOR",
+    "CALLER_OR_RESOURCE_ADMINISTRATOR",
+  ]);
+  const resourceScopes = new Set([
+    "REQUEST_REPOSITORY",
+    "REQUEST_NAMESPACE",
+    "REQUEST_RESOURCE",
+    "CALLER_GRANTS",
+  ]);
+  const valid =
+    (role === "NONE" && scope === "NONE" && existence === "DISCLOSE") ||
+    (role === "CALLER_BOUND" &&
+      new Set(["CALLER_SUBJECT", "REQUEST_RESOURCE"]).has(scope)) ||
+    (resourceRoles.has(role) && resourceScopes.has(scope)) ||
+    (role === "GLOBAL_ADMINISTRATOR" && scope === "NONE" && existence === "DISCLOSE");
+  if (!valid || (access === "PUBLIC" && resourceRoles.has(role))) {
+    throw new Error(`invalid authorization combination: ${rpc}`);
+  }
 }
 
 function main() {
@@ -98,6 +153,26 @@ function main() {
     registry,
     "getEnum",
     `${PACKAGE}.CapabilityArea`,
+  );
+  const authorizationAccess = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationAccess`,
+  );
+  const authorizationRole = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationRole`,
+  );
+  const authorizationScopeSource = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationScopeSource`,
+  );
+  const authorizationExistence = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationExistence`,
   );
 
   const rpcContractFields = new Set(
@@ -162,6 +237,29 @@ function main() {
         if (inventory[rpc] !== undefined) {
           throw new Error(`descriptor contains duplicate RPC: ${rpc}`);
         }
+        const authorization = {
+          authorization_access: enumLocalIncludingUnspecified(
+            authorizationAccess,
+            option.authorizationAccess,
+            `authorization access: ${rpc}`,
+          ),
+          authorization_role: enumLocalIncludingUnspecified(
+            authorizationRole,
+            option.authorizationRole,
+            `authorization role: ${rpc}`,
+          ),
+          authorization_scope_source: enumLocalIncludingUnspecified(
+            authorizationScopeSource,
+            option.authorizationScopeSource,
+            `authorization scope source: ${rpc}`,
+          ),
+          authorization_existence: enumLocalIncludingUnspecified(
+            authorizationExistence,
+            option.authorizationExistence,
+            `authorization existence: ${rpc}`,
+          ),
+        };
+        validateAuthorization(authorization, maturity, rpc);
         inventory[rpc] = {
           rpc,
           service: service.typeName,
@@ -186,6 +284,7 @@ function main() {
             `retry behavior: ${rpc}`,
           ),
           client_operation_id_required: option.clientOperationIdRequired,
+          ...authorization,
           client_streaming: method.proto.clientStreaming,
           server_streaming: method.proto.serverStreaming,
         };

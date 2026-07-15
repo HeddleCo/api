@@ -38,6 +38,10 @@ def inventory() -> dict[str, dict[str, object]]:
         "effect": "READ_ONLY",
         "retry_behavior": "SAFE",
         "client_operation_id_required": False,
+        "authorization_access": "AUTHENTICATED_PRINCIPAL",
+        "authorization_role": "RESOURCE_READER",
+        "authorization_scope_source": "REQUEST_REPOSITORY",
+        "authorization_existence": "HIDE",
     }
     return {
         RPC: {**common, "rpc": RPC, "method": "GetCompare", "maturity": "SHIPPED"},
@@ -138,11 +142,29 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
     def test_capability_is_owned_by_descriptor_not_consumers(self) -> None:
         audit_declarations(inventory(), declarations())
 
-    def test_report_separates_signing_from_unavailable_authorization(self) -> None:
+    def test_report_separates_signing_from_authorization(self) -> None:
         rendered = render_report(inventory(), audit_declarations(inventory(), declarations()))
         self.assertIn("| Signing contract | Authorization contract metadata |", rendered)
         self.assertIn("signing is not authorization", rendered)
-        self.assertIn("unavailable (no descriptor authorization role/scope option)", rendered)
+        self.assertIn(
+            "AUTHENTICATED_PRINCIPAL / RESOURCE_READER / REQUEST_REPOSITORY / HIDE",
+            rendered,
+        )
+
+    def test_authorization_metadata_does_not_change_signing_metadata(self) -> None:
+        baseline = inventory()
+        changed = copy.deepcopy(baseline)
+        changed[RPC]["authorization_role"] = "RESOURCE_WRITER"
+        self.assertEqual(
+            baseline[RPC]["signing_identity"], changed[RPC]["signing_identity"]
+        )
+        self.assertEqual(baseline[RPC]["signing_tier"], changed[RPC]["signing_tier"])
+
+        changed = copy.deepcopy(baseline)
+        changed[RPC]["signing_tier"] = "PROOF_OF_POSSESSION"
+        self.assertEqual(
+            baseline[RPC]["authorization_role"], changed[RPC]["authorization_role"]
+        )
 
     def test_report_detects_descriptor_metadata_drift(self) -> None:
         checked = render_report(inventory(), audit_declarations(inventory(), declarations()))
@@ -197,6 +219,46 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             descriptor = root / "missing.binpb"
             self.build_descriptor(root, descriptor)
             with self.assertRaisesRegex(AuditError, "capability"):
+                descriptor_inventory(descriptor)
+
+    def test_descriptor_inventory_fails_closed_when_shipped_authorization_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/repository.proto"
+            text = source.read_text()
+            changed, count = re.subn(
+                r"\n\s+authorization_access: AUTHORIZATION_ACCESS_[A-Z_]+",
+                "",
+                text,
+                count=1,
+            )
+            self.assertEqual(count, 1)
+            source.write_text(changed)
+            descriptor = root / "missing-authz.binpb"
+            self.build_descriptor(root, descriptor)
+            with self.assertRaisesRegex(AuditError, "authorization access"):
+                descriptor_inventory(descriptor)
+
+    def test_descriptor_inventory_rejects_invalid_authorization_combination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/repository.proto"
+            text = source.read_text()
+            changed, count = re.subn(
+                r"authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER",
+                "authorization_role: AUTHORIZATION_ROLE_NONE",
+                text,
+                count=1,
+            )
+            self.assertEqual(count, 1)
+            source.write_text(changed)
+            descriptor = root / "invalid-authz.binpb"
+            self.build_descriptor(root, descriptor)
+            with self.assertRaisesRegex(AuditError, "invalid authorization combination"):
                 descriptor_inventory(descriptor)
 
     def test_descriptor_inventory_fails_closed_when_rpc_contract_schema_changes(self) -> None:

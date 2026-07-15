@@ -4,7 +4,6 @@
   "rpc_mappings": [
     {
       "rpc": "heddle.api.v1alpha1.AgentGatewayService/Connect",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -16,7 +15,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/ControlAgent",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -28,7 +26,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/DecideAgentPermission",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -40,7 +37,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/DeleteHarnessPreference",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -52,7 +48,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/GetAgentCommand",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -64,7 +59,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/GetAgentPolicy",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -76,7 +70,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/GetAgentRun",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -88,7 +81,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/ListAgentRuns",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -100,7 +92,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/ListAgentTimelineEvents",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -112,7 +103,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/ListHarnessPreferences",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -124,7 +114,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/UpdateAgentPolicy",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -136,7 +125,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AgentService/WatchAgentRun",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "planned"
@@ -148,7 +136,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AttentionService/GetFeedSnapshot",
-      "capability": "attention feed",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -160,7 +147,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AttentionService/RecordInteraction",
-      "capability": "attention feed",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -172,7 +158,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AttentionService/StreamFeed",
-      "capability": "attention feed",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -184,7 +169,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.AttentionService/UpdateFeedItem",
-      "capability": "attention feed",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -196,7 +180,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn",
-      "capability": "collaboration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -208,7 +191,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.CollaborationService/ListByState",
-      "capability": "collaboration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -220,7 +202,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.CollaborationService/ListBySymbol",
-      "capability": "collaboration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -232,7 +213,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion",
-      "capability": "collaboration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -244,7 +224,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion",
-      "capability": "collaboration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -256,7 +235,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ApproveDeviceAuthorization",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -268,7 +246,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "shipped"
@@ -280,7 +257,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnRegistration",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -292,7 +268,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "shipped"
@@ -304,7 +279,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateServiceAccount",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "shipped"
@@ -316,7 +290,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ExchangeDeviceAuthorization",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "shipped"
@@ -328,7 +301,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/FinishWebAuthnAuthentication",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -340,7 +312,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/GetInvitationSummary",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -352,7 +323,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/IntrospectCredential",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -364,7 +334,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/IssuePresenceToken",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -376,7 +345,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/IssueServiceAccountCredential",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "shipped"
@@ -388,7 +356,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -400,7 +367,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -412,7 +378,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ListServiceAccounts",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -424,7 +389,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ListSessions",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -436,7 +400,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -448,7 +411,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "shipped"
@@ -460,7 +422,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -472,7 +433,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/RevokeCredential",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -484,7 +444,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/RevokeServiceAccount",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -496,7 +455,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/RevokeSession",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -508,7 +466,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/RotateCredential",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -520,7 +477,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -532,7 +488,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -544,7 +499,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/WaitForDeviceAuthorization",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "shipped"
@@ -556,7 +510,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/WhoAmI",
-      "capability": "identity and credentials",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -568,7 +521,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
-      "capability": "pull request review",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -580,7 +532,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus",
-      "capability": "pull request review",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -592,7 +543,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis",
-      "capability": "pull request review",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -604,7 +554,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/AttachChild",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -616,7 +565,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateGrant",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -628,7 +576,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateInvitation",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -640,7 +587,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -652,7 +598,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -664,7 +609,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -676,7 +620,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteGrant",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -688,7 +631,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteNamespace",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -700,7 +642,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteRepository",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -712,7 +653,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/DetachChild",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -724,7 +664,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -736,7 +675,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/GetSpool",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -748,7 +686,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -760,7 +697,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListBookmarks",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -772,7 +708,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListChildren",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -784,7 +719,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListGrants",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -796,7 +730,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListInvitations",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -808,7 +741,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListMembers",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -820,7 +752,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListSpools",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -832,7 +763,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListSupportAccessGrants",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -844,7 +774,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListWorktrees",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -856,7 +785,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ResolveMonorepo",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -868,7 +796,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ResolveSubjects",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -880,7 +807,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/RevokeInvitation",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -892,7 +818,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -904,7 +829,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -916,7 +840,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -928,7 +851,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateGrant",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -940,7 +862,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateNamespace",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -952,7 +873,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateRepository",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "shipped"
@@ -964,7 +884,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpoolSettings",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -976,7 +895,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/UpsertBookmark",
-      "capability": "spool administration",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -988,7 +906,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepoSyncService/ListRefs",
-      "capability": "synchronization",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1000,7 +917,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepoSyncService/Pull",
-      "capability": "synchronization",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1012,7 +928,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepoSyncService/Push",
-      "capability": "synchronization",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1024,7 +939,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepoSyncService/UpdateRef",
-      "capability": "synchronization",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1036,7 +950,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/CreateImportJob",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1048,7 +961,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1060,7 +972,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlob",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1072,7 +983,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetCompare",
-      "capability": "state comparison",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1084,7 +994,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetContextHistory",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1096,7 +1005,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetDiff",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1108,7 +1016,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetRefs",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1120,7 +1027,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetSemanticHotSpots",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1132,7 +1038,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetState",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1144,7 +1049,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetTree",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1156,7 +1060,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListActions",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1168,7 +1071,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListContext",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1180,7 +1082,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListContextSuggestions",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1192,7 +1093,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListProvenanceSummaries",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1204,7 +1104,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
-      "capability": "run history/details",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1216,7 +1115,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ReviseContext",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1228,7 +1126,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/SetContext",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1240,7 +1137,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/StreamImportProgress",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1252,7 +1148,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1264,7 +1159,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/SupersedeContext",
-      "capability": "repository inspection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1276,7 +1170,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.SearchService/Search",
-      "capability": "search",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1288,7 +1181,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload",
-      "capability": "review decisions",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1300,7 +1192,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures",
-      "capability": "review decisions",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1312,7 +1203,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.StateReviewService/SignState",
-      "capability": "review decisions",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1324,7 +1214,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/AddApprovalGroupMember",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1336,7 +1225,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/AddPolicyGroupRequirement",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1348,7 +1236,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/ApproveThread",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1360,7 +1247,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/CheckMergeEligibility",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1372,7 +1258,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/CreateApprovalGroup",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1384,7 +1269,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/CreateThreadPolicy",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1396,7 +1280,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteApprovalGroup",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1408,7 +1291,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteThreadPolicy",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1420,7 +1302,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary",
-      "capability": "workspace management",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1432,7 +1313,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1444,7 +1324,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadApprovals",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1456,7 +1335,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadPolicies",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1468,7 +1346,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads",
-      "capability": "workspace management",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1480,7 +1357,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/RemoveApprovalGroupMember",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1492,7 +1368,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/RemovePolicyGroupRequirement",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "planned"
@@ -1504,7 +1379,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/RevokeApproval",
-      "capability": "branch protection",
       "layers": {
         "client": {
           "status": "shipped"
@@ -1516,7 +1390,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/StreamWorkspaceSummary",
-      "capability": "workspace management",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"

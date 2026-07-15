@@ -303,6 +303,7 @@ service RepoSyncService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
     };
   }
   rpc Pull(stream PullClientFrame) returns (stream PullServerFrame) {
@@ -312,6 +313,7 @@ service RepoSyncService {
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
     };
   }
   rpc Push(stream PushClientFrame) returns (stream PushServerFrame) {
@@ -321,6 +323,7 @@ service RepoSyncService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
     };
   }
   rpc UpdateRef(UpdateRefRequest) returns (UpdateRefResponse) {
@@ -330,6 +333,7 @@ service RepoSyncService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
     };
   }
 }

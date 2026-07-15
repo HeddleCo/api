@@ -159,6 +159,7 @@ service AttentionService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_ATTENTION_FEED
     };
   }
   rpc RecordInteraction(RecordInteractionRequest) returns (RecordInteractionResponse) {
@@ -168,6 +169,7 @@ service AttentionService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_ATTENTION_FEED
     };
   }
   rpc StreamFeed(StreamFeedRequest) returns (stream FeedItem) {
@@ -177,6 +179,7 @@ service AttentionService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_ATTENTION_FEED
     };
   }
   rpc UpdateFeedItem(UpdateFeedItemRequest) returns (UpdateFeedItemResponse) {
@@ -186,6 +189,7 @@ service AttentionService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_ATTENTION_FEED
     };
   }
 }

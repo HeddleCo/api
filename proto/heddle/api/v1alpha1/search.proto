@@ -98,6 +98,7 @@ service SearchService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SEARCH
     };
   }
 }

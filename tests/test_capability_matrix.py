@@ -7,16 +7,18 @@ import copy
 import hashlib
 import json
 import re
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 from tools.capability_matrix import (
     AuditError,
-    audit_authorization_metadata_absence,
     audit_declarations,
     audit_provenance,
     check_report,
+    descriptor_inventory,
     render_report,
 )
 
@@ -29,6 +31,7 @@ PLANNED_RPC = "heddle.api.v1alpha1.AgentService/GetAgentRun"
 def inventory() -> dict[str, dict[str, object]]:
     common = {
         "service": "heddle.api.v1alpha1.RepositoryService",
+        "capability": "state comparison",
         "deployment_targets": ["WEFT"],
         "signing_identity": "AUTHENTICATED_PRINCIPAL",
         "signing_tier": "NONE",
@@ -43,6 +46,7 @@ def inventory() -> dict[str, dict[str, object]]:
             "rpc": PLANNED_RPC,
             "service": "heddle.api.v1alpha1.AgentService",
             "method": "GetAgentRun",
+            "capability": "run history/details",
             "maturity": "PLANNED",
         },
     }
@@ -51,7 +55,6 @@ def inventory() -> dict[str, dict[str, object]]:
 def row(rpc: str, status: str) -> dict[str, object]:
     return {
         "rpc": rpc,
-        "capability": "state comparison" if rpc == RPC else "run history/details",
         "layers": {"first": {"status": status}, "second": {"status": status}},
     }
 
@@ -81,6 +84,14 @@ def declarations() -> dict[str, dict[str, object]]:
 
 
 class CapabilityMatrixAuditTests(unittest.TestCase):
+    def build_descriptor(self, root: Path, output: Path) -> None:
+        subprocess.run(
+            ["buf", "build", "-o", str(output)],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+
     def assert_audit_fails(self, data: dict[str, dict[str, object]], match: str) -> None:
         with self.assertRaisesRegex(AuditError, match):
             audit_declarations(inventory(), data)
@@ -119,10 +130,13 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         ]
         self.assert_audit_fails(data, "invalid weft implementation layer")
 
-    def test_capability_mismatch_fails(self) -> None:
+    def test_consumer_capability_copy_fails(self) -> None:
         data = declarations()
-        data["heddle"]["rpc_mappings"][0]["capability"] = "different"  # type: ignore[index]
-        self.assert_audit_fails(data, "capability mismatch")
+        data["heddle"]["rpc_mappings"][0]["capability"] = "state comparison"  # type: ignore[index]
+        self.assert_audit_fails(data, "invalid mapping row")
+
+    def test_capability_is_owned_by_descriptor_not_consumers(self) -> None:
+        audit_declarations(inventory(), declarations())
 
     def test_report_separates_signing_from_unavailable_authorization(self) -> None:
         rendered = render_report(inventory(), audit_declarations(inventory(), declarations()))
@@ -141,12 +155,49 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(AuditError, "generated report drift"):
                 check_report(path, regenerated)
 
-    def test_authorization_unavailable_claim_is_tied_to_option_absence(self) -> None:
+    def test_descriptor_inventory_ignores_formatting_and_comments(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            contract = Path(directory) / "contract.proto"
-            contract.write_text("message RpcContract {\n  string authorization_scope = 1;\n}\n")
-            with self.assertRaisesRegex(AuditError, "metadata now exists"):
-                audit_authorization_metadata_absence(contract)
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            baseline = root / "baseline.binpb"
+            formatted = root / "formatted.binpb"
+            self.build_descriptor(root, baseline)
+
+            source = root / "proto/heddle/api/v1alpha1/repository.proto"
+            source.write_text(
+                "// Formatting and comments are not contract metadata.\n\n"
+                + source.read_text().replace(
+                    "service RepositoryService {",
+                    "service RepositoryService /* descriptor traversal */ {",
+                )
+            )
+            subprocess.run(["buf", "format", "-w"], cwd=root, check=True)
+            self.build_descriptor(root, formatted)
+
+            self.assertEqual(
+                descriptor_inventory(baseline), descriptor_inventory(formatted)
+            )
+
+    def test_descriptor_inventory_fails_closed_when_capability_option_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/repository.proto"
+            text = source.read_text()
+            changed, count = re.subn(
+                r"\n\s+capability: CAPABILITY_AREA_[A-Z_]+",
+                "",
+                text,
+                count=1,
+            )
+            self.assertEqual(count, 1)
+            source.write_text(changed)
+            descriptor = root / "missing.binpb"
+            self.build_descriptor(root, descriptor)
+            with self.assertRaisesRegex(AuditError, "capability"):
+                descriptor_inventory(descriptor)
 
     def test_public_attestation_detects_content_drift_and_has_no_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -177,6 +228,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         ]
         text = "\n".join(path.read_text() for path in files)
         for forbidden in (
+            '"capability"',
             '"evidence"',
             '"follow_up"',
             '"revision"',

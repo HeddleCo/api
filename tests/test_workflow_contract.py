@@ -8,6 +8,8 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 VERIFY_COMMAND = "./tools/verify.sh"
 PROTOC_ACTION = "arduino/setup-protoc@v3"
 PROTOC_VERSION = '"31.1"'
+BUF_ACTION = "bufbuild/buf-setup-action@v1"
+BUF_GITHUB_TOKEN = "github_token: ${{ github.token }}"
 
 
 def workflow_jobs(workflow: Path) -> list[tuple[str, list[str]]]:
@@ -59,6 +61,28 @@ def job_steps(job: list[str]) -> list[list[str]]:
 
 
 class WorkflowContractTest(unittest.TestCase):
+    def test_every_buf_setup_action_uses_github_token(self) -> None:
+        callers: list[str] = []
+        workflow_paths = sorted(WORKFLOWS.glob("*.yml")) + sorted(
+            WORKFLOWS.glob("*.yaml")
+        )
+
+        for workflow in workflow_paths:
+            for job_name, job in workflow_jobs(workflow):
+                for step in job_steps(job):
+                    rendered = "\n".join(step)
+                    if f"uses: {BUF_ACTION}" not in rendered:
+                        continue
+                    caller = f"{workflow.relative_to(ROOT)}:{job_name}"
+                    callers.append(caller)
+                    self.assertIn(
+                        BUF_GITHUB_TOKEN,
+                        rendered,
+                        f"{caller} must authenticate {BUF_ACTION} GitHub API requests",
+                    )
+
+        self.assertTrue(callers, f"no workflow job uses {BUF_ACTION}")
+
     def test_verify_jobs_install_pinned_protoc_first(self) -> None:
         callers: list[str] = []
         workflow_paths = sorted(WORKFLOWS.glob("*.yml")) + sorted(

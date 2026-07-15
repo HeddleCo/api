@@ -657,8 +657,9 @@ message InvitationSummary {
 
 // ── Handle directory and native-name escrow ────────────────────────────────
 
-// Availability of a native handle after normalization and the confusable,
-// escrow, active-name, and policy checks have run.
+// Availability of a native handle after normalization and classification.
+// RESERVED represents an explicit policy reservation; implementations MUST NOT
+// infer it merely because a name is otherwise unavailable.
 enum HandleAvailability {
   HANDLE_AVAILABILITY_UNSPECIFIED = 0;
   HANDLE_AVAILABILITY_AVAILABLE = 1;

@@ -34,10 +34,40 @@ def rpc_body(service: str, name: str) -> tuple[str, str, str]:
     return match.group(1), match.group(2), match.group(3)
 
 
+def rpc_comment(service: str, name: str) -> str:
+    match = re.search(
+        rf"(?m)((?:^[ \t]*//[^\n]*\n)+)[ \t]*rpc {re.escape(name)}\(",
+        service,
+    )
+    if match is None:
+        raise AssertionError(f"missing documentation for rpc {name}")
+    return " ".join(
+        re.sub(r"^[ \t]*//[ ]?", "", line).strip()
+        for line in match.group(1).splitlines()
+    )
+
+
+def named_comment(source: str, kind: str, name: str) -> str:
+    match = re.search(
+        rf"(?m)((?:^//[^\n]*\n)+){re.escape(kind)} {re.escape(name)} \{{",
+        source,
+    )
+    if match is None:
+        raise AssertionError(f"missing documentation for {kind} {name}")
+    return " ".join(
+        re.sub(r"^//[ ]?", "", line).strip()
+        for line in match.group(1).splitlines()
+    )
+
+
 class SharedHandleContractTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.source = PROTO.read_text()
+        cls.all_proto_sources = "\n".join(
+            path.read_text()
+            for path in sorted((ROOT / "proto/heddle/api/v1alpha1").glob("*.proto"))
+        )
         cls.fixture = json.loads(FIXTURE.read_text())
 
     def test_all_handle_operations_have_descriptor_owned_contracts(self) -> None:
@@ -106,16 +136,43 @@ class SharedHandleContractTest(unittest.TestCase):
         self.assertRegex(response, r"\bHandlePrincipal\s+principal\s*=")
         self.assertRegex(response, r"\bbool\s+tombstoned\s*=")
 
-    def test_comments_lock_existence_hiding_and_retry_semantics(self) -> None:
-        for fragment in (
-            "MUST NOT expose the holder subject",
-            "same NOT_FOUND status and public error shape",
+    def test_each_rpc_locks_its_own_existence_hiding_and_retry_semantics(self) -> None:
+        status = named_body(self.source, "message", "GetHandleStatusResponse")
+        self.assertIn("MUST NOT expose the holder subject", status)
+
+        service = named_body(self.source, "service", "IdentityService")
+        claim_comment = rpc_comment(service, "ClaimHandle")
+        self.assertIn("same NOT_FOUND status and public error shape", claim_comment)
+        request_comment = rpc_comment(service, "RequestHeldName")
+        self.assertIn("same NOT_FOUND status and public error shape", request_comment)
+        resolve_comment = rpc_comment(service, "ResolveHandle")
+        self.assertIn("subject-free projection", resolve_comment)
+        self.assertIn("never-claimed names return", resolve_comment)
+
+        self.assertIn(
             "MUST NOT expose an underlying subject",
-            "same authenticated subject, RPC, and client_operation_id",
-            "same response without repeating the mutation",
-            "reuse with a different normalized name MUST fail",
-        ):
-            self.assertIn(fragment, self.source)
+            named_comment(self.source, "message", "HandlePrincipal"),
+        )
+        for request_name in ("ClaimHandleRequest", "RequestHeldNameRequest"):
+            request = named_body(self.source, "message", request_name)
+            for fragment in (
+                "same authenticated subject, RPC, and client_operation_id",
+                "same response without repeating the mutation",
+                "reuse with a different normalized name MUST fail",
+            ):
+                self.assertIn(fragment, request, request_name)
+
+    def test_handle_operations_have_one_canonical_service_owner(self) -> None:
+        service_blocks = re.findall(
+            r"(?ms)^service (\w+) \{(.*?)^\}", self.all_proto_sources
+        )
+        for method in self.fixture:
+            owners = [
+                service_name
+                for service_name, body in service_blocks
+                if re.search(rf"(?m)^\s*rpc {re.escape(method)}\(", body)
+            ]
+            self.assertEqual(owners, ["IdentityService"], method)
 
     def test_migration_manifest_preserves_all_four_operations(self) -> None:
         methods = {

@@ -11,6 +11,7 @@ from tools.build_contract import REPLACED_METHODS
 ROOT = Path(__file__).resolve().parent.parent
 PROTO = ROOT / "proto/heddle/api/v1alpha1/identity.proto"
 FIXTURE = ROOT / "tests/fixtures/handle-contract-v1.json"
+WIRE_FIXTURE = ROOT / "tests/fixtures/handle-wire-v1.json"
 PACKAGE = "heddle.api.v1alpha1"
 
 
@@ -60,6 +61,19 @@ def named_comment(source: str, kind: str, name: str) -> str:
     )
 
 
+def enum_value_comment(enum_body: str, name: str) -> str:
+    match = re.search(
+        rf"(?m)((?:^[ \t]*//[^\n]*\n)+)[ \t]*HANDLE_AVAILABILITY_{re.escape(name)}\s*=",
+        enum_body,
+    )
+    if match is None:
+        raise AssertionError(f"missing documentation for HANDLE_AVAILABILITY_{name}")
+    return " ".join(
+        re.sub(r"^[ \t]*//[ ]?", "", line).strip()
+        for line in match.group(1).splitlines()
+    )
+
+
 class SharedHandleContractTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -69,6 +83,7 @@ class SharedHandleContractTest(unittest.TestCase):
             for path in sorted((ROOT / "proto/heddle/api/v1alpha1").glob("*.proto"))
         )
         cls.fixture = json.loads(FIXTURE.read_text())
+        cls.wire_fixture = json.loads(WIRE_FIXTURE.read_text())
 
     def test_all_handle_operations_have_descriptor_owned_contracts(self) -> None:
         service = named_body(self.source, "service", "IdentityService")
@@ -104,16 +119,19 @@ class SharedHandleContractTest(unittest.TestCase):
 
         principal = named_body(self.source, "message", "HandlePrincipal")
         self.assertNotRegex(principal, r"\bsubject\s*=")
-        for field in (
-            "display_name",
-            "handle",
-            "resolved",
-            "primary_handle",
-            "kind",
-            "verified",
-            "discriminator",
-        ):
-            self.assertRegex(principal, rf"\b{field}\s*=")
+        self.assertRegex(principal, r'\breserved\s+1\s*;')
+        self.assertRegex(principal, r'\breserved\s+"subject"\s*;')
+        public_field_tags = {
+            field: int(tag)
+            for field, tag in re.findall(
+                r"(?m)^\s*(?:string|bool)\s+(\w+)\s*=\s*(\d+)\s*;",
+                principal,
+            )
+        }
+        self.assertEqual(
+            public_field_tags,
+            self.wire_fixture["public_field_tags"],
+        )
 
         status = named_body(self.source, "message", "GetHandleStatusResponse")
         self.assertRegex(status, r"\bHandleAvailability\s+availability\s*=")
@@ -135,6 +153,57 @@ class SharedHandleContractTest(unittest.TestCase):
         response = named_body(self.source, "message", "ResolveHandleResponse")
         self.assertRegex(response, r"\bHandlePrincipal\s+principal\s*=")
         self.assertRegex(response, r"\bbool\s+tombstoned\s*=")
+
+    def test_resolve_preserves_legacy_subject_route_without_a_subject_response(self) -> None:
+        request = named_body(self.source, "message", "ResolveHandleRequest")
+        for request_form in self.wire_fixture["request_forms"]:
+            self.assertIn(f"`{request_form}`", request)
+        self.assertIn("MUST preserve `/u:<subject>` request lookup compatibility", request)
+        self.assertIn("subject-free HandlePrincipal projection", request)
+
+        principal = named_body(self.source, "message", "HandlePrincipal")
+        reserved = self.wire_fixture["reserved_legacy_field"]
+        self.assertRegex(principal, rf"\breserved\s+{reserved['tag']}\s*;")
+        self.assertRegex(principal, rf'\breserved\s+"{reserved["name"]}"\s*;')
+        self.assertNotRegex(principal, r"\bsubject\s*=")
+
+    def test_available_native_names_have_explicit_successful_paths(self) -> None:
+        availability = named_body(self.source, "enum", "HandleAvailability")
+        for method in self.wire_fixture["available_native_paths"][
+            "genuinely_free_new_account"
+        ]:
+            self.assertIn(method, availability)
+
+        service = named_body(self.source, "service", "IdentityService")
+        claim_comment = rpc_comment(service, "ClaimHandle")
+        for method in self.wire_fixture["available_native_paths"][
+            "caller_owned_hold"
+        ]:
+            self.assertIn(method, claim_comment)
+        self.assertIn("held_for_verified_owner = true", claim_comment)
+        self.assertIn("genuinely free AVAILABLE names", claim_comment)
+        self.assertIn("same NOT_FOUND status and public error shape", claim_comment)
+
+        request_comment = rpc_comment(service, "RequestHeldName")
+        self.assertIn("held by another verified owner", request_comment)
+        self.assertIn("same NOT_FOUND status and public error shape", request_comment)
+
+    def test_every_availability_state_names_its_actual_next_operation(self) -> None:
+        availability = named_body(self.source, "enum", "HandleAvailability")
+        for state, operations in self.wire_fixture[
+            "availability_next_operations"
+        ].items():
+            comment = enum_value_comment(availability, state)
+            for operation in operations:
+                self.assertIn(operation, comment, state)
+
+        for state in self.wire_fixture["states_without_current_candidate_mutation"]:
+            comment = enum_value_comment(availability, state)
+            self.assertRegex(
+                comment,
+                r"(?:[Nn]o .*mutation|MUST NOT infer that a mutation)",
+                state,
+            )
 
     def test_each_rpc_locks_its_own_existence_hiding_and_retry_semantics(self) -> None:
         status = named_body(self.source, "message", "GetHandleStatusResponse")
@@ -191,6 +260,20 @@ class SharedHandleContractTest(unittest.TestCase):
             )
             for evidence in ("production_callsite", "production_implementation"):
                 self.assertEqual(entry.get(evidence), expected.get(evidence))
+
+        for method in self.wire_fixture["available_native_paths"][
+            "genuinely_free_new_account"
+        ]:
+            legacy = f"heddle.v1.AuthService/{method}"
+            entry = methods[legacy]
+            self.assertEqual(entry["classification"], "renamed")
+            self.assertEqual(
+                entry["new_rpc"], f"{PACKAGE}.IdentityService/{method}"
+            )
+            self.assertEqual(
+                entry["production_implementation"],
+                "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/auth.rs",
+            )
 
     def test_extraction_aid_cannot_reclassify_handles_as_dropped(self) -> None:
         for method in self.fixture:

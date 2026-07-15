@@ -661,11 +661,31 @@ message InvitationSummary {
 // RESERVED represents an explicit policy reservation; implementations MUST NOT
 // infer it merely because a name is otherwise unavailable.
 enum HandleAvailability {
+  // No usable classification was produced. The caller may retry the safe
+  // GetHandleStatus read; it MUST NOT infer that a mutation is allowed.
   HANDLE_AVAILABILITY_UNSPECIFIED = 0;
+  // No other-owner hold, active native handle, or confusable collision blocks
+  // this caller. `held_for_verified_owner = false` means a genuinely free name:
+  // a new account claims it through BeginWebAuthnRegistration followed by
+  // RegisterPublicKey. `held_for_verified_owner = true` means the caller may
+  // own the nonblocking verified-owner hold; ClaimHandle is the authoritative
+  // self-claim check.
   HANDLE_AVAILABILITY_AVAILABLE = 1;
+  // A verified-owner hold for another subject blocks this caller. The only
+  // mutation offered to the caller is RequestHeldName, which starts the
+  // right-of-first-refusal window without exposing the owner.
   HANDLE_AVAILABILITY_HELD = 2;
+  // An active native handle already owns this name. ResolveHandle can read the
+  // public subject-free projection; no claim or escrow mutation is available.
   HANDLE_AVAILABILITY_TAKEN = 3;
+  // Explicit policy reservation. No handle mutation is available for this
+  // candidate; choose another candidate and call GetHandleStatus again.
   HANDLE_AVAILABILITY_RESERVED = 4;
+  // The candidate conflicts with a trust-bearing handle under the confusable
+  // classifier, so no free-name registration mutation is available; choose
+  // another candidate and call GetHandleStatus again. ClaimHandle remains only
+  // for a previously earned caller-owned verified-owner hold and is the
+  // authoritative check for that hidden ownership fact.
   HANDLE_AVAILABILITY_CONFUSABLE = 5;
 }
 
@@ -675,8 +695,10 @@ message GetHandleStatusRequest {
 
 message GetHandleStatusResponse {
   HandleAvailability availability = 1;
-  // True when the normalized name is held in escrow for a verified owner.
-  // The response MUST NOT expose the holder subject or distinguish holders.
+  // True whenever the normalized name has an active verified-owner hold. A
+  // blocking other-owner hold reports HELD; a nonblocking caller-owned hold
+  // reports AVAILABLE, but ClaimHandle remains the authoritative ownership
+  // check. The response MUST NOT expose the holder subject.
   bool held_for_verified_owner = 2;
 }
 
@@ -711,8 +733,10 @@ message ClaimHandleResponse {
 }
 
 message ResolveHandleRequest {
-  // Canonical text or a bare native name, for example `gh:torvalds` or
-  // `torvalds`.
+  // Canonical handle text, a bare native name, or the legacy subject-route
+  // form, for example `gh:torvalds`, `torvalds`, or `/u:user:<uuid>`.
+  // Implementations MUST preserve `/u:<subject>` request lookup compatibility;
+  // the response remains the subject-free HandlePrincipal projection.
   string name = 1;
 }
 
@@ -720,13 +744,17 @@ message ResolveHandleRequest {
 // resolving a name MUST NOT expose an underlying subject. `primary_handle` is
 // the canonical URL/display token for the active principal.
 message HandlePrincipal {
-  string display_name = 1;
-  string handle = 2;
-  bool resolved = 3;
-  string primary_handle = 4;
-  string kind = 5;
-  bool verified = 6;
-  string discriminator = 7;
+  // Legacy ResolvedPrincipal.subject occupied tag 1. Reserving both its tag and
+  // name prevents legacy response bytes from decoding into any public field.
+  reserved 1;
+  reserved "subject";
+  string display_name = 2;
+  string handle = 3;
+  bool resolved = 4;
+  string primary_handle = 5;
+  string kind = 6;
+  bool verified = 7;
+  string discriminator = 8;
 }
 
 message ResolveHandleResponse {
@@ -773,8 +801,12 @@ service IdentityService {
     };
   }
   // Claims only a verified-owner hold belonging to the authenticated subject.
-  // A free name, a name held for another subject, or a name already active for
-  // another subject returns the same NOT_FOUND status and public error shape.
+  // ClaimHandle is the successful path for AVAILABLE with
+  // `held_for_verified_owner = true`; genuinely free AVAILABLE names are
+  // claimed only during new-account registration through
+  // BeginWebAuthnRegistration followed by RegisterPublicKey. A free name, a
+  // name held for another subject, or a name already active for another subject
+  // returns the same NOT_FOUND status and public error shape.
   rpc ClaimHandle(ClaimHandleRequest) returns (ClaimHandleResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -961,7 +993,8 @@ service IdentityService {
     };
   }
   // Directory lookup requires a valid bearer but is not gated by the caller's
-  // readable-resource set. Active names return a subject-free projection;
+  // readable-resource set. Canonical handles, bare native names, and legacy
+  // `/u:<subject>` request routes return the same subject-free projection;
   // tombstoned names return `tombstoned = true`; never-claimed names return
   // NOT_FOUND.
   rpc ResolveHandle(ResolveHandleRequest) returns (ResolveHandleResponse) {

@@ -368,6 +368,17 @@ def production_callsite(service_name: str, method: str) -> str:
 
 
 def production_evidence(service_name: str, method: str) -> dict[str, str]:
+    if service_name == "AuthService" and method in {
+        "BeginWebAuthnRegistration",
+        "RegisterPublicKey",
+    }:
+        return {
+            "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+            "production_implementation": (
+                "HeddleCo/weft:crates/weft-server/src/server/"
+                "grpc_hosted_impl/auth.rs"
+            ),
+        }
     if service_name == "HostedUserService" and method in {
         "ClaimHandle",
         "GetHandleStatus",

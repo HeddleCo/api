@@ -149,7 +149,7 @@ def audit_new_descriptor(decoded: str) -> None:
     ):
         assert removed not in decoded
 
-    messages: dict[str, list[tuple[str, str]]] = {}
+    messages: dict[str, list[tuple[str, str, int]]] = {}
     for file_block in blocks(decoded.splitlines(), "file {"):
         package = re.search(r'^  package: "(.+)"$', "\n".join(file_block), re.MULTILINE)
         if not package or package.group(1) != PACKAGE:
@@ -169,9 +169,24 @@ def audit_new_descriptor(decoded: str) -> None:
                 start = int(re.search(r'^      start: (\d+)$', reserved_text, re.MULTILINE).group(1))
                 end = int(re.search(r'^      end: (\d+)$', reserved_text, re.MULTILINE).group(1))
                 reserved_numbers.update(range(start, end))
+            reserved_names = set(
+                re.findall(r'^    reserved_name: "(.+)"$', "\n".join(message_block), re.MULTILINE)
+            )
             field_numbers = {field[2] for field in fields}
             highest = max(field_numbers | reserved_numbers, default=0)
             assert field_numbers == set(range(1, highest + 1)) - reserved_numbers, name
+            if name == "HandlePrincipal":
+                assert reserved_numbers == {1}, name
+                assert reserved_names == {"subject"}, name
+                assert [(field[0], field[2]) for field in fields] == [
+                    ("display_name", 2),
+                    ("handle", 3),
+                    ("resolved", 4),
+                    ("primary_handle", 5),
+                    ("kind", 6),
+                    ("verified", 7),
+                    ("discriminator", 8),
+                ], name
             messages[f".{PACKAGE}.{name}"] = fields
         for enum_block in blocks(file_block, "  enum_type {"):
             enum_text = "\n".join(enum_block)

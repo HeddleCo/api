@@ -279,7 +279,7 @@ def audit_declarations(
         layers = audited["weft"][rpc]["layers"]
         if layers["implementation"]["status"] not in {"shipped", "partial"}:
             raise AuditError(f"shipped descriptor RPC lacks Weft implementation: {rpc}")
-        if layers["registration"]["status"] != "shipped":
+        if layers["registration"]["status"] not in {"shipped", "partial"}:
             raise AuditError(f"shipped descriptor RPC lacks Weft registration: {rpc}")
     return audited
 

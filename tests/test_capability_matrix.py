@@ -107,6 +107,11 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         data["weft"]["rpc_mappings"][0]["layers"]["implementation"]["status"] = "partial"  # type: ignore[index]
         audit_declarations(inventory(), data)
 
+    def test_partial_weft_registration_is_explicitly_valid(self) -> None:
+        data = declarations()
+        data["weft"]["rpc_mappings"][0]["layers"]["registration"]["status"] = "partial"  # type: ignore[index]
+        audit_declarations(inventory(), data)
+
     def test_private_evidence_field_fails_public_schema(self) -> None:
         data = declarations()
         data["weft"]["rpc_mappings"][0]["layers"]["implementation"]["evidence"] = [  # type: ignore[index]

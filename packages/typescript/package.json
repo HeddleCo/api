@@ -21,6 +21,7 @@
     "./shared": "./dist/shared.js",
     "./signing": "./dist/signing.js",
     "./identity": "./dist/identity_pb.js",
+    "./operation": "./dist/operation_pb.js",
     "./registry": "./dist/registry_pb.js",
     "./repository": "./dist/repository_pb.js",
     "./collaboration": "./dist/collaboration_pb.js",

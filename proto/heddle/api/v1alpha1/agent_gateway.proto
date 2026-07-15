@@ -102,16 +102,18 @@ message AgentOpenAcknowledgement {
   string hosted_high_water_cursor = 2;
 }
 
-enum OperationDisposition {
-  OPERATION_DISPOSITION_UNSPECIFIED = 0;
-  OPERATION_DISPOSITION_ACCEPTED = 1;
-  OPERATION_DISPOSITION_REJECTED = 2;
-  OPERATION_DISPOSITION_SUPPRESSED = 3;
+// Receipt disposition for a CanonicalTimelineOperation frame. This is stream
+// acknowledgement, not the durable asynchronous Operation lifecycle.
+enum TimelineOperationDisposition {
+  TIMELINE_OPERATION_DISPOSITION_UNSPECIFIED = 0;
+  TIMELINE_OPERATION_DISPOSITION_ACCEPTED = 1;
+  TIMELINE_OPERATION_DISPOSITION_REJECTED = 2;
+  TIMELINE_OPERATION_DISPOSITION_SUPPRESSED = 3;
 }
 
-message OperationReceipt {
+message TimelineOperationReceipt {
   TimelineOperationId operation_id = 1;
-  OperationDisposition disposition = 2;
+  TimelineOperationDisposition disposition = 2;
   string reason = 3;
   string hosted_high_water_cursor = 4;
 }
@@ -137,7 +139,7 @@ message AgentResyncRequest {
 message AgentGatewayFrame {
   oneof frame {
     AgentOpenAcknowledgement open_acknowledgement = 1;
-    OperationReceipt operation_receipt = 2;
+    TimelineOperationReceipt operation_receipt = 2;
     AgentPolicySnapshot policy_snapshot = 3;
     AgentCommandDelivery command = 4;
     AgentResyncRequest resync = 5;

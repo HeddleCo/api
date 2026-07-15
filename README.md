@@ -5,8 +5,8 @@ repository is the sole owner of schema source, compiled descriptors,
 compatibility policy, generation tooling, and Rust/TypeScript releases.
 
 The current wire package is `heddle.api.v1alpha1`. Ten interfaces are marked
-`SHIPPED`; `AgentGatewayService` and `AgentService` are contract-first and
-explicitly `PLANNED` for the first release.
+`SHIPPED`; `AgentGatewayService`, `AgentService`, and `OperationService` are
+contract-first and explicitly `PLANNED` for the first release.
 
 ## Packages
 
@@ -35,6 +35,7 @@ npm install --save-exact @heddleco/api@0.1.0
 ```sh
 buf format -d --exit-code
 buf lint
+python3 -B -m unittest tests/test_operation_contract.py
 python3 tools/audit_contract.py
 cargo check --all-features
 npm ci

@@ -60,6 +60,7 @@ enum CapabilityArea {
   CAPABILITY_AREA_ATTENTION_FEED = 11;
   CAPABILITY_AREA_PULL_REQUEST_REVIEW = 12;
   CAPABILITY_AREA_SEARCH = 13;
+  CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS = 14;
 }
 
 message ServiceContract {
@@ -76,10 +77,23 @@ message RpcContract {
   CapabilityArea capability = 6;
 }
 
+// Machine-readable lifecycle semantics for the canonical Operation state enum.
+// `error_required` is valid only for terminal failure, and
+// `cancellation_succeeded` is valid only for terminal cancellation.
+message OperationStateContract {
+  bool terminal = 1;
+  bool error_required = 2;
+  bool cancellation_succeeded = 3;
+}
+
 extend google.protobuf.ServiceOptions {
   ServiceContract service_contract = 50001;
 }
 
 extend google.protobuf.MethodOptions {
   RpcContract rpc_contract = 50002;
+}
+
+extend google.protobuf.EnumValueOptions {
+  OperationStateContract operation_state_contract = 50003;
 }

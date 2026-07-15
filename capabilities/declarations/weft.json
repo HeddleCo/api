@@ -520,6 +520,94 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.OperationService/BatchGetOperations",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/CancelOperation",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperation",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperationBatch",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperationBatch",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
       "layers": {
         "implementation": {
@@ -949,17 +1037,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.RepositoryService/CreateImportJob",
-      "layers": {
-        "implementation": {
-          "status": "shipped"
-        },
-        "registration": {
-          "status": "partial"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame",
       "layers": {
         "implementation": {
@@ -1126,17 +1203,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/SetContext",
-      "layers": {
-        "implementation": {
-          "status": "shipped"
-        },
-        "registration": {
-          "status": "partial"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RepositoryService/StreamImportProgress",
       "layers": {
         "implementation": {
           "status": "shipped"

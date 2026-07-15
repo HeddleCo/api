@@ -63,7 +63,7 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 10
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 2
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 3
     assert "google.protobuf.Any" not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
@@ -83,6 +83,72 @@ def audit_new_descriptor(decoded: str) -> None:
     )
     assert not unaudited_bytes, f"unaudited bytes fields: {unaudited_bytes}"
 
+    operation_state_contracts = {
+        "OPERATION_STATE_UNSPECIFIED": (False, False, False),
+        "OPERATION_STATE_QUEUED": (False, False, False),
+        "OPERATION_STATE_RUNNING": (False, False, False),
+        "OPERATION_STATE_COMPLETED": (True, False, False),
+        "OPERATION_STATE_FAILED": (True, True, False),
+        "OPERATION_STATE_CANCELED": (True, False, True),
+    }
+    operation_state = next(
+        enum_block
+        for file_block in blocks(decoded.splitlines(), "file {")
+        for enum_block in blocks(file_block, "  enum_type {")
+        if '    name: "OperationState"' in enum_block
+    )
+    values = {
+        re.search(r'^      name: "(.+)"$', "\n".join(value), re.MULTILINE).group(1): "\n".join(value)
+        for value in blocks(operation_state, "    value {")
+    }
+    assert values.keys() == operation_state_contracts.keys()
+    for name, (terminal, error_required, cancellation_succeeded) in operation_state_contracts.items():
+        value = values[name]
+        assert f"[{PACKAGE}.operation_state_contract]" in value, name
+        assert ("terminal: true" in value) is terminal, name
+        assert ("error_required: true" in value) is error_required, name
+        assert ("cancellation_succeeded: true" in value) is cancellation_succeeded, name
+
+    operation_service = next(
+        service_block
+        for file_block in blocks(decoded.splitlines(), "file {")
+        for service_block in blocks(file_block, "  service {")
+        if '    name: "OperationService"' in service_block
+    )
+    operation_methods = {
+        re.search(r'^      name: "(.+)"$', "\n".join(method), re.MULTILINE).group(1): "\n".join(method)
+        for method in blocks(operation_service, "    method {")
+    }
+    operation_rpc_contracts = {
+        "SubmitOperation": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
+        "SubmitOperationBatch": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
+        "GetOperation": ("NONE", "READ_ONLY", "SAFE", False),
+        "BatchGetOperations": ("NONE", "READ_ONLY", "SAFE", False),
+        "GetOperationBatch": ("NONE", "READ_ONLY", "SAFE", False),
+        "ListOperations": ("NONE", "READ_ONLY", "SAFE", False),
+        "WatchOperations": ("NONE", "READ_ONLY", "RESUMABLE_STREAM", False),
+        "CancelOperation": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
+    }
+    assert operation_methods.keys() == operation_rpc_contracts.keys()
+    for name, (tier, effect, retry, client_operation_id_required) in operation_rpc_contracts.items():
+        method = operation_methods[name]
+        assert "signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL" in method, name
+        assert f"signing_tier: SIGNING_TIER_{tier}" in method, name
+        assert f"effect: RPC_EFFECT_{effect}" in method, name
+        assert f"retry_behavior: RETRY_BEHAVIOR_{retry}" in method, name
+        required = "client_operation_id_required: true" in method
+        assert required is client_operation_id_required, name
+    assert "server_streaming: true" in operation_methods["WatchOperations"]
+
+    for removed in (
+        "CreateImportJob",
+        "StreamImportProgress",
+        "ImportProgressEvent",
+        "ImportJobSummary",
+        'name: "OperationReceipt"',
+    ):
+        assert removed not in decoded
+
     messages: dict[str, list[tuple[str, str]]] = {}
     for file_block in blocks(decoded.splitlines(), "file {"):
         package = re.search(r'^  package: "(.+)"$', "\n".join(file_block), re.MULTILINE)
@@ -97,7 +163,15 @@ def audit_new_descriptor(decoded: str) -> None:
                 label = re.search(r'^      label: (.+)$', field_text, re.MULTILINE)
                 number = int(re.search(r'^      number: (\d+)$', field_text, re.MULTILINE).group(1))
                 fields.append((field_name, label.group(1) if label else "LABEL_OPTIONAL", number))
-            assert sorted(field[2] for field in fields) == list(range(1, len(fields) + 1)), name
+            reserved_numbers: set[int] = set()
+            for reserved_block in blocks(message_block, "    reserved_range {"):
+                reserved_text = "\n".join(reserved_block)
+                start = int(re.search(r'^      start: (\d+)$', reserved_text, re.MULTILINE).group(1))
+                end = int(re.search(r'^      end: (\d+)$', reserved_text, re.MULTILINE).group(1))
+                reserved_numbers.update(range(start, end))
+            field_numbers = {field[2] for field in fields}
+            highest = max(field_numbers | reserved_numbers, default=0)
+            assert field_numbers == set(range(1, highest + 1)) - reserved_numbers, name
             messages[f".{PACKAGE}.{name}"] = fields
         for enum_block in blocks(file_block, "  enum_type {"):
             enum_text = "\n".join(enum_block)

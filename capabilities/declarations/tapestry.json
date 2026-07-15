@@ -520,6 +520,94 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.OperationService/BatchGetOperations",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/CancelOperation",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperation",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperationBatch",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperationBatch",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
       "layers": {
         "server_adapter": {
@@ -949,17 +1037,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.RepositoryService/CreateImportJob",
-      "layers": {
-        "server_adapter": {
-          "status": "shipped"
-        },
-        "ui": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame",
       "layers": {
         "server_adapter": {
@@ -1132,17 +1209,6 @@
         },
         "ui": {
           "status": "intentionally-unsupported"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RepositoryService/StreamImportProgress",
-      "layers": {
-        "server_adapter": {
-          "status": "shipped"
-        },
-        "ui": {
-          "status": "shipped"
         }
       }
     },

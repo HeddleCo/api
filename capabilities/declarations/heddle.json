@@ -520,6 +520,94 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.OperationService/BatchGetOperations",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/CancelOperation",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperation",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperationBatch",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperationBatch",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
       "layers": {
         "client": {
@@ -949,17 +1037,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.RepositoryService/CreateImportJob",
-      "layers": {
-        "client": {
-          "status": "intentionally-unsupported"
-        },
-        "cli": {
-          "status": "intentionally-unsupported"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame",
       "layers": {
         "client": {
@@ -1129,17 +1206,6 @@
       "layers": {
         "client": {
           "status": "shipped"
-        },
-        "cli": {
-          "status": "intentionally-unsupported"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RepositoryService/StreamImportProgress",
-      "layers": {
-        "client": {
-          "status": "intentionally-unsupported"
         },
         "cli": {
           "status": "intentionally-unsupported"

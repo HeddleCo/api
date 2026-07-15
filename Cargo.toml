@@ -7,7 +7,7 @@ license = "Apache-2.0"
 repository = "https://github.com/HeddleCo/api"
 description = "Generated Rust types and gRPC bindings for the Heddle public API"
 build = "build.rs"
-include = ["build.rs", "src/**", "proto/**", "tests/fixtures/**", "Cargo.toml", "README.md", "LICENSE"]
+include = ["/build.rs", "/src/**", "/proto/**", "/tests/fixtures/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [features]
 default = []

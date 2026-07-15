@@ -19,6 +19,7 @@ service AgentService {
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc GetAgentRun(GetAgentRunRequest) returns (AgentRun) {
@@ -27,6 +28,7 @@ service AgentService {
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc ListAgentTimelineEvents(ListAgentTimelineEventsRequest) returns (ListAgentTimelineEventsResponse) {
@@ -35,6 +37,7 @@ service AgentService {
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc WatchAgentRun(WatchAgentRunRequest) returns (stream AgentTimelineEvent) {
@@ -43,6 +46,7 @@ service AgentService {
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc ControlAgent(ControlAgentRequest) returns (AgentCommandAudit) {
@@ -52,6 +56,7 @@ service AgentService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc DecideAgentPermission(DecideAgentPermissionRequest) returns (PermissionDecision) {
@@ -61,6 +66,7 @@ service AgentService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc GetAgentCommand(GetAgentCommandRequest) returns (AgentCommandAudit) {
@@ -69,6 +75,7 @@ service AgentService {
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc GetAgentPolicy(GetAgentPolicyRequest) returns (AgentPolicySnapshot) {
@@ -77,6 +84,7 @@ service AgentService {
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc UpdateAgentPolicy(UpdateAgentPolicyRequest) returns (AgentPolicySnapshot) {
@@ -86,6 +94,7 @@ service AgentService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc ListHarnessPreferences(ListHarnessPreferencesRequest) returns (ListHarnessPreferencesResponse) {
@@ -94,6 +103,7 @@ service AgentService {
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc DeleteHarnessPreference(DeleteHarnessPreferenceRequest) returns (DeleteHarnessPreferenceResponse) {
@@ -103,6 +113,7 @@ service AgentService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
 }

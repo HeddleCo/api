@@ -173,6 +173,7 @@ service PullRequestReviewService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_PULL_REQUEST_REVIEW
     };
   }
   rpc GetReviewAnalysisStatus(GetReviewAnalysisStatusRequest) returns (GetReviewAnalysisStatusResponse) {
@@ -182,6 +183,7 @@ service PullRequestReviewService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_PULL_REQUEST_REVIEW
     };
   }
   rpc StartReviewAnalysis(StartReviewAnalysisRequest) returns (StartReviewAnalysisResponse) {
@@ -191,6 +193,7 @@ service PullRequestReviewService {
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_PULL_REQUEST_REVIEW
     };
   }
 }

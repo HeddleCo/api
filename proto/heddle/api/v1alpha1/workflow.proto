@@ -152,6 +152,7 @@ service WorkflowService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
     };
   }
   rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse) {
@@ -161,6 +162,7 @@ service WorkflowService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
     };
   }
   rpc StreamWorkspaceSummary(GetWorkspaceSummaryRequest) returns (stream WorkspaceSummary) {
@@ -170,6 +172,7 @@ service WorkflowService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
     };
   }
   rpc AddApprovalGroupMember(AddApprovalGroupMemberRequest) returns (ApprovalGroupMember) {
@@ -179,6 +182,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc AddPolicyGroupRequirement(AddPolicyGroupRequirementRequest) returns (PolicyGroupRequirement) {
@@ -188,6 +192,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc ApproveThread(ApproveThreadRequest) returns (ThreadApproval) {
@@ -197,6 +202,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc CheckMergeEligibility(CheckMergeEligibilityRequest) returns (CheckMergeEligibilityResponse) {
@@ -206,6 +212,7 @@ service WorkflowService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc CreateApprovalGroup(CreateApprovalGroupRequest) returns (ApprovalGroup) {
@@ -215,6 +222,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc CreateThreadPolicy(CreateThreadPolicyRequest) returns (ThreadPolicy) {
@@ -224,6 +232,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc DeleteApprovalGroup(DeleteApprovalGroupRequest) returns (DeleteResponse) {
@@ -233,6 +242,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc DeleteThreadPolicy(DeleteThreadPolicyRequest) returns (DeleteResponse) {
@@ -242,6 +252,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc ListApprovalGroups(ListApprovalGroupsRequest) returns (ListApprovalGroupsResponse) {
@@ -251,6 +262,7 @@ service WorkflowService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc ListThreadApprovals(ListThreadApprovalsRequest) returns (ListThreadApprovalsResponse) {
@@ -260,6 +272,7 @@ service WorkflowService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc ListThreadPolicies(ListThreadPoliciesRequest) returns (ListThreadPoliciesResponse) {
@@ -269,6 +282,7 @@ service WorkflowService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc RemoveApprovalGroupMember(RemoveApprovalGroupMemberRequest) returns (DeleteResponse) {
@@ -278,6 +292,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc RemovePolicyGroupRequirement(RemovePolicyGroupRequirementRequest) returns (DeleteResponse) {
@@ -287,6 +302,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
   rpc RevokeApproval(RevokeApprovalRequest) returns (DeleteResponse) {
@@ -296,6 +312,7 @@ service WorkflowService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
     };
   }
 }

@@ -910,6 +910,15 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "parent_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "child_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -924,6 +933,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "target"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -938,6 +951,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "namespace_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -952,6 +969,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "parent_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -966,6 +987,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "namespace_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -994,6 +1019,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "target"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1008,6 +1037,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1022,6 +1055,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1036,6 +1073,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "parent_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1064,6 +1105,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
@@ -1078,6 +1123,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "target"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1106,6 +1155,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "parent_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1120,6 +1173,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "resource"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1134,6 +1191,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "namespace_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1148,6 +1209,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "namespace_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1176,6 +1241,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "target"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1204,6 +1273,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "root_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1232,6 +1305,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1246,6 +1323,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1260,6 +1341,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1274,6 +1359,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1288,6 +1377,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "target"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1302,6 +1395,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1316,6 +1413,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1330,6 +1431,10 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }

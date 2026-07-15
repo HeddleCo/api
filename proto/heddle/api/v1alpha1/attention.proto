@@ -205,6 +205,10 @@ service AttentionService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "item_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }

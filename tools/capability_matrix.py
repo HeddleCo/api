@@ -198,7 +198,18 @@ def render_report(
             signing = f"{contract['signing_identity']} / {contract['signing_tier']}"
             authorization = (
                 f"{contract['authorization_access']} / {contract['authorization_role']} / "
-                f"{contract['authorization_scope_source']} / {contract['authorization_existence']}"
+                f"{contract['authorization_scope_source']}"
+                + (
+                    "["
+                    + ", ".join(
+                        f"{target['path']}:{target['role']}"
+                        for target in contract["authorization_request_targets"]
+                    )
+                    + "]"
+                    if contract["authorization_request_targets"]
+                    else ""
+                )
+                + f" / {contract['authorization_existence']}"
             )
             retry = (
                 f"{contract['effect']}; {contract['retry_behavior']}; "

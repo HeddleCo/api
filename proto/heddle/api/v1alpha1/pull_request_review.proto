@@ -177,6 +177,27 @@ service PullRequestReviewService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "job_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "provider"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "owner"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "repo"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "pr_number"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
@@ -191,6 +212,27 @@ service PullRequestReviewService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "job_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "provider"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "owner"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "repo"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "pr_number"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
@@ -205,6 +247,23 @@ service PullRequestReviewService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "provider"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "owner"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "repo"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "pr_number"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }

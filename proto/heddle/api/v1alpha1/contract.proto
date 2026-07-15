@@ -71,6 +71,9 @@ enum AuthorizationAccess {
   // anonymous transport principal for abuse controls or ownership binding.
   AUTHORIZATION_ACCESS_PUBLIC = 1;
   AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL = 2;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_ACCESS_PLANNED_UNDECIDED = 3;
 }
 
 enum AuthorizationRole {
@@ -82,6 +85,9 @@ enum AuthorizationRole {
   AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR = 5;
   AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR = 6;
   AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR = 7;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_ROLE_PLANNED_UNDECIDED = 8;
 }
 
 enum AuthorizationScopeSource {
@@ -92,17 +98,31 @@ enum AuthorizationScopeSource {
   AUTHORIZATION_SCOPE_SOURCE_REQUEST_NAMESPACE = 4;
   AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE = 5;
   AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS = 6;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED = 7;
 }
 
 enum AuthorizationExistence {
   AUTHORIZATION_EXISTENCE_UNSPECIFIED = 0;
   AUTHORIZATION_EXISTENCE_DISCLOSE = 1;
   AUTHORIZATION_EXISTENCE_HIDE = 2;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED = 3;
 }
 
 message ServiceContract {
   repeated DeploymentTarget deployment_targets = 1;
   ServiceMaturity maturity = 2;
+}
+
+message AuthorizationRequestTarget {
+  // A protobuf field path in the request, using proto field names separated
+  // by dots.
+  string path = 1;
+  // The role required for the resource selected by `path`.
+  AuthorizationRole role = 2;
 }
 
 message RpcContract {
@@ -116,6 +136,15 @@ message RpcContract {
   AuthorizationRole authorization_role = 8;
   AuthorizationScopeSource authorization_scope_source = 9;
   AuthorizationExistence authorization_existence = 10;
+  // Every request field that selects an authorization guard target and the
+  // role required for that target. Every populated selector is guarded;
+  // request-derived scope sources require at least one target, while
+  // non-request scope sources prohibit targets.
+  repeated AuthorizationRequestTarget authorization_request_targets = 11;
+  // True when the authorization rule deliberately has multiple request
+  // targets. Audits reject a mismatch so a multi-resource rule cannot
+  // silently collapse to one selector.
+  bool authorization_multi_target = 12;
 }
 
 // Machine-readable lifecycle semantics for the canonical Operation state enum.

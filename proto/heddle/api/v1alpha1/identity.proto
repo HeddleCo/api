@@ -810,6 +810,10 @@ service IdentityService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "username"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -857,9 +861,13 @@ service IdentityService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "scope"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ExchangeDeviceAuthorization(ExchangeDeviceAuthorizationRequest) returns (AccessTokenResponse) {
@@ -931,6 +939,10 @@ service IdentityService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "credential_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
@@ -957,8 +969,17 @@ service IdentityService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "service_account_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_request_targets: {
+        path: "scope"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -973,6 +994,23 @@ service IdentityService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "provider"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "id_token"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "access_token"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "webauthn_assertion"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1043,6 +1081,23 @@ service IdentityService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "subject"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "requested_scope"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "keypair.public_key_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "device_auth.device_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1057,6 +1112,10 @@ service IdentityService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "challenge_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1105,8 +1164,12 @@ service IdentityService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "credential_id"
+        role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1119,8 +1182,12 @@ service IdentityService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "service_account_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1148,7 +1215,11 @@ service IdentityService {
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "credential_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }

@@ -21,6 +21,10 @@ service AgentGatewayService {
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
       client_operation_id_required: true
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
 }

@@ -20,6 +20,10 @@ service AgentService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc GetAgentRun(GetAgentRunRequest) returns (AgentRun) {
@@ -29,6 +33,10 @@ service AgentService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc ListAgentTimelineEvents(ListAgentTimelineEventsRequest) returns (ListAgentTimelineEventsResponse) {
@@ -38,6 +46,10 @@ service AgentService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc WatchAgentRun(WatchAgentRunRequest) returns (stream AgentTimelineEvent) {
@@ -47,6 +59,10 @@ service AgentService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc ControlAgent(ControlAgentRequest) returns (AgentCommandAudit) {
@@ -57,6 +73,10 @@ service AgentService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc DecideAgentPermission(DecideAgentPermissionRequest) returns (PermissionDecision) {
@@ -67,6 +87,10 @@ service AgentService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc GetAgentCommand(GetAgentCommandRequest) returns (AgentCommandAudit) {
@@ -76,6 +100,10 @@ service AgentService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc GetAgentPolicy(GetAgentPolicyRequest) returns (AgentPolicySnapshot) {
@@ -85,6 +113,10 @@ service AgentService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc UpdateAgentPolicy(UpdateAgentPolicyRequest) returns (AgentPolicySnapshot) {
@@ -95,6 +127,10 @@ service AgentService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc ListHarnessPreferences(ListHarnessPreferencesRequest) returns (ListHarnessPreferencesResponse) {
@@ -104,6 +140,10 @@ service AgentService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc DeleteHarnessPreference(DeleteHarnessPreferenceRequest) returns (DeleteHarnessPreferenceResponse) {
@@ -114,6 +154,10 @@ service AgentService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
 }

@@ -559,7 +559,7 @@
       "capability": "identity and credentials",
       "layers": {
         "client": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "cli": {
           "status": "intentionally-unsupported"

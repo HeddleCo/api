@@ -4,7 +4,7 @@
     "heddle": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/heddle.json",
-      "sha256": "824ec657929ec8a2e17c13df5389886d89d493c90d69460a00adee398689be5c"
+      "sha256": "714711dcf80a2bd5bb5782d8d8c4743e1cf7d3444a7161e9ab27a7b37f60a153"
     },
     "weft": {
       "kind": "consumer-derived-sanitized-declaration",
@@ -14,7 +14,7 @@
     "tapestry": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/tapestry.json",
-      "sha256": "1b6934aa921680c97e001f2de09b1bffe00b2d1571943c74cc57dd5072537c13"
+      "sha256": "16f4eccc9f5b950ef413c56314d9ba9bda56c4095fd456fb7e7ef7f022eacc4b"
     }
   }
 }

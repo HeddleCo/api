@@ -67,7 +67,59 @@ function enumLocalIncludingUnspecified(enumDescriptor, number, context) {
   return value.localName;
 }
 
-function validateAuthorization(metadata, maturity, rpc) {
+function messageContainsType(message, typeName, visited = new Set()) {
+  if (visited.has(message.typeName)) {
+    return false;
+  }
+  visited.add(message.typeName);
+  return message.fields.some((field) => {
+    const nested =
+      field.fieldKind === "message" ||
+      (field.fieldKind === "list" && field.listKind === "message")
+        ? field.message
+        : undefined;
+    return (
+      nested !== undefined &&
+      (nested.typeName === typeName ||
+        messageContainsType(nested, typeName, visited))
+    );
+  });
+}
+
+function requestHasNamedField(message, names) {
+  return message.fields.some((field) => names.has(field.name));
+}
+
+function requestHasResourceSelector(message) {
+  return message.fields.some(
+    (field) =>
+      field.name !== "client_operation_id" &&
+      (/^(?:id|name|owner|provider|repo|resource|subject|target|username)$/.test(
+        field.name,
+      ) || /(?:^|_)(?:code|id|path|ref|token)$/.test(field.name)),
+  );
+}
+
+function validateScopeSource(scope, input, rpc) {
+  let derivable = true;
+  if (scope === "REQUEST_REPOSITORY") {
+    derivable = messageContainsType(input, `${PACKAGE}.RepositoryRef`);
+  } else if (scope === "REQUEST_NAMESPACE") {
+    derivable = requestHasNamedField(
+      input,
+      new Set(["namespace_path", "parent_path"]),
+    );
+  } else if (scope === "REQUEST_RESOURCE") {
+    derivable = requestHasResourceSelector(input);
+  }
+  if (!derivable) {
+    throw new Error(
+      `authorization scope source ${scope} is not derivable from ${input.typeName}: ${rpc}`,
+    );
+  }
+}
+
+function validateAuthorization(metadata, maturity, rpc, input) {
   const values = [
     metadata.authorization_access,
     metadata.authorization_role,
@@ -97,15 +149,17 @@ function validateAuthorization(metadata, maturity, rpc) {
     "REQUEST_RESOURCE",
     "CALLER_GRANTS",
   ]);
+  const publicRoles = new Set(["NONE", "CALLER_BOUND"]);
   const valid =
     (role === "NONE" && scope === "NONE" && existence === "DISCLOSE") ||
     (role === "CALLER_BOUND" &&
       new Set(["CALLER_SUBJECT", "REQUEST_RESOURCE"]).has(scope)) ||
     (resourceRoles.has(role) && resourceScopes.has(scope)) ||
     (role === "GLOBAL_ADMINISTRATOR" && scope === "NONE" && existence === "DISCLOSE");
-  if (!valid || (access === "PUBLIC" && resourceRoles.has(role))) {
+  if (!valid || (access === "PUBLIC" && !publicRoles.has(role))) {
     throw new Error(`invalid authorization combination: ${rpc}`);
   }
+  validateScopeSource(scope, input, rpc);
 }
 
 function main() {
@@ -259,7 +313,7 @@ function main() {
             `authorization existence: ${rpc}`,
           ),
         };
-        validateAuthorization(authorization, maturity, rpc);
+        validateAuthorization(authorization, maturity, rpc, method.input);
         inventory[rpc] = {
           rpc,
           service: service.typeName,

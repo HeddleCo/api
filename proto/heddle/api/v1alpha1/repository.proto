@@ -812,7 +812,7 @@ service RepositoryService {
       capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }

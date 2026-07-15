@@ -27,6 +27,21 @@ from tools.capability_matrix import (
 ROOT = Path(__file__).resolve().parent.parent
 RPC = "heddle.api.v1alpha1.RepositoryService/GetCompare"
 PLANNED_RPC = "heddle.api.v1alpha1.AgentService/GetAgentRun"
+PUBLIC_RPC = "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication"
+ID_SCOPED_RPCS = tuple(
+    f"heddle.api.v1alpha1.WorkflowService/{method}"
+    for method in (
+        "AddApprovalGroupMember",
+        "AddPolicyGroupRequirement",
+        "DeleteApprovalGroup",
+        "DeleteThreadPolicy",
+        "RemoveApprovalGroupMember",
+        "RemovePolicyGroupRequirement",
+        "RevokeApproval",
+    )
+)
+EVENTS_RPC = "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents"
+STREAMING_RPC = "heddle.api.v1alpha1.RepoSyncService/Pull"
 
 
 def inventory() -> dict[str, dict[str, object]]:
@@ -338,6 +353,128 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             self.build_descriptor(root, descriptor)
             with self.assertRaisesRegex(AuditError, "invalid authorization combination"):
                 descriptor_inventory(descriptor)
+
+    def test_public_access_roles_are_allowlisted_and_future_roles_fail_closed(self) -> None:
+        contract = (ROOT / "proto/heddle/api/v1alpha1/contract.proto").read_text()
+        roles = re.findall(r"AUTHORIZATION_ROLE_([A-Z_]+)\s*=", contract)
+        allowed = {"NONE", "CALLER_BOUND"}
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/identity.proto"
+            original = source.read_text()
+
+            for role in roles:
+                with self.subTest(role=role):
+                    changed, count = re.subn(
+                        r"(rpc BeginWebAuthnAuthentication\b.*?authorization_role:) "
+                        r"AUTHORIZATION_ROLE_[A-Z_]+",
+                        rf"\1 AUTHORIZATION_ROLE_{role}",
+                        original,
+                        count=1,
+                        flags=re.DOTALL,
+                    )
+                    self.assertEqual(count, 1)
+                    scope = (
+                        "REQUEST_RESOURCE"
+                        if role not in {"NONE", "GLOBAL_ADMINISTRATOR", "UNSPECIFIED"}
+                        else "NONE"
+                    )
+                    changed, count = re.subn(
+                        r"(rpc BeginWebAuthnAuthentication\b.*?authorization_scope_source:) "
+                        r"AUTHORIZATION_SCOPE_SOURCE_[A-Z_]+",
+                        rf"\1 AUTHORIZATION_SCOPE_SOURCE_{scope}",
+                        changed,
+                        count=1,
+                        flags=re.DOTALL,
+                    )
+                    self.assertEqual(count, 1)
+                    source.write_text(changed)
+                    descriptor = root / f"public-{role.lower()}.binpb"
+                    self.build_descriptor(root, descriptor)
+
+                    if role in allowed:
+                        self.assertEqual(
+                            descriptor_inventory(descriptor)[PUBLIC_RPC][
+                                "authorization_role"
+                            ],
+                            role,
+                        )
+                    else:
+                        with self.assertRaisesRegex(
+                            AuditError,
+                            "authorization access/role/scope/existence|"
+                            "invalid authorization combination",
+                        ):
+                            descriptor_inventory(descriptor)
+
+    def test_request_scope_sources_must_be_derivable_from_input_descriptors(self) -> None:
+        cases = (
+            (
+                "workflow.proto",
+                "DeleteApprovalGroup",
+                "REQUEST_REPOSITORY",
+                "DeleteApprovalGroupRequest",
+            ),
+            (
+                "workflow.proto",
+                "DeleteApprovalGroup",
+                "REQUEST_NAMESPACE",
+                "DeleteApprovalGroupRequest",
+            ),
+            (
+                "identity.proto",
+                "WhoAmI",
+                "REQUEST_RESOURCE",
+                "WhoAmIRequest",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+
+            for filename, method, scope, input_type in cases:
+                with self.subTest(scope=scope):
+                    source = root / "proto/heddle/api/v1alpha1" / filename
+                    original = (ROOT / "proto/heddle/api/v1alpha1" / filename).read_text()
+                    changed, count = re.subn(
+                        rf"(rpc {method}\b.*?authorization_scope_source:) "
+                        r"AUTHORIZATION_SCOPE_SOURCE_[A-Z_]+",
+                        rf"\1 AUTHORIZATION_SCOPE_SOURCE_{scope}",
+                        original,
+                        count=1,
+                        flags=re.DOTALL,
+                    )
+                    self.assertEqual(count, 1)
+                    source.write_text(changed)
+                    descriptor = root / f"invalid-{scope.lower()}.binpb"
+                    self.build_descriptor(root, descriptor)
+                    with self.assertRaisesRegex(
+                        AuditError,
+                        rf"scope source {scope} is not derivable from .*{input_type}",
+                    ):
+                        descriptor_inventory(descriptor)
+                    source.write_text(original)
+
+    def test_shipped_scope_sources_match_request_shapes(self) -> None:
+        actual = build_inventory()
+        for rpc in ID_SCOPED_RPCS:
+            with self.subTest(rpc=rpc):
+                self.assertEqual(
+                    actual[rpc]["authorization_scope_source"],
+                    "REQUEST_RESOURCE",
+                )
+        self.assertEqual(
+            actual[EVENTS_RPC]["authorization_scope_source"],
+            "REQUEST_RESOURCE",
+        )
+        self.assertEqual(
+            actual[STREAMING_RPC]["authorization_scope_source"],
+            "REQUEST_REPOSITORY",
+        )
 
     def test_descriptor_inventory_rejects_unknown_authorization_enum_value(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -8,7 +8,7 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 VERIFY_COMMAND = "./tools/verify.sh"
 PROTOC_ACTION = "arduino/setup-protoc@v3"
 PROTOC_VERSION = '"31.1"'
-BUF_ACTION = "bufbuild/buf-setup-action@v1"
+BUF_ACTION = "bufbuild/buf-setup-action"
 BUF_GITHUB_TOKEN = "github_token: ${{ github.token }}"
 
 
@@ -60,6 +60,25 @@ def job_steps(job: list[str]) -> list[list[str]]:
     ]
 
 
+def action_name(step: list[str]) -> str | None:
+    for line in step:
+        match = re.match(r"\s*-\s*uses:\s*([^\s#]+)", line)
+        if match:
+            action_ref = match.group(1).strip("\"'")
+            owner_name, separator, _ = action_ref.partition("@")
+            return owner_name if separator else None
+    return None
+
+
+def unauthenticated_buf_setup_steps(steps: list[list[str]]) -> list[list[str]]:
+    return [
+        step
+        for step in steps
+        if action_name(step) == BUF_ACTION
+        and BUF_GITHUB_TOKEN not in "\n".join(step)
+    ]
+
+
 class WorkflowContractTest(unittest.TestCase):
     def test_every_buf_setup_action_uses_github_token(self) -> None:
         callers: list[str] = []
@@ -69,19 +88,24 @@ class WorkflowContractTest(unittest.TestCase):
 
         for workflow in workflow_paths:
             for job_name, job in workflow_jobs(workflow):
-                for step in job_steps(job):
-                    rendered = "\n".join(step)
-                    if f"uses: {BUF_ACTION}" not in rendered:
-                        continue
-                    caller = f"{workflow.relative_to(ROOT)}:{job_name}"
-                    callers.append(caller)
-                    self.assertIn(
-                        BUF_GITHUB_TOKEN,
-                        rendered,
-                        f"{caller} must authenticate {BUF_ACTION} GitHub API requests",
-                    )
+                steps = job_steps(job)
+                buf_steps = [step for step in steps if action_name(step) == BUF_ACTION]
+                if buf_steps:
+                    callers.append(f"{workflow.relative_to(ROOT)}:{job_name}")
+                self.assertFalse(
+                    unauthenticated_buf_setup_steps(steps),
+                    f"{workflow.relative_to(ROOT)}:{job_name} must authenticate "
+                    f"{BUF_ACTION} GitHub API requests",
+                )
 
         self.assertTrue(callers, f"no workflow job uses {BUF_ACTION}")
+
+    def test_buf_setup_action_alternate_ref_still_requires_token(self) -> None:
+        for ref in ("v2", "main", "0123456789abcdef"):
+            with self.subTest(ref=ref):
+                step = [f"      - uses: '{BUF_ACTION}@{ref}' # alternate ref"]
+                self.assertEqual(action_name(step), BUF_ACTION)
+                self.assertEqual(unauthenticated_buf_setup_steps([step]), [step])
 
     def test_verify_jobs_install_pinned_protoc_first(self) -> None:
         callers: list[str] = []

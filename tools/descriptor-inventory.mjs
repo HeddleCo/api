@@ -68,6 +68,9 @@ function enumLocalIncludingUnspecified(enumDescriptor, number, context) {
 }
 
 function messageContainsType(message, typeName, visited = new Set()) {
+  if (message.typeName === typeName) {
+    return true;
+  }
   if (visited.has(message.typeName)) {
     return false;
   }
@@ -75,13 +78,12 @@ function messageContainsType(message, typeName, visited = new Set()) {
   return message.fields.some((field) => {
     const nested =
       field.fieldKind === "message" ||
-      (field.fieldKind === "list" && field.listKind === "message")
+      (field.fieldKind === "list" && field.listKind === "message") ||
+      (field.fieldKind === "map" && field.mapKind === "message")
         ? field.message
         : undefined;
     return (
-      nested !== undefined &&
-      (nested.typeName === typeName ||
-        messageContainsType(nested, typeName, visited))
+      nested !== undefined && messageContainsType(nested, typeName, visited)
     );
   });
 }
@@ -160,6 +162,57 @@ function validateAuthorization(metadata, maturity, rpc, input) {
     throw new Error(`invalid authorization combination: ${rpc}`);
   }
   validateScopeSource(scope, input, rpc);
+}
+
+function authorizationMatches(metadata, expected) {
+  return Object.entries(expected).every(
+    ([field, value]) => metadata[field] === value,
+  );
+}
+
+function validateSensitiveResponseAuthorization(metadata, maturity, output, rpc) {
+  if (maturity === "PLANNED") {
+    return;
+  }
+  if (messageContainsType(output, `${PACKAGE}.CredentialInfo`)) {
+    const safe =
+      metadata.authorization_access === "AUTHENTICATED_PRINCIPAL" &&
+      metadata.authorization_role !== "NONE" &&
+      metadata.authorization_scope_source !== "NONE" &&
+      metadata.authorization_existence === "HIDE";
+    if (!safe) {
+      throw new Error(
+        `credential information requires scoped, existence-hiding authorization: ${rpc}`,
+      );
+    }
+  }
+
+  const handleDirectory =
+    messageContainsType(output, `${PACKAGE}.HandlePrincipal`) ||
+    messageContainsType(output, `${PACKAGE}.GetHandleStatusResponse`);
+  if (
+    handleDirectory &&
+    !authorizationMatches(metadata, {
+      authorization_access: "AUTHENTICATED_PRINCIPAL",
+      authorization_role: "NONE",
+      authorization_scope_source: "NONE",
+      authorization_existence: "DISCLOSE",
+    })
+  ) {
+    throw new Error(`handle directory requires an authenticated bearer: ${rpc}`);
+  }
+
+  if (
+    messageContainsType(output, `${PACKAGE}.ResolvedPrincipal`) &&
+    !authorizationMatches(metadata, {
+      authorization_access: "AUTHENTICATED_PRINCIPAL",
+      authorization_role: "RESOURCE_READER",
+      authorization_scope_source: "CALLER_GRANTS",
+      authorization_existence: "HIDE",
+    })
+  ) {
+    throw new Error(`subject directory must be limited to caller grants: ${rpc}`);
+  }
 }
 
 function main() {
@@ -314,6 +367,12 @@ function main() {
           ),
         };
         validateAuthorization(authorization, maturity, rpc, method.input);
+        validateSensitiveResponseAuthorization(
+          authorization,
+          maturity,
+          method.output,
+          rpc,
+        );
         inventory[rpc] = {
           rpc,
           service: service.typeName,

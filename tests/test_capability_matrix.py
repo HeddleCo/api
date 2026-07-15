@@ -42,6 +42,73 @@ ID_SCOPED_RPCS = tuple(
 )
 EVENTS_RPC = "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents"
 STREAMING_RPC = "heddle.api.v1alpha1.RepoSyncService/Pull"
+CREDENTIAL_READ_CONTRACTS = {
+    "heddle.api.v1alpha1.IdentityService/IntrospectCredential": (
+        "AUTHENTICATED_PRINCIPAL",
+        "CALLER_BOUND",
+        "REQUEST_RESOURCE",
+        "HIDE",
+    ),
+    "heddle.api.v1alpha1.IdentityService/ListServiceAccounts": (
+        "AUTHENTICATED_PRINCIPAL",
+        "RESOURCE_ADMINISTRATOR",
+        "CALLER_GRANTS",
+        "HIDE",
+    ),
+}
+DIRECTORY_READ_CONTRACTS = {
+    "heddle.api.v1alpha1.IdentityService/GetHandleStatus": (
+        "AUTHENTICATED_PRINCIPAL",
+        "NONE",
+        "NONE",
+        "DISCLOSE",
+    ),
+    "heddle.api.v1alpha1.IdentityService/ResolveHandle": (
+        "AUTHENTICATED_PRINCIPAL",
+        "NONE",
+        "NONE",
+        "DISCLOSE",
+    ),
+    "heddle.api.v1alpha1.RegistryService/ResolveSubjects": (
+        "AUTHENTICATED_PRINCIPAL",
+        "RESOURCE_READER",
+        "CALLER_GRANTS",
+        "HIDE",
+    ),
+}
+AUTHORIZATION_FIELDS = (
+    "authorization_access",
+    "authorization_role",
+    "authorization_scope_source",
+    "authorization_existence",
+)
+
+
+def replace_rpc_authorization(
+    text: str,
+    method: str,
+    access: str,
+    role: str,
+    scope: str,
+    existence: str,
+) -> str:
+    replacements = (
+        ("authorization_access", "AUTHORIZATION_ACCESS", access),
+        ("authorization_role", "AUTHORIZATION_ROLE", role),
+        ("authorization_scope_source", "AUTHORIZATION_SCOPE_SOURCE", scope),
+        ("authorization_existence", "AUTHORIZATION_EXISTENCE", existence),
+    )
+    for field, prefix, value in replacements:
+        text, count = re.subn(
+            rf"(rpc {method}\b.*?{field}:) {prefix}_[A-Z_]+",
+            rf"\1 {prefix}_{value}",
+            text,
+            count=1,
+            flags=re.DOTALL,
+        )
+        if count != 1:
+            raise AssertionError(f"could not replace {method} {field}")
+    return text
 
 
 def inventory() -> dict[str, dict[str, object]]:
@@ -475,6 +542,78 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             actual[STREAMING_RPC]["authorization_scope_source"],
             "REQUEST_REPOSITORY",
         )
+
+    def test_sensitive_read_classes_have_grounded_authorization(self) -> None:
+        actual = build_inventory()
+        for rpc, expected in {
+            **CREDENTIAL_READ_CONTRACTS,
+            **DIRECTORY_READ_CONTRACTS,
+        }.items():
+            with self.subTest(rpc=rpc):
+                self.assertEqual(
+                    tuple(actual[rpc][field] for field in AUTHORIZATION_FIELDS),
+                    expected,
+                )
+
+    def test_credential_information_responses_fail_closed_as_a_class(self) -> None:
+        methods = ("IntrospectCredential", "ListServiceAccounts")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/identity.proto"
+            original = source.read_text()
+
+            for method in methods:
+                with self.subTest(method=method):
+                    source.write_text(
+                        replace_rpc_authorization(
+                            original,
+                            method,
+                            "AUTHENTICATED_PRINCIPAL",
+                            "NONE",
+                            "NONE",
+                            "DISCLOSE",
+                        )
+                    )
+                    descriptor = root / f"unsafe-{method}.binpb"
+                    self.build_descriptor(root, descriptor)
+                    with self.assertRaisesRegex(
+                        AuditError,
+                        "credential information requires scoped, existence-hiding authorization",
+                    ):
+                        descriptor_inventory(descriptor)
+
+    def test_directory_responses_fail_closed_as_a_class(self) -> None:
+        cases = (
+            ("identity.proto", "GetHandleStatus", "handle directory"),
+            ("identity.proto", "ResolveHandle", "handle directory"),
+            ("registry.proto", "ResolveSubjects", "subject directory"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+
+            for filename, method, error in cases:
+                with self.subTest(method=method):
+                    source = root / "proto/heddle/api/v1alpha1" / filename
+                    original = (ROOT / "proto/heddle/api/v1alpha1" / filename).read_text()
+                    source.write_text(
+                        replace_rpc_authorization(
+                            original,
+                            method,
+                            "PUBLIC",
+                            "NONE",
+                            "NONE",
+                            "DISCLOSE",
+                        )
+                    )
+                    descriptor = root / f"public-{method}.binpb"
+                    self.build_descriptor(root, descriptor)
+                    with self.assertRaisesRegex(AuditError, error):
+                        descriptor_inventory(descriptor)
+                    source.write_text(original)
 
     def test_descriptor_inventory_rejects_unknown_authorization_enum_value(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

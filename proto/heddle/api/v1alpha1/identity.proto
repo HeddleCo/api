@@ -740,9 +740,10 @@ message ResolveHandleRequest {
   string name = 1;
 }
 
-// Public handle-directory projection. There is deliberately no subject field:
-// resolving a name MUST NOT expose an underlying subject. `primary_handle` is
-// the canonical URL/display token for the active principal.
+// Subject-free handle-directory projection. ResolveHandle requires a valid
+// bearer, but there is deliberately no subject field: resolving a name MUST NOT
+// expose an underlying subject. `primary_handle` is the canonical URL/display
+// token for the active principal.
 message HandlePrincipal {
   // Legacy ResolvedPrincipal.subject occupied tag 1. Reserving both its tag and
   // name prevents legacy response bytes from decoding into any public field.
@@ -928,9 +929,9 @@ service IdentityService {
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_NONE
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc IssuePresenceToken(IssuePresenceTokenRequest) returns (IssuePresenceTokenResponse) {
@@ -998,9 +999,9 @@ service IdentityService {
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
@@ -1089,7 +1090,7 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
-      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_NONE
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE

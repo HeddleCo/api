@@ -389,7 +389,8 @@ message ListGrantsResponse {
 // Batch subject→display-name resolution. The grant/member UIs hold opaque
 // subjects (from HostedGrant.subject / MemberEntry.Grant.subject) and today
 // render them raw; this lets a consumer enrich a whole grant/member list in a
-// single round trip. Backend impl is a weft follow-up.
+// single round trip. The producer resolves only subjects reachable through the
+// caller's readable grants and returns an unresolved projection for the rest.
 message ResolveSubjectsRequest {
   // Opaque subjects, e.g. "user:<uuid>" / "ops-alice".
   repeated string subjects = 1;
@@ -1215,9 +1216,9 @@ service RegistryService {
       client_operation_id_required: false
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_NONE
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc RevokeInvitation(RevokeInvitationRequest) returns (DeleteResponse) {

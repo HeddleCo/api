@@ -267,6 +267,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
       "layers": {
         "implementation": {
@@ -304,6 +315,17 @@
       "layers": {
         "implementation": {
           "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/GetHandleStatus",
+      "layers": {
+        "implementation": {
+          "status": "partial"
         },
         "registration": {
           "status": "partial"
@@ -425,6 +447,28 @@
       "layers": {
         "implementation": {
           "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ResolveHandle",
+      "layers": {
+        "implementation": {
+          "status": "partial"
         },
         "registration": {
           "status": "partial"

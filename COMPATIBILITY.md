@@ -13,3 +13,10 @@ is required.
 The migration from `heddle.v1` is intentionally incompatible and is recorded
 exhaustively in `migration-manifest.json`. There is no dual registration or
 wire compatibility shim.
+
+The four live handle operations are explicitly retained as
+`IdentityService/{ClaimHandle,GetHandleStatus,RequestHeldName,ResolveHandle}`.
+Their migration requires the [Weft adapter](https://github.com/HeddleCo/weft/issues/591)
+and [Tapestry adapter](https://github.com/HeddleCo/tapestry/issues/163) before
+HeddleCo/heddle#1021 repins; until then the shared descriptor is a cutover
+contract, not authorization to remove the live legacy registration.

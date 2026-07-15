@@ -36,6 +36,7 @@ npm install --save-exact @heddleco/api@0.1.0
 buf format -d --exit-code
 buf lint
 python3 -B -m unittest tests/test_operation_contract.py
+python3 -B -m unittest tests/test_handle_contract.py
 python3 tools/audit_contract.py
 cargo check --all-features
 npm ci

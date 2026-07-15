@@ -204,7 +204,9 @@ def main() -> None:
     assert classified == inventory, f"unclassified={inventory - classified}, unknown={classified - inventory}"
     for entry in manifest:
         if entry["classification"] == "renamed":
-            assert entry.get("production_callsite"), entry["old_rpc"]
+            assert entry.get("production_callsite") or entry.get(
+                "production_implementation"
+            ), entry["old_rpc"]
             assert entry.get("new_rpc"), entry["old_rpc"]
         else:
             assert entry.get("reason"), entry["old_rpc"]

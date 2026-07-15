@@ -267,6 +267,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
+      "layers": {
+        "server_adapter": {
+          "status": "partial"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
       "layers": {
         "server_adapter": {
@@ -304,6 +315,17 @@
       "layers": {
         "server_adapter": {
           "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/GetHandleStatus",
+      "layers": {
+        "server_adapter": {
+          "status": "partial"
         },
         "ui": {
           "status": "shipped"
@@ -428,6 +450,28 @@
         },
         "ui": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName",
+      "layers": {
+        "server_adapter": {
+          "status": "partial"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ResolveHandle",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },

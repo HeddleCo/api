@@ -155,6 +155,10 @@ RETAINED["HostedUserService"].update(WORKFLOW_HOSTED_METHODS)
 REPLACED_METHODS = {
     ("ImportService", "CreateImportJob"): "OperationService/SubmitOperation",
     ("ImportService", "StreamImportProgress"): "OperationService/WatchOperations",
+    ("HostedUserService", "ClaimHandle"): "IdentityService/ClaimHandle",
+    ("HostedUserService", "GetHandleStatus"): "IdentityService/GetHandleStatus",
+    ("HostedUserService", "RequestHeldName"): "IdentityService/RequestHeldName",
+    ("HostedUserService", "ResolveHandle"): "IdentityService/ResolveHandle",
 }
 
 SERVICE_TARGET = {
@@ -361,6 +365,27 @@ def production_callsite(service_name: str, method: str) -> str:
     if service_name == "FeedService" and method == "RecordInteraction":
         return "HeddleCo/tapestry:src/routes/app/feed/interaction.json/+server.ts"
     return "HeddleCo/tapestry:src/lib/server/api.ts"
+
+
+def production_evidence(service_name: str, method: str) -> dict[str, str]:
+    if service_name == "HostedUserService" and method in {
+        "ClaimHandle",
+        "GetHandleStatus",
+        "RequestHeldName",
+        "ResolveHandle",
+    }:
+        evidence = {
+            "production_implementation": (
+                "HeddleCo/weft:crates/weft-server/src/server/"
+                "grpc_hosted_impl/user.rs"
+            )
+        }
+        if method != "ResolveHandle":
+            evidence["production_callsite"] = (
+                "HeddleCo/tapestry:src/lib/server/api.ts"
+            )
+        return evidence
+    return {"production_callsite": production_callsite(service_name, method)}
 
 
 def make_sync_directional(text: str) -> str:
@@ -606,7 +631,7 @@ def main() -> None:
             manifest.append({
                 "old_rpc": f"heddle.v1.{old_service}/{method}",
                 "classification": "renamed",
-                "production_callsite": production_callsite(old_service, method),
+                **production_evidence(old_service, method),
                 "new_rpc": f"{PACKAGE}.{new_service}/{method}",
             })
         rendered_service = service(new_service, [m for _, m in selected], selected_blocks)
@@ -621,7 +646,7 @@ def main() -> None:
         manifest.append({
             "old_rpc": f"heddle.v1.{old_service}/{method}",
             "classification": "renamed",
-            "production_callsite": production_callsite(old_service, method),
+            **production_evidence(old_service, method),
             "new_rpc": f"{PACKAGE}.{new_rpc}",
         })
 

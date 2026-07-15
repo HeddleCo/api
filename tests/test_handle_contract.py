@@ -5,6 +5,8 @@ import re
 import unittest
 from pathlib import Path
 
+from tools.build_contract import REPLACED_METHODS
+
 
 ROOT = Path(__file__).resolve().parent.parent
 PROTO = ROOT / "proto/heddle/api/v1alpha1/identity.proto"
@@ -125,11 +127,20 @@ class SharedHandleContractTest(unittest.TestCase):
         for method in self.fixture:
             legacy = f"heddle.v1.HostedUserService/{method}"
             entry = methods[legacy]
+            expected = self.fixture[method]
             self.assertEqual(entry["classification"], "renamed")
             self.assertEqual(
                 entry["new_rpc"], f"{PACKAGE}.IdentityService/{method}"
             )
-            self.assertIn("production_callsite", entry)
+            for evidence in ("production_callsite", "production_implementation"):
+                self.assertEqual(entry.get(evidence), expected.get(evidence))
+
+    def test_extraction_aid_cannot_reclassify_handles_as_dropped(self) -> None:
+        for method in self.fixture:
+            self.assertEqual(
+                REPLACED_METHODS[("HostedUserService", method)],
+                f"IdentityService/{method}",
+            )
 
     def test_every_consumer_declares_each_handle_operation(self) -> None:
         for consumer in ("heddle", "tapestry", "weft"):

@@ -430,8 +430,10 @@
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ClaimHandle",
-      "classification": "dropped",
-      "reason": "no reachable production caller in the coordinated cutover inventory"
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateApprovalGroup",
@@ -524,8 +526,10 @@
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GetHandleStatus",
-      "classification": "dropped",
-      "reason": "no reachable production caller in the coordinated cutover inventory"
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/GetHandleStatus"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GetMembershipHistory",
@@ -634,8 +638,10 @@
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RequestHeldName",
-      "classification": "dropped",
-      "reason": "no reachable production caller in the coordinated cutover inventory"
+      "classification": "renamed",
+      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
+      "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RequestProofChallenge",
@@ -644,8 +650,9 @@
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ResolveHandle",
-      "classification": "dropped",
-      "reason": "no reachable production caller in the coordinated cutover inventory"
+      "classification": "renamed",
+      "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/user.rs",
+      "new_rpc": "heddle.api.v1alpha1.IdentityService/ResolveHandle"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ResolveMonorepo",

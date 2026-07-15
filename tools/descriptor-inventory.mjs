@@ -25,6 +25,14 @@ const CAPABILITY_LABELS = new Map([
   ["PULL_REQUEST_REVIEW", "pull request review"],
   ["SEARCH", "search"],
 ]);
+const RPC_CONTRACT_FIELDS = new Set([
+  "signing_identity",
+  "signing_tier",
+  "effect",
+  "retry_behavior",
+  "client_operation_id_required",
+  "capability",
+]);
 
 function required(registry, kind, name) {
   const value = registry[kind](name);
@@ -91,12 +99,15 @@ function main() {
     `${PACKAGE}.CapabilityArea`,
   );
 
-  const authorizationFields = rpcContract.message.fields
-    .map((field) => field.name)
-    .filter((name) => /authorization|role|scope/.test(name));
-  if (authorizationFields.length !== 0) {
+  const rpcContractFields = new Set(
+    rpcContract.message.fields.map((field) => field.name),
+  );
+  if (
+    rpcContractFields.size !== RPC_CONTRACT_FIELDS.size ||
+    [...rpcContractFields].some((name) => !RPC_CONTRACT_FIELDS.has(name))
+  ) {
     throw new Error(
-      "authorization role/scope metadata now exists; update the matrix renderer",
+      "RpcContract schema changed; update the matrix renderer after contract review",
     );
   }
 

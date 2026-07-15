@@ -199,6 +199,26 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(AuditError, "capability"):
                 descriptor_inventory(descriptor)
 
+    def test_descriptor_inventory_fails_closed_when_rpc_contract_schema_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / "proto", root / "proto")
+            shutil.copy2(ROOT / "buf.yaml", root / "buf.yaml")
+            source = root / "proto/heddle/api/v1alpha1/contract.proto"
+            text = source.read_text()
+            changed, count = re.subn(
+                r"(\n  CapabilityArea capability = 6;)",
+                r"\1\n  string required_permission = 7;",
+                text,
+                count=1,
+            )
+            self.assertEqual(count, 1)
+            source.write_text(changed)
+            descriptor = root / "changed.binpb"
+            self.build_descriptor(root, descriptor)
+            with self.assertRaisesRegex(AuditError, "RpcContract schema changed"):
+                descriptor_inventory(descriptor)
+
     def test_public_attestation_detects_content_drift_and_has_no_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -571,6 +571,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc GetBlob(GetBlobRequest) returns (BlobResponse) {
@@ -580,6 +581,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc GetCompare(GetCompareRequest) returns (CompareResponse) {
@@ -589,6 +591,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_STATE_COMPARISON
     };
   }
   rpc GetContextHistory(GetContextHistoryRequest) returns (GetContextHistoryResponse) {
@@ -598,6 +601,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc GetDiff(GetStateRequest) returns (DiffResponse) {
@@ -607,6 +611,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc GetRefs(GetRefsRequest) returns (GetRefsResponse) {
@@ -616,6 +621,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc GetSemanticHotSpots(GetSemanticHotSpotsRequest) returns (GetSemanticHotSpotsResponse) {
@@ -625,6 +631,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc GetState(GetStateRequest) returns (StateSummary) {
@@ -634,6 +641,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc GetTree(GetTreeRequest) returns (TreeResponse) {
@@ -643,6 +651,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc ListActions(GetStateRequest) returns (ActionsResponse) {
@@ -652,6 +661,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc ListContext(ListContextRequest) returns (ListContextResponse) {
@@ -661,6 +671,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc ListContextSuggestions(ListContextSuggestionsRequest) returns (ListContextSuggestionsResponse) {
@@ -670,6 +681,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc ListProvenanceSummaries(ListProvenanceSummariesRequest) returns (ListProvenanceSummariesResponse) {
@@ -679,6 +691,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc ListStates(ListStatesRequest) returns (ListStatesResponse) {
@@ -688,6 +701,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
     };
   }
   rpc ReviseContext(ReviseContextRequest) returns (ReviseContextResponse) {
@@ -697,6 +711,7 @@ service RepositoryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc SetContext(SetContextRequest) returns (SetContextResponse) {
@@ -706,6 +721,7 @@ service RepositoryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc SupersedeContext(SupersedeContextRequest) returns (SupersedeContextResponse) {
@@ -715,6 +731,7 @@ service RepositoryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
   rpc SubscribeRepoEvents(SubscribeRepoEventsRequest) returns (stream RepoEvent) {
@@ -724,6 +741,7 @@ service RepositoryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
     };
   }
 }

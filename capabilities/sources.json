@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "attestations": {
+    "heddle": {
+      "kind": "consumer-derived-sanitized-declaration",
+      "snapshot": "capabilities/declarations/heddle.json",
+      "sha256": "ab5cea9da81a7723caad188f72be6187700146a307c72cc86639a222cdf11134"
+    },
+    "weft": {
+      "kind": "consumer-derived-sanitized-declaration",
+      "snapshot": "capabilities/declarations/weft.json",
+      "sha256": "6562e0773a488bfc4a099db9e716766db1edcf764c8c57f84cf4a38a5f13e924"
+    },
+    "tapestry": {
+      "kind": "consumer-derived-sanitized-declaration",
+      "snapshot": "capabilities/declarations/tapestry.json",
+      "sha256": "7c9cf4fd3ad862a8d5c23a2b40e911d44cde2c30f57cf75f314cec82ed45503c"
+    }
+  }
+}

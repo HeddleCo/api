@@ -905,6 +905,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc CreateGrant(CreateGrantRequest) returns (HostedGrant) {
@@ -914,6 +915,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc CreateInvitation(CreateInvitationRequest) returns (Invitation) {
@@ -923,6 +925,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc CreateNamespace(CreateNamespaceRequest) returns (HostedNamespace) {
@@ -932,6 +935,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc CreateRepository(CreateRepositoryRequest) returns (HostedRepository) {
@@ -941,6 +945,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc DeleteBookmark(DeleteBookmarkRequest) returns (DeleteResponse) {
@@ -950,6 +955,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc DeleteGrant(DeleteGrantRequest) returns (DeleteResponse) {
@@ -959,6 +965,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteResponse) {
@@ -968,6 +975,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc DeleteRepository(DeleteRepositoryRequest) returns (DeleteResponse) {
@@ -977,6 +985,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc DetachChild(DetachChildRequest) returns (DetachChildResponse) {
@@ -986,6 +995,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc GetCurrentUserNamespace(GetCurrentUserNamespaceRequest) returns (HostedNamespace) {
@@ -995,6 +1005,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc GetSpool(GetSpoolRequest) returns (HostedSpool) {
@@ -1004,6 +1015,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc GrantSupportAccess(GrantSupportAccessRequest) returns (SupportAccessGrant) {
@@ -1013,6 +1025,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListBookmarks(ListBookmarksRequest) returns (ListBookmarksResponse) {
@@ -1022,6 +1035,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListChildren(ListChildrenRequest) returns (ListChildrenResponse) {
@@ -1031,6 +1045,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse) {
@@ -1040,6 +1055,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
@@ -1049,6 +1065,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListMembers(ListMembersRequest) returns (ListMembersResponse) {
@@ -1058,6 +1075,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListSpools(ListSpoolsRequest) returns (ListSpoolsResponse) {
@@ -1067,6 +1085,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListSupportAccessGrants(ListSupportAccessGrantsRequest) returns (ListSupportAccessGrantsResponse) {
@@ -1076,6 +1095,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse) {
@@ -1085,6 +1105,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ResolveMonorepo(ResolveMonorepoRequest) returns (MonorepoNode) {
@@ -1094,6 +1115,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc ResolveSubjects(ResolveSubjectsRequest) returns (ResolveSubjectsResponse) {
@@ -1103,6 +1125,7 @@ service RegistryService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc RevokeInvitation(RevokeInvitationRequest) returns (DeleteResponse) {
@@ -1112,6 +1135,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc RevokeSupportAccess(RevokeSupportAccessRequest) returns (DeleteResponse) {
@@ -1121,6 +1145,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc SetNamespaceVisibility(SetNamespaceVisibilityRequest) returns (HostedNamespace) {
@@ -1130,6 +1155,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc SetSpoolVisibility(SetSpoolVisibilityRequest) returns (HostedSpool) {
@@ -1139,6 +1165,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc UpdateGrant(UpdateGrantRequest) returns (HostedGrant) {
@@ -1148,6 +1175,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc UpdateNamespace(UpdateNamespaceRequest) returns (HostedNamespace) {
@@ -1157,6 +1185,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc UpdateRepository(UpdateRepositoryRequest) returns (HostedRepository) {
@@ -1166,6 +1195,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc UpdateSpoolSettings(UpdateSpoolSettingsRequest) returns (HostedSpool) {
@@ -1175,6 +1205,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
   rpc UpsertBookmark(UpsertBookmarkRequest) returns (Bookmark) {
@@ -1184,6 +1215,7 @@ service RegistryService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
     };
   }
 }

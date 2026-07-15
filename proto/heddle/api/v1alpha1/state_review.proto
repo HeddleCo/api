@@ -233,6 +233,7 @@ service StateReviewService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
     };
   }
   rpc ListSignatures(ListSignaturesRequest) returns (ListSignaturesResponse) {
@@ -242,6 +243,7 @@ service StateReviewService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
     };
   }
   rpc SignState(SignStateRequest) returns (SignStateResponse) {
@@ -251,6 +253,7 @@ service StateReviewService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
     };
   }
 }

@@ -1,0 +1,1469 @@
+{
+  "schema_version": 2,
+  "consumer": "tapestry",
+  "rpc_mappings": [
+    {
+      "rpc": "heddle.api.v1alpha1.AgentGatewayService/Connect",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ControlAgent",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/DecideAgentPermission",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/DeleteHarnessPreference",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentCommand",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentPolicy",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentRun",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListAgentRuns",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListAgentTimelineEvents",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListHarnessPreferences",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/UpdateAgentPolicy",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/WatchAgentRun",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/GetFeedSnapshot",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/RecordInteraction",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/StreamFeed",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/UpdateFeedItem",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListByState",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListBySymbol",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ApproveDeviceAuthorization",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnRegistration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateServiceAccount",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ExchangeDeviceAuthorization",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/FinishWebAuthnAuthentication",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/GetInvitationSummary",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IntrospectCredential",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssuePresenceToken",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssueServiceAccountCredential",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListServiceAccounts",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListSessions",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeCredential",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeServiceAccount",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeSession",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RotateCredential",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/WaitForDeviceAuthorization",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/WhoAmI",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/BatchGetOperations",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/CancelOperation",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperation",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperationBatch",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperationBatch",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/AttachChild",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateGrant",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateInvitation",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteGrant",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteNamespace",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteRepository",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DetachChild",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GetSpool",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListBookmarks",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListChildren",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListGrants",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListInvitations",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListMembers",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListSpools",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListSupportAccessGrants",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListWorktrees",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ResolveMonorepo",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ResolveSubjects",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/RevokeInvitation",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateGrant",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateNamespace",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateRepository",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpoolSettings",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpsertBookmark",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/ListRefs",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/Pull",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/Push",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/UpdateRef",
+      "layers": {
+        "server_adapter": {
+          "status": "intentionally-unsupported"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlob",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetCompare",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetContextHistory",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetDiff",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetRefs",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetSemanticHotSpots",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetState",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetTree",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListActions",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListContext",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListContextSuggestions",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListProvenanceSummaries",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ReviseContext",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SetContext",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SupersedeContext",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.SearchService/Search",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/SignState",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/AddApprovalGroupMember",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/AddPolicyGroupRequirement",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ApproveThread",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CheckMergeEligibility",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CreateApprovalGroup",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CreateThreadPolicy",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteApprovalGroup",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteThreadPolicy",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadApprovals",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadPolicies",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RemoveApprovalGroupMember",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RemovePolicyGroupRequirement",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RevokeApproval",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/StreamWorkspaceSummary",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    }
+  ]
+}

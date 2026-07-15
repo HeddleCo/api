@@ -215,8 +215,10 @@ message BatchGetOperationsRequest {
 }
 
 message BatchGetOperationsResponse {
-  // Returned in request order. An inaccessible or unknown id fails the whole
-  // request so callers cannot use omissions as an existence oracle.
+  // Returned in request order. Any inaccessible or unknown id fails the whole
+  // request with the same NOT_FOUND status and public error shape, without
+  // identifying which id failed, so callers cannot use errors or omissions as
+  // an existence oracle.
   repeated Operation operations = 1;
 }
 
@@ -265,6 +267,9 @@ message OperationWatchEvent {
 
 message CancelOperationRequest {
   OperationId operation_id = 1;
+  // Stable cancellation retry key within the authenticated subject and target
+  // operation_id. Reusing that tuple returns the same cancellation outcome;
+  // the same key may be used independently for a different operation.
   string client_operation_id = 2;
 }
 
@@ -290,6 +295,7 @@ service OperationService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
   rpc SubmitOperationBatch(SubmitOperationBatchRequest) returns (SubmitOperationBatchResponse) {
@@ -299,6 +305,7 @@ service OperationService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
   rpc GetOperation(GetOperationRequest) returns (Operation) {
@@ -308,6 +315,7 @@ service OperationService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
   rpc BatchGetOperations(BatchGetOperationsRequest) returns (BatchGetOperationsResponse) {
@@ -317,6 +325,7 @@ service OperationService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
   rpc GetOperationBatch(GetOperationBatchRequest) returns (GetOperationBatchResponse) {
@@ -326,6 +335,7 @@ service OperationService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
   rpc ListOperations(ListOperationsRequest) returns (ListOperationsResponse) {
@@ -335,6 +345,7 @@ service OperationService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
   rpc WatchOperations(WatchOperationsRequest) returns (stream OperationWatchEvent) {
@@ -344,6 +355,7 @@ service OperationService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
   rpc CancelOperation(CancelOperationRequest) returns (CancelOperationResponse) {
@@ -353,6 +365,7 @@ service OperationService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
     };
   }
 }

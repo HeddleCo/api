@@ -62,6 +62,17 @@ class SharedOperationContractTest(unittest.TestCase):
         ):
             self.assertNotIn(removed, proto_sources)
 
+    def test_lookup_and_cancellation_do_not_create_identity_oracles(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        batch_response = message_body(source, "BatchGetOperationsResponse")
+        cancel_request = message_body(source, "CancelOperationRequest")
+
+        self.assertIn("same NOT_FOUND status and public error shape", batch_response)
+        self.assertIn("without\n  // identifying which id failed", batch_response)
+        self.assertIn("authenticated subject and target", cancel_request)
+        self.assertIn("operation_id", cancel_request)
+        self.assertIn("different operation", cancel_request)
+
 
 if __name__ == "__main__":
     unittest.main()

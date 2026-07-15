@@ -1,0 +1,1469 @@
+{
+  "schema_version": 2,
+  "consumer": "weft",
+  "rpc_mappings": [
+    {
+      "rpc": "heddle.api.v1alpha1.AgentGatewayService/Connect",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ControlAgent",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/DecideAgentPermission",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/DeleteHarnessPreference",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentCommand",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentPolicy",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentRun",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListAgentRuns",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListAgentTimelineEvents",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListHarnessPreferences",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/UpdateAgentPolicy",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/WatchAgentRun",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/GetFeedSnapshot",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/RecordInteraction",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/StreamFeed",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/UpdateFeedItem",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListByState",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListBySymbol",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ApproveDeviceAuthorization",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnRegistration",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateServiceAccount",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ExchangeDeviceAuthorization",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/FinishWebAuthnAuthentication",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/GetInvitationSummary",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IntrospectCredential",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssuePresenceToken",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssueServiceAccountCredential",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListServiceAccounts",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListSessions",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeCredential",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeServiceAccount",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeSession",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RotateCredential",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/WaitForDeviceAuthorization",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/WhoAmI",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/BatchGetOperations",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/CancelOperation",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperation",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetOperationBatch",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperationBatch",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/AttachChild",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateGrant",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateInvitation",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteGrant",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteNamespace",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteRepository",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DetachChild",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GetSpool",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListBookmarks",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListChildren",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListGrants",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListInvitations",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListMembers",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListSpools",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListSupportAccessGrants",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListWorktrees",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ResolveMonorepo",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ResolveSubjects",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/RevokeInvitation",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateGrant",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateNamespace",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateRepository",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpoolSettings",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpsertBookmark",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/ListRefs",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/Pull",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/Push",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/UpdateRef",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlob",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetCompare",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetContextHistory",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetDiff",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetRefs",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetSemanticHotSpots",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetState",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetTree",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListActions",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListContext",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListContextSuggestions",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListProvenanceSummaries",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ReviseContext",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SetContext",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SupersedeContext",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.SearchService/Search",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/SignState",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/AddApprovalGroupMember",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/AddPolicyGroupRequirement",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ApproveThread",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CheckMergeEligibility",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CreateApprovalGroup",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CreateThreadPolicy",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteApprovalGroup",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteThreadPolicy",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadApprovals",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadPolicies",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RemoveApprovalGroupMember",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RemovePolicyGroupRequirement",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RevokeApproval",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/StreamWorkspaceSummary",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    }
+  ]
+}

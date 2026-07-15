@@ -45,6 +45,24 @@ enum RetryBehavior {
   RETRY_BEHAVIOR_RESUMABLE_STREAM = 4;
 }
 
+enum CapabilityArea {
+  CAPABILITY_AREA_UNSPECIFIED = 0;
+  CAPABILITY_AREA_RUN_HISTORY_DETAILS = 1;
+  CAPABILITY_AREA_STATE_COMPARISON = 2;
+  CAPABILITY_AREA_BRANCH_PROTECTION = 3;
+  CAPABILITY_AREA_WORKSPACE_MANAGEMENT = 4;
+  CAPABILITY_AREA_REVIEW_DECISIONS = 5;
+  CAPABILITY_AREA_SYNCHRONIZATION = 6;
+  CAPABILITY_AREA_SPOOL_ADMINISTRATION = 7;
+  CAPABILITY_AREA_REPOSITORY_INSPECTION = 8;
+  CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS = 9;
+  CAPABILITY_AREA_COLLABORATION = 10;
+  CAPABILITY_AREA_ATTENTION_FEED = 11;
+  CAPABILITY_AREA_PULL_REQUEST_REVIEW = 12;
+  CAPABILITY_AREA_SEARCH = 13;
+  CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS = 14;
+}
+
 message ServiceContract {
   repeated DeploymentTarget deployment_targets = 1;
   ServiceMaturity maturity = 2;
@@ -56,6 +74,7 @@ message RpcContract {
   RpcEffect effect = 3;
   RetryBehavior retry_behavior = 4;
   bool client_operation_id_required = 5;
+  CapabilityArea capability = 6;
 }
 
 // Machine-readable lifecycle semantics for the canonical Operation state enum.

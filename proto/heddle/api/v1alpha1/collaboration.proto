@@ -101,6 +101,7 @@ service CollaborationService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_COLLABORATION
     };
   }
   rpc ListByState(ListDiscussionsByStateRequest) returns (ListDiscussionsResponse) {
@@ -110,6 +111,7 @@ service CollaborationService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_COLLABORATION
     };
   }
   rpc ListBySymbol(ListDiscussionsBySymbolRequest) returns (ListDiscussionsResponse) {
@@ -119,6 +121,7 @@ service CollaborationService {
       effect: RPC_EFFECT_READ_ONLY
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
+      capability: CAPABILITY_AREA_COLLABORATION
     };
   }
   rpc OpenDiscussion(OpenDiscussionRequest) returns (Discussion) {
@@ -128,6 +131,7 @@ service CollaborationService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_COLLABORATION
     };
   }
   rpc ResolveDiscussion(ResolveDiscussionRequest) returns (Discussion) {
@@ -137,6 +141,7 @@ service CollaborationService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_COLLABORATION
     };
   }
 }

@@ -51,7 +51,9 @@ enum StateStatus {
 
 // Grants are scoped to either a namespace or a repository — never both,
 // never neither. The `target` oneof is the wire-level form of that
-// "exactly one of" guarantee.
+// "exactly one of" guarantee. Server-side `classify_grant_target` converts
+// the populated arm to the canonical `GrantTarget` value and rejects an
+// unset target.
 message GrantTargetRef {
   oneof target {
     string namespace_path = 1;

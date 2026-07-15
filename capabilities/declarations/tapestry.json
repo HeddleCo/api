@@ -270,7 +270,7 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
       "layers": {
         "server_adapter": {
-          "status": "partial"
+          "status": "shipped"
         },
         "ui": {
           "status": "shipped"
@@ -325,7 +325,7 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/GetHandleStatus",
       "layers": {
         "server_adapter": {
-          "status": "partial"
+          "status": "shipped"
         },
         "ui": {
           "status": "shipped"
@@ -457,7 +457,7 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName",
       "layers": {
         "server_adapter": {
-          "status": "partial"
+          "status": "shipped"
         },
         "ui": {
           "status": "shipped"
@@ -468,10 +468,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ResolveHandle",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },

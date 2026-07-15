@@ -1,0 +1,2452 @@
+{
+  "schema_version": 1,
+  "consumer": "tapestry",
+  "source_repository": "HeddleCo/tapestry",
+  "rpc_mappings": [
+    {
+      "rpc": "heddle.api.v1alpha1.AgentGatewayService/Connect",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ControlAgent",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/DecideAgentPermission",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/DeleteHarnessPreference",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentCommand",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentPolicy",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/GetAgentRun",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListAgentRuns",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListAgentTimelineEvents",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/ListHarnessPreferences",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/UpdateAgentPolicy",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AgentService/WatchAgentRun",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "The descriptor marks this service planned."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/GetFeedSnapshot",
+      "capability": "attention feed",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetFeedSnapshot"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/feed/:feed routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/RecordInteraction",
+      "capability": "attention feed",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/feed/interaction.json/+server.ts:RecordInteraction"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/feed/:feed routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/StreamFeed",
+      "capability": "attention feed",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:StreamFeed"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/feed/:feed routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttentionService/UpdateFeedItem",
+      "capability": "attention feed",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:UpdateFeedItem"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/feed/:feed routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn",
+      "capability": "collaboration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:AppendTurn"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/-/discussion/+server.ts:discussion actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListByState",
+      "capability": "collaboration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListByState"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/-/discussion/+server.ts:discussion actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListBySymbol",
+      "capability": "collaboration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListBySymbol"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion",
+      "capability": "collaboration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:OpenDiscussion"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/-/discussion/+server.ts:discussion actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion",
+      "capability": "collaboration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ResolveDiscussion"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/-/discussion/+server.ts:discussion actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ApproveDeviceAuthorization",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ApproveDeviceAuthorization"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:BeginWebAuthnAuthentication"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnRegistration",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:BeginWebAuthnRegistration"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateServiceAccount",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateServiceAccount"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ExchangeDeviceAuthorization",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/FinishWebAuthnAuthentication",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:FinishWebAuthnAuthentication"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/GetInvitationSummary",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetInvitationSummary"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IntrospectCredential",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssuePresenceToken",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:IssuePresenceToken"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssueServiceAccountCredential",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:IssueServiceAccountCredential"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:LinkOAuthIdentity"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListScopeCapabilities"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListServiceAccounts",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListServiceAccounts"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListSessions",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListSessions"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:MintAnonBiscuit"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:RegisterPublicKey"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeCredential",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:RevokeCredential"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeServiceAccount",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:RevokeServiceAccount"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RevokeSession",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:RevokeSession"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RotateCredential",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:StoreProviderToken"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/WaitForDeviceAuthorization",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/WhoAmI",
+      "capability": "identity and credentials",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:WhoAmI"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/login/:authentication and settings routes"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
+      "capability": "pull request review",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/review-api.ts:GetReviewAnalysisResult"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/review/[owner]/[repo]/pull/[prNumber]/+page.server.ts:review analysis"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus",
+      "capability": "pull request review",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/review-api.ts:GetReviewAnalysisStatus"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/review/[owner]/[repo]/pull/[prNumber]/+page.server.ts:review analysis"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis",
+      "capability": "pull request review",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/review-api.ts:StartReviewAnalysis"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/review/[owner]/[repo]/pull/[prNumber]/+page.server.ts:review analysis"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/AttachChild",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:AttachChild"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateGrant",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateGrant"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateInvitation",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateInvitation"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateNamespace"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateRepository"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:DeleteBookmark"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteGrant",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:DeleteGrant"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteNamespace",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:DeleteNamespace"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteRepository",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:DeleteRepository"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DetachChild",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:DetachChild"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GetSpool",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetSpool"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListBookmarks",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListBookmarks"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListChildren",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListChildren"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListGrants",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListGrants"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListInvitations",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListInvitations"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListMembers",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListMembers"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListSpools",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListSpools"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListSupportAccessGrants",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListWorktrees",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListWorktrees"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ResolveMonorepo",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ResolveMonorepo"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ResolveSubjects",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ResolveSubjects"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/RevokeInvitation",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:RevokeInvitation"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:SetNamespaceVisibility"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateGrant",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:UpdateGrant"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateNamespace",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:UpdateNamespace"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateRepository",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:UpdateRepository"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpoolSettings",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:UpdateSpoolSettings"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpsertBookmark",
+      "capability": "spool administration",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:UpsertBookmark"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:spool administration actions"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/ListRefs",
+      "capability": "synchronization",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/Pull",
+      "capability": "synchronization",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/Push",
+      "capability": "synchronization",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepoSyncService/UpdateRef",
+      "capability": "synchronization",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/CreateImportJob",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateImportJob"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetBlame"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/152",
+          "reason": "The spool-history UI follow-up owns this comparison/history path."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetBlob",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetBlob"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetCompare",
+      "capability": "state comparison",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetCompare"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/152",
+          "reason": "The spool-history UI follow-up owns this comparison/history path."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetContextHistory",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetContextHistory"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/18",
+          "reason": "The review history UI follow-up owns this path."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetDiff",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetDiff"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetRefs",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetRefs"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetSemanticHotSpots",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetSemanticHotSpots"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetState",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetState"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/GetTree",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetTree"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListActions",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListActions"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListContext",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListContext"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListContextSuggestions",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListContextSuggestions"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListProvenanceSummaries",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListProvenanceSummaries"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
+      "capability": "run history/details",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListStates"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ReviseContext",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ReviseContext"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SetContext",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:SetContext"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/StreamImportProgress",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:StreamImportProgress"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/events/+server.ts:SubscribeRepoEvents"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/[...path]/+page.server.ts:repository app surface"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/SupersedeContext",
+      "capability": "repository inspection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:SupersedeContext"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.SearchService/Search",
+      "capability": "search",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:Search"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/routes/app/search/+server.ts:search"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload",
+      "capability": "review decisions",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures",
+      "capability": "review decisions",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/SignState",
+      "capability": "review decisions",
+      "layers": {
+        "server_adapter": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No Tapestry server-adapter mapping is shipped."
+        },
+        "ui": {
+          "status": "unsupported",
+          "evidence": [],
+          "follow_up": null,
+          "reason": "No distinct Tapestry UI path is shipped for this adapter row."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/AddApprovalGroupMember",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:AddApprovalGroupMember"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/AddPolicyGroupRequirement",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:AddPolicyGroupRequirement"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ApproveThread",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this missing adapter path."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this UI path."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CheckMergeEligibility",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this missing adapter path."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this UI path."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CreateApprovalGroup",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateApprovalGroup"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/CreateThreadPolicy",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:CreateThreadPolicy"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteApprovalGroup",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:DeleteApprovalGroup"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteThreadPolicy",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:DeleteThreadPolicy"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary",
+      "capability": "workspace management",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:GetWorkspaceSummary"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/spool-views.ts:workspace views"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListApprovalGroups"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadApprovals",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this missing adapter path."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this UI path."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadPolicies",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListThreadPolicies"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads",
+      "capability": "workspace management",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:ListThreads"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/spool-views.ts:workspace views"
+          ],
+          "follow_up": null
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RemoveApprovalGroupMember",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:RemoveApprovalGroupMember"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RemovePolicyGroupRequirement",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:RemovePolicyGroupRequirement"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/157",
+          "reason": "The branch-protection administration follow-up owns this UI gap."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/RevokeApproval",
+      "capability": "branch protection",
+      "layers": {
+        "server_adapter": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this missing adapter path."
+        },
+        "ui": {
+          "status": "planned",
+          "evidence": [],
+          "follow_up": "https://github.com/HeddleCo/tapestry/issues/16",
+          "reason": "The approval/block UI follow-up owns this UI path."
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/StreamWorkspaceSummary",
+      "capability": "workspace management",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/api.ts:StreamWorkspaceSummary"
+          ],
+          "follow_up": null
+        },
+        "ui": {
+          "status": "shipped",
+          "evidence": [
+            "src/lib/server/spool-views.ts:workspace views"
+          ],
+          "follow_up": null
+        }
+      }
+    }
+  ]
+}

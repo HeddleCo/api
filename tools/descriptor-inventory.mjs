@@ -166,7 +166,9 @@ function validateScopeSource(
     "CALLER_BOUND",
     "RESOURCE_READER",
     "RESOURCE_WRITER",
+    "RESOURCE_MAINTAINER",
     "RESOURCE_ADMINISTRATOR",
+    "RESOURCE_OWNER",
     "CALLER_OR_RESOURCE_ADMINISTRATOR",
   ]);
   if (
@@ -229,7 +231,9 @@ function validateAuthorization(metadata, maturity, rpc, input) {
   const resourceRoles = new Set([
     "RESOURCE_READER",
     "RESOURCE_WRITER",
+    "RESOURCE_MAINTAINER",
     "RESOURCE_ADMINISTRATOR",
+    "RESOURCE_OWNER",
     "CALLER_OR_RESOURCE_ADMINISTRATOR",
   ]);
   const resourceScopes = new Set([

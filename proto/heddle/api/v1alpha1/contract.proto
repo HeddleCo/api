@@ -88,6 +88,10 @@ enum AuthorizationRole {
   // The service is planned, but its authorization policy has not been
   // decided. This value is invalid for shipped services.
   AUTHORIZATION_ROLE_PLANNED_UNDECIDED = 8;
+  // Resource roles preserve Weft's hosted-role guard vocabulary. These values
+  // are appended so existing enum numbers remain wire-compatible.
+  AUTHORIZATION_ROLE_RESOURCE_MAINTAINER = 9;
+  AUTHORIZATION_ROLE_RESOURCE_OWNER = 10;
 }
 
 enum AuthorizationScopeSource {

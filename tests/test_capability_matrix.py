@@ -110,6 +110,60 @@ IDENTITY_CREDENTIAL_CONTRACTS = {
         (("credential_id", "CALLER_BOUND"),),
     ),
 }
+REVIEW_ANALYSIS_CONTRACTS = {
+    "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult": (
+        "PUBLIC",
+        "CALLER_BOUND",
+        "CALLER_SUBJECT",
+        "HIDE",
+    ),
+    "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus": (
+        "PUBLIC",
+        "CALLER_BOUND",
+        "CALLER_SUBJECT",
+        "HIDE",
+    ),
+    "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis": (
+        "PUBLIC",
+        "CALLER_BOUND",
+        "CALLER_SUBJECT",
+        "DISCLOSE",
+    ),
+}
+REGISTRY_AUTHORIZATION_CONTRACTS = {
+    "AttachChild": ("RESOURCE_WRITER", "REQUEST_RESOURCE", ("parent_path", "child_path")),
+    "CreateGrant": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
+    "CreateInvitation": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("namespace_path",)),
+    "CreateNamespace": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("parent_path",)),
+    "CreateRepository": ("RESOURCE_MAINTAINER", "REQUEST_RESOURCE", ("namespace_path",)),
+    "DeleteBookmark": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
+    "DeleteGrant": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
+    "DeleteNamespace": ("RESOURCE_OWNER", "REQUEST_RESOURCE", ("full_path",)),
+    "DeleteRepository": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
+    "DetachChild": ("RESOURCE_WRITER", "REQUEST_RESOURCE", ("parent_path",)),
+    "GetCurrentUserNamespace": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
+    "GetSpool": ("RESOURCE_READER", "REQUEST_RESOURCE", ("full_path",)),
+    "GrantSupportAccess": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
+    "ListBookmarks": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
+    "ListChildren": ("RESOURCE_READER", "REQUEST_RESOURCE", ("parent_path",)),
+    "ListGrants": ("RESOURCE_ADMINISTRATOR", "CALLER_GRANTS", ()),
+    "ListInvitations": ("RESOURCE_READER", "REQUEST_RESOURCE", ("namespace_path",)),
+    "ListMembers": ("RESOURCE_READER", "REQUEST_RESOURCE", ("namespace_path",)),
+    "ListSpools": ("RESOURCE_READER", "CALLER_GRANTS", ()),
+    "ListSupportAccessGrants": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
+    "ListWorktrees": ("GLOBAL_ADMINISTRATOR", "NONE", ()),
+    "ResolveMonorepo": ("RESOURCE_READER", "REQUEST_RESOURCE", ("root_path",)),
+    "ResolveSubjects": ("RESOURCE_READER", "CALLER_GRANTS", ()),
+    "RevokeInvitation": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("id",)),
+    "RevokeSupportAccess": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("id",)),
+    "SetNamespaceVisibility": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
+    "SetSpoolVisibility": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
+    "UpdateGrant": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
+    "UpdateNamespace": ("RESOURCE_OWNER", "REQUEST_RESOURCE", ("full_path",)),
+    "UpdateRepository": ("RESOURCE_MAINTAINER", "REQUEST_RESOURCE", ("full_path",)),
+    "UpdateSpoolSettings": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
+    "UpsertBookmark": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
+}
 DIRECTORY_READ_CONTRACTS = {
     "heddle.api.v1alpha1.IdentityService/GetHandleStatus": (
         "AUTHENTICATED_PRINCIPAL",
@@ -795,6 +849,39 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
                         for target in actual[rpc]["authorization_request_targets"]
                     ),
                     tuple(paths),
+                )
+
+    def test_review_analysis_work_selectors_are_not_authorization_targets(self) -> None:
+        actual = build_inventory()
+        for rpc, expected in REVIEW_ANALYSIS_CONTRACTS.items():
+            with self.subTest(rpc=rpc):
+                self.assertEqual(
+                    tuple(actual[rpc][field] for field in AUTHORIZATION_FIELDS),
+                    expected,
+                )
+                self.assertEqual(actual[rpc]["authorization_request_targets"], [])
+                self.assertFalse(actual[rpc]["authorization_multi_target"])
+
+    def test_registry_authorization_role_table_matches_weft_guards(self) -> None:
+        actual = build_inventory()
+        prefix = "heddle.api.v1alpha1.RegistryService/"
+        registry = {
+            rpc.removeprefix(prefix): contract
+            for rpc, contract in actual.items()
+            if rpc.startswith(prefix)
+        }
+        self.assertEqual(set(registry), set(REGISTRY_AUTHORIZATION_CONTRACTS))
+        for method, (role, scope, paths) in REGISTRY_AUTHORIZATION_CONTRACTS.items():
+            with self.subTest(method=method):
+                contract = registry[method]
+                self.assertEqual(contract["authorization_role"], role)
+                self.assertEqual(contract["authorization_scope_source"], scope)
+                self.assertEqual(
+                    tuple(
+                        target["path"]
+                        for target in contract["authorization_request_targets"]
+                    ),
+                    paths,
                 )
 
     def test_credential_information_responses_fail_closed_as_a_class(self) -> None:

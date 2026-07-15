@@ -985,11 +985,11 @@ service RegistryService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_MAINTAINER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_request_targets: {
         path: "namespace_path"
-        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+        role: AUTHORIZATION_ROLE_RESOURCE_MAINTAINER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
@@ -1035,11 +1035,11 @@ service RegistryService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_OWNER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_request_targets: {
         path: "full_path"
-        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+        role: AUTHORIZATION_ROLE_RESOURCE_OWNER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
@@ -1172,11 +1172,7 @@ service RegistryService {
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
-      authorization_request_targets: {
-        path: "resource"
-        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
-      }
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
@@ -1393,11 +1389,11 @@ service RegistryService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_OWNER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_request_targets: {
         path: "full_path"
-        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+        role: AUTHORIZATION_ROLE_RESOURCE_OWNER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
@@ -1411,11 +1407,11 @@ service RegistryService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_MAINTAINER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_request_targets: {
         path: "full_path"
-        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+        role: AUTHORIZATION_ROLE_RESOURCE_MAINTAINER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };

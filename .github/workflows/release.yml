@@ -18,6 +18,10 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: 1.71.0
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: "31.1"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-node@v4
         with:

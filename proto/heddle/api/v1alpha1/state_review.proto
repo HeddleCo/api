@@ -26,6 +26,11 @@ enum Verdict {
 }
 
 // Kind of review-progress check (weft#482).
+enum CheckKind {
+  CHECK_KIND_UNSPECIFIED = 0;
+  CHECK_KIND_FILE_REVIEWED = 1; // per-file checkmark; check_ref = file path
+  CHECK_KIND_RISK_SIGNAL_ACK = 2; // per-risk-signal ack; check_ref = signal id
+}
 
 message GetReviewPayloadRequest {
   RepositoryRef repo_path = 1;
@@ -213,12 +218,97 @@ message ReviewSignature {
 // +weft#481: record a signed reviewer verdict. Mirrors the SignStateRequest
 // signing model (canonical payload, algorithm, public_key, signature,
 // signed_at). DECOUPLED from status.
+message RecordVerdictRequest {
+  RepositoryRef repo_path = 1;
+  StateId state_id = 2;
+  Verdict verdict = 3;
+  ReviewScope scope = 4;
+  // REQUIRED for HOLD/REJECT (server-validated non-empty).
+  string reason = 5;
+  string algorithm = 6;
+  bytes public_key = 7;
+  // Raw signature bytes over the v2 canonical signing payload (incl. verdict).
+  bytes signature = 8;
+  google.protobuf.Timestamp signed_at = 9;
+  string client_operation_id = 10;
+}
+
+message RecordVerdictResponse {
+  // The appended attestation's id.
+  string signature_id = 1;
+  // Unchanged — the SAME state. A verdict never mints a successor, moves the
+  // tip, or changes status (decoupling). No status field by design.
+  StateId state_id = 2;
+}
 
 // +weft#482: a signed review-progress ack, keyed by
 // (state_id, actor, check_kind, check_ref). Acks are auditable attestations
 // (mirror the SignState signing fields).
+message ReviewCheckAck {
+  string actor_name = 1;
+  string actor_email = 2;
+  CheckKind check_kind = 3;
+  // The file path (FILE_REVIEWED) or risk-signal id (RISK_SIGNAL_ACK).
+  string check_ref = 4;
+  bool acked = 5;
+  google.protobuf.Timestamp acked_at = 6;
+  string algorithm = 7;
+  bytes public_key = 8;
+  bytes signature = 9;
+}
 
-// Risk signal computation + repo-level health.
+message RecordCheckAckRequest {
+  RepositoryRef repo_path = 1;
+  StateId state_id = 2;
+  CheckKind check_kind = 3;
+  string check_ref = 4;
+  bool acked = 5;
+  string algorithm = 6;
+  bytes public_key = 7;
+  bytes signature = 8;
+  google.protobuf.Timestamp acked_at = 9;
+  string client_operation_id = 10;
+}
+
+message RecordCheckAckResponse {
+  ReviewCheckAck ack = 1;
+}
+
+message GetReviewProgressRequest {
+  RepositoryRef repo_path = 1;
+  StateId state_id = 2;
+  // Optional: restrict to a single reviewer's acks. Empty = all users.
+  string actor_name = 3;
+  // Pagination (table-backed).
+  uint32 limit = 4;
+  // Opaque cursor (row id).
+  string page_token = 5;
+}
+
+message GetReviewProgressResponse {
+  repeated ReviewCheckAck acks = 1;
+  string next_page_token = 2;
+}
+
+// Repo-level signal health (ported from legacy SignalService.GetRepoSignalHealth).
+// Powers the CLI `heddle review health` rolling-window fire-rate report.
+message GetRepoSignalHealthRequest {
+  RepositoryRef repo_path = 1;
+  // Number of recent states to include in the rolling window. Server applies a
+  // sane default when zero.
+  uint32 window_states = 2;
+}
+
+message RepoSignalHealthReport {
+  repeated SignalHealthEntry entries = 1;
+  uint32 window_states = 2;
+}
+
+message SignalHealthEntry {
+  string module_id = 1;
+  float fire_rate = 2;
+  bool warn = 3;
+}
 
 service StateReviewService {
   option (heddle.api.v1alpha1.service_contract) = {
@@ -226,7 +316,43 @@ service StateReviewService {
     deployment_targets: DEPLOYMENT_TARGET_HEDDLE_DAEMON
     maturity: SERVICE_MATURITY_SHIPPED
   };
+  rpc GetRepoSignalHealth(GetRepoSignalHealthRequest) returns (RepoSignalHealthReport) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   rpc GetReviewPayload(GetReviewPayloadRequest) returns (ReviewPayload) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc GetReviewProgress(GetReviewProgressRequest) returns (GetReviewProgressResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
@@ -258,6 +384,47 @@ service StateReviewService {
       authorization_request_targets: {
         path: "repo_path"
         role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Record a signed per-file / per-risk-signal review-progress ack. Repo Write
+  // parity — an ack is durable review evidence.
+  rpc RecordCheckAck(RecordCheckAckRequest) returns (RecordCheckAckResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Record a signed SIGN/HOLD/REJECT reviewer verdict. DECOUPLED from status —
+  // returns the SAME state, never mints a successor. Repo Write parity (same
+  // gate as a positive SignState).
+  rpc RecordVerdict(RecordVerdictRequest) returns (RecordVerdictResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };

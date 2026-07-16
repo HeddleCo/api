@@ -190,6 +190,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/GetDiscussion",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.CollaborationService/ListByState",
       "layers": {
         "implementation": {
@@ -245,6 +256,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginRecovery",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication",
       "layers": {
         "implementation": {
@@ -278,6 +300,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CompleteRecovery",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
       "layers": {
         "implementation": {
@@ -293,6 +326,17 @@
       "layers": {
         "implementation": {
           "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
+      "layers": {
+        "implementation": {
+          "status": "partial"
         },
         "registration": {
           "status": "partial"
@@ -443,6 +487,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RecordSubscription",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
       "layers": {
         "implementation": {
@@ -531,10 +586,32 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/SubmitRecoveryProof",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
       "layers": {
         "implementation": {
           "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/VetoRecovery",
+      "layers": {
+        "implementation": {
+          "status": "partial"
         },
         "registration": {
           "status": "partial"
@@ -821,6 +898,17 @@
       "layers": {
         "implementation": {
           "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListActors",
+      "layers": {
+        "implementation": {
+          "status": "partial"
         },
         "registration": {
           "status": "partial"
@@ -1290,6 +1378,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/GetRepoSignalHealth",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload",
       "layers": {
         "implementation": {
@@ -1301,10 +1400,43 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewProgress",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures",
       "layers": {
         "implementation": {
           "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/RecordCheckAck",
+      "layers": {
+        "implementation": {
+          "status": "partial"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/RecordVerdict",
+      "layers": {
+        "implementation": {
+          "status": "partial"
         },
         "registration": {
           "status": "partial"
@@ -1404,6 +1536,17 @@
       "layers": {
         "implementation": {
           "status": "shipped"
+        },
+        "registration": {
+          "status": "partial"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/GetThread",
+      "layers": {
+        "implementation": {
+          "status": "partial"
         },
         "registration": {
           "status": "partial"

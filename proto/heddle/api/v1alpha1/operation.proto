@@ -296,6 +296,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc SubmitOperationBatch(SubmitOperationBatchRequest) returns (SubmitOperationBatchResponse) {
@@ -306,6 +310,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc GetOperation(GetOperationRequest) returns (Operation) {
@@ -316,6 +324,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc BatchGetOperations(BatchGetOperationsRequest) returns (BatchGetOperationsResponse) {
@@ -326,6 +338,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc GetOperationBatch(GetOperationBatchRequest) returns (GetOperationBatchResponse) {
@@ -336,6 +352,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc ListOperations(ListOperationsRequest) returns (ListOperationsResponse) {
@@ -346,6 +366,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc WatchOperations(WatchOperationsRequest) returns (stream OperationWatchEvent) {
@@ -356,6 +380,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
   rpc CancelOperation(CancelOperationRequest) returns (CancelOperationResponse) {
@@ -366,6 +394,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
+      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
+      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
     };
   }
 }

@@ -20,6 +20,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: 1.71.0
+          github_token: ${{ github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22

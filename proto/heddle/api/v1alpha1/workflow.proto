@@ -153,6 +153,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse) {
@@ -163,6 +171,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc StreamWorkspaceSummary(GetWorkspaceSummaryRequest) returns (stream WorkspaceSummary) {
@@ -173,6 +189,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc AddApprovalGroupMember(AddApprovalGroupMemberRequest) returns (ApprovalGroupMember) {
@@ -183,6 +207,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "group_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc AddPolicyGroupRequirement(AddPolicyGroupRequirementRequest) returns (PolicyGroupRequirement) {
@@ -193,6 +225,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "policy_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ApproveThread(ApproveThreadRequest) returns (ThreadApproval) {
@@ -203,6 +243,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CheckMergeEligibility(CheckMergeEligibilityRequest) returns (CheckMergeEligibilityResponse) {
@@ -213,6 +261,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CreateApprovalGroup(CreateApprovalGroupRequest) returns (ApprovalGroup) {
@@ -223,6 +279,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CreateThreadPolicy(CreateThreadPolicyRequest) returns (ThreadPolicy) {
@@ -233,6 +297,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc DeleteApprovalGroup(DeleteApprovalGroupRequest) returns (DeleteResponse) {
@@ -243,6 +315,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc DeleteThreadPolicy(DeleteThreadPolicyRequest) returns (DeleteResponse) {
@@ -253,6 +333,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListApprovalGroups(ListApprovalGroupsRequest) returns (ListApprovalGroupsResponse) {
@@ -263,6 +351,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListThreadApprovals(ListThreadApprovalsRequest) returns (ListThreadApprovalsResponse) {
@@ -273,6 +369,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListThreadPolicies(ListThreadPoliciesRequest) returns (ListThreadPoliciesResponse) {
@@ -283,6 +387,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc RemoveApprovalGroupMember(RemoveApprovalGroupMemberRequest) returns (DeleteResponse) {
@@ -293,6 +405,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc RemovePolicyGroupRequirement(RemovePolicyGroupRequirementRequest) returns (DeleteResponse) {
@@ -303,6 +423,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc RevokeApproval(RevokeApprovalRequest) returns (DeleteResponse) {
@@ -313,6 +441,14 @@ service WorkflowService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "id"
+        role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
 }

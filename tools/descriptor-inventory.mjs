@@ -6,6 +6,7 @@ import {
   fromBinary,
   getOption,
   hasOption,
+  ScalarType,
 } from "@bufbuild/protobuf";
 import { FileDescriptorSetSchema } from "@bufbuild/protobuf/wkt";
 
@@ -33,6 +34,12 @@ const RPC_CONTRACT_FIELDS = new Set([
   "retry_behavior",
   "client_operation_id_required",
   "capability",
+  "authorization_access",
+  "authorization_role",
+  "authorization_scope_source",
+  "authorization_existence",
+  "authorization_request_targets",
+  "authorization_multi_target",
 ]);
 
 function required(registry, kind, name) {
@@ -51,6 +58,259 @@ function enumLocal(enumDescriptor, number, context) {
     throw new Error(`descriptor metadata missing ${context}`);
   }
   return value.localName;
+}
+
+function enumLocalIncludingUnspecified(enumDescriptor, number, context) {
+  const value = enumDescriptor.values.find(
+    (candidate) => candidate.number === number,
+  );
+  if (value === undefined) {
+    throw new Error(`descriptor metadata has unknown ${context}`);
+  }
+  return value.localName;
+}
+
+function messageContainsType(message, typeName, visited = new Set()) {
+  if (message.typeName === typeName) {
+    return true;
+  }
+  if (visited.has(message.typeName)) {
+    return false;
+  }
+  visited.add(message.typeName);
+  return message.fields.some((field) => {
+    const nested =
+      field.fieldKind === "message" ||
+      (field.fieldKind === "list" && field.listKind === "message") ||
+      (field.fieldKind === "map" && field.mapKind === "message")
+        ? field.message
+        : undefined;
+    return (
+      nested !== undefined && messageContainsType(nested, typeName, visited)
+    );
+  });
+}
+
+function nestedMessage(field) {
+  if (
+    field.fieldKind === "message" ||
+    (field.fieldKind === "list" && field.listKind === "message") ||
+    (field.fieldKind === "map" && field.mapKind === "message")
+  ) {
+    return field.message;
+  }
+  return undefined;
+}
+
+function resolveRequestPath(input, path, rpc) {
+  if (!/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/.test(path)) {
+    throw new Error(`invalid authorization request path ${path}: ${rpc}`);
+  }
+  const segments = path.split(".");
+  let message = input;
+  let field;
+  for (const [index, segment] of segments.entries()) {
+    field = message.fields.find((candidate) => candidate.name === segment);
+    if (field === undefined) {
+      throw new Error(
+        `authorization request path ${path} does not exist in ${input.typeName}: ${rpc}`,
+      );
+    }
+    if (index !== segments.length - 1) {
+      message = nestedMessage(field);
+      if (message === undefined) {
+        throw new Error(
+          `authorization request path ${path} traverses non-message field ${segment}: ${rpc}`,
+        );
+      }
+    }
+  }
+  return field;
+}
+
+function validateScopeSource(
+  scope,
+  requestTargets,
+  multiTarget,
+  input,
+  rpc,
+  contractRole,
+) {
+  const requestScopes = new Set([
+    "REQUEST_REPOSITORY",
+    "REQUEST_NAMESPACE",
+    "REQUEST_RESOURCE",
+  ]);
+  if (!requestScopes.has(scope)) {
+    if (requestTargets.length !== 0) {
+      throw new Error(
+        `authorization request targets require a request-derived scope source: ${rpc}`,
+      );
+    }
+    if (multiTarget) {
+      throw new Error(`authorization multi-target declaration mismatch: ${rpc}`);
+    }
+    return;
+  }
+  if (requestTargets.length === 0) {
+    throw new Error(`authorization request targets missing for ${scope}: ${rpc}`);
+  }
+  const requestPaths = requestTargets.map((target) => target.path);
+  if (new Set(requestPaths).size !== requestPaths.length) {
+    throw new Error(`duplicate authorization request path: ${rpc}`);
+  }
+  if (multiTarget !== (requestTargets.length > 1)) {
+    throw new Error(`authorization multi-target declaration mismatch: ${rpc}`);
+  }
+  const targetRoles = new Set([
+    "CALLER_BOUND",
+    "RESOURCE_READER",
+    "RESOURCE_WRITER",
+    "RESOURCE_MAINTAINER",
+    "RESOURCE_ADMINISTRATOR",
+    "RESOURCE_OWNER",
+    "CALLER_OR_RESOURCE_ADMINISTRATOR",
+  ]);
+  if (
+    requestTargets.some((target) => !targetRoles.has(target.role)) ||
+    !requestTargets.some((target) => target.role === contractRole)
+  ) {
+    throw new Error(`invalid authorization request target role: ${rpc}`);
+  }
+  const fields = requestPaths.map((path) => resolveRequestPath(input, path, rpc));
+  if (
+    scope === "REQUEST_REPOSITORY" &&
+    fields.some(
+      (field) => nestedMessage(field)?.typeName !== `${PACKAGE}.RepositoryRef`,
+    )
+  ) {
+    throw new Error(
+      `authorization scope source REQUEST_REPOSITORY must target RepositoryRef fields: ${rpc}`,
+    );
+  }
+  if (
+    scope === "REQUEST_NAMESPACE" &&
+    fields.some(
+      (field) =>
+        field.fieldKind !== "scalar" || field.scalar !== ScalarType.STRING,
+    )
+  ) {
+    throw new Error(
+      `authorization scope source REQUEST_NAMESPACE must target string fields: ${rpc}`,
+    );
+  }
+}
+
+function validateAuthorization(metadata, maturity, rpc, input) {
+  const values = [
+    metadata.authorization_access,
+    metadata.authorization_role,
+    metadata.authorization_scope_source,
+    metadata.authorization_existence,
+  ];
+  const unspecified = values.filter((value) => value === "UNSPECIFIED").length;
+  if (unspecified !== 0) {
+    throw new Error(`descriptor metadata missing authorization access/role/scope/existence: ${rpc}`);
+  }
+  const undecided = values.filter((value) => value === "PLANNED_UNDECIDED").length;
+  if (undecided !== 0) {
+    if (
+      maturity !== "PLANNED" ||
+      undecided !== values.length ||
+      metadata.authorization_request_targets.length !== 0 ||
+      metadata.authorization_multi_target
+    ) {
+      throw new Error(`invalid planned-undecided authorization contract: ${rpc}`);
+    }
+    return;
+  }
+
+  const { authorization_access: access, authorization_role: role } = metadata;
+  const scope = metadata.authorization_scope_source;
+  const existence = metadata.authorization_existence;
+  const resourceRoles = new Set([
+    "RESOURCE_READER",
+    "RESOURCE_WRITER",
+    "RESOURCE_MAINTAINER",
+    "RESOURCE_ADMINISTRATOR",
+    "RESOURCE_OWNER",
+    "CALLER_OR_RESOURCE_ADMINISTRATOR",
+  ]);
+  const resourceScopes = new Set([
+    "REQUEST_REPOSITORY",
+    "REQUEST_NAMESPACE",
+    "REQUEST_RESOURCE",
+    "CALLER_GRANTS",
+  ]);
+  const publicRoles = new Set(["NONE", "CALLER_BOUND"]);
+  const valid =
+    (role === "NONE" && scope === "NONE" && existence === "DISCLOSE") ||
+    (role === "CALLER_BOUND" &&
+      new Set(["CALLER_SUBJECT", "REQUEST_RESOURCE"]).has(scope)) ||
+    (resourceRoles.has(role) && resourceScopes.has(scope)) ||
+    (role === "GLOBAL_ADMINISTRATOR" && scope === "NONE" && existence === "DISCLOSE");
+  if (!valid || (access === "PUBLIC" && !publicRoles.has(role))) {
+    throw new Error(`invalid authorization combination: ${rpc}`);
+  }
+  validateScopeSource(
+    scope,
+    metadata.authorization_request_targets,
+    metadata.authorization_multi_target,
+    input,
+    rpc,
+    role,
+  );
+}
+
+function authorizationMatches(metadata, expected) {
+  return Object.entries(expected).every(
+    ([field, value]) => metadata[field] === value,
+  );
+}
+
+function validateSensitiveResponseAuthorization(metadata, maturity, output, rpc) {
+  if (maturity === "PLANNED") {
+    return;
+  }
+  if (messageContainsType(output, `${PACKAGE}.CredentialInfo`)) {
+    const safe =
+      metadata.authorization_access === "AUTHENTICATED_PRINCIPAL" &&
+      metadata.authorization_role !== "NONE" &&
+      metadata.authorization_scope_source !== "NONE" &&
+      metadata.authorization_existence === "HIDE";
+    if (!safe) {
+      throw new Error(
+        `credential information requires scoped, existence-hiding authorization: ${rpc}`,
+      );
+    }
+  }
+
+  const handleDirectory =
+    messageContainsType(output, `${PACKAGE}.HandlePrincipal`) ||
+    messageContainsType(output, `${PACKAGE}.GetHandleStatusResponse`);
+  if (
+    handleDirectory &&
+    !authorizationMatches(metadata, {
+      authorization_access: "AUTHENTICATED_PRINCIPAL",
+      authorization_role: "NONE",
+      authorization_scope_source: "NONE",
+      authorization_existence: "DISCLOSE",
+    })
+  ) {
+    throw new Error(`handle directory requires an authenticated bearer: ${rpc}`);
+  }
+
+  if (
+    messageContainsType(output, `${PACKAGE}.ResolvedPrincipal`) &&
+    !authorizationMatches(metadata, {
+      authorization_access: "AUTHENTICATED_PRINCIPAL",
+      authorization_role: "RESOURCE_READER",
+      authorization_scope_source: "CALLER_GRANTS",
+      authorization_existence: "HIDE",
+    })
+  ) {
+    throw new Error(`subject directory must be limited to caller grants: ${rpc}`);
+  }
 }
 
 function main() {
@@ -98,6 +358,26 @@ function main() {
     registry,
     "getEnum",
     `${PACKAGE}.CapabilityArea`,
+  );
+  const authorizationAccess = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationAccess`,
+  );
+  const authorizationRole = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationRole`,
+  );
+  const authorizationScopeSource = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationScopeSource`,
+  );
+  const authorizationExistence = required(
+    registry,
+    "getEnum",
+    `${PACKAGE}.AuthorizationExistence`,
   );
 
   const rpcContractFields = new Set(
@@ -162,6 +442,46 @@ function main() {
         if (inventory[rpc] !== undefined) {
           throw new Error(`descriptor contains duplicate RPC: ${rpc}`);
         }
+        const authorization = {
+          authorization_access: enumLocalIncludingUnspecified(
+            authorizationAccess,
+            option.authorizationAccess,
+            `authorization access: ${rpc}`,
+          ),
+          authorization_role: enumLocalIncludingUnspecified(
+            authorizationRole,
+            option.authorizationRole,
+            `authorization role: ${rpc}`,
+          ),
+          authorization_scope_source: enumLocalIncludingUnspecified(
+            authorizationScopeSource,
+            option.authorizationScopeSource,
+            `authorization scope source: ${rpc}`,
+          ),
+          authorization_existence: enumLocalIncludingUnspecified(
+            authorizationExistence,
+            option.authorizationExistence,
+            `authorization existence: ${rpc}`,
+          ),
+          authorization_request_targets: option.authorizationRequestTargets.map(
+            (target) => ({
+              path: target.path,
+              role: enumLocal(
+                authorizationRole,
+                target.role,
+                `authorization request target role: ${rpc}:${target.path}`,
+              ),
+            }),
+          ),
+          authorization_multi_target: option.authorizationMultiTarget,
+        };
+        validateAuthorization(authorization, maturity, rpc, method.input);
+        validateSensitiveResponseAuthorization(
+          authorization,
+          maturity,
+          method.output,
+          rpc,
+        );
         inventory[rpc] = {
           rpc,
           service: service.typeName,
@@ -186,6 +506,7 @@ function main() {
             `retry behavior: ${rpc}`,
           ),
           client_operation_id_required: option.clientOperationIdRequired,
+          ...authorization,
           client_streaming: method.proto.clientStreaming,
           server_streaming: method.proto.serverStreaming,
         };

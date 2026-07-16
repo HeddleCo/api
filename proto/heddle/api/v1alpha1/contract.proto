@@ -63,9 +63,70 @@ enum CapabilityArea {
   CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS = 14;
 }
 
+// Authorization is declarative contract metadata. Producers still own runtime
+// enforcement; signing identity and signing tier remain independent fields.
+enum AuthorizationAccess {
+  AUTHORIZATION_ACCESS_UNSPECIFIED = 0;
+  // No established user account is required. A producer may still mint an
+  // anonymous transport principal for abuse controls or ownership binding.
+  AUTHORIZATION_ACCESS_PUBLIC = 1;
+  AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL = 2;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_ACCESS_PLANNED_UNDECIDED = 3;
+}
+
+enum AuthorizationRole {
+  AUTHORIZATION_ROLE_UNSPECIFIED = 0;
+  AUTHORIZATION_ROLE_NONE = 1;
+  AUTHORIZATION_ROLE_CALLER_BOUND = 2;
+  AUTHORIZATION_ROLE_RESOURCE_READER = 3;
+  AUTHORIZATION_ROLE_RESOURCE_WRITER = 4;
+  AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR = 5;
+  AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR = 6;
+  AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR = 7;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_ROLE_PLANNED_UNDECIDED = 8;
+  // Resource roles preserve Weft's hosted-role guard vocabulary. These values
+  // are appended so existing enum numbers remain wire-compatible.
+  AUTHORIZATION_ROLE_RESOURCE_MAINTAINER = 9;
+  AUTHORIZATION_ROLE_RESOURCE_OWNER = 10;
+}
+
+enum AuthorizationScopeSource {
+  AUTHORIZATION_SCOPE_SOURCE_UNSPECIFIED = 0;
+  AUTHORIZATION_SCOPE_SOURCE_NONE = 1;
+  AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT = 2;
+  AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY = 3;
+  AUTHORIZATION_SCOPE_SOURCE_REQUEST_NAMESPACE = 4;
+  AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE = 5;
+  AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS = 6;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED = 7;
+}
+
+enum AuthorizationExistence {
+  AUTHORIZATION_EXISTENCE_UNSPECIFIED = 0;
+  AUTHORIZATION_EXISTENCE_DISCLOSE = 1;
+  AUTHORIZATION_EXISTENCE_HIDE = 2;
+  // The service is planned, but its authorization policy has not been
+  // decided. This value is invalid for shipped services.
+  AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED = 3;
+}
+
 message ServiceContract {
   repeated DeploymentTarget deployment_targets = 1;
   ServiceMaturity maturity = 2;
+}
+
+message AuthorizationRequestTarget {
+  // A protobuf field path in the request, using proto field names separated
+  // by dots.
+  string path = 1;
+  // The role required for the resource selected by `path`.
+  AuthorizationRole role = 2;
 }
 
 message RpcContract {
@@ -75,6 +136,19 @@ message RpcContract {
   RetryBehavior retry_behavior = 4;
   bool client_operation_id_required = 5;
   CapabilityArea capability = 6;
+  AuthorizationAccess authorization_access = 7;
+  AuthorizationRole authorization_role = 8;
+  AuthorizationScopeSource authorization_scope_source = 9;
+  AuthorizationExistence authorization_existence = 10;
+  // Every request field that selects an authorization guard target and the
+  // role required for that target. Every populated selector is guarded;
+  // request-derived scope sources require at least one target, while
+  // non-request scope sources prohibit targets.
+  repeated AuthorizationRequestTarget authorization_request_targets = 11;
+  // True when the authorization rule deliberately has multiple request
+  // targets. Audits reject a mismatch so a multi-resource rule cannot
+  // silently collapse to one selector.
+  bool authorization_multi_target = 12;
 }
 
 // Machine-readable lifecycle semantics for the canonical Operation state enum.

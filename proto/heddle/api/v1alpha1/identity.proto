@@ -740,9 +740,10 @@ message ResolveHandleRequest {
   string name = 1;
 }
 
-// Public handle-directory projection. There is deliberately no subject field:
-// resolving a name MUST NOT expose an underlying subject. `primary_handle` is
-// the canonical URL/display token for the active principal.
+// Subject-free handle-directory projection. ResolveHandle requires a valid
+// bearer, but there is deliberately no subject field: resolving a name MUST NOT
+// expose an underlying subject. `primary_handle` is the canonical URL/display
+// token for the active principal.
 message HandlePrincipal {
   // Legacy ResolvedPrincipal.subject occupied tag 1. Reserving both its tag and
   // name prevents legacy response bytes from decoding into any public field.
@@ -778,6 +779,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc BeginWebAuthnAuthentication(BeginWebAuthnAuthenticationRequest) returns (AuthChallengeResponse) {
@@ -788,6 +793,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc BeginWebAuthnRegistration(BeginWebAuthnRegistrationRequest) returns (AuthChallengeResponse) {
@@ -798,6 +807,14 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "username"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   // Claims only a verified-owner hold belonging to the authenticated subject.
@@ -815,6 +832,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CreateDeviceAuthorization(CreateDeviceAuthorizationRequest) returns (DeviceAuthorizationResponse) {
@@ -825,6 +846,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc CreateServiceAccount(CreateServiceAccountRequest) returns (ServiceAccountResponse) {
@@ -835,6 +860,14 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "scope"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ExchangeDeviceAuthorization(ExchangeDeviceAuthorizationRequest) returns (AccessTokenResponse) {
@@ -845,6 +878,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc FinishWebAuthnAuthentication(FinishWebAuthnAuthenticationRequest) returns (AccessTokenResponse) {
@@ -855,6 +892,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc GetInvitationSummary(GetInvitationSummaryRequest) returns (InvitationSummary) {
@@ -865,6 +906,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   // Authenticated availability lookup. The response is intentionally limited
@@ -877,6 +922,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc IntrospectCredential(IntrospectCredentialRequest) returns (CredentialInfo) {
@@ -887,6 +936,14 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "credential_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc IssuePresenceToken(IssuePresenceTokenRequest) returns (IssuePresenceTokenResponse) {
@@ -897,6 +954,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc IssueServiceAccountCredential(IssueServiceAccountCredentialRequest) returns (IssuedCredentialResponse) {
@@ -907,6 +968,19 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "service_account_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_request_targets: {
+        path: "scope"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_multi_target: true
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc LinkOAuthIdentity(LinkOAuthIdentityRequest) returns (AccessTokenResponse) {
@@ -917,6 +991,27 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "provider"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "id_token"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "access_token"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "webauthn_assertion"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_multi_target: true
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListScopeCapabilities(ListScopeCapabilitiesRequest) returns (ListScopeCapabilitiesResponse) {
@@ -927,6 +1022,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc ListServiceAccounts(ListServiceAccountsRequest) returns (ListServiceAccountsResponse) {
@@ -937,6 +1036,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
@@ -947,6 +1050,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc MintAnonBiscuit(MintAnonBiscuitRequest) returns (MintAnonBiscuitResponse) {
@@ -957,6 +1064,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc MintBiscuit(MintBiscuitRequest) returns (AccessTokenResponse) {
@@ -967,6 +1078,27 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "subject"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "requested_scope"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "keypair.public_key_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_request_targets: {
+        path: "device_auth.device_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_multi_target: true
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc RegisterPublicKey(RegisterPublicKeyRequest) returns (AccessTokenResponse) {
@@ -977,6 +1109,14 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "challenge_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   // Starts right-of-first-refusal only for a name held by another verified
@@ -990,6 +1130,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   // Directory lookup requires a valid bearer but is not gated by the caller's
@@ -1005,6 +1149,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc RevokeCredential(RevokeCredentialRequest) returns (RevokeCredentialResponse) {
@@ -1015,6 +1163,14 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "credential_id"
+        role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc RevokeServiceAccount(RevokeServiceAccountRequest) returns (DeleteResponse) {
@@ -1025,6 +1181,14 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "service_account_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc RevokeSession(RevokeSessionRequest) returns (DeleteResponse) {
@@ -1035,6 +1199,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc RotateCredential(RotateCredentialRequest) returns (IssuedCredentialResponse) {
@@ -1045,6 +1213,14 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "credential_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc StoreProviderToken(StoreProviderTokenRequest) returns (StoreProviderTokenResponse) {
@@ -1055,6 +1231,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc VerifySignupEmail(VerifySignupEmailRequest) returns (VerifySignupEmailResponse) {
@@ -1065,6 +1245,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc WaitForDeviceAuthorization(WaitForDeviceAuthorizationRequest) returns (stream DeviceAuthorizationEvent) {
@@ -1075,6 +1259,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse) {
@@ -1085,6 +1273,10 @@ service IdentityService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
 }

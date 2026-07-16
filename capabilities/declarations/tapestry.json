@@ -190,6 +190,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/GetDiscussion",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.CollaborationService/ListByState",
       "layers": {
         "server_adapter": {
@@ -245,6 +256,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BeginRecovery",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication",
       "layers": {
         "server_adapter": {
@@ -278,6 +300,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CompleteRecovery",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
       "layers": {
         "server_adapter": {
@@ -296,6 +329,17 @@
         },
         "ui": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },
@@ -443,6 +487,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RecordSubscription",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
       "layers": {
         "server_adapter": {
@@ -531,6 +586,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/SubmitRecoveryProof",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
       "layers": {
         "server_adapter": {
@@ -538,6 +604,17 @@
         },
         "ui": {
           "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/VetoRecovery",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },
@@ -824,6 +901,17 @@
         },
         "ui": {
           "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListActors",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },
@@ -1290,6 +1378,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/GetRepoSignalHealth",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload",
       "layers": {
         "server_adapter": {
@@ -1301,6 +1400,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewProgress",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures",
       "layers": {
         "server_adapter": {
@@ -1308,6 +1418,28 @@
         },
         "ui": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/RecordCheckAck",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.StateReviewService/RecordVerdict",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },
@@ -1404,6 +1536,17 @@
       "layers": {
         "server_adapter": {
           "status": "shipped"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/GetThread",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
         },
         "ui": {
           "status": "planned"

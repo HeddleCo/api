@@ -144,6 +144,7 @@ REGISTRY_AUTHORIZATION_CONTRACTS = {
     "GetCurrentUserNamespace": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
     "GetSpool": ("RESOURCE_READER", "REQUEST_RESOURCE", ("full_path",)),
     "GrantSupportAccess": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
+    "ListActors": ("GLOBAL_ADMINISTRATOR", "NONE", ()),
     "ListBookmarks": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
     "ListChildren": ("RESOURCE_READER", "REQUEST_RESOURCE", ("parent_path",)),
     "ListGrants": ("RESOURCE_ADMINISTRATOR", "CALLER_GRANTS", ()),
@@ -443,7 +444,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         actual = build_inventory()
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
-        self.assertEqual(len(shipped), 117)
+        self.assertEqual(len(shipped), 130)
         self.assertEqual(len(planned), 20)
         authorization_fields = (
             "authorization_access",

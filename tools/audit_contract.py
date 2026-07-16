@@ -73,6 +73,7 @@ def audit_new_descriptor(decoded: str) -> None:
     )
     allowed_byte_field = re.compile(
         r"^(?:value|digest|hash|parent_id|parents|source_hash|base_root|"
+        r"salt|argon2id_hash|"
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|pack_chunk|pack_id|"

@@ -88,6 +88,15 @@ message ListDiscussionsResponse {
   repeated Discussion discussions = 1;
 }
 
+message GetDiscussionRequest {
+  RepositoryRef repo_path = 1;
+  string discussion_id = 2;
+  // Optional: resolve the discussion against this specific state instead of
+  // HEAD. Empty = HEAD (the default). Lets a discussion living on a prior
+  // state be recovered by id + state without a full cross-state scan.
+  StateId state_id = 3;
+}
+
 service CollaborationService {
   option (heddle.api.v1alpha1.service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
@@ -108,6 +117,25 @@ service CollaborationService {
       authorization_request_targets: {
         path: "repo_path"
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Single-discussion fetch by id (state_id empty ⇒ HEAD).
+  rpc GetDiscussion(GetDiscussionRequest) returns (Discussion) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_COLLABORATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };

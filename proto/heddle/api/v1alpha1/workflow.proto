@@ -127,6 +127,11 @@ message GetWorkspaceSummaryRequest {
   RepositoryRef repo_path = 1;
 }
 
+message GetThreadRequest {
+  RepositoryRef repo_path = 1;
+  string name = 2;
+}
+
 message WorkspaceThreadGroup {
   string id = 1;
   string label = 2;
@@ -145,6 +150,25 @@ service WorkflowService {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
     maturity: SERVICE_MATURITY_SHIPPED
   };
+  // Single-thread detail fetch by name (reuses the ThreadSummary shape).
+  rpc GetThread(GetThreadRequest) returns (ThreadSummary) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   rpc GetWorkspaceSummary(GetWorkspaceSummaryRequest) returns (WorkspaceSummary) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

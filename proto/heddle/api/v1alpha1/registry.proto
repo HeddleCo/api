@@ -310,6 +310,35 @@ message WorktreeSummary {
   bool is_current = 9;
 }
 
+message ActorSummary {
+  string session_id = 1;
+  string thread = 2;
+  optional string path = 3;
+  StateId base_state = 4;
+  google.protobuf.Timestamp started_at = 5;
+  optional string provider = 6;
+  optional string model = 7;
+  string status = 8;
+  optional string heddle_session_id = 9;
+  optional string harness = 10;
+  optional string thinking_level = 11;
+  UsageSummary usage_summary = 12;
+  optional google.protobuf.Timestamp last_progress_at = 13;
+  optional string report_flush_state = 14;
+  optional string client_instance_id = 15;
+  optional string attach_reason = 16;
+  optional string native_actor_key = 17;
+  optional string native_parent_actor_key = 18;
+  optional string probe_source = 19;
+  optional float probe_confidence = 20;
+}
+
+message ListActorsRequest {}
+
+message ListActorsResponse {
+  repeated ActorSummary actors = 1;
+}
+
 message ListWorktreesResponse {
   repeated WorktreeSummary worktrees = 1;
 }
@@ -1241,6 +1270,21 @@ service RegistryService {
         path: "target"
         role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Global operator view of active agent actors (mirrors ListWorktrees).
+  rpc ListActors(ListActorsRequest) returns (ListActorsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }

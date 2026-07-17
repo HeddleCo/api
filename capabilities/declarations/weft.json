@@ -644,10 +644,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/BatchGetOperations",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -655,10 +655,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/CancelOperation",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "partial"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -666,10 +666,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/GetOperation",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -677,10 +677,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/GetOperationBatch",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "partial"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -688,10 +688,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "partial"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -699,10 +699,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -710,10 +710,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperationBatch",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "partial"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -721,10 +721,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },

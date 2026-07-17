@@ -280,12 +280,13 @@ message CancelOperationResponse {
   Operation operation = 1;
 }
 
-// PLANNED: Weft adapters and durable storage land in coordinated consumer
-// changes. This repository defines the contract but does not ship a handler.
+// SHIPPED: Weft exposes import operations through the shared lifecycle. Remote
+// sync, atomic batches, listing, and cancellation remain partial server
+// capabilities and return UNIMPLEMENTED until their durable semantics land.
 service OperationService {
   option (service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
-    maturity: SERVICE_MATURITY_PLANNED
+    maturity: SERVICE_MATURITY_SHIPPED
   };
 
   rpc SubmitOperation(SubmitOperationRequest) returns (SubmitOperationResponse) {
@@ -296,10 +297,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc SubmitOperationBatch(SubmitOperationBatchRequest) returns (SubmitOperationBatchResponse) {
@@ -310,10 +311,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc GetOperation(GetOperationRequest) returns (Operation) {
@@ -324,10 +325,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc BatchGetOperations(BatchGetOperationsRequest) returns (BatchGetOperationsResponse) {
@@ -338,10 +339,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc GetOperationBatch(GetOperationBatchRequest) returns (GetOperationBatchResponse) {
@@ -352,10 +353,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ListOperations(ListOperationsRequest) returns (ListOperationsResponse) {
@@ -366,10 +367,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_SAFE
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc WatchOperations(WatchOperationsRequest) returns (stream OperationWatchEvent) {
@@ -380,10 +381,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
       client_operation_id_required: false
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CancelOperation(CancelOperationRequest) returns (CancelOperationResponse) {
@@ -394,10 +395,10 @@ service OperationService {
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS
-      authorization_access: AUTHORIZATION_ACCESS_PLANNED_UNDECIDED
-      authorization_role: AUTHORIZATION_ROLE_PLANNED_UNDECIDED
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_PLANNED_UNDECIDED
-      authorization_existence: AUTHORIZATION_EXISTENCE_PLANNED_UNDECIDED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
 }

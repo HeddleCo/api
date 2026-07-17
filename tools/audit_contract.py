@@ -62,8 +62,8 @@ def audit_new_descriptor(decoded: str) -> None:
     rpc_count = len(re.findall(r"(?m)^\s*rpc \w+", proto_sources))
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
-    assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 10
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 3
+    assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 11
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 2
     assert "google.protobuf.Any" not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded

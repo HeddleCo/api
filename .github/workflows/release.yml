@@ -60,9 +60,17 @@ jobs:
           cp release-a/* release/
           (cd release && sha256sum *) > release/SHA256SUMS
       - name: Publish Rust crate
-        run: cargo publish
+        # The env var name (CARGO_REGISTRY_TOKEN) is cargo's documented input; the
+        # repo secret label (CRATES_IO_API_KEY) matches the HeddleCo convention used
+        # by heddle/sley — set it under repo Settings → Secrets and variables → Actions.
+        run: |
+          if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
+            echo "::error::CARGO_REGISTRY_TOKEN is empty — the CRATES_IO_API_KEY secret is unset in HeddleCo/api. Add it (the same crates.io token heddle/sley use), then re-run this release."
+            exit 1
+          fi
+          cargo publish
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_API_KEY }}
       - name: Publish TypeScript package to GitHub Packages
         run: npm publish --workspace @heddleco/api
         env:

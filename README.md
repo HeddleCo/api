@@ -4,9 +4,11 @@ The public protobuf contract shared by Heddle, Weft, and Tapestry. This
 repository is the sole owner of schema source, compiled descriptors,
 compatibility policy, generation tooling, and Rust/TypeScript releases.
 
-The current wire package is `heddle.api.v1alpha1`. Ten interfaces are marked
-`SHIPPED`; `AgentGatewayService`, `AgentService`, and `OperationService` are
-contract-first and explicitly `PLANNED` for the first release.
+The current wire package is `heddle.api.v1alpha1`. Eleven interfaces are marked
+`SHIPPED`; `AgentGatewayService` and `AgentService` are contract-first and
+explicitly `PLANNED` for the first release. `OperationService` ships the import
+lifecycle; its batch, list, remote-sync, and cancellation capabilities remain
+partial.
 
 ## Packages
 

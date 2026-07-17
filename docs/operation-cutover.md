@@ -2,8 +2,9 @@
 
 ## Contract status
 
-`OperationService` is `PLANNED`. This repository generates its Rust and
-TypeScript contract, but does not contain a Weft handler. The authoritative
+`OperationService` is `SHIPPED` for import submit/get/batch-get/watch through
+Weft's durable import worker. Atomic batches, listing, remote synchronization,
+and cancellation are partial and return `UNIMPLEMENTED`. The authoritative
 service and lifecycle shapes are in
 [`operation.proto`](../proto/heddle/api/v1alpha1/operation.proto).
 
@@ -38,7 +39,7 @@ Durable scheduled synchronization uses `OPERATION_KIND_REMOTE_SYNC` with
 `Push` and `Pull` remain directional transfer protocols used while work runs;
 their stream frames are not durable job identity or lifecycle surfaces.
 
-The Weft handler and storage work is planned in
+The remote-sync handler and storage work is planned in
 [HeddleCo/weft#578](https://github.com/HeddleCo/weft/issues/578). It must resolve
 provider mappings before submission, persist acceptance and deduplication
 before acknowledging the producer, and publish all durable status through

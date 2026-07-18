@@ -976,7 +976,7 @@ service IdentityService {
   rpc BeginRecovery(BeginRecoveryRequest) returns (BeginRecoveryResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -990,7 +990,7 @@ service IdentityService {
   rpc BeginWebAuthnAuthentication(BeginWebAuthnAuthenticationRequest) returns (AuthChallengeResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1004,7 +1004,7 @@ service IdentityService {
   rpc BeginWebAuthnRegistration(BeginWebAuthnRegistrationRequest) returns (AuthChallengeResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1047,7 +1047,7 @@ service IdentityService {
   rpc CompleteRecovery(CompleteRecoveryRequest) returns (AccessTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1061,7 +1061,7 @@ service IdentityService {
   rpc CreateDeviceAuthorization(CreateDeviceAuthorizationRequest) returns (DeviceAuthorizationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1075,7 +1075,7 @@ service IdentityService {
   rpc CreateServiceAccount(CreateServiceAccountRequest) returns (ServiceAccountResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1097,7 +1097,7 @@ service IdentityService {
   rpc DeclareRecoveryMethod(DeclareRecoveryMethodRequest) returns (DeclareRecoveryMethodResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1111,7 +1111,7 @@ service IdentityService {
   rpc ExchangeDeviceAuthorization(ExchangeDeviceAuthorizationRequest) returns (AccessTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1125,7 +1125,7 @@ service IdentityService {
   rpc FinishWebAuthnAuthentication(FinishWebAuthnAuthenticationRequest) returns (AccessTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1187,7 +1187,7 @@ service IdentityService {
   rpc IssuePresenceToken(IssuePresenceTokenRequest) returns (IssuePresenceTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1201,7 +1201,7 @@ service IdentityService {
   rpc IssueServiceAccountCredential(IssueServiceAccountCredentialRequest) returns (IssuedCredentialResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1297,7 +1297,7 @@ service IdentityService {
   rpc MintAnonBiscuit(MintAnonBiscuitRequest) returns (MintAnonBiscuitResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1311,7 +1311,7 @@ service IdentityService {
   rpc MintBiscuit(MintBiscuitRequest) returns (AccessTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1363,7 +1363,7 @@ service IdentityService {
   rpc RegisterPublicKey(RegisterPublicKeyRequest) returns (AccessTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1417,7 +1417,7 @@ service IdentityService {
   rpc RevokeCredential(RevokeCredentialRequest) returns (RevokeCredentialResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1435,7 +1435,7 @@ service IdentityService {
   rpc RevokeServiceAccount(RevokeServiceAccountRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1453,7 +1453,7 @@ service IdentityService {
   rpc RevokeSession(RevokeSessionRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1502,7 +1502,7 @@ service IdentityService {
   rpc SubmitRecoveryProof(SubmitRecoveryProofRequest) returns (SubmitRecoveryProofResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1516,7 +1516,7 @@ service IdentityService {
   rpc VerifySignupEmail(VerifySignupEmailRequest) returns (VerifySignupEmailResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1533,7 +1533,7 @@ service IdentityService {
   rpc VetoRecovery(VetoRecoveryRequest) returns (VetoRecoveryResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true

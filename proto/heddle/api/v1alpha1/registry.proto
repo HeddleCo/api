@@ -1040,7 +1040,7 @@ service RegistryService {
   rpc DeleteGrant(DeleteGrantRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1058,7 +1058,7 @@ service RegistryService {
   rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1076,7 +1076,7 @@ service RegistryService {
   rpc DeleteRepository(DeleteRepositoryRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1144,7 +1144,7 @@ service RegistryService {
   rpc GrantSupportAccess(GrantSupportAccessRequest) returns (SupportAccessGrant) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1337,7 +1337,7 @@ service RegistryService {
   rpc RevokeInvitation(RevokeInvitationRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1355,7 +1355,7 @@ service RegistryService {
   rpc RevokeSupportAccess(RevokeSupportAccessRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1373,7 +1373,7 @@ service RegistryService {
   rpc SetNamespaceVisibility(SetNamespaceVisibilityRequest) returns (HostedNamespace) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1391,7 +1391,7 @@ service RegistryService {
   rpc SetSpoolVisibility(SetSpoolVisibilityRequest) returns (HostedSpool) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1409,7 +1409,7 @@ service RegistryService {
   rpc UpdateGrant(UpdateGrantRequest) returns (HostedGrant) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true

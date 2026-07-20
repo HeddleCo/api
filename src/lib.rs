@@ -9,6 +9,12 @@ pub use transport::{
     method_descriptor,
 };
 
+/// Cross-product hosted-call framing and typed-failure fixture.
+pub const HOSTED_CALL_V1_FIXTURE_JSON: &str = include_str!("../tests/fixtures/hosted-call-v1.json");
+/// Cross-product canonical unary-signing fixture.
+pub const UNARY_SIGNING_V1_FIXTURE_JSON: &str =
+    include_str!("../tests/fixtures/unary-signing-v1.json");
+
 /// Page size used when callers omit or pass zero for a requested size.
 pub const DEFAULT_PAGE_SIZE: u32 = 50;
 /// Largest page the public API permits.

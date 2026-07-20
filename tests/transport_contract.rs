@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use heddle_api::framing::{
-    ResponseFrame, StreamFrame, decode_request_frame, decode_response_frame, decode_stream_frame,
-    encode_failure_response, encode_request_frame, encode_stream_failure, encode_stream_message,
+    ResponseFrame, StreamFrame, decode_request_frame, decode_request_prelude,
+    decode_response_frame, decode_stream_frame, encode_failure_response, encode_request_frame,
+    encode_request_prelude, encode_stream_failure, encode_stream_message,
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
@@ -53,6 +54,23 @@ fn streaming_frames_are_incremental_and_transport_neutral() {
         StreamFrame::Failure(decoded) => assert_eq!(decoded, failure),
         StreamFrame::Message(_) => panic!("failure decoded as message"),
     }
+}
+
+#[test]
+fn request_prelude_can_be_routed_before_a_bidi_stream_finishes() {
+    let context = CallContext {
+        bearer_capability: b"token".to_vec(),
+        ..Default::default()
+    };
+    let prelude = encode_request_prelude("/heddle.api.v1alpha1.RepoSyncService/Pull", &context)
+        .expect("request prelude");
+    assert!(decode_request_prelude(&prelude[..5]).unwrap().is_none());
+    let (decoded, consumed) = decode_request_prelude(&prelude)
+        .unwrap()
+        .expect("complete prelude");
+    assert_eq!(consumed, prelude.len());
+    assert_eq!(decoded.method, "/heddle.api.v1alpha1.RepoSyncService/Pull");
+    assert_eq!(decoded.context, context);
 }
 
 #[test]

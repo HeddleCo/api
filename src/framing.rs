@@ -39,6 +39,15 @@ pub struct RequestFrame<'a> {
     pub body: &'a [u8],
 }
 
+/// Decoded request prelude used before a streaming body is consumed.
+#[derive(Debug)]
+pub struct RequestPrelude<'a> {
+    /// Canonical fully-qualified method path.
+    pub method: &'a str,
+    /// Typed call metadata decoded before routing.
+    pub context: CallContext,
+}
+
 /// Decoded unary response outcome.
 #[derive(Debug)]
 pub enum ResponseFrame<'a> {
@@ -64,8 +73,15 @@ pub fn encode_request_frame(
     context: &CallContext,
     body: &[u8],
 ) -> Result<Vec<u8>, FrameError> {
-    validate_method(method)?;
     validate_body(body)?;
+    let mut frame = encode_request_prelude(method, context)?;
+    frame.extend_from_slice(body);
+    Ok(frame)
+}
+
+/// Encodes the method and typed context that precede a streaming body.
+pub fn encode_request_prelude(method: &str, context: &CallContext) -> Result<Vec<u8>, FrameError> {
+    validate_method(method)?;
     let context = context.encode_to_vec();
     if context.len() > MAX_CALL_CONTEXT {
         return Err(FrameError::Invalid(format!(
@@ -77,21 +93,34 @@ pub fn encode_request_frame(
         .map_err(|_| FrameError::Invalid("method path exceeds u16".to_string()))?;
     let context_len = u32::try_from(context.len())
         .map_err(|_| FrameError::Invalid("call context exceeds u32".to_string()))?;
-    let mut frame = Vec::with_capacity(6 + method.len() + context.len() + body.len());
+    let mut frame = Vec::with_capacity(6 + method.len() + context.len());
     frame.extend_from_slice(&method_len.to_be_bytes());
     frame.extend_from_slice(&context_len.to_be_bytes());
     frame.extend_from_slice(method.as_bytes());
     frame.extend_from_slice(&context);
-    frame.extend_from_slice(body);
     Ok(frame)
 }
 
 /// Decodes a complete FIN-delimited request frame.
 pub fn decode_request_frame(frame: &[u8]) -> Result<RequestFrame<'_>, FrameError> {
+    let (prelude, body_start) = decode_request_prelude(frame)?.ok_or_else(|| {
+        FrameError::Invalid("request frame contains a truncated prelude".to_string())
+    })?;
+    let body = &frame[body_start..];
+    validate_body(body)?;
+    Ok(RequestFrame {
+        method: prelude.method,
+        context: prelude.context,
+        body,
+    })
+}
+
+/// Incrementally decodes the method and typed context at an operation-stream start.
+pub fn decode_request_prelude(
+    frame: &[u8],
+) -> Result<Option<(RequestPrelude<'_>, usize)>, FrameError> {
     if frame.len() < 6 {
-        return Err(FrameError::Invalid(
-            "request prelude is truncated".to_string(),
-        ));
+        return Ok(None);
     }
     let method_len = u16::from_be_bytes([frame[0], frame[1]]) as usize;
     let context_len = u32::from_be_bytes([frame[2], frame[3], frame[4], frame[5]]) as usize;
@@ -103,24 +132,22 @@ pub fn decode_request_frame(frame: &[u8]) -> Result<RequestFrame<'_>, FrameError
     let context_start = 6_usize
         .checked_add(method_len)
         .ok_or_else(|| FrameError::Invalid("request length overflow".to_string()))?;
-    let body_start = context_start
+    let consumed = context_start
         .checked_add(context_len)
         .ok_or_else(|| FrameError::Invalid("request length overflow".to_string()))?;
-    if body_start > frame.len() {
-        return Err(FrameError::Invalid(
-            "request frame is truncated".to_string(),
-        ));
+    if frame.len() < consumed {
+        return Ok(None);
     }
     let method = std::str::from_utf8(&frame[6..context_start])
         .map_err(|_| FrameError::Invalid("method path is not UTF-8".to_string()))?;
     validate_method(method)?;
-    let body = &frame[body_start..];
-    validate_body(body)?;
-    Ok(RequestFrame {
-        method,
-        context: CallContext::decode(&frame[context_start..body_start])?,
-        body,
-    })
+    Ok(Some((
+        RequestPrelude {
+            method,
+            context: CallContext::decode(&frame[context_start..consumed])?,
+        },
+        consumed,
+    )))
 }
 
 /// Encodes a successful unary response; stream FIN delimits the body.

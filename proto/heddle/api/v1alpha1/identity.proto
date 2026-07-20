@@ -230,9 +230,8 @@ message RevokeSessionRequest {
   string client_operation_id = 2;
 }
 
-// Caller authenticates with their normal session bearer in the
-// `Authorization: Bearer ...` metadata (same path as every other
-// gRPC). No body fields — the response is purely a function of the
+// Caller authenticates with their normal session bearer in `CallContext`
+// (the same path as every other hosted call). No body fields — the response is purely a function of the
 // caller's identity and a fixed 5-minute TTL.
 message IssuePresenceTokenRequest {
   string client_operation_id = 1;
@@ -540,6 +539,7 @@ message LinkOAuthIdentityRequest {
   //   - Google / Apple: OIDC `id_token` (provider-signed JWT).
   //   - GitHub: OAuth2 access token (server validates via /user +
   //     /user/emails).
+  //
   // Server validates this proof and extracts
   // `(sub, email, email_verified)` from the verified result; the
   // request itself carries NO user-identity claims the caller can

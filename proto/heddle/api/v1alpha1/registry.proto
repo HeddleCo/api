@@ -465,7 +465,8 @@ message ResolvedPrincipal {
 
 // ── Handle resolution (URL routing, weft#467) ────────────────────────────────
 // Resolve a bare handle name to its principal for `/gh:<name>` / `/<name>` /
-// `/u:<subject>` routing. Never-claimed → gRPC NotFound (frontend 404);
+// `/u:<subject>` routing. Never-claimed → `CALL_FAILURE_CODE_NOT_FOUND`
+// (frontend 404);
 // tombstoned/renamed-away → `tombstoned = true` (frontend 410 Gone).
 
 // ============================================================================

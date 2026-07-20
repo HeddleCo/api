@@ -3,6 +3,53 @@ syntax = "proto3";
 package heddle.api.v1alpha1;
 
 import "google/protobuf/descriptor.proto";
+import "google/protobuf/timestamp.proto";
+
+// Bearer proof-of-possession fields shared by every transport adapter. The
+// signature covers the bearer capability, timestamp, method,
+// method path, and nonce according to the shared signing fixture.
+message BearerProof {
+  int64 timestamp_seconds = 1;
+  bytes nonce = 2;
+  bytes signature = 3;
+}
+
+// Signature over the canonical request bytes. `algorithm` is `ed25519` for a
+// device proof and `webauthn` when `human_verification` is also populated.
+message RequestProof {
+  string algorithm = 1;
+  string signing_identity = 2;
+  int64 timestamp_millis = 3;
+  bytes nonce = 4;
+  bytes signature = 5;
+}
+
+// WebAuthn assertion fields for descriptor-declared human verification.
+message HumanVerification {
+  bytes client_data_json = 1;
+  bytes authenticator_data = 2;
+  bytes user_handle = 3;
+}
+
+// W3C trace context propagated without depending on a transport library.
+message TraceContext {
+  string traceparent = 1;
+  string tracestate = 2;
+  string baggage = 3;
+}
+
+// Context shared by every hosted call. The method path and encoded request
+// body stay in the operation-stream envelope because both are inputs to
+// routing and canonical request signing.
+message CallContext {
+  google.protobuf.Timestamp deadline = 1;
+  bytes bearer_capability = 2;
+  BearerProof bearer_proof = 3;
+  RequestProof request_proof = 4;
+  HumanVerification human_verification = 5;
+  string client_operation_id = 6;
+  TraceContext trace = 7;
+}
 
 enum DeploymentTarget {
   DEPLOYMENT_TARGET_UNSPECIFIED = 0;

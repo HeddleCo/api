@@ -1,6 +1,13 @@
-//! Generated Rust types and optional gRPC bindings for the Heddle API.
+//! Generated transport-neutral Rust types for the Heddle API.
 
+pub mod framing;
 pub mod signing;
+mod transport;
+
+pub use transport::{
+    ALL_METHODS, HOSTED_ALPN_V1, MethodDescriptor, MethodRoute, RoutedCall, StreamingShape,
+    method_descriptor,
+};
 
 /// Page size used when callers omit or pass zero for a requested size.
 pub const DEFAULT_PAGE_SIZE: u32 = 50;

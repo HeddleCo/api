@@ -14,6 +14,11 @@ The migration from `heddle.v1` is intentionally incompatible and is recorded
 exhaustively in `migration-manifest.json`. There is no dual registration or
 wire compatibility shim.
 
+Version 0.2 is the coordinated hard cutover from generated tonic bindings to
+the transport-neutral hosted-call contract. Consumers must move together; the
+package does not contain a tonic compatibility feature or a dual-protocol
+router.
+
 The four live handle operations are explicitly retained as
 `IdentityService/{ClaimHandle,GetHandleStatus,RequestHeldName,ResolveHandle}`.
 Their migration requires the [Weft adapter](https://github.com/HeddleCo/weft/issues/591)

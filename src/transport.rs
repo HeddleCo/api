@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::heddle::api::v1alpha1::{
-    CallContext, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
+    AuthorizationAccess, CallContext, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity,
+    SigningTier,
 };
 
 /// Production ALPN for the first transport-neutral hosted-call protocol.

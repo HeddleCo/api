@@ -16,6 +16,7 @@ struct Method {
     effect: String,
     retry: String,
     signing: String,
+    authorization_access: String,
     client_operation_id_required: bool,
     maturity: String,
     deployments: Vec<String>,
@@ -56,6 +57,11 @@ pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn E
                 effect: enum_variant(&options, "effect", "RPC_EFFECT_")?,
                 retry: enum_variant(&options, "retry_behavior", "RETRY_BEHAVIOR_")?,
                 signing: enum_variant(&options, "signing_tier", "SIGNING_TIER_")?,
+                authorization_access: enum_variant(
+                    &options,
+                    "authorization_access",
+                    "AUTHORIZATION_ACCESS_",
+                )?,
                 client_operation_id_required: bool_value(&options, "client_operation_id_required")?,
                 maturity: maturity.clone(),
                 deployments: deployments.clone(),
@@ -183,6 +189,7 @@ fn render(methods: &[Method]) -> String {
          pub effect: RpcEffect,\n\
          pub retry_behavior: RetryBehavior,\n\
          pub signing_tier: SigningTier,\n\
+         pub authorization_access: AuthorizationAccess,\n\
          pub client_operation_id_required: bool,\n\
          pub maturity: ServiceMaturity,\n\
          pub deployment_targets: &'static [DeploymentTarget],\n\
@@ -199,7 +206,7 @@ fn render(methods: &[Method]) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         output.push_str(&format!(
-            "MethodDescriptor {{ path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, client_operation_id_required: {}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
+            "MethodDescriptor {{ path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
             method.path,
             method.input,
             method.output,
@@ -207,6 +214,7 @@ fn render(methods: &[Method]) -> String {
             method.effect,
             method.retry,
             method.signing,
+            method.authorization_access,
             method.client_operation_id_required,
             method.maturity,
             deployments,

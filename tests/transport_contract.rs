@@ -5,7 +5,8 @@ use heddle_api::framing::{
     encode_request_frame,
 };
 use heddle_api::heddle::api::v1alpha1::{
-    CallContext, CallFailure, CallFailureCode, HumanVerification, RequestProof, TraceContext,
+    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
+    RequestProof, TraceContext,
 };
 use heddle_api::{ALL_METHODS, HOSTED_ALPN_V1, StreamingShape, method_descriptor};
 use prost::Message;
@@ -38,6 +39,16 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
     assert_eq!(descriptor.output, "heddle.api.v1alpha1.ListRefsResponse");
     assert_eq!(descriptor.streaming, StreamingShape::Unary);
     assert!(descriptor.allows_zero_rtt());
+    assert_eq!(
+        descriptor.authorization_access,
+        AuthorizationAccess::AuthenticatedPrincipal
+    );
+    assert_eq!(
+        method_descriptor("/heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization")
+            .expect("public device authorization descriptor")
+            .authorization_access,
+        AuthorizationAccess::Public
+    );
     assert_eq!(ALL_METHODS.len(), 150);
     assert!(
         ALL_METHODS

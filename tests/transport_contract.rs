@@ -11,7 +11,7 @@ use heddle_api::framing::{
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
-    HumanVerificationChallenge, RequestProof, TraceContext,
+    HumanVerificationChallenge, RequestProof, ServiceMaturity, TraceContext,
 };
 use heddle_api::{ALL_METHODS, HOSTED_ALPN_V1, StreamingShape, method_descriptor};
 use prost::Message;
@@ -157,6 +157,19 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
         AuthorizationAccess::Public
     );
     assert_eq!(ALL_METHODS.len(), 150);
+    for method in [
+        "ClaimHandle",
+        "GetHandleStatus",
+        "RequestHeldName",
+        "ResolveHandle",
+    ] {
+        assert_eq!(
+            method_descriptor(&format!("/heddle.api.v1alpha1.IdentityService/{method}"))
+                .expect("handle method descriptor")
+                .maturity,
+            ServiceMaturity::Planned
+        );
+    }
     assert!(
         ALL_METHODS
             .windows(2)

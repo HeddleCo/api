@@ -40,6 +40,8 @@ const RPC_CONTRACT_FIELDS = new Set([
   "authorization_existence",
   "authorization_request_targets",
   "authorization_multi_target",
+  "deployment_targets",
+  "maturity",
 ]);
 
 function required(registry, kind, name) {
@@ -269,7 +271,10 @@ function authorizationMatches(metadata, expected) {
 }
 
 function validateSensitiveResponseAuthorization(metadata, maturity, output, rpc) {
-  if (maturity === "PLANNED") {
+  if (
+    maturity === "PLANNED" &&
+    metadata.authorization_access === "PLANNED_UNDECIDED"
+  ) {
     return;
   }
   if (messageContainsType(output, `${PACKAGE}.CredentialInfo`)) {
@@ -430,6 +435,22 @@ function main() {
           throw new Error(`descriptor metadata missing RPC contract: ${rpc}`);
         }
         const option = getOption(method, rpcContract);
+        const methodDeploymentTargets =
+          option.deploymentTargets.length === 0
+            ? deploymentTargets
+            : option.deploymentTargets
+                .map((number) =>
+                  enumLocal(
+                    deploymentTarget,
+                    number,
+                    `deployment target: ${rpc}`,
+                  ),
+                )
+                .sort();
+        const methodMaturity =
+          option.maturity === 0
+            ? maturity
+            : enumLocal(serviceMaturity, option.maturity, `maturity: ${rpc}`);
         const capabilityName = enumLocal(
           capabilityArea,
           option.capability,
@@ -475,10 +496,10 @@ function main() {
           ),
           authorization_multi_target: option.authorizationMultiTarget,
         };
-        validateAuthorization(authorization, maturity, rpc, method.input);
+        validateAuthorization(authorization, methodMaturity, rpc, method.input);
         validateSensitiveResponseAuthorization(
           authorization,
-          maturity,
+          methodMaturity,
           method.output,
           rpc,
         );
@@ -487,8 +508,8 @@ function main() {
           service: service.typeName,
           method: method.name,
           capability,
-          deployment_targets: deploymentTargets,
-          maturity,
+          deployment_targets: methodDeploymentTargets,
+          maturity: methodMaturity,
           signing_identity: enumLocal(
             signingIdentity,
             option.signingIdentity,

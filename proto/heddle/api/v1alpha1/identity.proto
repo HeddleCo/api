@@ -1033,6 +1033,7 @@ service IdentityService {
   // returns the same NOT_FOUND status and public error shape.
   rpc ClaimHandle(ClaimHandleRequest) returns (ClaimHandleResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1159,6 +1160,7 @@ service IdentityService {
   // to the public classification and holder-presence boolean.
   rpc GetHandleStatus(GetHandleStatusRequest) returns (GetHandleStatusResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -1388,6 +1390,7 @@ service IdentityService {
   // public error shape, so the RPC does not reveal which condition applied.
   rpc RequestHeldName(RequestHeldNameRequest) returns (RequestHeldNameResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1407,6 +1410,7 @@ service IdentityService {
   // NOT_FOUND.
   rpc ResolveHandle(ResolveHandleRequest) returns (ResolveHandleResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY

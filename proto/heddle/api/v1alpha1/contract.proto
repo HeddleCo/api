@@ -207,6 +207,10 @@ message RpcContract {
   // targets. Audits reject a mismatch so a multi-resource rule cannot
   // silently collapse to one selector.
   bool authorization_multi_target = 12;
+  // Optional per-method deployment override. Empty inherits the service contract.
+  repeated DeploymentTarget deployment_targets = 13;
+  // Optional per-method maturity override. UNSPECIFIED inherits the service contract.
+  ServiceMaturity maturity = 14;
 }
 
 // Machine-readable lifecycle semantics for the canonical Operation state enum.

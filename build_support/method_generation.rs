@@ -40,6 +40,15 @@ pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn E
             enum_variants(&service_options, "deployment_targets", "DEPLOYMENT_TARGET_")?;
         for method in service.methods() {
             let options = extension_message(method.options(), &rpc_contract)?;
+            let method_maturity = enum_variant_override(&options, "maturity", "SERVICE_MATURITY_")?
+                .unwrap_or_else(|| maturity.clone());
+            let method_deployments =
+                enum_variants(&options, "deployment_targets", "DEPLOYMENT_TARGET_")?;
+            let method_deployments = if method_deployments.is_empty() {
+                deployments.clone()
+            } else {
+                method_deployments
+            };
             let streaming = match (
                 method.method_descriptor_proto().client_streaming(),
                 method.method_descriptor_proto().server_streaming(),
@@ -69,8 +78,8 @@ pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn E
                 )?,
                 client_operation_id_required: bool_value(&options, "client_operation_id_required")?,
                 client_operation_id_field_number,
-                maturity: maturity.clone(),
-                deployments: deployments.clone(),
+                maturity: method_maturity,
+                deployments: method_deployments,
             });
         }
     }
@@ -124,6 +133,31 @@ fn enum_variant(
         .get_value(*number)
         .ok_or_else(|| format!("option field {field_name} has unknown value {number}"))?;
     rust_variant(enum_value.name(), prefix)
+}
+
+fn enum_variant_override(
+    message: &DynamicMessage,
+    field_name: &str,
+    prefix: &str,
+) -> Result<Option<String>, Box<dyn Error>> {
+    let field = message
+        .descriptor()
+        .get_field_by_name(field_name)
+        .ok_or_else(|| format!("option message is missing {field_name}"))?;
+    let Kind::Enum(descriptor) = field.kind() else {
+        return Err(format!("option field {field_name} is not an enum").into());
+    };
+    let value = message.get_field(&field);
+    let Value::EnumNumber(number) = value.as_ref() else {
+        return Err(format!("option field {field_name} has the wrong value type").into());
+    };
+    if *number == 0 {
+        return Ok(None);
+    }
+    let enum_value = descriptor
+        .get_value(*number)
+        .ok_or_else(|| format!("option field {field_name} has unknown value {number}"))?;
+    rust_variant(enum_value.name(), prefix).map(Some)
 }
 
 fn enum_variants(

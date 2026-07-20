@@ -18,6 +18,7 @@ struct Method {
     signing: String,
     authorization_access: String,
     client_operation_id_required: bool,
+    client_operation_id_field_number: Option<u32>,
     maturity: String,
     deployments: Vec<String>,
 }
@@ -48,6 +49,10 @@ pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn E
                 (false, true) => "ServerStreaming",
                 (true, true) => "Bidirectional",
             };
+            let client_operation_id_field_number = method
+                .input()
+                .get_field_by_name("client_operation_id")
+                .map(|field| field.number());
             methods.push(Method {
                 path: format!("/{}/{}", service.full_name(), method.name()),
                 input: method.input().full_name().to_string(),
@@ -63,6 +68,7 @@ pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn E
                     "AUTHORIZATION_ACCESS_",
                 )?,
                 client_operation_id_required: bool_value(&options, "client_operation_id_required")?,
+                client_operation_id_field_number,
                 maturity: maturity.clone(),
                 deployments: deployments.clone(),
             });
@@ -191,6 +197,7 @@ fn render(methods: &[Method]) -> String {
          pub signing_tier: SigningTier,\n\
          pub authorization_access: AuthorizationAccess,\n\
          pub client_operation_id_required: bool,\n\
+         pub client_operation_id_field_number: Option<u32>,\n\
          pub maturity: ServiceMaturity,\n\
          pub deployment_targets: &'static [DeploymentTarget],\n\
          pub route: MethodRoute,\n\
@@ -206,7 +213,7 @@ fn render(methods: &[Method]) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         output.push_str(&format!(
-            "MethodDescriptor {{ path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
+            "MethodDescriptor {{ path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, client_operation_id_field_number: {:?}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
             method.path,
             method.input,
             method.output,
@@ -216,6 +223,7 @@ fn render(methods: &[Method]) -> String {
             method.signing,
             method.authorization_access,
             method.client_operation_id_required,
+            method.client_operation_id_field_number,
             method.maturity,
             deployments,
             method.route,

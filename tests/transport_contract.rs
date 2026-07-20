@@ -117,6 +117,23 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
 }
 
 #[test]
+fn generated_descriptor_extracts_client_operation_id_without_route_specific_code() {
+    let method = method_descriptor("/heddle.api.v1alpha1.RegistryService/CreateRepository")
+        .expect("create repository descriptor");
+    assert!(method.client_operation_id_required);
+    assert!(method.client_operation_id_field_number.is_some());
+    let request = heddle_api::heddle::api::v1alpha1::CreateRepositoryRequest {
+        client_operation_id: "operation-123".to_string(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    assert_eq!(
+        method.client_operation_id(&request).expect("valid request"),
+        Some("operation-123")
+    );
+}
+
+#[test]
 fn call_context_carries_transport_neutral_auth_and_trace_fields() {
     let context = CallContext {
         bearer_capability: b"opaque-biscuit".to_vec(),

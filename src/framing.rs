@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use bytes::{BufMut, BytesMut};
 use prost::Message;
 
 use crate::heddle::api::v1alpha1::{CallContext, CallFailure};
@@ -158,21 +159,42 @@ pub fn decode_request_prelude(
 
 /// Encodes a successful unary response; stream FIN delimits the body.
 pub fn encode_success_response(body: &[u8]) -> Result<Vec<u8>, FrameError> {
+    let mut frame = BytesMut::with_capacity(1 + body.len());
+    encode_success_response_into(&mut frame, body)?;
+    Ok(frame.to_vec())
+}
+
+/// Reuses `frame` for a successful unary response.
+pub fn encode_success_response_into(frame: &mut BytesMut, body: &[u8]) -> Result<(), FrameError> {
     validate_body(body)?;
-    let mut frame = Vec::with_capacity(1 + body.len());
-    frame.push(RESPONSE_SUCCESS);
+    frame.clear();
+    frame.reserve(1 + body.len());
+    frame.put_u8(RESPONSE_SUCCESS);
     frame.extend_from_slice(body);
-    Ok(frame)
+    Ok(())
 }
 
 /// Encodes a contract-owned unary failure; stream FIN delimits the envelope.
 pub fn encode_failure_response(failure: &CallFailure) -> Result<Vec<u8>, FrameError> {
-    let body = failure.encode_to_vec();
-    validate_body(&body)?;
-    let mut frame = Vec::with_capacity(1 + body.len());
-    frame.push(RESPONSE_FAILURE);
-    frame.extend_from_slice(&body);
-    Ok(frame)
+    let mut frame = BytesMut::with_capacity(1 + failure.encoded_len());
+    encode_failure_response_into(&mut frame, failure)?;
+    Ok(frame.to_vec())
+}
+
+/// Reuses `frame` for a contract-owned unary failure.
+pub fn encode_failure_response_into(
+    frame: &mut BytesMut,
+    failure: &CallFailure,
+) -> Result<(), FrameError> {
+    let body_len = failure.encoded_len();
+    validate_body_len(body_len)?;
+    frame.clear();
+    frame.reserve(1 + body_len);
+    frame.put_u8(RESPONSE_FAILURE);
+    failure
+        .encode(frame)
+        .expect("BytesMut reserves the exact protobuf failure size");
+    Ok(())
 }
 
 /// Decodes a complete FIN-delimited unary response frame.
@@ -192,26 +214,62 @@ pub fn decode_response_frame(frame: &[u8]) -> Result<ResponseFrame<'_>, FrameErr
 
 /// Encodes one protobuf message for a streaming operation.
 pub fn encode_stream_message(body: &[u8]) -> Result<Vec<u8>, FrameError> {
-    encode_stream_item(STREAM_MESSAGE, body)
+    let mut frame = BytesMut::with_capacity(STREAM_HEADER + body.len());
+    encode_stream_message_into(&mut frame, body)?;
+    Ok(frame.to_vec())
+}
+
+/// Reuses `frame` for one protobuf stream message.
+pub fn encode_stream_message_into(frame: &mut BytesMut, body: &[u8]) -> Result<(), FrameError> {
+    encode_stream_item_into(frame, STREAM_MESSAGE, body)
 }
 
 /// Encodes one terminal failure for a streaming operation.
 pub fn encode_stream_failure(failure: &CallFailure) -> Result<Vec<u8>, FrameError> {
-    encode_stream_item(STREAM_FAILURE, &failure.encode_to_vec())
+    let mut frame = BytesMut::with_capacity(STREAM_HEADER + failure.encoded_len());
+    encode_stream_failure_into(&mut frame, failure)?;
+    Ok(frame.to_vec())
+}
+
+/// Reuses `frame` for one terminal stream failure.
+pub fn encode_stream_failure_into(
+    frame: &mut BytesMut,
+    failure: &CallFailure,
+) -> Result<(), FrameError> {
+    let body_len = failure.encoded_len();
+    validate_body_len(body_len)?;
+    let body_len = u32::try_from(body_len)
+        .map_err(|_| FrameError::Invalid("stream item exceeds u32".to_string()))?;
+    frame.clear();
+    frame.reserve(STREAM_HEADER + body_len as usize);
+    frame.put_u8(STREAM_FAILURE);
+    frame.extend_from_slice(&body_len.to_be_bytes());
+    failure
+        .encode(frame)
+        .expect("BytesMut reserves the exact protobuf failure size");
+    Ok(())
 }
 
 /// Encodes a raw-body header. Exactly `length` uninterpreted bytes follow it
 /// before the next framed stream item.
 pub fn encode_stream_raw_body(length: u64) -> Result<Vec<u8>, FrameError> {
+    let mut frame = BytesMut::with_capacity(STREAM_RAW_HEADER);
+    encode_stream_raw_body_into(&mut frame, length)?;
+    Ok(frame.to_vec())
+}
+
+/// Reuses `frame` for a raw-body header.
+pub fn encode_stream_raw_body_into(frame: &mut BytesMut, length: u64) -> Result<(), FrameError> {
     if length == 0 || length > MAX_RAW_BODY {
         return Err(FrameError::Invalid(format!(
             "raw stream body is {length} bytes; range is 1..={MAX_RAW_BODY}"
         )));
     }
-    let mut frame = Vec::with_capacity(STREAM_RAW_HEADER);
-    frame.push(STREAM_RAW_BODY);
+    frame.clear();
+    frame.reserve(STREAM_RAW_HEADER);
+    frame.put_u8(STREAM_RAW_BODY);
     frame.extend_from_slice(&length.to_be_bytes());
-    Ok(frame)
+    Ok(())
 }
 
 /// Decodes one item from a streaming receive buffer.
@@ -264,15 +322,16 @@ pub fn decode_stream_frame(buffer: &[u8]) -> Result<Option<(StreamFrame<'_>, usi
     Ok(Some((frame, consumed)))
 }
 
-fn encode_stream_item(kind: u8, body: &[u8]) -> Result<Vec<u8>, FrameError> {
+fn encode_stream_item_into(frame: &mut BytesMut, kind: u8, body: &[u8]) -> Result<(), FrameError> {
     validate_body(body)?;
     let body_len = u32::try_from(body.len())
         .map_err(|_| FrameError::Invalid("stream item exceeds u32".to_string()))?;
-    let mut frame = Vec::with_capacity(STREAM_HEADER + body.len());
-    frame.push(kind);
+    frame.clear();
+    frame.reserve(STREAM_HEADER + body.len());
+    frame.put_u8(kind);
     frame.extend_from_slice(&body_len.to_be_bytes());
     frame.extend_from_slice(body);
-    Ok(frame)
+    Ok(())
 }
 
 fn validate_method(method: &str) -> Result<(), FrameError> {
@@ -285,10 +344,13 @@ fn validate_method(method: &str) -> Result<(), FrameError> {
 }
 
 fn validate_body(body: &[u8]) -> Result<(), FrameError> {
-    if body.len() > MAX_CONTROL_BODY {
+    validate_body_len(body.len())
+}
+
+fn validate_body_len(body_len: usize) -> Result<(), FrameError> {
+    if body_len > MAX_CONTROL_BODY {
         return Err(FrameError::Invalid(format!(
-            "control body is {} bytes; maximum is {MAX_CONTROL_BODY}",
-            body.len()
+            "control body is {body_len} bytes; maximum is {MAX_CONTROL_BODY}"
         )));
     }
     Ok(())

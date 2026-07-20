@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use bytes::BytesMut;
 use heddle_api::framing::{
     ResponseFrame, StreamFrame, decode_request_frame, decode_request_prelude,
-    decode_response_frame, decode_stream_frame, encode_failure_response, encode_request_frame,
-    encode_request_prelude, encode_stream_failure, encode_stream_message, encode_stream_raw_body,
+    decode_response_frame, decode_stream_frame, encode_failure_response,
+    encode_failure_response_into, encode_request_frame, encode_request_prelude,
+    encode_stream_failure, encode_stream_failure_into, encode_stream_message,
+    encode_stream_message_into, encode_stream_raw_body, encode_stream_raw_body_into,
+    encode_success_response, encode_success_response_into,
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
@@ -55,6 +59,49 @@ fn streaming_frames_are_incremental_and_transport_neutral() {
         StreamFrame::Message(_) => panic!("failure decoded as message"),
         StreamFrame::RawBody { .. } => panic!("failure decoded as raw body"),
     }
+}
+
+#[test]
+fn control_frame_encoders_reuse_the_caller_buffer_without_changing_wire_bytes() {
+    let failure = CallFailure {
+        code: CallFailureCode::PermissionDenied as i32,
+        message: "repository is not visible".into(),
+        details: Vec::new(),
+    };
+    let mut frame = BytesMut::with_capacity(4096);
+    let capacity = frame.capacity();
+    let allocation = frame.as_ptr();
+
+    encode_success_response_into(&mut frame, b"response").expect("success frame");
+    assert_eq!(
+        frame.as_ref(),
+        encode_success_response(b"response").unwrap()
+    );
+    assert_eq!(frame.capacity(), capacity);
+    assert_eq!(frame.as_ptr(), allocation);
+
+    encode_failure_response_into(&mut frame, &failure).expect("failure frame");
+    assert_eq!(frame.as_ref(), encode_failure_response(&failure).unwrap());
+    assert_eq!(frame.capacity(), capacity);
+    assert_eq!(frame.as_ptr(), allocation);
+
+    encode_stream_message_into(&mut frame, b"stream message").expect("stream message");
+    assert_eq!(
+        frame.as_ref(),
+        encode_stream_message(b"stream message").unwrap()
+    );
+    assert_eq!(frame.capacity(), capacity);
+    assert_eq!(frame.as_ptr(), allocation);
+
+    encode_stream_failure_into(&mut frame, &failure).expect("stream failure");
+    assert_eq!(frame.as_ref(), encode_stream_failure(&failure).unwrap());
+    assert_eq!(frame.capacity(), capacity);
+    assert_eq!(frame.as_ptr(), allocation);
+
+    encode_stream_raw_body_into(&mut frame, 1_048_576).expect("raw body header");
+    assert_eq!(frame.as_ref(), encode_stream_raw_body(1_048_576).unwrap());
+    assert_eq!(frame.capacity(), capacity);
+    assert_eq!(frame.as_ptr(), allocation);
 }
 
 #[test]

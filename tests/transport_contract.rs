@@ -76,6 +76,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
 fn call_context_carries_transport_neutral_auth_and_trace_fields() {
     let context = CallContext {
         bearer_capability: b"opaque-biscuit".to_vec(),
+        bearer_grant_envelope: b"opaque-grant-envelope".to_vec(),
         request_proof: Some(RequestProof {
             algorithm: "ed25519".to_string(),
             signing_identity: "principal:alice".to_string(),
@@ -98,6 +99,7 @@ fn call_context_carries_transport_neutral_auth_and_trace_fields() {
     };
 
     assert_eq!(context.bearer_capability, b"opaque-biscuit");
+    assert_eq!(context.bearer_grant_envelope, b"opaque-grant-envelope");
     assert_eq!(
         context
             .request_proof

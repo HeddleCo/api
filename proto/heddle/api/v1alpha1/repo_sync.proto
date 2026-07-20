@@ -69,11 +69,23 @@ message TransferCheckpoint {
   bool is_complete = 6;
 }
 
+enum StateAttachmentKind {
+  STATE_ATTACHMENT_KIND_UNSPECIFIED = 0;
+  STATE_ATTACHMENT_KIND_CONTEXT = 1;
+  STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2;
+  STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3;
+  STATE_ATTACHMENT_KIND_DISCUSSIONS = 4;
+  STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5;
+  STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6;
+  STATE_ATTACHMENT_KIND_SIGNATURE = 7;
+}
+
 message ObjectDescriptor {
   string id = 1;
   string object_type = 2;
   ObjectAvailabilityStatus availability_status = 3;
   string availability_note = 4;
+  StateAttachmentKind attachment_kind = 5; // REQUIRED iff object_type == "state_attachment"; UNSPECIFIED otherwise
 }
 
 message PushRequest {
@@ -159,6 +171,27 @@ message RedactionTransfer {
 message StateVisibilityTransfer {
   StateId state_id = 1;
   bytes state_visibility_blob = 2;
+}
+
+// Out-of-pack transport for state-attachment sidecars. State attachments
+// (context, risk signals, review signatures, discussions, structured
+// conflicts, semantic index, signature) are partitioned onto the sidecar
+// lane and live structurally outside `.heddle/objects/`, so they can't
+// ride the native-pack object channel. The sender emits one
+// `StateAttachmentTransfer` per pushed attachment; the receiver
+// reconstructs and verifies the attachment from the raw object bytes.
+//
+// `state_id` is the hex-encoded ChangeId of the state the attachment
+// hangs off.
+// `attachment_id` is the hex-encoded id of the attachment object.
+// `attachment_kind` is the attachment body kind (see StateAttachmentKind).
+// `attachment_object` is the raw serialized StateAttachment object byte
+// payload — byte-identical to what the sender stored on disk.
+message StateAttachmentTransfer {
+  StateId state_id = 1;
+  string attachment_id = 2;
+  StateAttachmentKind attachment_kind = 3;
+  bytes attachment_object = 4;
 }
 
 enum GitRefKind {
@@ -262,6 +295,7 @@ message PushClientFrame {
     RedactionTransfer redaction = 4;
     StateVisibilityTransfer state_visibility = 5;
     GitLaneTransfer git_lane = 6;
+    StateAttachmentTransfer state_attachment = 8;
   }
   string client_operation_id = 7;
 }

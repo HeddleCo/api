@@ -10,12 +10,16 @@ pub const MAX_METHOD_PATH: usize = 1024;
 pub const MAX_CALL_CONTEXT: usize = 64 * 1024;
 /// Largest protobuf control body carried in a FIN-delimited frame.
 pub const MAX_CONTROL_BODY: usize = 8 * 1024 * 1024;
+/// Largest raw pack/index phase declared on one operation stream.
+pub const MAX_RAW_BODY: u64 = 64 * 1024 * 1024 * 1024;
 
 const RESPONSE_SUCCESS: u8 = 0;
 const RESPONSE_FAILURE: u8 = 1;
 const STREAM_MESSAGE: u8 = 0;
 const STREAM_FAILURE: u8 = 1;
+const STREAM_RAW_BODY: u8 = 2;
 const STREAM_HEADER: usize = 5;
+const STREAM_RAW_HEADER: usize = 9;
 
 /// Malformed or oversized hosted-call framing.
 #[derive(Debug, thiserror::Error)]
@@ -64,6 +68,8 @@ pub enum StreamFrame<'a> {
     Message(&'a [u8]),
     /// Terminal contract-owned failure.
     Failure(CallFailure),
+    /// Header for a known-length raw body that immediately follows this item.
+    RawBody { length: u64 },
 }
 
 /// Encodes `method_len:u16be | context_len:u32be | method | context | body`.
@@ -194,6 +200,20 @@ pub fn encode_stream_failure(failure: &CallFailure) -> Result<Vec<u8>, FrameErro
     encode_stream_item(STREAM_FAILURE, &failure.encode_to_vec())
 }
 
+/// Encodes a raw-body header. Exactly `length` uninterpreted bytes follow it
+/// before the next framed stream item.
+pub fn encode_stream_raw_body(length: u64) -> Result<Vec<u8>, FrameError> {
+    if length == 0 || length > MAX_RAW_BODY {
+        return Err(FrameError::Invalid(format!(
+            "raw stream body is {length} bytes; range is 1..={MAX_RAW_BODY}"
+        )));
+    }
+    let mut frame = Vec::with_capacity(STREAM_RAW_HEADER);
+    frame.push(STREAM_RAW_BODY);
+    frame.extend_from_slice(&length.to_be_bytes());
+    Ok(frame)
+}
+
 /// Decodes one item from a streaming receive buffer.
 ///
 /// Returns `Ok(None)` until the buffer contains the complete declared item.
@@ -203,6 +223,22 @@ pub fn decode_stream_frame(buffer: &[u8]) -> Result<Option<(StreamFrame<'_>, usi
         return Ok(None);
     }
     let kind = buffer[0];
+    if kind == STREAM_RAW_BODY {
+        if buffer.len() < STREAM_RAW_HEADER {
+            return Ok(None);
+        }
+        let length = u64::from_be_bytes(
+            buffer[1..STREAM_RAW_HEADER]
+                .try_into()
+                .expect("fixed raw header width"),
+        );
+        if length == 0 || length > MAX_RAW_BODY {
+            return Err(FrameError::Invalid(format!(
+                "raw stream body is {length} bytes; range is 1..={MAX_RAW_BODY}"
+            )));
+        }
+        return Ok(Some((StreamFrame::RawBody { length }, STREAM_RAW_HEADER)));
+    }
     let body_len = u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
     if body_len > MAX_CONTROL_BODY {
         return Err(FrameError::Invalid(format!(

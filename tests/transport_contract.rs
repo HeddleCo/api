@@ -3,7 +3,7 @@
 use heddle_api::framing::{
     ResponseFrame, StreamFrame, decode_request_frame, decode_request_prelude,
     decode_response_frame, decode_stream_frame, encode_failure_response, encode_request_frame,
-    encode_request_prelude, encode_stream_failure, encode_stream_message,
+    encode_request_prelude, encode_stream_failure, encode_stream_message, encode_stream_raw_body,
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
@@ -53,7 +53,23 @@ fn streaming_frames_are_incremental_and_transport_neutral() {
     match decoded {
         StreamFrame::Failure(decoded) => assert_eq!(decoded, failure),
         StreamFrame::Message(_) => panic!("failure decoded as message"),
+        StreamFrame::RawBody { .. } => panic!("failure decoded as raw body"),
     }
+}
+
+#[test]
+fn raw_stream_body_has_a_bounded_known_length_header() {
+    let header = encode_stream_raw_body(1_048_576).expect("raw body header");
+    assert!(decode_stream_frame(&header[..8]).unwrap().is_none());
+    let (decoded, consumed) = decode_stream_frame(&header)
+        .unwrap()
+        .expect("complete raw body header");
+    assert_eq!(consumed, 9);
+    assert!(matches!(
+        decoded,
+        StreamFrame::RawBody { length: 1_048_576 }
+    ));
+    assert!(encode_stream_raw_body(0).is_err());
 }
 
 #[test]

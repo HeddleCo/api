@@ -5,8 +5,8 @@ pub mod signing;
 mod transport;
 
 pub use transport::{
-    ALL_METHODS, HOSTED_ALPN_V1, MethodDescriptor, MethodRoute, RoutedCall, StreamingShape,
-    method_descriptor,
+    ALL_METHODS, HOSTED_ALPN_V1, MethodDescriptor, MethodRoute, RequestMetadataError, RoutedCall,
+    StreamingShape, method_descriptor,
 };
 
 /// Cross-product hosted-call framing and typed-failure fixture.

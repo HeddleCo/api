@@ -77,7 +77,7 @@ def audit_new_descriptor(decoded: str) -> None:
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|pack_chunk|pack_id|"
-        r"bearer_capability|capability_context|canonical_envelope|encrypted_.*)$"
+        r"bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )
     unaudited_bytes = sorted(
         name for name in byte_field_pattern.findall(proto_sources) if not allowed_byte_field.fullmatch(name)

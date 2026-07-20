@@ -63,7 +63,9 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 11
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 2
+    # Two services are planned, and four methods on otherwise-shipped services
+    # deliberately override their inherited maturity to planned.
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 6
     assert decoded.count('type_name: ".google.protobuf.Any"') == 1
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded

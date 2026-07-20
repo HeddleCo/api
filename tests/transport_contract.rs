@@ -171,6 +171,23 @@ fn call_context_carries_transport_neutral_auth_and_trace_fields() {
 }
 
 #[test]
+fn service_account_issuance_proof_is_request_data_not_transport_metadata() {
+    let request = heddle_api::heddle::api::v1alpha1::IssueServiceAccountCredentialRequest {
+        service_account_id: "sa-1".to_string(),
+        client_operation_id: "operation-1".to_string(),
+        proof_timestamp_seconds: 1_700_000_000,
+        proof_signature: vec![7; 64],
+        ..Default::default()
+    };
+    let decoded = heddle_api::heddle::api::v1alpha1::IssueServiceAccountCredentialRequest::decode(
+        request.encode_to_vec().as_slice(),
+    )
+    .expect("issuance request round trip");
+    assert_eq!(decoded.proof_timestamp_seconds, 1_700_000_000);
+    assert_eq!(decoded.proof_signature, vec![7; 64]);
+}
+
+#[test]
 fn call_failure_uses_contract_owned_codes() {
     let failure = CallFailure {
         code: CallFailureCode::PermissionDenied as i32,

@@ -147,6 +147,11 @@ message IssueServiceAccountCredentialRequest {
   // the `issued_credentials.expires_at` row are both set to now + ttl_secs.
   google.protobuf.Duration ttl_secs = 4;
   string client_operation_id = 5;
+  // Proof made by the service account's currently registered key over the
+  // issuance challenge. These were gRPC metadata before the Iroh cutover;
+  // keeping them in the request makes retries and signatures transport-neutral.
+  int64 proof_timestamp_seconds = 6;
+  bytes proof_signature = 7;
 }
 
 message AuthChallengeResponse {

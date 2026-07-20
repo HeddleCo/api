@@ -76,7 +76,7 @@ def audit_new_descriptor(decoded: str) -> None:
         r"salt|argon2id_hash|"
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit|bootstrap_token|grant_envelope|nonce)|"
-        r"checkpoint|data|redactions_blob|state_visibility_blob|pack_chunk|pack_id|"
+        r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"
         r"capability_context|canonical_envelope|encrypted_.*)$"
     )
     unaudited_bytes = sorted(

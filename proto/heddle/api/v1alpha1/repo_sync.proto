@@ -71,11 +71,23 @@ message TransferCheckpoint {
   bool is_complete = 6;
 }
 
+enum StateAttachmentKind {
+  STATE_ATTACHMENT_KIND_UNSPECIFIED = 0;
+  STATE_ATTACHMENT_KIND_CONTEXT = 1;
+  STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2;
+  STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3;
+  STATE_ATTACHMENT_KIND_DISCUSSIONS = 4;
+  STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5;
+  STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6;
+  STATE_ATTACHMENT_KIND_SIGNATURE = 7;
+}
+
 message ObjectDescriptor {
   string id = 1;
   string object_type = 2;
   ObjectAvailabilityStatus availability_status = 3;
   string availability_note = 4;
+  StateAttachmentKind attachment_kind = 5; // REQUIRED iff object_type == "state_attachment"; UNSPECIFIED otherwise
 }
 
 message PushRequest {

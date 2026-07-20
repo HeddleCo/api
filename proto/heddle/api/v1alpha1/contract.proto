@@ -31,6 +31,13 @@ message HumanVerification {
   bytes user_handle = 3;
 }
 
+// Typed failure detail returned when a human-tier call needs an interactive
+// WebAuthn assertion. The challenge remains client-derived from the canonical
+// request bytes; `action_url` is only an optional UI handoff hint.
+message HumanVerificationChallenge {
+  string action_url = 1;
+}
+
 // W3C trace context propagated without depending on a transport library.
 message TraceContext {
   string traceparent = 1;

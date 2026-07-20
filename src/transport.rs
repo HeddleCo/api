@@ -1,12 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::heddle::api::v1alpha1::{
-    AuthorizationAccess, CallContext, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity,
-    SigningTier,
+    AuthorizationAccess, CallContext, DeploymentTarget, HumanVerificationChallenge, RetryBehavior,
+    RpcEffect, ServiceMaturity, SigningTier,
 };
+use prost::Message;
 
 /// Production ALPN for the first transport-neutral hosted-call protocol.
 pub const HOSTED_ALPN_V1: &[u8] = b"heddle-api/1";
+
+/// Type URL for the human-verification challenge carried in `CallFailure.details`.
+pub const HUMAN_VERIFICATION_CHALLENGE_TYPE_URL: &str =
+    "type.heddle.dev/heddle.api.v1alpha1.HumanVerificationChallenge";
+
+pub fn human_verification_challenge_detail(
+    challenge: HumanVerificationChallenge,
+) -> prost_types::Any {
+    prost_types::Any {
+        type_url: HUMAN_VERIFICATION_CHALLENGE_TYPE_URL.to_string(),
+        value: challenge.encode_to_vec(),
+    }
+}
+
+pub fn human_verification_challenge(
+    details: &[prost_types::Any],
+) -> Option<HumanVerificationChallenge> {
+    details
+        .iter()
+        .find(|detail| detail.type_url == HUMAN_VERIFICATION_CHALLENGE_TYPE_URL)
+        .and_then(|detail| HumanVerificationChallenge::decode(detail.value.as_slice()).ok())
+}
 
 /// Message cardinality on each side of a contract method.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

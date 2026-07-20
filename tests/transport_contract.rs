@@ -7,7 +7,7 @@ use heddle_api::framing::{
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
-    RequestProof, TraceContext,
+    HumanVerificationChallenge, RequestProof, TraceContext,
 };
 use heddle_api::{ALL_METHODS, HOSTED_ALPN_V1, StreamingShape, method_descriptor};
 use prost::Message;
@@ -200,6 +200,16 @@ fn call_failure_uses_contract_owned_codes() {
         CallFailureCode::PermissionDenied,
         "failure vocabulary must not depend on a transport status type"
     );
+}
+
+#[test]
+fn human_verification_challenge_is_a_typed_failure_detail() {
+    let detail = heddle_api::human_verification_challenge_detail(HumanVerificationChallenge {
+        action_url: "https://app.heddle.dev/verify-action".to_string(),
+    });
+    let decoded = heddle_api::human_verification_challenge(&[detail])
+        .expect("decode human verification challenge");
+    assert_eq!(decoded.action_url, "https://app.heddle.dev/verify-action");
 }
 
 #[test]

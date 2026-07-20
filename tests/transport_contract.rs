@@ -134,6 +134,29 @@ fn generated_descriptor_extracts_client_operation_id_without_route_specific_code
 }
 
 #[test]
+fn destructive_shipped_methods_match_weft_human_verification_policy() {
+    use heddle_api::heddle::api::v1alpha1::SigningTier;
+
+    for method in [
+        "/heddle.api.v1alpha1.RegistryService/DeleteGrant",
+        "/heddle.api.v1alpha1.RegistryService/DeleteNamespace",
+        "/heddle.api.v1alpha1.RegistryService/DeleteRepository",
+        "/heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
+        "/heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
+        "/heddle.api.v1alpha1.RegistryService/UpdateGrant",
+        "/heddle.api.v1alpha1.WorkflowService/RevokeApproval",
+    ] {
+        assert_eq!(
+            method_descriptor(method)
+                .expect("shipped destructive method")
+                .signing_tier,
+            SigningTier::HumanVerification,
+            "{method} must preserve Weft's production human-verification gate"
+        );
+    }
+}
+
+#[test]
 fn call_context_carries_transport_neutral_auth_and_trace_fields() {
     let context = CallContext {
         bearer_capability: b"opaque-biscuit".to_vec(),

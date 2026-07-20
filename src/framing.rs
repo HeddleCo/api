@@ -13,6 +13,9 @@ pub const MAX_CONTROL_BODY: usize = 8 * 1024 * 1024;
 
 const RESPONSE_SUCCESS: u8 = 0;
 const RESPONSE_FAILURE: u8 = 1;
+const STREAM_MESSAGE: u8 = 0;
+const STREAM_FAILURE: u8 = 1;
+const STREAM_HEADER: usize = 5;
 
 /// Malformed or oversized hosted-call framing.
 #[derive(Debug, thiserror::Error)]
@@ -42,6 +45,15 @@ pub enum ResponseFrame<'a> {
     /// Encoded successful response body.
     Success(&'a [u8]),
     /// Contract-owned failure envelope.
+    Failure(CallFailure),
+}
+
+/// One length-delimited item within a server or bidirectional stream.
+#[derive(Debug)]
+pub enum StreamFrame<'a> {
+    /// Encoded protobuf stream message.
+    Message(&'a [u8]),
+    /// Terminal contract-owned failure.
     Failure(CallFailure),
 }
 
@@ -143,6 +155,61 @@ pub fn decode_response_frame(frame: &[u8]) -> Result<ResponseFrame<'_>, FrameErr
             "unknown response outcome {value}"
         ))),
     }
+}
+
+/// Encodes one protobuf message for a streaming operation.
+pub fn encode_stream_message(body: &[u8]) -> Result<Vec<u8>, FrameError> {
+    encode_stream_item(STREAM_MESSAGE, body)
+}
+
+/// Encodes one terminal failure for a streaming operation.
+pub fn encode_stream_failure(failure: &CallFailure) -> Result<Vec<u8>, FrameError> {
+    encode_stream_item(STREAM_FAILURE, &failure.encode_to_vec())
+}
+
+/// Decodes one item from a streaming receive buffer.
+///
+/// Returns `Ok(None)` until the buffer contains the complete declared item.
+/// The consumed length lets callers retain any following frames already read.
+pub fn decode_stream_frame(buffer: &[u8]) -> Result<Option<(StreamFrame<'_>, usize)>, FrameError> {
+    if buffer.len() < STREAM_HEADER {
+        return Ok(None);
+    }
+    let kind = buffer[0];
+    let body_len = u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
+    if body_len > MAX_CONTROL_BODY {
+        return Err(FrameError::Invalid(format!(
+            "stream item is {body_len} bytes; maximum is {MAX_CONTROL_BODY}"
+        )));
+    }
+    let consumed = STREAM_HEADER
+        .checked_add(body_len)
+        .ok_or_else(|| FrameError::Invalid("stream item length overflow".to_string()))?;
+    if buffer.len() < consumed {
+        return Ok(None);
+    }
+    let body = &buffer[STREAM_HEADER..consumed];
+    let frame = match kind {
+        STREAM_MESSAGE => StreamFrame::Message(body),
+        STREAM_FAILURE => StreamFrame::Failure(CallFailure::decode(body)?),
+        value => {
+            return Err(FrameError::Invalid(format!(
+                "unknown stream item kind {value}"
+            )));
+        }
+    };
+    Ok(Some((frame, consumed)))
+}
+
+fn encode_stream_item(kind: u8, body: &[u8]) -> Result<Vec<u8>, FrameError> {
+    validate_body(body)?;
+    let body_len = u32::try_from(body.len())
+        .map_err(|_| FrameError::Invalid("stream item exceeds u32".to_string()))?;
+    let mut frame = Vec::with_capacity(STREAM_HEADER + body.len());
+    frame.push(kind);
+    frame.extend_from_slice(&body_len.to_be_bytes());
+    frame.extend_from_slice(body);
+    Ok(frame)
 }
 
 fn validate_method(method: &str) -> Result<(), FrameError> {

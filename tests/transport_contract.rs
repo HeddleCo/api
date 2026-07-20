@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use heddle_api::framing::{
-    ResponseFrame, decode_request_frame, decode_response_frame, encode_failure_response,
-    encode_request_frame,
+    ResponseFrame, StreamFrame, decode_request_frame, decode_response_frame, decode_stream_frame,
+    encode_failure_response, encode_request_frame, encode_stream_failure, encode_stream_message,
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
@@ -27,6 +27,32 @@ struct HostedCallFixture {
     detail_value_hex: String,
     failure_hex: String,
     framed_failure_hex: String,
+}
+
+#[test]
+fn streaming_frames_are_incremental_and_transport_neutral() {
+    let message = encode_stream_message(b"one").expect("stream message");
+    assert!(decode_stream_frame(&message[..4]).unwrap().is_none());
+    let (decoded, consumed) = decode_stream_frame(&message)
+        .unwrap()
+        .expect("complete frame");
+    assert_eq!(consumed, message.len());
+    assert!(matches!(decoded, StreamFrame::Message(b"one")));
+
+    let failure = CallFailure {
+        code: CallFailureCode::Cancelled as i32,
+        message: "caller cancelled".into(),
+        details: Vec::new(),
+    };
+    let framed = encode_stream_failure(&failure).expect("stream failure");
+    let (decoded, consumed) = decode_stream_frame(&framed)
+        .unwrap()
+        .expect("failure frame");
+    assert_eq!(consumed, framed.len());
+    match decoded {
+        StreamFrame::Failure(decoded) => assert_eq!(decoded, failure),
+        StreamFrame::Message(_) => panic!("failure decoded as message"),
+    }
 }
 
 #[test]

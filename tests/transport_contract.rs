@@ -194,9 +194,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
 
 #[test]
 fn push_request_carries_an_explicit_remote_head_precondition() {
-    let expected = StateId {
-        value: vec![7; 32],
-    };
+    let expected = StateId { value: vec![7; 32] };
     let encoded = PushRequest {
         expected_remote_head: Some(expected.clone()),
         expected_remote_head_missing: false,

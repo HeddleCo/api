@@ -11,7 +11,7 @@ use heddle_api::framing::{
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
-    HumanVerificationChallenge, RequestProof, ServiceMaturity, TraceContext,
+    HumanVerificationChallenge, PushRequest, RequestProof, ServiceMaturity, StateId, TraceContext,
 };
 use heddle_api::{ALL_METHODS, HOSTED_ALPN_V1, StreamingShape, method_descriptor};
 use prost::Message;
@@ -190,6 +190,23 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             StreamingShape::Bidirectional
         );
     }
+}
+
+#[test]
+fn push_request_carries_an_explicit_remote_head_precondition() {
+    let expected = StateId {
+        value: vec![7; 32],
+    };
+    let encoded = PushRequest {
+        expected_remote_head: Some(expected.clone()),
+        expected_remote_head_missing: false,
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let decoded = PushRequest::decode(encoded.as_slice()).expect("push request");
+
+    assert_eq!(decoded.expected_remote_head, Some(expected));
+    assert!(!decoded.expected_remote_head_missing);
 }
 
 #[test]

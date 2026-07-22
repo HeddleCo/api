@@ -124,12 +124,40 @@ message DiffLine {
   optional uint32 moved_counterpart_line = 5;
 }
 
+// One changed symbol, derived from the content-addressed merkle semantic index
+// (heddle#1067). Parse-free and reformat-stable: `change` distinguishes a logic
+// change from a cosmetic one by comparing the symbol's semantic_hash across states,
+// so pure reformatting reads as "cosmetic" rather than "logic". Empty for files
+// with no attached semantic index (see FileDiff.semantic_index_backed).
+message SymbolChange {
+  // Fully-qualified address, "Container::name" (e.g. "Parser::parse_array").
+  string anchor = 1;
+  // Leaf symbol name (e.g. "parse_array").
+  string name = 2;
+  // Container path (e.g. "Parser"); empty for a top-level symbol.
+  string container = 3;
+  // Symbol kind tag (e.g. "fn", "impl", "struct", "method").
+  string kind = 4;
+  // How the symbol changed: "added" | "removed" | "logic" | "cosmetic".
+  string change = 5;
+  // semantic_hash before the change (hex); empty when change == "added".
+  string old_semantic_hash = 6;
+  // semantic_hash after the change (hex); empty when change == "removed".
+  string new_semantic_hash = 7;
+}
+
 message DiffHunk {
   uint32 old_start = 1;
   uint32 old_lines = 2;
   uint32 new_start = 3;
   uint32 new_lines = 4;
   repeated DiffLine lines = 5;
+  // Display anchor of the symbol covering this hunk (e.g. "Parser::parse_array").
+  // Empty when the hunk maps to no indexed symbol (or the file is not index-backed).
+  string symbol_context = 6;
+  // Classification of the covering symbol's change for this hunk:
+  // "logic" | "cosmetic" | "added" | "" (unknown / not index-backed).
+  string symbol_change = 7;
 }
 
 message FileDiff {
@@ -137,9 +165,16 @@ message FileDiff {
   string kind = 2;
   repeated DiffHunk hunks = 3;
   // Semantic classification of the modification (e.g. "Logic", "FormattingOnly", "ImportsOnly").
+  // Merkle-index-derived when semantic_index_backed is true, else the legacy parse heuristic.
   string classification = 4;
   // Review importance (e.g. "High", "Medium", "Low", "Noise").
   string importance = 5;
+  // Per-symbol deltas from the semantic index; empty when the file has no attached index.
+  repeated SymbolChange symbol_changes = 6;
+  // True when classification and symbol_changes came from the merkle semantic index;
+  // false when they fell back to the legacy parse heuristic (or are unknown). Lets a
+  // client show semantic badges only when real index data backs them.
+  bool semantic_index_backed = 7;
 }
 
 message DiffResponse {

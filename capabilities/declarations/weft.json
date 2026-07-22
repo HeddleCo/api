@@ -138,10 +138,10 @@
       "rpc": "heddle.api.v1alpha1.AttentionService/GetFeedSnapshot",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -149,10 +149,10 @@
       "rpc": "heddle.api.v1alpha1.AttentionService/RecordInteraction",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -160,10 +160,10 @@
       "rpc": "heddle.api.v1alpha1.AttentionService/StreamFeed",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -171,10 +171,10 @@
       "rpc": "heddle.api.v1alpha1.AttentionService/UpdateFeedItem",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -185,7 +185,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -193,10 +193,10 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/GetDiscussion",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -207,7 +207,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -215,10 +215,10 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/ListBySymbol",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -229,7 +229,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -237,10 +237,10 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -248,10 +248,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ApproveDeviceAuthorization",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -259,10 +259,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/BeginRecovery",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -273,7 +273,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -281,10 +281,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnRegistration",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -292,10 +292,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -303,10 +303,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/CompleteRecovery",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -317,7 +317,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -328,7 +328,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -336,10 +336,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -350,7 +350,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -358,10 +358,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/FinishWebAuthnAuthentication",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -369,10 +369,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/GetHandleStatus",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -380,10 +380,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/GetInvitationSummary",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -391,10 +391,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/IntrospectCredential",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -402,10 +402,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/IssuePresenceToken",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -416,7 +416,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -424,10 +424,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -435,10 +435,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -446,10 +446,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ListServiceAccounts",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -457,10 +457,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ListSessions",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -468,10 +468,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -482,7 +482,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -490,10 +490,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RecordSubscription",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -501,10 +501,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -512,10 +512,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -523,10 +523,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ResolveHandle",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -534,10 +534,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RevokeCredential",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -545,10 +545,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RevokeServiceAccount",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -556,10 +556,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RevokeSession",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -567,10 +567,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RotateCredential",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -578,10 +578,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -589,10 +589,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/SubmitRecoveryProof",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -600,10 +600,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -611,10 +611,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/VetoRecovery",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -625,7 +625,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -636,7 +636,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -655,7 +655,7 @@
       "rpc": "heddle.api.v1alpha1.OperationService/CancelOperation",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "shipped"
         },
         "registration": {
           "status": "shipped"
@@ -677,7 +677,7 @@
       "rpc": "heddle.api.v1alpha1.OperationService/GetOperationBatch",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "shipped"
         },
         "registration": {
           "status": "shipped"
@@ -688,7 +688,7 @@
       "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "shipped"
         },
         "registration": {
           "status": "shipped"
@@ -710,7 +710,7 @@
       "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperationBatch",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "shipped"
         },
         "registration": {
           "status": "shipped"
@@ -732,10 +732,10 @@
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -743,10 +743,10 @@
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -754,10 +754,10 @@
       "rpc": "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -765,10 +765,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/AttachChild",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -779,7 +779,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -787,10 +787,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateInvitation",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -801,7 +801,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -812,7 +812,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -820,10 +820,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -834,7 +834,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -845,7 +845,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -856,7 +856,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -864,10 +864,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/DetachChild",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -878,7 +878,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -886,10 +886,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/GetSpool",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -900,7 +900,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -908,10 +908,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ListActors",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -919,10 +919,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ListBookmarks",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -930,10 +930,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ListChildren",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -944,7 +944,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -952,10 +952,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ListInvitations",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -963,10 +963,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ListMembers",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -977,7 +977,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -988,7 +988,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -996,10 +996,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ListWorktrees",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1010,7 +1010,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1018,10 +1018,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ResolveSubjects",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1029,10 +1029,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/RevokeInvitation",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1043,7 +1043,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1051,10 +1051,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1062,10 +1062,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1076,7 +1076,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1087,7 +1087,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1098,7 +1098,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1106,10 +1106,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpoolSettings",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1117,10 +1117,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/UpsertBookmark",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1131,7 +1131,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1142,7 +1142,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1153,7 +1153,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1164,7 +1164,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1175,7 +1175,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1186,7 +1186,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1197,7 +1197,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1208,7 +1208,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1219,7 +1219,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1227,10 +1227,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetRefs",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1238,10 +1238,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetSemanticHotSpots",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1249,10 +1249,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetState",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1260,10 +1260,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/GetTree",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1271,10 +1271,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListActions",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1285,7 +1285,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1296,7 +1296,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1304,10 +1304,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListProvenanceSummaries",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1315,10 +1315,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1329,7 +1329,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1340,7 +1340,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1348,10 +1348,10 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1362,7 +1362,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1370,10 +1370,10 @@
       "rpc": "heddle.api.v1alpha1.SearchService/Search",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1381,10 +1381,10 @@
       "rpc": "heddle.api.v1alpha1.StateReviewService/GetRepoSignalHealth",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1392,10 +1392,10 @@
       "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1403,10 +1403,10 @@
       "rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewProgress",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1414,10 +1414,10 @@
       "rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1425,10 +1425,10 @@
       "rpc": "heddle.api.v1alpha1.StateReviewService/RecordCheckAck",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1436,10 +1436,10 @@
       "rpc": "heddle.api.v1alpha1.StateReviewService/RecordVerdict",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1450,7 +1450,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1458,10 +1458,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/AddApprovalGroupMember",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1469,10 +1469,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/AddPolicyGroupRequirement",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1483,7 +1483,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1494,7 +1494,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1502,10 +1502,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/CreateApprovalGroup",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1513,10 +1513,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/CreateThreadPolicy",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1524,10 +1524,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteApprovalGroup",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1535,10 +1535,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/DeleteThreadPolicy",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1546,10 +1546,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/GetThread",
       "layers": {
         "implementation": {
-          "status": "partial"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1557,10 +1557,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1568,10 +1568,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1582,7 +1582,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1590,10 +1590,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadPolicies",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1601,10 +1601,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1612,10 +1612,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/RemoveApprovalGroupMember",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1623,10 +1623,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/RemovePolicyGroupRequirement",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     },
@@ -1637,7 +1637,7 @@
           "status": "shipped"
         },
         "registration": {
-          "status": "partial"
+          "status": "shipped"
         }
       }
     },
@@ -1645,10 +1645,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/StreamWorkspaceSummary",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "partial"
+          "status": "planned"
         }
       }
     }

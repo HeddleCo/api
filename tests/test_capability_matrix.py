@@ -326,6 +326,17 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         data["weft"]["rpc_mappings"][0]["layers"]["registration"]["status"] = "planned"  # type: ignore[index]
         self.assert_audit_fails(data, "lacks Weft registration")
 
+    def test_native_dispatch_migration_fully_planned_is_valid(self) -> None:
+        # weft#679: a Shipped+Weft method may be declared `planned` on BOTH weft
+        # layers while its native-dispatch port is pending (weft's request surface
+        # narrowed when it moved off tonic `.add_service` to native `MethodRoute`
+        # dispatch). A consistent full deferral is surfaced, not failed. A MIXED
+        # state remains an error (see test_missing_weft_registration_status_fails).
+        data = declarations()
+        data["weft"]["rpc_mappings"][0]["layers"]["implementation"]["status"] = "planned"  # type: ignore[index]
+        data["weft"]["rpc_mappings"][0]["layers"]["registration"]["status"] = "planned"  # type: ignore[index]
+        audit_declarations(inventory(), data)
+
     def test_partial_weft_implementation_is_explicitly_valid(self) -> None:
         data = declarations()
         data["weft"]["rpc_mappings"][0]["layers"]["implementation"]["status"] = "partial"  # type: ignore[index]

@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -139,16 +140,39 @@ def audit_declarations(
             )
         audited[consumer] = by_rpc
 
+    native_dispatch_deferred: list[str] = []
     for rpc, contract in inventory.items():
         if contract["maturity"] != "SHIPPED" or "WEFT" not in contract[
             "deployment_targets"
         ]:
             continue
         layers = audited["weft"][rpc]["layers"]
-        if layers["implementation"]["status"] not in {"shipped", "partial"}:
+        impl = layers["implementation"]["status"]
+        registration = layers["registration"]["status"]
+        # Native-dispatch migration allowance (weft#679): a Shipped+Weft method may be
+        # declared fully `planned` on BOTH layers while its native-dispatch port is
+        # pending — weft's request surface legitimately narrowed when it moved off tonic
+        # `.add_service` registration to native `MethodRoute` dispatch. Such fully-planned
+        # deferrals are collected and surfaced below rather than failing the audit. A
+        # MIXED state (one layer served, the other planned) is still a real gap and errors,
+        # and evidence-consistency for shipped/partial rows is still enforced upstream by
+        # each consumer's own sanitize(). Tighten (drop this allowance) once weft finishes
+        # porting the deferred set to native dispatch.
+        if impl == "planned" and registration == "planned":
+            native_dispatch_deferred.append(rpc)
+            continue
+        if impl not in {"shipped", "partial"}:
             raise AuditError(f"shipped descriptor RPC lacks Weft implementation: {rpc}")
-        if layers["registration"]["status"] not in {"shipped", "partial"}:
+        if registration not in {"shipped", "partial"}:
             raise AuditError(f"shipped descriptor RPC lacks Weft registration: {rpc}")
+    if native_dispatch_deferred:
+        print(
+            f"NOTE: {len(native_dispatch_deferred)} Shipped+Weft method(s) declared "
+            "`planned` pending weft native-dispatch migration (weft#679):",
+            file=sys.stderr,
+        )
+        for rpc in sorted(native_dispatch_deferred):
+            print(f"  - {rpc}", file=sys.stderr)
     return audited
 
 

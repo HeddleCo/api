@@ -36,6 +36,18 @@ message HumanVerification {
 // request bytes; `action_url` is only an optional UI handoff hint.
 message HumanVerificationChallenge {
   string action_url = 1;
+  // Present when the caller must complete a WebAuthn passkey assertion to link an
+  // OAuth login to an existing-email account ("existing_email_requires_passkey").
+  OAuthLinkChallenge oauth_link = 2;
+}
+
+// WebAuthn passkey challenge issued when an OAuth login maps to an existing-email
+// account and the caller must prove ownership of that account before linking.
+message OAuthLinkChallenge {
+  string existing_user_id = 1;
+  string challenge_id = 2;
+  bytes challenge = 3; // WebAuthn challenge nonce
+  string rp_id = 4; // relying-party id
 }
 
 // W3C trace context propagated without depending on a transport library.

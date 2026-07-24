@@ -465,7 +465,8 @@ message ResolvedPrincipal {
 
 // ── Handle resolution (URL routing, weft#467) ────────────────────────────────
 // Resolve a bare handle name to its principal for `/gh:<name>` / `/<name>` /
-// `/u:<subject>` routing. Never-claimed → gRPC NotFound (frontend 404);
+// `/u:<subject>` routing. Never-claimed → `CALL_FAILURE_CODE_NOT_FOUND`
+// (frontend 404);
 // tombstoned/renamed-away → `tombstoned = true` (frontend 410 Gone).
 
 // ============================================================================
@@ -1040,7 +1041,7 @@ service RegistryService {
   rpc DeleteGrant(DeleteGrantRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1058,7 +1059,7 @@ service RegistryService {
   rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1076,7 +1077,7 @@ service RegistryService {
   rpc DeleteRepository(DeleteRepositoryRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1144,7 +1145,7 @@ service RegistryService {
   rpc GrantSupportAccess(GrantSupportAccessRequest) returns (SupportAccessGrant) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1355,7 +1356,7 @@ service RegistryService {
   rpc RevokeSupportAccess(RevokeSupportAccessRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -1409,7 +1410,7 @@ service RegistryService {
   rpc UpdateGrant(UpdateGrantRequest) returns (HostedGrant) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true

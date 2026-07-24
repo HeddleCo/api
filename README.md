@@ -12,8 +12,9 @@ partial.
 
 ## Packages
 
-- `heddle-api` — Rust types by default; additive `client`, `server`, and
-  `reflection` features.
+- `heddle-api` — transport-neutral Rust messages, deterministic method
+  descriptors/router identities, hosted-call framing, and an additive
+  `reflection` feature. It does not generate transport clients or servers.
 - `@heddleco/api` — ESM and TypeScript declarations, published to GitHub
   Packages at `npm.pkg.github.com`.
 
@@ -29,8 +30,23 @@ and provide a classic token with `read:packages` through `NODE_AUTH_TOKEN`:
 ```
 
 ```sh
-npm install --save-exact @heddleco/api@0.1.2
+npm install --save-exact @heddleco/api@0.2.0
 ```
+
+## Hosted call contract
+
+Native Heddle and Weft use ALPN `heddle-api/1`. One logical call owns one
+bidirectional stream. A request is `method_len:u16be | context_len:u32be |
+fully_qualified_method | CallContext | body | FIN`; unary responses are an
+outcome byte followed by a successful protobuf body or `CallFailure`, delimited
+by FIN. Streaming methods retain bounded message framing and explicitly
+delimited raw pack/index phases.
+
+`ALL_METHODS` and `method_descriptor` are generated from the same protobuf
+descriptors as the messages. They expose type identity, streaming shape,
+effect, retry behavior, signing tier, maturity, deployment targets, and the
+stable route enum used by application endpoints. Only read-only, safe-retry
+descriptors permit 0-RTT.
 
 ## Verification
 

@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+// HTTPS bootstrap document for the terminating Weft Iroh application endpoint.
+// The descriptor is signed by the key named by SignedEndpointDescriptor.key_id.
+message EndpointDescriptor {
+  uint32 version = 1;
+  string endpoint_id = 2;
+  repeated string relay_urls = 3;
+  repeated bytes supported_alpns = 4;
+  repeated string direct_addresses = 5;
+  int64 issued_at_unix_millis = 6;
+  int64 expires_at_unix_millis = 7;
+  DescriptorKeyRotation rotation = 8;
+}
+
+// Announces the next descriptor-signing key without changing endpoint identity.
+message DescriptorKeyRotation {
+  string next_key_id = 1;
+  bytes next_public_key = 2;
+  int64 activates_at_unix_millis = 3;
+}
+
+message SignedEndpointDescriptor {
+  EndpointDescriptor descriptor = 1;
+  string key_id = 2;
+  bytes signature = 3;
+}
+
+// Short-lived relay connectivity authority. This is deliberately separate from
+// the Biscuit capability used by the terminating application endpoint.
+message RelayAdmissionClaims {
+  uint32 version = 1;
+  string token_id = 2;
+  string subject = 3;
+  string client_endpoint_id = 4;
+  repeated string allowed_origins = 5;
+  string relay_region = 6;
+  int64 issued_at_unix_millis = 7;
+  int64 expires_at_unix_millis = 8;
+  uint32 max_connections = 9;
+  uint64 max_bytes_per_minute = 10;
+}
+
+message SignedRelayAdmission {
+  RelayAdmissionClaims claims = 1;
+  string key_id = 2;
+  bytes signature = 3;
+}

@@ -2,8 +2,37 @@ syntax = "proto3";
 
 package heddle.api.v1alpha1;
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
+
+// Stable call outcome vocabulary independent of QUIC or any other concrete
+// transport implementation.
+enum CallFailureCode {
+  CALL_FAILURE_CODE_UNSPECIFIED = 0;
+  CALL_FAILURE_CODE_CANCELLED = 1;
+  CALL_FAILURE_CODE_UNKNOWN = 2;
+  CALL_FAILURE_CODE_INVALID_ARGUMENT = 3;
+  CALL_FAILURE_CODE_DEADLINE_EXCEEDED = 4;
+  CALL_FAILURE_CODE_NOT_FOUND = 5;
+  CALL_FAILURE_CODE_ALREADY_EXISTS = 6;
+  CALL_FAILURE_CODE_PERMISSION_DENIED = 7;
+  CALL_FAILURE_CODE_RESOURCE_EXHAUSTED = 8;
+  CALL_FAILURE_CODE_FAILED_PRECONDITION = 9;
+  CALL_FAILURE_CODE_ABORTED = 10;
+  CALL_FAILURE_CODE_OUT_OF_RANGE = 11;
+  CALL_FAILURE_CODE_UNIMPLEMENTED = 12;
+  CALL_FAILURE_CODE_INTERNAL = 13;
+  CALL_FAILURE_CODE_UNAVAILABLE = 14;
+  CALL_FAILURE_CODE_DATA_LOSS = 15;
+  CALL_FAILURE_CODE_UNAUTHENTICATED = 16;
+}
+
+message CallFailure {
+  CallFailureCode code = 1;
+  string message = 2;
+  repeated google.protobuf.Any details = 3;
+}
 
 message RetryAdvice {
   google.protobuf.Duration retry_after = 1;
@@ -37,7 +66,7 @@ message PolicyDenial {
 }
 
 message StreamFailure {
-  int32 grpc_code = 1;
+  CallFailureCode code = 1;
   string message = 2;
   RetryAdvice retry = 3;
   CursorFailure cursor = 4;

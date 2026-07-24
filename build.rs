@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{env, fs, path::PathBuf};
 
+#[path = "build_support/method_generation.rs"]
+mod method_generation;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let protoc = protoc_bin_vendored::protoc_bin_path()?;
     unsafe { env::set_var("PROTOC", protoc) };
@@ -17,18 +20,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect::<Vec<_>>();
     protos.sort();
-    let descriptor = PathBuf::from(env::var("OUT_DIR")?).join("heddle_api_descriptor.bin");
 
+    let output = PathBuf::from(env::var("OUT_DIR")?);
+    let descriptor = output.join("heddle_api_descriptor.bin");
     println!("cargo:rerun-if-changed={}", package_root.display());
-    tonic_prost_build::configure()
-        .build_client(env::var_os("CARGO_FEATURE_CLIENT").is_some())
-        .build_server(env::var_os("CARGO_FEATURE_SERVER").is_some())
-        // AgentGatewayService.Connect would otherwise collide with tonic's
-        // transport convenience constructor. Consumers construct Channels
-        // explicitly, which also keeps endpoint policy outside this crate.
-        .build_transport(false)
+
+    let mut config = prost_build::Config::new();
+    config
         .boxed(".heddle.api.v1alpha1.PushClientFrame.frame.request")
-        .file_descriptor_set_path(descriptor)
+        .file_descriptor_set_path(&descriptor)
         .compile_protos(&protos, &[proto_root])?;
+    method_generation::write(&descriptor, &output.join("heddle_api_methods.rs"))?;
     Ok(())
 }

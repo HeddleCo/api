@@ -80,12 +80,24 @@ enum StateAttachmentKind {
   STATE_ATTACHMENT_KIND_SIGNATURE = 7;
 }
 
+// Hosted object discriminants from the native object-store model.
+enum HostedObjectType {
+  HOSTED_OBJECT_TYPE_UNSPECIFIED = 0;
+  HOSTED_OBJECT_TYPE_BLOB = 1;
+  HOSTED_OBJECT_TYPE_TREE = 2;
+  HOSTED_OBJECT_TYPE_STATE = 3;
+  HOSTED_OBJECT_TYPE_ACTION = 4;
+  HOSTED_OBJECT_TYPE_REDACTION = 5;
+  HOSTED_OBJECT_TYPE_STATE_VISIBILITY = 6;
+  HOSTED_OBJECT_TYPE_STATE_ATTACHMENT = 7;
+}
+
 message ObjectDescriptor {
   string id = 1;
-  string object_type = 2;
+  HostedObjectType object_type = 2;
   ObjectAvailabilityStatus availability_status = 3;
   string availability_note = 4;
-  StateAttachmentKind attachment_kind = 5; // REQUIRED iff object_type == "state_attachment"; UNSPECIFIED otherwise
+  StateAttachmentKind attachment_kind = 5; // REQUIRED iff object_type == HOSTED_OBJECT_TYPE_STATE_ATTACHMENT; UNSPECIFIED otherwise
 }
 
 message PushRequest {

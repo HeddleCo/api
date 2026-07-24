@@ -7,6 +7,31 @@ import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v1alpha1/types.proto";
 
+// Device-authorization lifecycle from the identity authorization model.
+enum DeviceAuthorizationStatus {
+  DEVICE_AUTHORIZATION_STATUS_UNSPECIFIED = 0;
+  DEVICE_AUTHORIZATION_STATUS_PENDING = 1;
+  DEVICE_AUTHORIZATION_STATUS_APPROVED = 2;
+  DEVICE_AUTHORIZATION_STATUS_EXPIRED = 3;
+}
+
+// Credential categories persisted by the identity credential registry.
+enum CredentialKind {
+  CREDENTIAL_KIND_UNSPECIFIED = 0;
+  CREDENTIAL_KIND_DEVICE = 1;
+  CREDENTIAL_KIND_SERVICE_ACCOUNT = 2;
+  CREDENTIAL_KIND_AGENT = 3;
+  CREDENTIAL_KIND_STAFF = 4;
+}
+
+// Shared handle-provider kind from the identity handle registry.
+enum HandleKind {
+  HANDLE_KIND_UNSPECIFIED = 0;
+  HANDLE_KIND_NATIVE = 1;
+  HANDLE_KIND_GITHUB = 2;
+  HANDLE_KIND_GITLAB = 3;
+}
+
 message BeginWebAuthnRegistrationRequest {
   string username = 1;
   string display_name = 2;
@@ -113,7 +138,7 @@ message WaitForDeviceAuthorizationRequest {
 }
 
 message DeviceAuthorizationEvent {
-  string status = 1;
+  DeviceAuthorizationStatus status = 1;
 }
 
 message RotateCredentialRequest {
@@ -480,7 +505,7 @@ message IntrospectCredentialRequest {
 message CredentialInfo {
   string credential_id = 1;
   string subject = 2;
-  string kind = 3;
+  CredentialKind kind = 3;
   string scope = 4;
   // Epoch seconds. 0 = never expires.
   google.protobuf.Timestamp expires_at = 5;
@@ -953,7 +978,7 @@ message HandlePrincipal {
   string handle = 3;
   bool resolved = 4;
   string primary_handle = 5;
-  string kind = 6;
+  HandleKind kind = 6;
   bool verified = 7;
   string discriminator = 8;
 }

@@ -62,6 +62,18 @@ enum ImportProvider {
   IMPORT_PROVIDER_GITLAB = 2;
 }
 
+// Stable import failure codes from the hosted import operation model.
+enum ImportErrorCode {
+  IMPORT_ERROR_UNSPECIFIED = 0;
+  IMPORT_ERROR_INVALID_SOURCE = 1;
+  IMPORT_ERROR_SOURCE_NOT_ALLOWED = 2;
+  IMPORT_ERROR_AUTH_FAILED = 3;
+  IMPORT_ERROR_NOT_FOUND = 4;
+  IMPORT_ERROR_TOO_LARGE = 5;
+  IMPORT_ERROR_TIMED_OUT = 6;
+  IMPORT_ERROR_INTERNAL = 7;
+}
+
 enum RemoteSyncDirection {
   REMOTE_SYNC_DIRECTION_UNSPECIFIED = 0;
   REMOTE_SYNC_DIRECTION_FETCH_FROM_REMOTE = 1;
@@ -129,8 +141,8 @@ message OperationProgress {
 }
 
 message OperationError {
-  // Stable machine-readable domain code.
-  string code = 1;
+  // Stable machine-readable import-domain code.
+  ImportErrorCode code = 1;
   // Sanitized human-safe explanation.
   string message = 2;
   // True means the same details may be submitted as a new operation with a new

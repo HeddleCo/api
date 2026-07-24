@@ -5,6 +5,7 @@ package heddle.api.v1alpha1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/identity.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 // Namespace kinds in the hosted control plane. `USER` namespaces are
@@ -35,6 +36,30 @@ enum SpoolBootstrapKind {
   SPOOL_BOOTSTRAP_KIND_EMPTY = 1;
   SPOOL_BOOTSTRAP_KIND_GIT_REMOTE = 2;
   SPOOL_BOOTSTRAP_KIND_TEMPLATE = 3;
+}
+
+// Actor lifecycle status emitted by the Heddle actor registry.
+enum ActorPresenceStatus {
+  ACTOR_PRESENCE_STATUS_UNSPECIFIED = 0;
+  ACTOR_PRESENCE_STATUS_ACTIVE = 1;
+  ACTOR_PRESENCE_STATUS_ABANDONED = 2;
+  ACTOR_PRESENCE_STATUS_COMPLETE = 3;
+  ACTOR_PRESENCE_STATUS_MERGED = 4;
+}
+
+// Report delivery state emitted by the Heddle actor registry.
+enum ReportFlushState {
+  REPORT_FLUSH_STATE_UNSPECIFIED = 0;
+  REPORT_FLUSH_STATE_PENDING_LOCAL = 1;
+  REPORT_FLUSH_STATE_QUEUED_LOCAL = 2;
+  REPORT_FLUSH_STATE_FLUSHED = 3;
+}
+
+// Merge-gate requirement kind from the hosted thread-policy model.
+enum UnmetRequirementKind {
+  UNMET_REQUIREMENT_KIND_UNSPECIFIED = 0;
+  UNMET_REQUIREMENT_KIND_FLAT_ROLE = 1;
+  UNMET_REQUIREMENT_KIND_GROUP = 2;
 }
 
 enum SpoolBootstrapSyncDirection {
@@ -318,13 +343,13 @@ message ActorSummary {
   google.protobuf.Timestamp started_at = 5;
   optional string provider = 6;
   optional string model = 7;
-  string status = 8;
+  ActorPresenceStatus status = 8;
   optional string heddle_session_id = 9;
   optional string harness = 10;
   optional string thinking_level = 11;
   UsageSummary usage_summary = 12;
   optional google.protobuf.Timestamp last_progress_at = 13;
-  optional string report_flush_state = 14;
+  ReportFlushState report_flush_state = 14;
   optional string client_instance_id = 15;
   optional string attach_reason = 16;
   optional string native_actor_key = 17;
@@ -451,9 +476,9 @@ message ResolvedPrincipal {
   // (GitHub), `gitlab.example.com:torvalds` (host-qualified GitLab), or the
   // bare native name `torvalds`. Empty when unresolved.
   string primary_handle = 5;
-  // Handle kind for the primary handle: "native" | "github" | "gitlab".
-  // Mirrors the weft `handles.kind` column. Empty when unresolved.
-  string kind = 6;
+  // Handle kind for the primary handle, mirroring the weft `handles.kind`
+  // column. UNSPECIFIED when unresolved.
+  HandleKind kind = 6;
   // True when the primary handle is provider-verified (OAuth-verified, or a
   // future git proof). Native self-asserted handles are false.
   bool verified = 7;
@@ -858,8 +883,8 @@ message CheckMergeEligibilityResponse {
 message UnmetRequirement {
   // Policy id this requirement came from.
   string policy_id = 1;
-  // 'flat_role' | 'group' — which kind of requirement is unmet.
-  string kind = 2;
+  // Closed requirement vocabulary from the hosted thread-policy model.
+  UnmetRequirementKind kind = 2;
   // For 'group' requirements, the group id; empty otherwise.
   string group_id = 3;
   // Human-readable explanation: "needs 2 maintainer approvals on

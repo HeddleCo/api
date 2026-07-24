@@ -124,6 +124,8 @@ message SpoolSettings {
 
 message GetCurrentUserNamespaceRequest {}
 
+message GetCurrentUserSpoolRequest {}
+
 message CreateNamespaceRequest {
   NamespaceKind kind = 1;
   string slug = 2;
@@ -169,6 +171,28 @@ message UpdateRepositoryRequest {
 }
 
 message DeleteRepositoryRequest {
+  string full_path = 1;
+  string client_operation_id = 2;
+}
+
+message CreateSpoolRequest {
+  string parent_path = 1;
+  string slug = 2;
+  bool is_repo = 3;
+  optional string display_name = 4;
+  SpoolVisibility visibility = 5;
+  string client_operation_id = 6;
+}
+
+message UpdateSpoolRequest {
+  string full_path = 1;
+  optional string new_slug = 2;
+  optional string display_name = 3;
+  bool clear_display_name = 4;
+  string client_operation_id = 5;
+}
+
+message DeleteSpoolRequest {
   string full_path = 1;
   string client_operation_id = 2;
 }
@@ -227,7 +251,9 @@ message HostedRepository {
 message SpoolSummary {
   string spool_id = 1;
   string full_path = 2;
-  string kind = 3; // UX label only: "namespace" | "repository"/"project" — NEVER structural
+  // UX label only: `namespace` | `repository`. Structural identity is always
+  // spool; these are human labels, never structural.
+  string kind = 3;
   bool is_repo = 4; // capability: content-bearing spool (pushable/pullable)
   // Unset when the serving registry has no activity data; weft computes the
   // value in the registry (weft#457) and populates it in the follow-on handler
@@ -250,7 +276,9 @@ message HostedSpool {
 
   string spool_id = 1;
   string full_path = 2;
-  string kind = 3; // UX label only: "namespace" | "repository" — NEVER structural
+  // UX label only: `namespace` | `repository`. Structural identity is always
+  // spool; these are human labels, never structural.
+  string kind = 3;
   bool is_repo = 4; // capability: content-bearing spool (pushable/pullable)
   // Unset when the serving registry has no activity data (mirrors
   // SpoolSummary.last_activity_at).
@@ -262,6 +290,7 @@ message HostedSpool {
   // its durable snapshot through OperationService; absent means no known
   // import operation. Handler adoption is part of the planned cutover.
   OperationId latest_import_operation_id = 8;
+  string display_name = 9;
 }
 
 message GetSpoolRequest {
@@ -1049,6 +1078,24 @@ service RegistryService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
+  rpc CreateSpool(CreateSpoolRequest) returns (HostedSpool) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "parent_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
   rpc DeleteBookmark(DeleteBookmarkRequest) returns (DeleteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -1117,6 +1164,24 @@ service RegistryService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
+  rpc DeleteSpool(DeleteSpoolRequest) returns (DeleteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
   rpc DetachChild(DetachChildRequest) returns (DetachChildResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -1136,6 +1201,20 @@ service RegistryService {
     };
   }
   rpc GetCurrentUserNamespace(GetCurrentUserNamespaceRequest) returns (HostedNamespace) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  rpc GetCurrentUserSpool(GetCurrentUserSpoolRequest) returns (HostedSpool) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
@@ -1482,6 +1561,24 @@ service RegistryService {
       authorization_request_targets: {
         path: "full_path"
         role: AUTHORIZATION_ROLE_RESOURCE_MAINTAINER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  rpc UpdateSpool(UpdateSpoolRequest) returns (HostedSpool) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "full_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };

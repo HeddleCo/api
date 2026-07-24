@@ -3,6 +3,7 @@ syntax = "proto3";
 package heddle.api.v1alpha1;
 
 import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/identity.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 // ───────────────────────────────────────────────────────────────
@@ -55,7 +56,8 @@ message SearchHit {
 // handle = canonical text (gh:torvalds / torvalds / torvalds#hex); NEVER the biscuit subject.
 message UserHit {
   string handle = 1;
-  string kind = 2;
+  // Shared handle-provider kind from the identity handle registry.
+  HandleKind kind = 2;
   bool verified = 3;
   string display_name = 4;
 }

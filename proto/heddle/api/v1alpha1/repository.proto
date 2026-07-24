@@ -116,8 +116,73 @@ message DiffSpan {
   bool changed = 3; // true = this span was added/removed
 }
 
+// Diff line vocabulary emitted by the repository diff model.
+enum DiffLineKind {
+  DIFF_LINE_KIND_UNSPECIFIED = 0;
+  DIFF_LINE_KIND_CONTEXT = 1;
+  DIFF_LINE_KIND_ADDED = 2;
+  DIFF_LINE_KIND_REMOVED = 3;
+}
+
+// File delta vocabulary emitted by the repository diff model.
+enum FileDiffKind {
+  FILE_DIFF_KIND_UNSPECIFIED = 0;
+  FILE_DIFF_KIND_ADDED = 1;
+  FILE_DIFF_KIND_MODIFIED = 2;
+  FILE_DIFF_KIND_DELETED = 3;
+  // Producer emits "renamed" (heddle core/src/diff/mod.rs); rename-detector
+  // score lives alongside. Must be representable, not folded into MODIFIED.
+  FILE_DIFF_KIND_RENAMED = 4;
+}
+
+// Semantic change classification emitted by the repository diff analyzer.
+// UNCLASSIFIED is the legacy "modified" fallback when no finer result exists.
+enum ChangeClassification {
+  CHANGE_CLASSIFICATION_UNSPECIFIED = 0;
+  CHANGE_CLASSIFICATION_LOGIC = 1;
+  CHANGE_CLASSIFICATION_WHITESPACE_ONLY = 2;
+  CHANGE_CLASSIFICATION_IMPORTS_ONLY = 3;
+  CHANGE_CLASSIFICATION_COMMENTS_ONLY = 4;
+  CHANGE_CLASSIFICATION_FORMATTING_ONLY = 5;
+  CHANGE_CLASSIFICATION_MIXED = 6;
+  CHANGE_CLASSIFICATION_UNCLASSIFIED = 7;
+}
+
+// Review importance emitted by the repository diff analyzer.
+enum ChangeImportance {
+  CHANGE_IMPORTANCE_UNSPECIFIED = 0;
+  CHANGE_IMPORTANCE_NOISE = 1;
+  CHANGE_IMPORTANCE_LOW = 2;
+  CHANGE_IMPORTANCE_MEDIUM = 3;
+  CHANGE_IMPORTANCE_HIGH = 4;
+}
+
+// Per-symbol delta vocabulary emitted by the merkle semantic index.
+enum SymbolChangeKind {
+  SYMBOL_CHANGE_KIND_UNSPECIFIED = 0;
+  SYMBOL_CHANGE_KIND_ADDED = 1;
+  SYMBOL_CHANGE_KIND_REMOVED = 2;
+  SYMBOL_CHANGE_KIND_LOGIC = 3;
+  SYMBOL_CHANGE_KIND_COSMETIC = 4;
+}
+
+// Symbol kinds emitted by the repository semantic index (api#32).
+enum SymbolKind {
+  SYMBOL_KIND_UNSPECIFIED = 0;
+  SYMBOL_KIND_FUNCTION = 1;
+  SYMBOL_KIND_TYPE = 2;
+  SYMBOL_KIND_ENUM = 3;
+  SYMBOL_KIND_TRAIT = 4;
+  SYMBOL_KIND_CLASS = 5;
+  SYMBOL_KIND_INTERFACE = 6;
+  SYMBOL_KIND_TYPE_ALIAS = 7;
+  SYMBOL_KIND_CONST = 8;
+  SYMBOL_KIND_MODULE = 9;
+  SYMBOL_KIND_OTHER = 10;
+}
+
 message DiffLine {
-  string kind = 1;
+  DiffLineKind kind = 1;
   string content = 2;
   repeated DiffSpan word_changes = 3;
   optional string moved_counterpart_path = 4;
@@ -136,10 +201,10 @@ message SymbolChange {
   string name = 2;
   // Container path (e.g. "Parser"); empty for a top-level symbol.
   string container = 3;
-  // Symbol kind tag (e.g. "fn", "impl", "struct", "method").
-  string kind = 4;
-  // How the symbol changed: "added" | "removed" | "logic" | "cosmetic".
-  string change = 5;
+  // Closed symbol kind emitted by the repository semantic index (api#32).
+  SymbolKind kind = 4;
+  // How the symbol changed, from the merkle semantic index.
+  SymbolChangeKind change = 5;
   // semantic_hash before the change (hex); empty when change == "added".
   string old_semantic_hash = 6;
   // semantic_hash after the change (hex); empty when change == "removed".
@@ -155,20 +220,20 @@ message DiffHunk {
   // Display anchor of the symbol covering this hunk (e.g. "Parser::parse_array").
   // Empty when the hunk maps to no indexed symbol (or the file is not index-backed).
   string symbol_context = 6;
-  // Classification of the covering symbol's change for this hunk:
-  // "logic" | "cosmetic" | "added" | "" (unknown / not index-backed).
-  string symbol_change = 7;
+  // Classification of the covering symbol's change for this hunk.
+  // UNSPECIFIED means unknown or not index-backed.
+  SymbolChangeKind symbol_change = 7;
 }
 
 message FileDiff {
   string path = 1;
-  string kind = 2;
+  FileDiffKind kind = 2;
   repeated DiffHunk hunks = 3;
-  // Semantic classification of the modification (e.g. "Logic", "FormattingOnly", "ImportsOnly").
+  // Semantic classification of the modification.
   // Merkle-index-derived when semantic_index_backed is true, else the legacy parse heuristic.
-  string classification = 4;
-  // Review importance (e.g. "High", "Medium", "Low", "Noise").
-  string importance = 5;
+  ChangeClassification classification = 4;
+  // Review importance from the repository diff analyzer.
+  ChangeImportance importance = 5;
   // Per-symbol deltas from the semantic index; empty when the file has no attached index.
   repeated SymbolChange symbol_changes = 6;
   // True when classification and symbol_changes came from the merkle semantic index;

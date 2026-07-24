@@ -124,7 +124,7 @@ class SharedHandleContractTest(unittest.TestCase):
         public_field_tags = {
             field: int(tag)
             for field, tag in re.findall(
-                r"(?m)^\s*(?:string|bool)\s+(\w+)\s*=\s*(\d+)\s*;",
+                r"(?m)^\s*(?:string|bool|HandleKind)\s+(\w+)\s*=\s*(\d+)\s*;",
                 principal,
             )
         }

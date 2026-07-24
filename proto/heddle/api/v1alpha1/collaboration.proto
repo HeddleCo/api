@@ -10,6 +10,15 @@ import "heddle/api/v1alpha1/types.proto";
 
 // Discussion CRUD over the per-state `Discussion` blob.
 
+// Discussion lifecycle filter from the collaboration discussion model.
+// UNSPECIFIED selects all discussions, preserving the former empty-string path.
+enum DiscussionStatusFilter {
+  DISCUSSION_STATUS_FILTER_UNSPECIFIED = 0;
+  DISCUSSION_STATUS_FILTER_OPEN = 1;
+  DISCUSSION_STATUS_FILTER_RESOLVED = 2;
+  DISCUSSION_STATUS_FILTER_ORPHANED = 3;
+}
+
 message OpenDiscussionRequest {
   RepositoryRef repo_path = 1;
   StateId state_id = 2;
@@ -73,14 +82,15 @@ message Discussion {
 message ListDiscussionsByStateRequest {
   RepositoryRef repo_path = 1;
   StateId state_id = 2;
-  // "open" | "resolved" | "all" | "orphaned"
-  string status = 3;
+  // UNSPECIFIED selects all discussions.
+  DiscussionStatusFilter status = 3;
 }
 
 message ListDiscussionsBySymbolRequest {
   RepositoryRef repo_path = 1;
   PathSymbolRef anchor = 2;
-  string status = 3;
+  // UNSPECIFIED selects all discussions.
+  DiscussionStatusFilter status = 3;
 }
 
 message ListDiscussionsResponse {

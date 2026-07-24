@@ -35,12 +35,12 @@
     "displayName": "Ada",
     "discriminator": "a3f9",
     "handle": "ada",
-    "kind": "native",
+    "kind": 1,
     "primaryHandle": "ada",
     "resolved": true,
     "verified": true
   },
-  "legacy_resolved_principal_hex": "0a0b757365723a73656372657412034164611a0361646120012a0361646132066e61746976653801420461336639",
+  "legacy_resolved_principal_hex": "0a0b757365723a73656372657412034164611a0361646120012a0361646130013801420461336639",
   "public_field_tags": {
     "display_name": 2,
     "discriminator": 8,

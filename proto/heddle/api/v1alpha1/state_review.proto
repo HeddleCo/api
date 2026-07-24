@@ -31,6 +31,23 @@ enum CheckKind {
   CHECK_KIND_RISK_SIGNAL_ACK = 2; // per-risk-signal ack; check_ref = signal id
 }
 
+// Risk categories emitted by `objects::object::RiskSignalKind`.
+enum RiskSignalKind {
+  RISK_SIGNAL_KIND_UNSPECIFIED = 0;
+  RISK_SIGNAL_KIND_NOVELTY = 1;
+  RISK_SIGNAL_KIND_TEST_REACHABILITY = 2;
+  RISK_SIGNAL_KIND_PATTERN_DEVIATION = 3;
+  RISK_SIGNAL_KIND_INVARIANT_ADJACENCY = 4;
+  RISK_SIGNAL_KIND_SELF_FLAGGED_UNCERTAINTY = 5;
+}
+
+// Render-time signal tier emitted by the server-side review budgeter.
+enum SignalVisibility {
+  SIGNAL_VISIBILITY_UNSPECIFIED = 0;
+  SIGNAL_VISIBILITY_VISIBLE = 1;
+  SIGNAL_VISIBILITY_HIDDEN = 2;
+}
+
 message GetReviewPayloadRequest {
   RepositoryRef repo_path = 1;
   StateId state_id = 2;
@@ -76,16 +93,16 @@ message PathSymbolRef {
 }
 
 message RiskSignal {
-  // Snake-case wire vocabulary matching `objects::object::RiskSignalKind`.
-  string kind = 1;
+  // Closed vocabulary matching `objects::object::RiskSignalKind`.
+  RiskSignalKind kind = 1;
   SignalAnchor anchor = 2;
   string reason = 3;
   string producer_module = 4;
   uint32 producer_version = 5;
   google.protobuf.Timestamp computed_at = 6;
-  // Render-time tier — `visible` or `hidden`. Set by the server-side
-  // budgeter so clients render without re-budgeting.
-  string visibility = 7;
+  // Render-time tier set by the server-side budgeter so clients render without
+  // re-budgeting.
+  SignalVisibility visibility = 7;
 }
 
 message SignalAnchor {

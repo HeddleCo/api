@@ -483,7 +483,7 @@ def type_identifiers(text: str) -> str:
         text,
     )
     # `thread_state` is the thread lifecycle label, not a content-addressed
-    # repository state. Its neighboring `thread_state_typed` enum is the typed
+    # repository state. Its neighboring `thread_state` enum is the typed
     # lifecycle representation.
     text = re.sub(
         r"(?m)^(?P<indent>\s*)(?P<qualifier>optional\s+)?StateId\s+thread_state(?P<tag>\s*=\s*\d+[^;]*;)",

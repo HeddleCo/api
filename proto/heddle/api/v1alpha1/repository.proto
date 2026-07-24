@@ -130,6 +130,9 @@ enum FileDiffKind {
   FILE_DIFF_KIND_ADDED = 1;
   FILE_DIFF_KIND_MODIFIED = 2;
   FILE_DIFF_KIND_DELETED = 3;
+  // Producer emits "renamed" (heddle core/src/diff/mod.rs); rename-detector
+  // score lives alongside. Must be representable, not folded into MODIFIED.
+  FILE_DIFF_KIND_RENAMED = 4;
 }
 
 // Semantic change classification emitted by the repository diff analyzer.

@@ -817,6 +817,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RegistryService/CreateSpool",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark",
       "layers": {
         "server_adapter": {
@@ -861,6 +872,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteSpool",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RegistryService/DetachChild",
       "layers": {
         "server_adapter": {
@@ -879,6 +901,17 @@
         },
         "ui": {
           "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserSpool",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },
@@ -1099,6 +1132,17 @@
         },
         "ui": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpool",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },

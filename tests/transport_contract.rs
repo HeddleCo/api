@@ -160,7 +160,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 150);
+    assert_eq!(ALL_METHODS.len(), 154);
     for method in [
         "ClaimHandle",
         "GetHandleStatus",

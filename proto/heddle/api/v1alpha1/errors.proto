@@ -4,6 +4,7 @@ package heddle.api.v1alpha1;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
 
 // Stable call outcome vocabulary independent of QUIC or any other concrete
 // transport implementation.
@@ -56,7 +57,8 @@ enum ErrorReason {
   ERROR_REASON_VERSION_CONFLICT = 502;
   ERROR_REASON_ALREADY_EXISTS = 503;
 
-  // Flow control (6xx) — retryable
+  // Flow control (6xx). RATE_LIMITED / QUOTA_EXCEEDED are retryable;
+  // CURSOR_INVALID is a client-fix (restart from a valid cursor), not retryable.
   ERROR_REASON_RATE_LIMITED = 600;
   ERROR_REASON_QUOTA_EXCEEDED = 601;
   ERROR_REASON_CURSOR_INVALID = 602;
@@ -118,6 +120,9 @@ message ErrorDetail {
     CursorFailure cursor = 12;
     CapabilityRequirement capability = 13;
     PolicyDenial policy = 14;
+    // A human-verification challenge the caller must satisfy (carried here now
+    // that CallFailure dropped the Any details channel).
+    HumanVerificationChallenge human_verification = 15;
   }
 }
 

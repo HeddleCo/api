@@ -322,10 +322,10 @@ fn call_failure_uses_contract_owned_codes() {
 
 #[test]
 fn human_verification_challenge_is_a_typed_failure_detail() {
-    let detail = heddle_api::human_verification_challenge_detail(HumanVerificationChallenge {
+    let detail = heddle_api::human_verification_error_detail(HumanVerificationChallenge {
         action_url: "https://app.heddle.dev/verify-action".to_string(),
     });
-    let decoded = heddle_api::human_verification_challenge(&[detail])
+    let decoded = heddle_api::human_verification_challenge(&detail)
         .expect("decode human verification challenge");
     assert_eq!(decoded.action_url, "https://app.heddle.dev/verify-action");
 }

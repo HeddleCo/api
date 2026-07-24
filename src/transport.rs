@@ -1,34 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::heddle::api::v1alpha1::{
-    AuthorizationAccess, CallContext, DeploymentTarget, HumanVerificationChallenge, RetryBehavior,
-    RpcEffect, ServiceMaturity, SigningTier,
+    AuthorizationAccess, CallContext, DeploymentTarget, ErrorDetail, ErrorReason,
+    HumanVerificationChallenge, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
+    error_detail,
 };
-use prost::Message;
 
 /// Production ALPN for the first transport-neutral hosted-call protocol.
 pub const HOSTED_ALPN_V1: &[u8] = b"heddle-api/1";
 
-/// Type URL for the human-verification challenge carried in `CallFailure.details`.
-pub const HUMAN_VERIFICATION_CHALLENGE_TYPE_URL: &str =
-    "type.heddle.dev/heddle.api.v1alpha1.HumanVerificationChallenge";
-
-pub fn human_verification_challenge_detail(
-    challenge: HumanVerificationChallenge,
-) -> prost_types::Any {
-    prost_types::Any {
-        type_url: HUMAN_VERIFICATION_CHALLENGE_TYPE_URL.to_string(),
-        value: challenge.encode_to_vec(),
+/// Build an `ErrorDetail` carrying a human-verification challenge (policy-denied
+/// with an actionable challenge), for the `ErrorDetail.human_verification` arm.
+pub fn human_verification_error_detail(challenge: HumanVerificationChallenge) -> ErrorDetail {
+    ErrorDetail {
+        reason: ErrorReason::PolicyDenied as i32,
+        resource: String::new(),
+        field: String::new(),
+        context: Some(error_detail::Context::HumanVerification(challenge)),
     }
 }
 
-pub fn human_verification_challenge(
-    details: &[prost_types::Any],
-) -> Option<HumanVerificationChallenge> {
-    details
-        .iter()
-        .find(|detail| detail.type_url == HUMAN_VERIFICATION_CHALLENGE_TYPE_URL)
-        .and_then(|detail| HumanVerificationChallenge::decode(detail.value.as_slice()).ok())
+/// Extract a human-verification challenge from an `ErrorDetail`, if present.
+pub fn human_verification_challenge(detail: &ErrorDetail) -> Option<HumanVerificationChallenge> {
+    match &detail.context {
+        Some(error_detail::Context::HumanVerification(challenge)) => Some(challenge.clone()),
+        _ => None,
+    }
 }
 
 /// Message cardinality on each side of a contract method.

@@ -66,7 +66,7 @@ def audit_new_descriptor(decoded: str) -> None:
     # Two services are planned, and four methods on otherwise-shipped services
     # deliberately override their inherited maturity to planned.
     assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 6
-    assert decoded.count('type_name: ".google.protobuf.Any"') == 1
+    assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
 
@@ -176,9 +176,38 @@ def audit_new_descriptor(decoded: str) -> None:
                 re.findall(r'^    reserved_name: "(.+)"$', "\n".join(message_block), re.MULTILINE)
             )
             field_numbers = {field[2] for field in fields}
-            highest = max(field_numbers | reserved_numbers, default=0)
-            assert field_numbers == set(range(1, highest + 1)) - reserved_numbers, name
-            if name == "HandlePrincipal":
+            if name == "ErrorDetail":
+                assert [(field[0], field[2]) for field in fields] == [
+                    ("reason", 1),
+                    ("resource", 2),
+                    ("field", 3),
+                    ("retry", 10),
+                    ("conflict", 11),
+                    ("cursor", 12),
+                    ("capability", 13),
+                    ("policy", 14),
+                    ("human_verification", 15),
+                ], name
+            else:
+                highest = max(field_numbers | reserved_numbers, default=0)
+                assert field_numbers == set(range(1, highest + 1)) - reserved_numbers, name
+            if name == "CallFailure":
+                assert reserved_numbers == {3}, name
+                assert reserved_names == {"details"}, name
+                assert [(field[0], field[2]) for field in fields] == [
+                    ("code", 1),
+                    ("message", 2),
+                    ("error", 4),
+                ], name
+            elif name == "StreamFailure":
+                assert reserved_numbers == {3, 4}, name
+                assert reserved_names == {"retry", "cursor"}, name
+                assert [(field[0], field[2]) for field in fields] == [
+                    ("code", 1),
+                    ("message", 2),
+                    ("error", 5),
+                ], name
+            elif name == "HandlePrincipal":
                 assert reserved_numbers == {1}, name
                 assert reserved_names == {"subject"}, name
                 assert [(field[0], field[2]) for field in fields] == [

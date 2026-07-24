@@ -5,9 +5,9 @@ pub mod signing;
 mod transport;
 
 pub use transport::{
-    ALL_METHODS, HOSTED_ALPN_V1, HUMAN_VERIFICATION_CHALLENGE_TYPE_URL, MethodDescriptor,
-    MethodRoute, RequestMetadataError, RoutedCall, StreamingShape, human_verification_challenge,
-    human_verification_challenge_detail, method_descriptor,
+    ALL_METHODS, HOSTED_ALPN_V1, MethodDescriptor, MethodRoute, RequestMetadataError, RoutedCall,
+    StreamingShape, human_verification_challenge, human_verification_error_detail,
+    method_descriptor,
 };
 
 /// Cross-product hosted-call framing and typed-failure fixture.
@@ -43,6 +43,16 @@ pub mod heddle {
         pub mod v1alpha1 {
             include!(concat!(env!("OUT_DIR"), "/heddle.api.v1alpha1.rs"));
         }
+    }
+}
+
+impl heddle::api::v1alpha1::ErrorReason {
+    /// Returns whether callers may retry without first correcting the request.
+    pub fn retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::RateLimited | Self::QuotaExceeded | Self::Transient
+        )
     }
 }
 
@@ -135,7 +145,8 @@ fn fixed_width(
 #[cfg(test)]
 mod tests {
     use super::heddle::api::v1alpha1::{
-        ChangeId, GitObjectAlgorithm, GitObjectId, OperationBatchId, OperationId, StateId,
+        ChangeId, ErrorReason, GitObjectAlgorithm, GitObjectId, OperationBatchId, OperationId,
+        StateId,
     };
 
     #[test]
@@ -150,5 +161,14 @@ mod tests {
         assert!(OperationBatchId::from_bytes([0; 17]).is_err());
         assert!(GitObjectId::from_digest(GitObjectAlgorithm::Sha1, [0; 20]).is_ok());
         assert!(GitObjectId::from_digest(GitObjectAlgorithm::Sha256, [0; 20]).is_err());
+    }
+
+    #[test]
+    fn error_reason_retryability_is_derived_from_the_taxonomy() {
+        assert!(ErrorReason::RateLimited.retryable());
+        assert!(ErrorReason::QuotaExceeded.retryable());
+        assert!(ErrorReason::Transient.retryable());
+        assert!(!ErrorReason::CursorInvalid.retryable());
+        assert!(!ErrorReason::Internal.retryable());
     }
 }

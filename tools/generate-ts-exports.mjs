@@ -6,10 +6,13 @@ const modules = readdirSync(root)
   .filter((name) => name.endsWith("_pb.ts"))
   .sort();
 const lines = modules.map((name) => `export * from "./${name.replace(/\.ts$/, ".js")}";`);
+copyFileSync("packages/typescript/runtime/errors.ts", join(root, "errors.ts"));
 copyFileSync("packages/typescript/runtime/signing.ts", join(root, "signing.ts"));
+lines.push('export * from "./errors.js";');
 lines.push('export * from "./signing.js";');
 writeFileSync(join(root, "index.ts"), `${lines.join("\n")}\n`);
 writeFileSync(
   join(root, "shared.ts"),
-  ["contract_pb", "errors_pb", "types_pb"].map((name) => `export * from "./${name}.js";`).join("\n") + '\nexport * from "./signing.js";\n',
+  ["contract_pb", "errors_pb", "types_pb"].map((name) => `export * from "./${name}.js";`).join("\n") +
+    '\nexport * from "./errors.js";\nexport * from "./signing.js";\n',
 );

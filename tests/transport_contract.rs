@@ -10,8 +10,9 @@ use heddle_api::framing::{
     encode_success_response, encode_success_response_into,
 };
 use heddle_api::heddle::api::v1alpha1::{
-    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, HumanVerification,
-    HumanVerificationChallenge, PushRequest, RequestProof, ServiceMaturity, StateId, TraceContext,
+    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ErrorDetail, ErrorReason,
+    HumanVerification, HumanVerificationChallenge, PolicyDenial, PushRequest, RequestProof,
+    ServiceMaturity, StateId, TraceContext, error_detail,
 };
 use heddle_api::{ALL_METHODS, HOSTED_ALPN_V1, StreamingShape, method_descriptor};
 use prost::Message;
@@ -28,8 +29,11 @@ struct HostedCallFixture {
     framed_request_hex: String,
     failure_code: String,
     failure_message: String,
-    detail_type_url: String,
-    detail_value_hex: String,
+    error_reason: String,
+    error_resource: String,
+    policy_id: String,
+    policy_rule: String,
+    policy_human_verification_can_override: bool,
     failure_hex: String,
     framed_failure_hex: String,
 }
@@ -47,7 +51,7 @@ fn streaming_frames_are_incremental_and_transport_neutral() {
     let failure = CallFailure {
         code: CallFailureCode::Cancelled as i32,
         message: "caller cancelled".into(),
-        details: Vec::new(),
+        error: None,
     };
     let framed = encode_stream_failure(&failure).expect("stream failure");
     let (decoded, consumed) = decode_stream_frame(&framed)
@@ -66,7 +70,7 @@ fn control_frame_encoders_reuse_the_caller_buffer_without_changing_wire_bytes() 
     let failure = CallFailure {
         code: CallFailureCode::PermissionDenied as i32,
         message: "repository is not visible".into(),
-        details: Vec::new(),
+        error: None,
     };
     let mut frame = BytesMut::with_capacity(4096);
     let capacity = frame.capacity();
@@ -306,7 +310,7 @@ fn call_failure_uses_contract_owned_codes() {
     let failure = CallFailure {
         code: CallFailureCode::PermissionDenied as i32,
         message: "repository is not visible".to_string(),
-        details: Vec::new(),
+        error: None,
     };
 
     assert_eq!(
@@ -318,10 +322,10 @@ fn call_failure_uses_contract_owned_codes() {
 
 #[test]
 fn human_verification_challenge_is_a_typed_failure_detail() {
-    let detail = heddle_api::human_verification_challenge_detail(HumanVerificationChallenge {
+    let detail = heddle_api::human_verification_error_detail(HumanVerificationChallenge {
         action_url: "https://app.heddle.dev/verify-action".to_string(),
     });
-    let decoded = heddle_api::human_verification_challenge(&[detail])
+    let decoded = heddle_api::human_verification_challenge(&detail)
         .expect("decode human verification challenge");
     assert_eq!(decoded.action_url, "https://app.heddle.dev/verify-action");
 }
@@ -350,13 +354,20 @@ fn hosted_call_framing_and_failure_match_the_cross_product_fixture() {
     assert_eq!(decoded.body, request);
 
     assert_eq!(fixture.failure_code, "PERMISSION_DENIED");
+    assert_eq!(fixture.error_reason, "POLICY_DENIED");
     let failure = CallFailure {
         code: CallFailureCode::PermissionDenied as i32,
         message: fixture.failure_message,
-        details: vec![prost_types::Any {
-            type_url: fixture.detail_type_url,
-            value: hex::decode(&fixture.detail_value_hex).expect("typed detail hex"),
-        }],
+        error: Some(ErrorDetail {
+            reason: ErrorReason::PolicyDenied as i32,
+            resource: fixture.error_resource,
+            field: String::new(),
+            context: Some(error_detail::Context::Policy(PolicyDenial {
+                policy_id: fixture.policy_id,
+                rule: fixture.policy_rule,
+                human_verification_can_override: fixture.policy_human_verification_can_override,
+            })),
+        }),
     };
     assert_eq!(hex::encode(failure.encode_to_vec()), fixture.failure_hex);
     let framed_failure = encode_failure_response(&failure).expect("frame failure");

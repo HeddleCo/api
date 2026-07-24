@@ -120,6 +120,16 @@ message RotateCredentialRequest {
   string credential_id = 1;
   bytes public_key = 2;
   string client_operation_id = 3;
+  // Proof made by the new credential's Ed25519 private key. The signature is
+  // over the 32-byte canonical digest
+  // `SHA256("heddle-credential-rotation-v1" || 0x00 ||
+  //         u64_be(proof_timestamp_seconds) || 0x00 ||
+  //         credential_id || 0x00 || public_key)`.
+  // The timestamp is Unix seconds and the signature is 64 raw bytes. The
+  // server rejects proofs whose timestamp is outside ±60s of now (same
+  // window as KeypairProof).
+  uint64 proof_timestamp_seconds = 4;
+  bytes proof_signature = 5;
 }
 
 message RevokeCredentialRequest {

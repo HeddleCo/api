@@ -22,6 +22,8 @@ jobs:
           version: "31.1"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install nightly rustfmt
+        run: rustup toolchain install nightly --profile minimal --component rustfmt
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

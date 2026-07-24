@@ -46,6 +46,16 @@ pub mod heddle {
     }
 }
 
+impl heddle::api::v1alpha1::ErrorReason {
+    /// Returns whether callers may retry without first correcting the request.
+    pub fn retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::RateLimited | Self::QuotaExceeded | Self::Transient
+        )
+    }
+}
+
 /// Compiled protobuf descriptor set for reflection and contract inspection.
 #[cfg(feature = "reflection")]
 pub const FILE_DESCRIPTOR_SET: &[u8] =
@@ -135,7 +145,8 @@ fn fixed_width(
 #[cfg(test)]
 mod tests {
     use super::heddle::api::v1alpha1::{
-        ChangeId, GitObjectAlgorithm, GitObjectId, OperationBatchId, OperationId, StateId,
+        ChangeId, ErrorReason, GitObjectAlgorithm, GitObjectId, OperationBatchId, OperationId,
+        StateId,
     };
 
     #[test]
@@ -150,5 +161,14 @@ mod tests {
         assert!(OperationBatchId::from_bytes([0; 17]).is_err());
         assert!(GitObjectId::from_digest(GitObjectAlgorithm::Sha1, [0; 20]).is_ok());
         assert!(GitObjectId::from_digest(GitObjectAlgorithm::Sha256, [0; 20]).is_err());
+    }
+
+    #[test]
+    fn error_reason_retryability_is_derived_from_the_taxonomy() {
+        assert!(ErrorReason::RateLimited.retryable());
+        assert!(ErrorReason::QuotaExceeded.retryable());
+        assert!(ErrorReason::Transient.retryable());
+        assert!(!ErrorReason::CursorInvalid.retryable());
+        assert!(!ErrorReason::Internal.retryable());
     }
 }

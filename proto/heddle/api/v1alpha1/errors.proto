@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package heddle.api.v1alpha1;
 
-import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -28,10 +27,52 @@ enum CallFailureCode {
   CALL_FAILURE_CODE_UNAUTHENTICATED = 16;
 }
 
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+
+  // Authentication (1xx)
+  ERROR_REASON_CREDENTIAL_MISSING = 100;
+  ERROR_REASON_CREDENTIAL_EXPIRED = 101;
+  ERROR_REASON_CREDENTIAL_REVOKED = 102;
+  ERROR_REASON_PROOF_INVALID = 103;
+
+  // Authorization (2xx)
+  ERROR_REASON_SCOPE_MISSING = 200;
+  ERROR_REASON_ROLE_INSUFFICIENT = 201;
+  ERROR_REASON_POLICY_DENIED = 202;
+  ERROR_REASON_PLAN_LIMIT = 203;
+
+  // Existence (3xx)
+  ERROR_REASON_RESOURCE_NOT_FOUND = 300;
+  ERROR_REASON_RESOURCE_GONE = 301;
+
+  // Request validity (4xx)
+  ERROR_REASON_FIELD_INVALID = 400;
+  ERROR_REASON_FIELD_REQUIRED = 401;
+
+  // Preconditions & conflicts (5xx)
+  ERROR_REASON_LIFECYCLE_STATE = 500;
+  ERROR_REASON_OPERATION_ID_REUSED = 501;
+  ERROR_REASON_VERSION_CONFLICT = 502;
+  ERROR_REASON_ALREADY_EXISTS = 503;
+
+  // Flow control (6xx) — retryable
+  ERROR_REASON_RATE_LIMITED = 600;
+  ERROR_REASON_QUOTA_EXCEEDED = 601;
+  ERROR_REASON_CURSOR_INVALID = 602;
+
+  // Server (9xx)
+  ERROR_REASON_TRANSIENT = 900;
+  ERROR_REASON_INTERNAL = 901;
+  ERROR_REASON_UNIMPLEMENTED = 902;
+}
+
 message CallFailure {
   CallFailureCode code = 1;
   string message = 2;
-  repeated google.protobuf.Any details = 3;
+  reserved 3;
+  reserved "details";
+  ErrorDetail error = 4;
 }
 
 message RetryAdvice {
@@ -65,9 +106,25 @@ message PolicyDenial {
   bool human_verification_can_override = 3;
 }
 
+message ErrorDetail {
+  ErrorReason reason = 1;
+  // Canonical path/id the failure is about; empty if none.
+  string resource = 2;
+  // Request proto field path, for validation failures.
+  string field = 3;
+  oneof context {
+    RetryAdvice retry = 10;
+    ConflictDetail conflict = 11;
+    CursorFailure cursor = 12;
+    CapabilityRequirement capability = 13;
+    PolicyDenial policy = 14;
+  }
+}
+
 message StreamFailure {
   CallFailureCode code = 1;
   string message = 2;
-  RetryAdvice retry = 3;
-  CursorFailure cursor = 4;
+  reserved 3, 4;
+  reserved "retry", "cursor";
+  ErrorDetail error = 5;
 }

@@ -5,7 +5,9 @@ import { CallContextSchema } from "../packages/typescript/dist/contract_pb.js";
 import {
   CallFailureCode,
   CallFailureSchema,
+  ErrorReason,
 } from "../packages/typescript/dist/errors_pb.js";
+import { errorReasonRetryable } from "../packages/typescript/dist/errors.js";
 import { unarySigningBytes } from "../packages/typescript/dist/signing.js";
 
 const vector = JSON.parse(readFileSync("tests/fixtures/unary-signing-v1.json", "utf8"));
@@ -72,10 +74,30 @@ const failure = fromBinary(CallFailureSchema, fromHex(hostedCall.failure_hex));
 if (
   failure.code !== CallFailureCode.PERMISSION_DENIED ||
   failure.message !== hostedCall.failure_message ||
-  failure.details.length !== 1 ||
-  failure.details[0].typeUrl !== hostedCall.detail_type_url ||
+  failure.error?.reason !== ErrorReason.POLICY_DENIED ||
+  failure.error.resource !== hostedCall.error_resource ||
+  failure.error.context.case !== "policy" ||
+  failure.error.context.value.policyId !== hostedCall.policy_id ||
+  failure.error.context.value.rule !== hostedCall.policy_rule ||
+  failure.error.context.value.humanVerificationCanOverride !==
+    hostedCall.policy_human_verification_can_override ||
   Buffer.from(toBinary(CallFailureSchema, failure)).toString("hex") !==
     hostedCall.failure_hex
 ) {
   throw new Error("TypeScript call failure differs from the hosted-call fixture");
+}
+
+for (const reason of [
+  ErrorReason.RATE_LIMITED,
+  ErrorReason.QUOTA_EXCEEDED,
+  ErrorReason.TRANSIENT,
+]) {
+  if (!errorReasonRetryable(reason)) {
+    throw new Error(`TypeScript error reason ${reason} must be retryable`);
+  }
+}
+for (const reason of [ErrorReason.CURSOR_INVALID, ErrorReason.INTERNAL]) {
+  if (errorReasonRetryable(reason)) {
+    throw new Error(`TypeScript error reason ${reason} must not be retryable`);
+  }
 }

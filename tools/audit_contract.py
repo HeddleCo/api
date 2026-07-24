@@ -63,8 +63,10 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 11
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 2
-    assert "google.protobuf.Any" not in decoded
+    # Two services are planned, and four methods on otherwise-shipped services
+    # deliberately override their inherited maturity to planned.
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 6
+    assert decoded.count('type_name: ".google.protobuf.Any"') == 1
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
 
@@ -77,7 +79,7 @@ def audit_new_descriptor(decoded: str) -> None:
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"
-        r"capability_context|canonical_envelope|encrypted_.*)$"
+        r"bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )
     unaudited_bytes = sorted(
         name for name in byte_field_pattern.findall(proto_sources) if not allowed_byte_field.fullmatch(name)

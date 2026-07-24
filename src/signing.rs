@@ -2,6 +2,9 @@
 
 use sha2::{Digest, Sha256};
 
+use crate::heddle::api::v1alpha1::{EndpointDescriptor, RelayAdmissionClaims};
+use prost::Message;
+
 pub const DOMAIN: &str = "heddle-req-sig-v1";
 pub const HEADER_ALGORITHM: &str = "x-heddle-sig-alg";
 pub const HEADER_SIGNATURE_BIN: &str = "x-heddle-sig-bin";
@@ -79,6 +82,20 @@ pub fn retry_key_hash(route: &str, client_operation_id: &str, request: &[u8]) ->
         ],
     ))
     .into()
+}
+
+/// Returns the domain-separated bytes signed for an HTTPS endpoint descriptor.
+pub fn endpoint_descriptor_bytes(descriptor: &EndpointDescriptor) -> Vec<u8> {
+    bootstrap_bytes("endpoint-descriptor", descriptor)
+}
+
+/// Returns the domain-separated bytes signed for a relay admission token.
+pub fn relay_admission_bytes(claims: &RelayAdmissionClaims) -> Vec<u8> {
+    bootstrap_bytes("relay-admission", claims)
+}
+
+fn bootstrap_bytes(kind: &str, message: &impl Message) -> Vec<u8> {
+    canonical(kind, &[("protobuf", message.encode_to_vec())])
 }
 
 fn canonical(kind: &str, fields: &[(&str, Vec<u8>)]) -> Vec<u8> {

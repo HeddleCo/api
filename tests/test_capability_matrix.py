@@ -455,8 +455,8 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         actual = build_inventory()
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
-        self.assertEqual(len(shipped), 138)
-        self.assertEqual(len(planned), 12)
+        self.assertEqual(len(shipped), 134)
+        self.assertEqual(len(planned), 16)
         authorization_fields = (
             "authorization_access",
             "authorization_role",
@@ -468,12 +468,15 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
                 "UNSPECIFIED", [contract[field] for field in authorization_fields]
             )
         for contract in planned:
-            self.assertEqual(
-                [contract[field] for field in authorization_fields],
-                ["PLANNED_UNDECIDED"] * len(authorization_fields),
-            )
-            self.assertEqual(contract["authorization_request_targets"], [])
-            self.assertFalse(contract["authorization_multi_target"])
+            values = [contract[field] for field in authorization_fields]
+            self.assertNotIn("UNSPECIFIED", values)
+            if "PLANNED_UNDECIDED" in values:
+                self.assertEqual(
+                    values,
+                    ["PLANNED_UNDECIDED"] * len(authorization_fields),
+                )
+                self.assertEqual(contract["authorization_request_targets"], [])
+                self.assertFalse(contract["authorization_multi_target"])
 
     def test_planned_rpc_cannot_fall_back_to_unspecified_authorization(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -985,7 +988,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
             text = source.read_text()
             changed, count = re.subn(
                 r"(\n  bool authorization_multi_target = 12;)",
-                r"\1\n  string required_permission = 13;",
+                r"\1\n  string required_permission = 15;",
                 text,
                 count=1,
             )

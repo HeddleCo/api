@@ -272,7 +272,7 @@ class SharedHandleContractTest(unittest.TestCase):
             )
             self.assertEqual(
                 entry["production_implementation"],
-                "HeddleCo/weft:crates/weft-server/src/server/grpc_hosted_impl/auth.rs",
+                "HeddleCo/weft:crates/weft-server/src/server/hosted/auth.rs",
             )
 
     def test_extraction_aid_cannot_reclassify_handles_as_dropped(self) -> None:

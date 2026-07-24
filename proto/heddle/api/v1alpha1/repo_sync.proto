@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package heddle.api.v1alpha1;
 
-import "google/protobuf/duration.proto";
-import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v1alpha1/types.proto";
 import "heddle/api/v1alpha1/workflow.proto";
@@ -105,6 +103,15 @@ message PushRequest {
   // git-overlay repos use `git:<commit_oid>` and stream Git objects on the Git
   // lane rather than importing the commit as a Heddle state.
   string local_revision_address = 11;
+  // Optional compare-and-set precondition for the target thread. A present
+  // state requires the remote thread to name exactly that state;
+  // `expected_remote_head_missing` requires it not to exist. The fields are
+  // mutually exclusive. `force` relaxes ancestry validation only: when either
+  // precondition is supplied with `force`, both rules apply and the final ref
+  // update must still satisfy the precondition. When both are absent/false, no
+  // explicit ref precondition is supplied.
+  StateId expected_remote_head = 12;
+  bool expected_remote_head_missing = 13;
   // Idempotency on the stream-opening message. The PushMessage
   // envelope itself isn't the operation — PushRequest is.
 }

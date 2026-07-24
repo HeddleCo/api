@@ -1,6 +1,23 @@
-//! Generated Rust types and optional gRPC bindings for the Heddle API.
+//! Generated transport-neutral Rust types for the Heddle API.
 
+pub mod framing;
 pub mod signing;
+mod transport;
+
+pub use transport::{
+    ALL_METHODS, HOSTED_ALPN_V1, HUMAN_VERIFICATION_CHALLENGE_TYPE_URL, MethodDescriptor,
+    MethodRoute, RequestMetadataError, RoutedCall, StreamingShape, human_verification_challenge,
+    human_verification_challenge_detail, method_descriptor,
+};
+
+/// Cross-product hosted-call framing and typed-failure fixture.
+pub const HOSTED_CALL_V1_FIXTURE_JSON: &str = include_str!("../tests/fixtures/hosted-call-v1.json");
+/// Cross-product canonical unary-signing fixture.
+pub const UNARY_SIGNING_V1_FIXTURE_JSON: &str =
+    include_str!("../tests/fixtures/unary-signing-v1.json");
+/// Cross-product endpoint-descriptor and relay-admission signing fixture.
+pub const TRANSPORT_BOOTSTRAP_V1_FIXTURE_JSON: &str =
+    include_str!("../tests/fixtures/transport-bootstrap-v1.json");
 
 /// Page size used when callers omit or pass zero for a requested size.
 pub const DEFAULT_PAGE_SIZE: u32 = 50;

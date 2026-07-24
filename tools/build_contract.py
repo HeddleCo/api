@@ -353,7 +353,7 @@ def request_name(block: str) -> str:
 
 def production_callsite(service_name: str, method: str) -> str:
     if service_name == "RepoSyncService":
-        return "HeddleCo/heddle:crates/client/src/grpc_hosted/sync.rs"
+        return "HeddleCo/heddle:crates/client/src/hosted/sync.rs"
     if service_name == "StateReviewService":
         return "HeddleCo/heddle:crates/cli/src/cli/commands/review.rs"
     if service_name == "DiscussionService":
@@ -376,7 +376,7 @@ def production_evidence(service_name: str, method: str) -> dict[str, str]:
             "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
             "production_implementation": (
                 "HeddleCo/weft:crates/weft-server/src/server/"
-                "grpc_hosted_impl/auth.rs"
+                "hosted/auth.rs"
             ),
         }
     if service_name == "HostedUserService" and method in {
@@ -388,7 +388,7 @@ def production_evidence(service_name: str, method: str) -> dict[str, str]:
         evidence = {
             "production_implementation": (
                 "HeddleCo/weft:crates/weft-server/src/server/"
-                "grpc_hosted_impl/user.rs"
+                "hosted/user.rs"
             )
         }
         if method != "ResolveHandle":

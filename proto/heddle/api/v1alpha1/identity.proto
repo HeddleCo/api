@@ -492,6 +492,17 @@ message RecordSubscriptionRequest {
   // `client_operation_id`.
   string event_id = 8;
   string client_operation_id = 9;
+  // Provider version stamp for the state this write carries: Polar's
+  // `modified_at`, falling back to `created_at` while the object has never
+  // been mutated. Monotonically non-decreasing over the subscription's
+  // lifetime, so weft compares it against the stored stamp inside the upsert
+  // and rejects writes older than what is already recorded — a delayed
+  // `order.paid` can no longer undo a `subscription.revoked`. Absent means
+  // unstamped: the write applies without an ordering check and preserves any
+  // stamp already stored. Do not send `current_period_end` here; it is a
+  // business date, not a version, and is unchanged across a
+  // `past_due` -> `active` retry.
+  optional google.protobuf.Timestamp provider_modified_at = 10;
 }
 
 message RecordSubscriptionResponse {

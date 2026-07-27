@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+// A repository-local artifact whose exact bytes are being attested.
+//
+// `kind` is a stable, lowercase producer vocabulary such as
+// `git-commit-sha1`, `git-commit-sha256`, or `review-state`. `digest` is the
+// raw identifier bytes, not a display encoding. Both fields are signed, so a
+// signature for one kind cannot be reinterpreted as another kind.
+message ArtifactRef {
+  string kind = 1;
+  bytes digest = 2;
+}
+
+// The server-derived identity class of a verified signer.
+enum SignatureActorKind {
+  SIGNATURE_ACTOR_KIND_UNSPECIFIED = 0;
+  SIGNATURE_ACTOR_KIND_HUMAN = 1;
+  SIGNATURE_ACTOR_KIND_AGENT = 2;
+}
+
+// Records one Biscuit-signed artifact attestation.
+//
+// `biscuit_envelope` is a serialized Biscuit whose AUTHORITY block is signed
+// by `signer_public_key` and contains exactly one value for each fact below:
+//
+//   artifact_signature_version("1")
+//   artifact_repository("<canonical repository path>")
+//   artifact_kind("<ArtifactRef.kind>")
+//   artifact_digest("<lowercase hex of ArtifactRef.digest>")
+//   artifact_signer_key("<lowercase hex of signer_public_key>")
+//   artifact_signed_at(<unix seconds>)
+//
+// Weft verifies those facts `trusting authority`; facts appended in an
+// attenuation block cannot override them. The signed repository fact must exactly match the authenticated repository
+// selected by `repo_path`, and the
+// signed kind and digest must exactly match `artifact`. This binding prevents
+// replay onto another repository, artifact kind, or artifact digest.
+//
+// The server binds `signer_public_key` to the authenticated subject's active
+// key registry entry. Signer identity and human/agent classification are never accepted from a client-supplied flag.
+// Storage is unique by
+// (repository, artifact, signer), so retrying cannot inflate the chain.
+message RecordSignatureRequest {
+  RepositoryRef repo_path = 1;
+  ArtifactRef artifact = 2;
+  bytes biscuit_envelope = 3;
+  bytes signer_public_key = 4;
+  string client_operation_id = 5;
+}
+
+message SignatureReceipt {
+  string signature_id = 1;
+  ArtifactRef artifact = 2;
+  bytes signer_public_key = 3;
+  // True when the exact (artifact, signer) attestation was already present.
+  bool already_recorded = 4;
+}
+
+message VerifySignatureRequest {
+  RepositoryRef repo_path = 1;
+  ArtifactRef artifact = 2;
+}
+
+// One signature that survived cryptographic envelope verification, artifact
+// binding, subject/key binding, and current key-revocation checks. Weft omits
+// any row that fails any check.
+message VerifiedArtifactSignature {
+  string signature_id = 1;
+  string signer_subject = 2;
+  string signer_display_name = 3;
+  SignatureActorKind actor_kind = 4;
+  bytes signer_public_key = 5;
+  google.protobuf.Timestamp signed_at = 6;
+}
+
+message SignatureChain {
+  ArtifactRef artifact = 1;
+  repeated VerifiedArtifactSignature signatures = 2;
+}
+
+service AttestationService {
+  option (heddle.api.v1alpha1.service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_SHIPPED
+  };
+
+  // Privilege-granting write with its own Biscuit operation vocabulary entry:
+  // `operation("RecordSignature")`. Agent tokens attenuated to Pull/ListRefs do
+  // not satisfy this operation and fail before the handler mutates storage.
+  rpc RecordSignature(RecordSignatureRequest) returns (SignatureReceipt) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+
+  rpc VerifySignature(VerifySignatureRequest) returns (SignatureChain) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_REVIEW_DECISIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+}

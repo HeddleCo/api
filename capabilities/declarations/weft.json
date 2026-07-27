@@ -179,6 +179,28 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.AttestationService/RecordSignature",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.AttestationService/VerifySignature",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn",
       "layers": {
         "implementation": {

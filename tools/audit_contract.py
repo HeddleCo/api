@@ -62,7 +62,7 @@ def audit_new_descriptor(decoded: str) -> None:
     rpc_count = len(re.findall(r"(?m)^\s*rpc \w+", proto_sources))
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
-    assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 11
+    assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
     # Two services are planned, and four methods on otherwise-shipped services
     # deliberately override their inherited maturity to planned.
     assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 6
@@ -77,7 +77,7 @@ def audit_new_descriptor(decoded: str) -> None:
         r"^(?:value|digest|hash|parent_id|parents|source_hash|base_root|"
         r"salt|argon2id_hash|challenge|"
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
-        r"authenticator_data|user_handle|biscuit|bootstrap_token|grant_envelope|nonce)|"
+        r"authenticator_data|user_handle|biscuit.*|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"
         r"bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )

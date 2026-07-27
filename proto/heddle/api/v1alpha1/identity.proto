@@ -438,6 +438,10 @@ message WhoAmIResponse {
   // UX affordances only — servers enforce the effective plan on the gated
   // RPCs, never the client. Absent (default) ⇒ treat as the free plan.
   Entitlement entitlement = 14;
+  // Point-in-time logical storage held by the caller's subject and the
+  // allowance for its effective plan. This is retained capacity, not the
+  // interval-integrated usage used for billing.
+  StorageUsage storage_usage = 15;
 }
 
 // A single role grant held by the caller on a namespace or repository.
@@ -474,6 +478,24 @@ message Entitlement {
   Plan plan = 1;
   SubscriptionStatus status = 2;
   google.protobuf.Timestamp current_period_end = 3;
+  // Provider billing cadence copied from the subject's subscription row:
+  // "day", "week", "month", or "year".
+  optional string billing_interval = 4;
+  optional int32 billing_interval_count = 5;
+  // ISO 4217 currency code normalized to lowercase.
+  optional string currency = 6;
+  // Subscription amount in the smallest unit of `currency`.
+  optional int64 amount = 7;
+  // Opaque provider identifier for server-side subscription operations. This
+  // is not a credential or proof of ownership. A server using its organization
+  // token MUST re-bind this id to the authenticated subject before mutation.
+  optional string provider_subscription_id = 8;
+}
+
+// Caller-bound retained-storage projection returned by WhoAmI.
+message StorageUsage {
+  uint64 current_storage_bytes = 1;
+  uint64 storage_allowance_bytes = 2;
 }
 
 // Records/updates a subject's paid entitlement. A privilege-granting write —

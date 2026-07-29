@@ -8,31 +8,31 @@ const LIMIT_SECONDS = 3_600n;
 const DEFAULT_SEED = 0x248c0de;
 const GRAPH_COUNT = Number(process.env.OWNER_AUTH_GRAPH_COUNT ?? "24");
 const profile = process.env.OWNER_AUTH_PROFILE ?? "current";
-const verifier = process.env.HEDDLE_VERIFIER_BIN;
+const heddleVerifier = process.env.HEDDLE_VERIFIER_BIN;
+const tapestryCurrentVerifier = process.env.TAPESTRY_CURRENT_VERIFIER;
+const tapestryVerifierPath = process.env.TAPESTRY_VERIFIER;
 const scratch = process.env.OWNER_AUTH_SCRATCH;
 
 if (!["current", "pre-fix"].includes(profile)) {
   throw new Error(`unknown OWNER_AUTH_PROFILE: ${profile}`);
 }
-if (!verifier || !scratch) {
+if (
+  !heddleVerifier ||
+  !tapestryCurrentVerifier ||
+  !tapestryVerifierPath ||
+  !scratch
+) {
   throw new Error(
-    "HEDDLE_VERIFIER_BIN and OWNER_AUTH_SCRATCH are required",
+    "HEDDLE_VERIFIER_BIN, TAPESTRY_CURRENT_VERIFIER, TAPESTRY_VERIFIER, and OWNER_AUTH_SCRATCH are required",
   );
 }
 
-const bridgeUrl = (selectedProfile: string) =>
-  pathToFileURL(
-    path.join(
-      import.meta.dir,
-      "artifacts",
-      `${selectedProfile}-tapestry.mjs`,
-    ),
-  ).href;
-
 // Corpus construction is always pinned to the current bridge. Only verification
 // switches profiles, so the historical replay consumes byte-identical chains.
-const generator = await import(bridgeUrl("current"));
-const tapestryVerifier = await import(bridgeUrl(profile));
+const generator = await import(pathToFileURL(tapestryCurrentVerifier).href);
+const tapestryVerifier = await import(
+  pathToFileURL(tapestryVerifierPath).href
+);
 const capability = generator.capability;
 const canonical = generator.canonical;
 const cryptoModule = generator.cryptoModule;
@@ -486,7 +486,7 @@ writeFileSync(
   }),
 );
 const heddleOutcomes = JSON.parse(
-  execFileSync(verifier, [corpusPath], { encoding: "utf8" }),
+  execFileSync(heddleVerifier, [corpusPath], { encoding: "utf8" }),
 ) as Array<{ id: string; accepted: boolean; error?: string }>;
 const byId = new Map(heddleOutcomes.map((outcome) => [outcome.id, outcome]));
 const divergences: string[] = [];
@@ -502,13 +502,7 @@ for (const testCase of cases) {
       }`,
     );
   }
-  const expectedHistoricalViolation =
-    profile === "pre-fix" &&
-    testCase.id === "seeded-delegated-purge" &&
-    tapestryAccepted === true &&
-    heddle?.accepted === true;
   if (
-    !expectedHistoricalViolation &&
     (tapestryAccepted !== testCase.expected ||
       heddle?.accepted !== testCase.expected)
   ) {

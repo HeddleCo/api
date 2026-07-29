@@ -8,17 +8,100 @@ on:
 permissions:
   contents: read
 
+env:
+  # Pre-fix Tapestry accepts delegated purge; retained to prove the gate catches it.
+  TAPESTRY_PRE_FIX_REV: 88d00a6fd5d4dc9b9a091a48992978966e40bb4f
+  # Current Tapestry rejects delegated purge after HeddleCo/tapestry#248.
+  TAPESTRY_CURRENT_REV: 62f93a187dff4c1e6746b2332f3dcec3f0f52c87
+  # Pre-fix Heddle accepts delegated purge; retained to prove the gate catches it.
+  HEDDLE_PRE_FIX_REV: 68d10ba27a72638a2f8bdd95086c7a2dff79e2e6
+  # Current Heddle rejects delegated purge after HeddleCo/heddle#1140.
+  HEDDLE_CURRENT_REV: ca8a78141c459b95229df2afa25b1c9934f5377c
+
 jobs:
   cross-client:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore pinned verifier builds
+        id: verifier-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/owner-auth-verifiers
+          key: owner-auth-verifiers-${{ runner.os }}-${{ runner.arch }}-${{ env.TAPESTRY_PRE_FIX_REV }}-${{ env.TAPESTRY_CURRENT_REV }}-${{ env.HEDDLE_PRE_FIX_REV }}-${{ env.HEDDLE_CURRENT_REV }}-${{ hashFiles('owner-authorization-conformance/artifact-source/**', 'owner-authorization-conformance/heddle-verifier/**', 'owner-authorization-conformance/scripts/build-verifiers.sh') }}
+
+      - name: Generate read-only client source token
+        if: steps.verifier-cache.outputs.cache-hit != 'true'
+        id: client-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.HEDDLE_RELEASE_APP_ID }}
+          private-key: ${{ secrets.HEDDLE_RELEASE_APP_PRIVATE_KEY }}
+          owner: HeddleCo
+          repositories: api,heddle,tapestry
+          permission-contents: read
+
+      - name: Check out pinned client sources into runner scratch
+        if: steps.verifier-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ steps.client-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          source_root="${{ runner.temp }}/owner-auth-source"
+
+          checkout_pin() {
+            repo=$1
+            revision=$2
+            destination=$3
+            git init --quiet "$destination"
+            git -C "$destination" remote add origin "https://github.com/$repo"
+            git -C "$destination" fetch --quiet --depth=1 origin "$revision"
+            git -C "$destination" checkout --quiet --detach FETCH_HEAD
+            test "$(git -C "$destination" rev-parse HEAD)" = "$revision"
+          }
+
+          gh auth setup-git
+          checkout_pin HeddleCo/tapestry "$TAPESTRY_CURRENT_REV" \
+            "$source_root/current/tapestry"
+          checkout_pin HeddleCo/heddle "$HEDDLE_CURRENT_REV" \
+            "$source_root/current/heddle"
+          checkout_pin HeddleCo/tapestry "$TAPESTRY_PRE_FIX_REV" \
+            "$source_root/pre-fix/tapestry"
+          checkout_pin HeddleCo/heddle "$HEDDLE_PRE_FIX_REV" \
+            "$source_root/pre-fix/heddle"
+
+      - name: Build pinned verifiers into runner scratch
+        if: steps.verifier-cache.outputs.cache-hit != 'true'
+        env:
+          CARGO_HOME: ${{ runner.temp }}/owner-auth-cargo
+        run: |
+          set -euo pipefail
+          source_root="${{ runner.temp }}/owner-auth-source"
+          verifier_root="${{ runner.temp }}/owner-auth-verifiers"
+
+          owner-authorization-conformance/scripts/build-verifiers.sh \
+            current "$TAPESTRY_CURRENT_REV" "$source_root/current/tapestry" \
+            "$HEDDLE_CURRENT_REV" "$source_root/current/heddle" \
+            "$verifier_root"
+          owner-authorization-conformance/scripts/build-verifiers.sh \
+            pre-fix "$TAPESTRY_PRE_FIX_REV" "$source_root/pre-fix/tapestry" \
+            "$HEDDLE_PRE_FIX_REV" "$source_root/pre-fix/heddle" \
+            "$verifier_root"
+
+      - name: Report verifier cache status
+        run: echo "VERIFIER_CACHE_HIT=${{ steps.verifier-cache.outputs.cache-hit }}"
+
       - name: Verify current pinned clients
         env:
+          TAPESTRY_REV: ${{ env.TAPESTRY_CURRENT_REV }}
+          HEDDLE_REV: ${{ env.HEDDLE_CURRENT_REV }}
+          OWNER_AUTH_VERIFIER_ROOT: ${{ runner.temp }}/owner-auth-verifiers
           OWNER_AUTH_SCRATCH: ${{ runner.temp }}/owner-auth-corpus
         run: |
           while read -r seed; do
@@ -28,7 +111,22 @@ jobs:
 
       - name: Replay the seeded violation against pre-fix clients
         env:
+          TAPESTRY_REV: ${{ env.TAPESTRY_PRE_FIX_REV }}
+          HEDDLE_REV: ${{ env.HEDDLE_PRE_FIX_REV }}
           OWNER_AUTH_PROFILE: pre-fix
           OWNER_AUTH_GRAPH_COUNT: "0"
+          OWNER_AUTH_VERIFIER_ROOT: ${{ runner.temp }}/owner-auth-verifiers
           OWNER_AUTH_SCRATCH: ${{ runner.temp }}/owner-auth-pre-fix
-        run: scripts/owner-authorization-conformance.sh
+        run: |
+          set +e
+          output=$(scripts/owner-authorization-conformance.sh 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [[ $status -eq 0 ]]; then
+            echo "pre-fix verifier unexpectedly passed conformance" >&2
+            exit 1
+          fi
+          grep -F \
+            "SEEDED_VIOLATION=CAUGHT id=seeded-delegated-purge expected=REJECT tapestry=ACCEPT heddle=ACCEPT" \
+            <<<"$output"

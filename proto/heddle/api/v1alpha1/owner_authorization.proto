@@ -1,0 +1,333 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+// Owner-anchored authorization transport objects.
+//
+// This file is deliberately inert before the atomic Weft cutover: it declares
+// no service or RPC, and no live request, response, CallContext, bearer, trust
+// list, or minting message imports it. Importing these objects into a routed
+// surface before the server-minted authorization path is removed would create
+// two live verifiers, allowing the weaker path to decide.
+//
+// These protobuf messages are transport containers, not signed encodings.
+// Signatures MUST NOT cover a protobuf serialization. Every canonical_*_v1
+// body named below is domain-separated, fixed-order, and length-prefixed.
+// Integer widths are fixed and big-endian; signed timestamps are Unix seconds;
+// UUIDs are 16 raw bytes; v1 key ids, hashes, owner ids, and nonces are 32 raw
+// bytes. Repeated key sets are sorted by key_id. Duplicate keys, unknown
+// algorithms or versions, non-canonical paths, and trailing bytes fail closed.
+// A v1 signature is Ed25519 over:
+//
+//   SHA-256(domain || canonical_body)
+//
+// No private key is ever transmitted. Weft is not a portable authorization
+// signer. A WEFT recovery guardian contributes only its per-account public
+// verification key here; its HSM-derived private key is an opt-in threshold
+// guardian, not an owner, capability, bearer, or universal server trust root.
+
+enum AuthorizationKeyAlgorithm {
+  AUTHORIZATION_KEY_ALGORITHM_UNSPECIFIED = 0;
+  AUTHORIZATION_KEY_ALGORITHM_ED25519 = 1;
+}
+
+message AuthorizationVerificationKey {
+  AuthorizationKeyAlgorithm algorithm = 1;
+  // Exactly 32 raw Ed25519 public-key bytes in format version 1.
+  bytes public_key = 2;
+}
+
+message AuthorizationSignature {
+  // SHA-256("heddle-key-v1" || algorithm || public_key).
+  bytes signer_key_id = 1;
+  // Exactly 64 raw Ed25519 signature bytes in format version 1.
+  bytes signature = 2;
+}
+
+// Recovery-key provenance is part of the signed policy. A verifier can
+// distinguish paper, social, and Weft guardians when counting signatures.
+enum RecoveryGuardianKind {
+  RECOVERY_GUARDIAN_KIND_UNSPECIFIED = 0;
+  RECOVERY_GUARDIAN_KIND_PAPER = 1;
+  RECOVERY_GUARDIAN_KIND_SOCIAL = 2;
+  RECOVERY_GUARDIAN_KIND_WEFT = 3;
+}
+
+message RecoveryGuardian {
+  RecoveryGuardianKind kind = 1;
+  AuthorizationVerificationKey key = 2;
+}
+
+// The owner precommits to a threshold over distinct dedicated guardian keys.
+// Product policy defaults to threshold >= 2 and a device-independent co-factor
+// whenever Weft is a guardian. A 1-of-1 Weft policy is custodial and is allowed
+// only after the client obtains the separately reviewed explicit confirmation.
+message RecoveryPolicy {
+  uint32 threshold = 1;
+  repeated RecoveryGuardian guardians = 2;
+}
+
+// ── 1. Owner root ───────────────────────────────────────────────────────────
+
+message OwnerRoot {
+  // Exactly 1.
+  uint32 format_version = 1;
+  // Recomputed as SHA-256("heddle-owner-root-v1" ||
+  // canonical_owner_root_v1_without_owner_id).
+  bytes owner_id = 2;
+  // Raw 16-byte service/display locator. It is signed metadata, not authority.
+  bytes account_uuid = 3;
+  AuthorizationVerificationKey authority_key = 4;
+  RecoveryPolicy recovery_policy = 5;
+  bool claimable_deferred_human = 6;
+  // Exactly 32 random bytes.
+  bytes nonce = 7;
+  // Required only for a deferred root. A transition cannot extend it.
+  int64 claimable_until_unix_seconds = 8;
+}
+
+message SignedOwnerRoot {
+  OwnerRoot root = 1;
+  // The root authority key signs canonical_owner_root_v1(root).
+  AuthorizationSignature authority_proof = 2;
+  // Every declared guardian signs the same canonical root body as proof that
+  // the recovery signing material was present at declaration.
+  repeated AuthorizationSignature recovery_key_proofs = 3;
+}
+
+// ── 2. Bootstrap ────────────────────────────────────────────────────────────
+
+message NewPasskeyOwnerRootApproval {
+  bytes client_data_json = 1;
+  bytes attestation_object = 2;
+}
+
+message ExistingPasskeyOwnerRootApproval {
+  bytes credential_id = 1;
+  bytes client_data_json = 2;
+  bytes authenticator_data = 3;
+  bytes signature = 4;
+}
+
+message WebAuthnOwnerRootApproval {
+  string challenge_id = 1;
+  oneof proof {
+    NewPasskeyOwnerRootApproval new_passkey = 2;
+    ExistingPasskeyOwnerRootApproval existing_passkey = 3;
+  }
+}
+
+message DeferredOwnerRootApproval {
+  OwnerAuthorizationBundle provisioning_authority = 1;
+  AuthorizationSignature origin_key_request_signature = 2;
+}
+
+message BootstrapOwnerRootRequest {
+  SignedOwnerRoot owner_root = 1;
+  oneof approval {
+    WebAuthnOwnerRootApproval human = 2;
+    DeferredOwnerRootApproval deferred_human = 3;
+  }
+  string client_operation_id = 4;
+}
+
+// Unsigned acknowledgement only. It is not a credential or offline evidence.
+message BootstrapOwnerRootResponse {
+  bytes owner_id = 1;
+  bytes accepted_root_hash = 2;
+}
+
+// ── 3. Rotation and recovery ────────────────────────────────────────────────
+
+enum OwnerKeyTransitionKind {
+  OWNER_KEY_TRANSITION_KIND_UNSPECIFIED = 0;
+  OWNER_KEY_TRANSITION_KIND_ROTATE = 1;
+  OWNER_KEY_TRANSITION_KIND_RECOVER = 2;
+  OWNER_KEY_TRANSITION_KIND_RECOVERY_POLICY = 3;
+  OWNER_KEY_TRANSITION_KIND_CLAIM_DEFERRED_HUMAN = 4;
+}
+
+message OwnerKeyTransition {
+  // Exactly 1.
+  uint32 format_version = 1;
+  bytes owner_id = 2;
+  bytes previous_state_hash = 3;
+  // Exactly the previous sequence plus one.
+  uint64 sequence = 4;
+  OwnerKeyTransitionKind kind = 5;
+  AuthorizationVerificationKey next_authority_key = 6;
+  RecoveryPolicy next_recovery_policy = 7;
+  int64 valid_from_unix_seconds = 8;
+  // A bounded handover no longer than the maximum capability TTL. Recovery
+  // after suspected compromise uses no overlap.
+  int64 previous_key_valid_until_unix_seconds = 9;
+  // Exactly 32 random bytes.
+  bytes nonce = 10;
+}
+
+// Authorizations sign canonical_owner_key_transition_v1(transition).
+//
+// ROTATE requires the current authority and next key. RECOVER requires the
+// current recovery threshold and next key. RECOVERY_POLICY requires the
+// current authority, current recovery threshold, and possession proofs from
+// every next guardian. CLAIM_DEFERRED_HUMAN requires the origin key, the next
+// human authority key, and every next guardian.
+message SignedOwnerKeyTransition {
+  OwnerKeyTransition transition = 1;
+  repeated AuthorizationSignature authorizations = 2;
+  AuthorizationSignature next_authority_key_proof = 3;
+  repeated AuthorizationSignature next_recovery_key_proofs = 4;
+}
+
+// ── 4. Owner-anchored capability submission ────────────────────────────────
+
+enum CapabilityPrincipalKind {
+  CAPABILITY_PRINCIPAL_KIND_UNSPECIFIED = 0;
+  CAPABILITY_PRINCIPAL_KIND_HUMAN_DEVICE = 1;
+  CAPABILITY_PRINCIPAL_KIND_SERVICE_ACCOUNT = 2;
+  CAPABILITY_PRINCIPAL_KIND_AGENT = 3;
+  CAPABILITY_PRINCIPAL_KIND_ANONYMOUS_KEY = 4;
+  CAPABILITY_PRINCIPAL_KIND_ANY_ANONYMOUS = 5;
+}
+
+enum SpoolCapabilityAction {
+  SPOOL_CAPABILITY_ACTION_UNSPECIFIED = 0;
+  SPOOL_CAPABILITY_ACTION_READ = 1;
+  SPOOL_CAPABILITY_ACTION_WRITE = 2;
+  SPOOL_CAPABILITY_ACTION_MERGE = 3;
+  SPOOL_CAPABILITY_ACTION_APPROVE = 4;
+  SPOOL_CAPABILITY_ACTION_ADMIN = 5;
+  SPOOL_CAPABILITY_ACTION_REDACT = 6;
+  SPOOL_CAPABILITY_ACTION_GRANT = 7;
+  SPOOL_CAPABILITY_ACTION_PURGE = 8;
+}
+
+message SpoolSelector {
+  // Raw 16-byte spool UUID.
+  bytes root_spool_uuid = 1;
+  // Complete canonical path segments, never strings or general globs.
+  repeated string path_segments = 2;
+  bool include_descendants = 3;
+}
+
+message CapabilityPrincipal {
+  CapabilityPrincipalKind kind = 1;
+  // Signed audit identity, not an ownership anchor.
+  bytes principal_id = 2;
+  // Absent only for ANY_ANONYMOUS.
+  AuthorizationVerificationKey key = 3;
+}
+
+message SpoolCapabilityGrant {
+  SpoolSelector spool = 1;
+  repeated SpoolCapabilityAction actions = 2;
+}
+
+message OwnerCapability {
+  // Exactly 1.
+  uint32 format_version = 1;
+  bytes owner_id = 2;
+  bytes issuer_state_hash = 3;
+  // Empty only for a direct owner grant.
+  bytes parent_capability_id = 4;
+  CapabilityPrincipal subject = 5;
+  repeated SpoolCapabilityGrant grants = 6;
+  int64 not_before_unix_seconds = 7;
+  int64 expires_at_unix_seconds = 8;
+  // Exactly 32 random bytes.
+  bytes nonce = 9;
+  // Recomputed from canonical_owner_capability_v1_without_capability_id.
+  bytes capability_id = 10;
+}
+
+message SignedOwnerCapability {
+  OwnerCapability capability = 1;
+  AuthorizationSignature signature = 2;
+}
+
+message OwnerAuthorizationBundle {
+  SignedOwnerRoot owner_root = 1;
+  repeated SignedOwnerKeyTransition owner_state_chain = 2;
+  repeated SignedOwnerCapability capability_chain = 3;
+  // A subject-signed Biscuit whose authority facts are a subset of the leaf
+  // capability and match its subject key, kind, and id.
+  bytes subject_biscuit = 4;
+}
+
+message SubmitOwnerAuthorizationRequest {
+  OwnerAuthorizationBundle authorization = 1;
+  string client_operation_id = 2;
+}
+
+// Unsigned retry/UI receipt. The portable proof is the submitted bundle.
+message SubmitOwnerAuthorizationResponse {
+  bytes capability_id = 1;
+  int64 expires_at_unix_seconds = 2;
+}
+
+// ── 5. Anonymous authentication ─────────────────────────────────────────────
+
+message AnonymousKeyCredential {
+  // Exactly 1.
+  uint32 format_version = 1;
+  // SHA-256("heddle-anonymous-v1" || key_id).
+  bytes anonymous_id = 2;
+  AuthorizationVerificationKey key = 3;
+  int64 issued_at_unix_seconds = 4;
+  int64 expires_at_unix_seconds = 5;
+  // Exactly 32 random bytes.
+  bytes nonce = 6;
+  // The anonymous key signs canonical_anonymous_key_credential_v1 over fields
+  // 1 through 6. This authenticates a pseudonym and grants no rights.
+  AuthorizationSignature self_signature = 7;
+}
+
+message RegisterAnonymousKeyRequest {
+  AnonymousKeyCredential credential = 1;
+  optional string turnstile_token = 2;
+  string prior_continuity_token = 3;
+  // The anonymous key signs the canonical registration request excluding this
+  // proof. A continuity token alone cannot impersonate the key.
+  AuthorizationSignature continuity_proof = 4;
+  string client_operation_id = 5;
+}
+
+// Contains no authorization and no server signature.
+message RegisterAnonymousKeyResponse {
+  bytes anonymous_id = 1;
+  string continuity_token = 2;
+  int64 continuity_expires_at_unix_seconds = 3;
+}
+
+// ── 6. Clone keyring persistence ────────────────────────────────────────────
+
+enum CloneOwnerPinKind {
+  CLONE_OWNER_PIN_KIND_UNSPECIFIED = 0;
+  CLONE_OWNER_PIN_KIND_LOCAL_CREATION = 1;
+  CLONE_OWNER_PIN_KIND_INVITATION_FINGERPRINT = 2;
+}
+
+// Local provenance chosen and persisted by the client. There is no UUID-to-key
+// migration or legacy TOFU arm: all accounts start owner-anchored.
+message CloneOwnerPin {
+  CloneOwnerPinKind kind = 1;
+  bytes expected_owner_id = 2;
+  int64 first_seen_unix_seconds = 3;
+}
+
+// This wrapper is not signed. Its authority comes only from the verified
+// signed objects it contains. Loading it recomputes every id/hash and verifies
+// the full chain; unknown versions, gaps, duplicate sequences, forks, owner-id
+// mismatch, or capabilities for another spool fail closed.
+message CloneAuthorizationKeyring {
+  // Exactly 1.
+  uint32 format_version = 1;
+  // Raw 16-byte spool UUID.
+  bytes spool_uuid = 2;
+  repeated string canonical_spool_path_segments = 3;
+  CloneOwnerPin pin = 4;
+  SignedOwnerRoot owner_root = 5;
+  repeated SignedOwnerKeyTransition accepted_transitions = 6;
+  bytes accepted_state_hash = 7;
+  repeated SignedOwnerCapability public_access_capabilities = 8;
+}

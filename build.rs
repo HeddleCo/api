@@ -28,6 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = prost_build::Config::new();
     config
         .boxed(".heddle.api.v1alpha1.PushClientFrame.frame.request")
+        .boxed(".heddle.api.v1alpha1.BootstrapOwnerRootRequest.approval.deferred_human")
         .file_descriptor_set_path(&descriptor)
         .compile_protos(&protos, &[proto_root])?;
     method_generation::write(&descriptor, &output.join("heddle_api_methods.rs"))?;

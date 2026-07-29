@@ -86,6 +86,15 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             # Clone keyring persistence.
             "CloneOwnerPin",
             "CloneAuthorizationKeyring",
+            # Owner-signed spool governance.
+            "GovernanceStateHead",
+            "GovernanceSettingMergePolicy",
+            "OwnerGovernanceState",
+            "SignedOwnerGovernanceState",
+            "GetOwnerGovernanceHeadRequest",
+            "GetOwnerGovernanceHeadResponse",
+            "SubmitOwnerGovernanceStateRequest",
+            "SubmitOwnerGovernanceStateResponse",
         }
         actual_messages = set(
             re.findall(r"(?m)^message ([A-Za-z][A-Za-z0-9]*) \{", self.source)
@@ -282,6 +291,49 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                     8,
                 ),
             ],
+            "GovernanceStateHead": [
+                ("", "bytes", "state_hash", 1),
+                ("", "uint64", "sequence", 2),
+            ],
+            "GovernanceSettingMergePolicy": [
+                ("", "string", "setting_key", 1),
+                ("", "GovernanceSettingMergeSemantics", "semantics", 2),
+            ],
+            "OwnerGovernanceState": [
+                ("", "uint32", "format_version", 1),
+                ("", "bytes", "spool_uuid", 2),
+                ("", "GovernanceStateHead", "expected_head", 3),
+                ("", "uint64", "sequence", 4),
+                ("repeated", "bytes", "merge_parent_state_hashes", 5),
+                ("", "SpoolSettings", "settings", 6),
+                (
+                    "repeated",
+                    "GovernanceSettingMergePolicy",
+                    "merge_policies",
+                    7,
+                ),
+                ("", "bytes", "owner_state_hash", 8),
+                ("", "bytes", "governance_state_hash", 9),
+            ],
+            "SignedOwnerGovernanceState": [
+                ("", "OwnerGovernanceState", "state", 1),
+                ("", "AuthorizationSignature", "owner_signature", 2),
+            ],
+            "GetOwnerGovernanceHeadRequest": [
+                ("", "bytes", "spool_uuid", 1),
+            ],
+            "GetOwnerGovernanceHeadResponse": [
+                ("", "bytes", "spool_uuid", 1),
+                ("", "GovernanceStateHead", "head", 2),
+                ("", "bytes", "owner_state_hash", 3),
+            ],
+            "SubmitOwnerGovernanceStateRequest": [
+                ("", "SignedOwnerGovernanceState", "governance_state", 1),
+                ("", "string", "client_operation_id", 2),
+            ],
+            "SubmitOwnerGovernanceStateResponse": [
+                ("", "GovernanceStateHead", "accepted_head", 1),
+            ],
         }
         self.assertEqual(
             set(expected_fields),
@@ -338,6 +390,11 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                 ("CLONE_OWNER_PIN_KIND_UNSPECIFIED", 0),
                 ("CLONE_OWNER_PIN_KIND_LOCAL_CREATION", 1),
                 ("CLONE_OWNER_PIN_KIND_INVITATION_FINGERPRINT", 2),
+            ],
+            "GovernanceSettingMergeSemantics": [
+                ("GOVERNANCE_SETTING_MERGE_SEMANTICS_UNSPECIFIED", 0),
+                ("GOVERNANCE_SETTING_MERGE_SEMANTICS_LAST_WRITER_WINS", 1),
+                ("GOVERNANCE_SETTING_MERGE_SEMANTICS_GROW_ONLY_SET_UNION", 2),
             ],
         }
         actual_enums = set(
@@ -396,6 +453,56 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             [],
             "owner-anchored messages must remain unreachable until the "
             f"exclusive verifier cutover; imported by {imports}",
+        )
+
+    def test_governance_messages_cannot_authorize_anything_on_their_own(self) -> None:
+        governance_messages = (
+            "GovernanceStateHead",
+            "GovernanceSettingMergePolicy",
+            "OwnerGovernanceState",
+            "SignedOwnerGovernanceState",
+            "GetOwnerGovernanceHeadRequest",
+            "GetOwnerGovernanceHeadResponse",
+            "SubmitOwnerGovernanceStateRequest",
+            "SubmitOwnerGovernanceStateResponse",
+        )
+        for name in governance_messages:
+            with self.subTest(message=name):
+                body = message_body(self.source, name)
+                self.assertNotRegex(body, r"\b(?:bearer|grant_envelope)\b")
+
+        self.assertNotRegex(self.source, r"(?m)^service\s+")
+        self.assertNotRegex(self.source, r"(?m)^\s*rpc\s+")
+        routed_importers = [
+            path.name
+            for path in sorted(PROTO_ROOT.glob("*.proto"))
+            if path != OWNER_AUTHORIZATION_PROTO
+            and "heddle/api/v1alpha1/owner_authorization.proto" in path.read_text()
+        ]
+        self.assertEqual(
+            routed_importers,
+            [],
+            "governance messages must have no routed importer before Weft's "
+            f"exclusive cutover; imported by {routed_importers}",
+        )
+
+    def test_grow_only_merge_is_distinct_from_last_writer_wins_on_the_wire(
+        self,
+    ) -> None:
+        policies = enum_body(self.source, "GovernanceSettingMergeSemantics")
+        self.assertIn(
+            "GOVERNANCE_SETTING_MERGE_SEMANTICS_LAST_WRITER_WINS",
+            policies,
+        )
+        self.assertIn(
+            "GOVERNANCE_SETTING_MERGE_SEMANTICS_GROW_ONLY_SET_UNION",
+            policies,
+        )
+        policy = message_body(self.source, "GovernanceSettingMergePolicy")
+        self.assertRegex(policy, r"\bstring\s+setting_key\s*=\s*1\s*;")
+        self.assertRegex(
+            policy,
+            r"\bGovernanceSettingMergeSemantics\s+semantics\s*=\s*2\s*;",
         )
 
     def test_contract_carries_no_private_or_server_authorization_key(self) -> None:

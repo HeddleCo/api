@@ -36,21 +36,10 @@ jobs:
           path: ${{ runner.temp }}/owner-auth-verifiers
           key: owner-auth-verifiers-${{ runner.os }}-${{ runner.arch }}-${{ env.TAPESTRY_PRE_FIX_REV }}-${{ env.TAPESTRY_CURRENT_REV }}-${{ env.HEDDLE_PRE_FIX_REV }}-${{ env.HEDDLE_CURRENT_REV }}-${{ hashFiles('owner-authorization-conformance/artifact-source/**', 'owner-authorization-conformance/heddle-verifier/**', 'owner-authorization-conformance/scripts/build-verifiers.sh') }}
 
-      - name: Generate read-only client source token
-        if: steps.verifier-cache.outputs.cache-hit != 'true'
-        id: client-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        with:
-          app-id: ${{ secrets.HEDDLE_RELEASE_APP_ID }}
-          private-key: ${{ secrets.HEDDLE_RELEASE_APP_PRIVATE_KEY }}
-          owner: HeddleCo
-          repositories: api,heddle,tapestry
-          permission-contents: read
-
       - name: Check out pinned client sources into runner scratch
         if: steps.verifier-cache.outputs.cache-hit != 'true'
         env:
-          GH_TOKEN: ${{ steps.client-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.PROJECT_PAT }}
         run: |
           set -euo pipefail
           source_root="${{ runner.temp }}/owner-auth-source"

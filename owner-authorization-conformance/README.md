@@ -44,7 +44,7 @@ Advance those pins deliberately; never float them.
 `artifact-source/tapestry-bridge.ts`, `heddle-verifier`, and
 `scripts/build-verifiers.sh` document and reproduce the adapters from local
 client checkouts at the selected revisions. The workflow uses the existing
-read-only cross-repository app access only on a cache miss.
+cross-repository read credential only on a cache miss.
 
 Replay the vulnerability with:
 

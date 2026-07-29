@@ -31,8 +31,22 @@ assertions) and logs each seed for replay.
 CI checks out each client at an exact commit in runner scratch space. It builds
 an ESM bundle of Tapestry's browser verifier and a static Linux x86-64 Heddle
 verifier for each profile into `${{ runner.temp }}/owner-auth-verifiers`.
-No verifier binaries or generated bundles are committed. Actions cache restores
-the generated verifiers on later runs, keyed by all four pins.
+No verifier binaries or generated bundles are committed.
+
+Heddle is public, so its two pinned source builds run in a successful,
+independent job with no cross-repository credential. Actions cache stores those
+two generated executables under a key containing both Heddle pins and the
+adapter sources. The job logs `HEDDLE_VERIFIER_PREP` with `mode=cold` or
+`mode=warm` and its elapsed milliseconds.
+
+Tapestry is private. The cross-client job fails explicitly with
+`CROSS_CLIENT_CONFORMANCE=UNAVAILABLE` when `secrets.PROJECT_PAT` is absent;
+it does not skip the comparison or count unavailable coverage as passed. The
+comparison is intentionally gated because agreement is meaningful only when
+both distinct client implementations are present. Enabling it is an owner
+decision: the minimum credential scope is Contents: read on
+`HeddleCo/tapestry`, and nothing more. When present, CI builds and separately
+caches both pinned Tapestry bundles in runner scratch.
 
 | Profile | Tapestry | Heddle |
 | --- | --- | --- |
@@ -41,10 +55,10 @@ the generated verifiers on later runs, keyed by all four pins.
 
 The normal profile pins the merge commits for Heddle #1140 and Tapestry #248.
 Advance those pins deliberately; never float them.
-`artifact-source/tapestry-bridge.ts`, `heddle-verifier`, and
-`scripts/build-verifiers.sh` document and reproduce the adapters from local
-client checkouts at the selected revisions. The workflow uses the existing
-cross-repository read credential only on a cache miss.
+`artifact-source/tapestry-bridge.ts`, `heddle-verifier`, and the scripts under
+`scripts/` document and reproduce the adapters from local client checkouts at
+the selected revisions. Only the private Tapestry checkout uses the
+cross-repository read credential.
 
 Replay the vulnerability with:
 

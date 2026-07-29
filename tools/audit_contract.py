@@ -76,6 +76,9 @@ def audit_new_descriptor(decoded: str) -> None:
     allowed_byte_field = re.compile(
         r"^(?:value|digest|hash|parent_id|parents|source_hash|base_root|"
         r"salt|argon2id_hash|challenge|"
+        r"accepted_root_hash|accepted_state_hash|account_uuid|anonymous_id|capability_id|"
+        r"credential_id|expected_owner_id|issuer_state_hash|owner_id|parent_capability_id|"
+        r"previous_state_hash|principal_id|root_spool_uuid|signer_key_id|spool_uuid|"
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit.*|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"

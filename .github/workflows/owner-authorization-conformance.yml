@@ -1,0 +1,34 @@
+name: Owner authorization conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cross-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Verify current pinned clients
+        env:
+          OWNER_AUTH_SCRATCH: ${{ runner.temp }}/owner-auth-corpus
+        run: |
+          while read -r seed; do
+            OWNER_AUTH_CASE_SEED="$seed" \
+              scripts/owner-authorization-conformance.sh
+          done < owner-authorization-conformance/seeds.txt
+
+      - name: Replay the seeded violation against pre-fix clients
+        env:
+          OWNER_AUTH_PROFILE: pre-fix
+          OWNER_AUTH_GRAPH_COUNT: "0"
+          OWNER_AUTH_SCRATCH: ${{ runner.temp }}/owner-auth-pre-fix
+        run: scripts/owner-authorization-conformance.sh

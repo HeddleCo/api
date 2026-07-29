@@ -175,16 +175,25 @@ fn owner_governance_state_constructs_signs_serializes_and_verifies() {
             description: "owner-signed settings".to_string(),
             ..Default::default()
         }),
-        merge_policies: vec![
-            GovernanceSettingMergePolicy {
-                setting_key: "revoked_capability_ids".to_string(),
-                semantics: GovernanceSettingMergeSemantics::GrowOnlySetUnion as i32,
-            },
-            GovernanceSettingMergePolicy {
-                setting_key: "write_policy".to_string(),
-                semantics: GovernanceSettingMergeSemantics::LastWriterWins as i32,
-            },
-        ],
+        merge_policies: [
+            "bootstrap_kind",
+            "bootstrap_source",
+            "bootstrap_sync_direction",
+            "child_policy",
+            "default_state_visibility",
+            "description",
+            "hold_lifecycle",
+            "initial_tooling",
+            "sync_behavior",
+            "visibility",
+            "write_policy",
+        ]
+        .into_iter()
+        .map(|setting_key| GovernanceSettingMergePolicy {
+            setting_key: setting_key.to_string(),
+            semantics: GovernanceSettingMergeSemantics::LastWriterWins as i32,
+        })
+        .collect(),
         owner_state_hash: vec![0x44; 32],
         governance_state_hash: Vec::new(),
     };
@@ -233,15 +242,35 @@ fn owner_governance_state_constructs_signs_serializes_and_verifies() {
         .as_slice()
         .try_into()
         .expect("64-byte Ed25519 signature");
+    let decoded_signature = Signature::from_bytes(&signature_bytes);
     verifying_key
         .verify(
             &domain_hash(
                 b"heddle-owner-governance-signature-v1",
                 &canonical_owner_governance_state_v1(decoded_state, true),
             ),
-            &Signature::from_bytes(&signature_bytes),
+            &decoded_signature,
         )
         .expect("owner signature verifies after protobuf round trip");
+
+    let mut tampered_state = decoded_state.clone();
+    tampered_state
+        .settings
+        .as_mut()
+        .expect("decoded settings")
+        .description = "server-rewritten settings".to_string();
+    assert!(
+        verifying_key
+            .verify(
+                &domain_hash(
+                    b"heddle-owner-governance-signature-v1",
+                    &canonical_owner_governance_state_v1(&tampered_state, true),
+                ),
+                &decoded_signature,
+            )
+            .is_err(),
+        "rewriting settings after signing must invalidate the owner signature",
+    );
 }
 
 #[test]

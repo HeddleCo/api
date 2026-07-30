@@ -324,9 +324,12 @@ message ProviderPullCapabilityContext {
 // Safe, storage-coordinate-free description of the exact provider handoff.
 message ProviderPlanSummary {
   RepositoryRef repository = 1;
+  // Exact totals for the provider manifest: records, extents, and the sum of
+  // extent lengths. They exclude objects retained on the ordinary Weft pack.
   uint64 object_count = 2;
   uint64 extent_count = 3;
   uint64 total_bytes = 4;
+  // No source in the resulting manifest may outlive this consent boundary.
   uint64 expires_at_unix_millis = 5;
 }
 

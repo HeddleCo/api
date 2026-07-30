@@ -6,6 +6,7 @@ use crate::heddle::api::v1alpha1::{EndpointDescriptor, RelayAdmissionClaims};
 use prost::Message;
 
 pub const DOMAIN: &str = "heddle-req-sig-v1";
+pub const PROVIDER_PLAN_DOMAIN: &str = "heddle-provider-plan-v1";
 pub const HEADER_ALGORITHM: &str = "x-heddle-sig-alg";
 pub const HEADER_SIGNATURE_BIN: &str = "x-heddle-sig-bin";
 pub const HEADER_TIMESTAMP: &str = "x-heddle-sig-ts";
@@ -65,6 +66,36 @@ pub fn stream_open_bytes(
     )
 }
 
+/// Returns the canonical bytes signed to consent to one exact provider batch.
+///
+/// The server and Worker independently establish authorization from the
+/// owner-anchored capability. This signature proves possession of the same
+/// device key used for the stream opening and binds consent to one repository,
+/// endpoint, nonce, and exact private-batch digest.
+pub fn provider_plan_bytes(
+    signing_identity: &str,
+    stream_id: &str,
+    repository: &str,
+    client_endpoint_id: &str,
+    plan_nonce: &[u8],
+    grant_batch_digest: &[u8],
+) -> Vec<u8> {
+    provider_plan_canonical(
+        "exact-batch",
+        &[
+            ("identity", signing_identity.as_bytes().to_vec()),
+            ("stream_id", stream_id.as_bytes().to_vec()),
+            ("repository", repository.as_bytes().to_vec()),
+            ("client_endpoint_id", client_endpoint_id.as_bytes().to_vec()),
+            ("plan_nonce", hex::encode(plan_nonce).into_bytes()),
+            (
+                "grant_batch_digest",
+                hex::encode(grant_batch_digest).into_bytes(),
+            ),
+        ],
+    )
+}
+
 /// Hashes the retry identity without conflating it with the request payload.
 pub fn retry_key_hash(route: &str, client_operation_id: &str, request: &[u8]) -> [u8; 32] {
     Sha256::digest(canonical(
@@ -107,6 +138,15 @@ fn canonical(kind: &str, fields: &[(&str, Vec<u8>)]) -> Vec<u8> {
     result
 }
 
+fn provider_plan_canonical(kind: &str, fields: &[(&str, Vec<u8>)]) -> Vec<u8> {
+    let mut result = format!("{PROVIDER_PLAN_DOMAIN}\nkind={}:{}", kind.len(), kind).into_bytes();
+    for (name, value) in fields {
+        result.extend_from_slice(format!("\n{name}={}:", value.len()).as_bytes());
+        result.extend_from_slice(value);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use serde::Deserialize;
@@ -129,6 +169,39 @@ mod tests {
         let second = unary_bytes("a", "b/c", 1, &[0], &[1]);
         assert_ne!(first, second);
         assert!(first.starts_with(b"heddle-req-sig-v1\nkind=5:unary"));
+    }
+
+    #[test]
+    fn provider_plan_signature_changes_with_every_authorization_binding() {
+        let endpoint = "11".repeat(32);
+        let baseline = provider_plan_bytes(
+            "principal:alice",
+            "pull:one",
+            "acme/widgets",
+            &endpoint,
+            &[7; 16],
+            &[9; 32],
+        );
+        let different_digest = provider_plan_bytes(
+            "principal:alice",
+            "pull:one",
+            "acme/widgets",
+            &endpoint,
+            &[7; 16],
+            &[8; 32],
+        );
+        let different_nonce = provider_plan_bytes(
+            "principal:alice",
+            "pull:one",
+            "acme/widgets",
+            &endpoint,
+            &[6; 16],
+            &[9; 32],
+        );
+
+        assert!(baseline.starts_with(b"heddle-provider-plan-v1\nkind=11:exact-batch"));
+        assert_ne!(baseline, different_digest);
+        assert_ne!(baseline, different_nonce);
     }
 
     #[test]

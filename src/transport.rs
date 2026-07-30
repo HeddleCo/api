@@ -9,6 +9,9 @@ use crate::heddle::api::v1alpha1::{
 /// Production ALPN for the first transport-neutral hosted-call protocol.
 pub const HOSTED_ALPN_V1: &[u8] = b"heddle-api/1";
 
+/// Production ALPN for an opaque-ticket provider extent transfer.
+pub const PROVIDER_ALPN_V1: &[u8] = b"heddle-provider/1";
+
 /// Build an `ErrorDetail` carrying a human-verification challenge (policy-denied
 /// with an actionable challenge), for the `ErrorDetail.human_verification` arm.
 pub fn human_verification_error_detail(challenge: HumanVerificationChallenge) -> ErrorDetail {

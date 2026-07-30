@@ -161,6 +161,7 @@ fn provider_contract_separates_opening_negotiation_exact_plan_consent_and_opaque
         plan_nonce: opening.plan_nonce,
         grant_batch_digest: vec![9; 32],
         signature: vec![3; 64],
+        accepted: true,
     };
     let consent = ProviderPlanResponse::decode(consent.encode_to_vec().as_slice()).unwrap();
     assert_eq!(consent.grant_batch_digest, vec![9; 32]);

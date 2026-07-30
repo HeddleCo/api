@@ -347,6 +347,8 @@ message ProviderPlanResponse {
   bytes plan_nonce = 2;
   bytes grant_batch_digest = 3;
   bytes signature = 4;
+  // False declines provider installation and keeps this logical pull on Weft.
+  bool accepted = 5;
 }
 
 // One provider endpoint. direct_url is the complete broker-validated WSS URL;

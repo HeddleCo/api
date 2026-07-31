@@ -8,8 +8,10 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 env:
+  GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   # Pre-fix Tapestry accepts delegated purge; retained to prove the gate catches it.
   TAPESTRY_PRE_FIX_REV: 88d00a6fd5d4dc9b9a091a48992978966e40bb4f
   # Current Tapestry rejects delegated purge after HeddleCo/tapestry#248.

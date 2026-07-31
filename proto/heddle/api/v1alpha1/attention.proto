@@ -81,12 +81,20 @@ message FeedItem {
   bool has_agent_reasoning = 14; // context annotations attached? (+25 priority boost)
   uint32 files_changed = 15; // count from diff (feeds card metadata line)
   uint32 breaking_changes = 16; // count from semantic diff (+200 priority boost)
+  BreakingChangesComputationStatus breaking_changes_computation_status = 23; // pending, successfully computed, or unavailable
   string top_annotation = 17; // most important WHY/GOTCHA annotation text (max 80 chars)
   bool confidence_computed = 18; // false in V1; true in V2 when confidence is set
   bool security_sensitive = 19; // stored for score reproducibility
   float affinity_multiplier = 20; // stored for score reproducibility (default 1.0)
   repeated FileChangeSummary top_files = 21; // top changed file paths (max 5)
   repeated BreakingChangeSummary breaking_summaries = 22; // top breaking semantic changes (max 3)
+}
+
+enum BreakingChangesComputationStatus {
+  BREAKING_CHANGES_COMPUTATION_STATUS_UNSPECIFIED = 0;
+  BREAKING_CHANGES_COMPUTATION_STATUS_PENDING = 1;
+  BREAKING_CHANGES_COMPUTATION_STATUS_COMPUTED = 2;
+  BREAKING_CHANGES_COMPUTATION_STATUS_UNAVAILABLE = 3;
 }
 
 message FileChangeSummary {

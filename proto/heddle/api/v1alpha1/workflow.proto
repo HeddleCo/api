@@ -70,6 +70,7 @@ enum ConfidenceBand {
 message ThreadSummary {
   reserved 14;
 
+  // Renameable human-facing thread ref.
   string name = 1;
   optional StateId base_state = 2;
   optional StateId current_state = 3;
@@ -115,6 +116,17 @@ message ThreadSummary {
   // Typed lifecycle field from `heddle/repo/src/thread_model.rs`; legacy tag 14
   // is retired in favor of the typed field introduced at tag 44.
   ThreadState.Kind thread_state = 44;
+  // Stable opaque server-assigned identity. REQUIRED and immutable for the
+  // lifetime of the thread. This is not a per-repository sequence number.
+  string thread_id = 45;
+  // Stable identities paired with the renameable relationship refs above.
+  optional string target_thread_id = 46;
+  optional string parent_thread_id = 47;
+  // Positional peer of `child_threads`; both lists have the same length.
+  repeated string child_thread_ids = 48;
+  optional string superseded_by_thread_id = 49;
+  // Positional peer of `supersedes`; both lists have the same length.
+  repeated string supersedes_thread_ids = 50;
 }
 
 message ThreadVerificationSummary {
@@ -135,6 +147,7 @@ message ThreadIntegrationPolicy {
 }
 
 message ThreadMetadata {
+  // Renameable human-facing thread ref.
   string name = 1;
   optional string target_thread = 2;
   optional string parent_thread = 3;
@@ -155,6 +168,11 @@ message ThreadMetadata {
   ThreadIntegrationPolicy integration_policy_result = 18;
   google.protobuf.Timestamp created_at = 19;
   google.protobuf.Timestamp updated_at = 20;
+  // Stable opaque server-assigned identity. On create, the client leaves this
+  // empty and the server assigns it; subsequent metadata MUST carry it.
+  string thread_id = 21;
+  optional string target_thread_id = 22;
+  optional string parent_thread_id = 23;
 }
 
 message ListThreadsRequest {
@@ -171,7 +189,10 @@ message GetWorkspaceSummaryRequest {
 
 message GetThreadRequest {
   RepositoryRef repo_path = 1;
+  // Current renameable ref, retained for human-facing routing and display.
   string name = 2;
+  // Stable server-assigned identity used for lookup. Both fields are REQUIRED.
+  string thread_id = 3;
 }
 
 message WorkspaceThreadGroup {
@@ -185,6 +206,8 @@ message WorkspaceSummary {
   optional string current_thread = 2;
   repeated WorkspaceThreadGroup groups = 3;
   uint32 thread_count = 4;
+  // Present exactly when `current_thread` is present.
+  optional string current_thread_id = 5;
 }
 
 service WorkflowService {

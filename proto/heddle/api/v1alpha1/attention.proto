@@ -120,8 +120,9 @@ message FeedItemAction {
   string label = 2; // "Review", "Dismiss", "Pin"
   string url = 3; // url is emitted ONLY for external links (e.g. GitHub); empty for internal actions — clients compose canonical routes from state_id/thread/repo_path.
   bool is_primary = 4;
-  StateId state_id = 5; // the change/state this action targets
-  string thread = 6; // the thread the action targets
+  StateId state_id = 5; // the exact physical state this action targets
+  string thread = 6; // renameable ref of the thread the action targets
+  string thread_id = 7; // stable identity paired with thread
 }
 
 enum FeedItemKind {

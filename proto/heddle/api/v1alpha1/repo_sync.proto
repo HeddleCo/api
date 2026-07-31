@@ -11,9 +11,12 @@ message ListRefsRequest {
 }
 
 message ListRefsResponse {
+  // Renameable human-facing ref.
   string head_thread = 1;
   StateId head_state = 2;
   repeated RefEntry refs = 3;
+  // Stable identity paired with `head_thread`.
+  string head_thread_id = 4;
 }
 
 message UpdateRefRequest {
@@ -30,6 +33,9 @@ message UpdateRefRequest {
   string old_revision_address = 8;
   string new_revision_address = 9;
   string client_operation_id = 10;
+  // REQUIRED for an existing thread ref. Empty only while creating a thread,
+  // when the server assigns the id returned in UpdateRefResponse.
+  string thread_id = 11;
 }
 
 message UpdateRefResponse {
@@ -37,6 +43,8 @@ message UpdateRefResponse {
   string old_value = 2;
   string error = 3;
   string old_revision_address = 4;
+  // Stable server-assigned id when the updated ref is a thread.
+  string thread_id = 5;
 }
 
 enum TransportMode {
@@ -126,6 +134,9 @@ message PushRequest {
   bool expected_remote_head_missing = 13;
   // Idempotency on the stream-opening message. The PushMessage
   // envelope itself isn't the operation — PushRequest is.
+  // REQUIRED for an existing target thread. Empty only when `create_thread`
+  // is true, in which case the server assigns the id returned by PushComplete.
+  string target_thread_id = 14;
 }
 
 message PushReady {
@@ -161,6 +172,8 @@ message PushComplete {
   string error = 3;
   TransferCheckpoint transfer = 4;
   string new_revision_address = 5;
+  // Stable server-assigned identity paired with PushRequest.target_thread.
+  string target_thread_id = 6;
 }
 
 // Out-of-pack transport for redaction sidecars. Sidecars live
@@ -186,7 +199,7 @@ message RedactionTransfer {
 // records live outside `.heddle/objects/` and are keyed by the state id
 // whose audience tier they declare.
 //
-// `state_id` is the hex-encoded ChangeId of the state.
+// `state_id` is the exact 32-byte physical StateId of the state.
 // `state_visibility_blob` is the rmp-encoded `StateVisibilityBlob` byte
 // payload.
 message StateVisibilityTransfer {
@@ -202,7 +215,7 @@ message StateVisibilityTransfer {
 // `StateAttachmentTransfer` per pushed attachment; the receiver
 // reconstructs and verifies the attachment from the raw object bytes.
 //
-// `state_id` is the hex-encoded ChangeId of the state the attachment
+// `state_id` is the exact 32-byte physical StateId of the state the attachment
 // hangs off.
 // `attachment_id` is the hex-encoded id of the attachment object.
 // `attachment_kind` is the attachment body kind (see StateAttachmentKind).
@@ -248,6 +261,8 @@ message GitCheckpointTransfer {
   GitObjectId git_commit_oid = 2;
   string thread = 3;
   string metadata_json = 4;
+  // Stable identity paired with the renameable thread ref.
+  string thread_id = 5;
 }
 
 message GitLaneTransfer {
@@ -272,6 +287,9 @@ message PullRequest {
   string target_revision_address = 11;
   // Idempotency on the stream-opening message. The PullMessage
   // envelope itself isn't the operation — PullRequest is.
+  // Stable server-assigned identity paired with `remote_thread`. The
+  // `local_thread` is a client-local destination ref, not a hosted identity.
+  string remote_thread_id = 12;
 }
 
 message PullReady {

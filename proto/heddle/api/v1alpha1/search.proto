@@ -75,10 +75,13 @@ message AgentHit {
 }
 
 message ThreadHit {
+  // Stable opaque server-assigned identity; not a per-repository sequence.
   string thread_id = 1;
   string title = 2;
   RepositoryRef repo_path = 3;
   StateId state = 4;
+  // Current renameable human-facing ref.
+  string thread_ref = 5;
 }
 
 message FeedHit {

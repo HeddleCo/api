@@ -362,6 +362,8 @@ message WorktreeSummary {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp modified_at = 8;
   bool is_current = 9;
+  // Present exactly when `thread` is present; immutable across thread rename.
+  optional string thread_id = 10;
 }
 
 message ActorSummary {
@@ -385,6 +387,8 @@ message ActorSummary {
   optional string native_parent_actor_key = 18;
   optional string probe_source = 19;
   optional float probe_confidence = 20;
+  // Stable identity paired with the renameable `thread` ref.
+  string thread_id = 21;
 }
 
 message ListActorsRequest {}
@@ -526,8 +530,8 @@ message ResolvedPrincipal {
 // ============================================================================
 // Spool child edges + monorepo resolution + facet history (Spool epic P8a,
 // weft#358). ADDITIVE. Message shapes mirror weft's registry return types so
-// the P8b handler phase maps 1:1. State/change ids are `bytes` (16-byte
-// ChangeId), matching the package-wide wire convention.
+// the P8b handler phase maps 1:1. State ids use the package's typed 32-byte
+// physical StateId; logical rewrite-stable identity uses ChangeId separately.
 // ============================================================================
 
 // Who committed a facet change (audit trail). Mirrors heddle's
@@ -556,8 +560,8 @@ message ChildEdge {
   string parent_spool_id = 1;
   string child_spool_id = 2;
   string mount_name = 3;
-  // The child content state-id this edge is currently anchored to (16-byte
-  // ChangeId).
+  // The child content state this edge is currently anchored to (32-byte
+  // physical StateId).
   StateId anchored_state_id = 4;
   // The child's latest content-facet head, if any (absent = child has no
   // content head yet).
@@ -842,8 +846,9 @@ message ThreadApproval {
   RepositoryRef repo_path = 2;
   string source_thread = 3;
   string target_thread = 4;
-  // Change id at source thread's head when this approval was
-  // recorded. Used for stale-on-update detection.
+  // Physical StateId at source thread's head when this approval was recorded.
+  // Amend-in-place and rewrite both stale the approval because exact reviewed
+  // bytes changed.
   StateId source_state = 5;
   string approver_user_id = 6;
   // Biscuit session id of the approver — full audit attribution.
@@ -852,6 +857,9 @@ message ThreadApproval {
   google.protobuf.Timestamp approved_at = 9;
   // 0 when the policy did not specify a TTL.
   google.protobuf.Timestamp expires_at = 10;
+  // Stable identities paired with the renameable refs above.
+  string source_thread_id = 11;
+  string target_thread_id = 12;
 }
 
 message ApproveThreadRequest {
@@ -861,6 +869,10 @@ message ApproveThreadRequest {
   StateId source_state = 4;
   string note = 5;
   string client_operation_id = 6;
+  // Stable identities paired with the renameable refs above. Both are
+  // REQUIRED; identity, not ref text, is authoritative.
+  string source_thread_id = 7;
+  string target_thread_id = 8;
 }
 
 message RevokeApprovalRequest {
@@ -872,6 +884,8 @@ message ListThreadApprovalsRequest {
   RepositoryRef repo_path = 1;
   string source_thread = 2;
   string target_thread = 3;
+  string source_thread_id = 4;
+  string target_thread_id = 5;
 }
 
 message ListThreadApprovalsResponse {
@@ -897,6 +911,8 @@ message CheckMergeEligibilityRequest {
   // Optional: the user_id of the change author. Used for
   // forbid_author_approval. Empty = unknown / not enforced.
   string author_user_id = 7;
+  string source_thread_id = 8;
+  string target_thread_id = 9;
 }
 
 message CheckMergeEligibilityResponse {

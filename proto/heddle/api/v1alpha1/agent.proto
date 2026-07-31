@@ -168,6 +168,8 @@ message ListAgentRunsRequest {
   string page_cursor = 3;
   // Filters runs to this thread; empty returns all runs for the repository.
   optional string thread_ref = 4;
+  // Present exactly when `thread_ref` is present.
+  optional string thread_id = 5;
 }
 message ListAgentRunsResponse {
   repeated AgentRun runs = 1;
@@ -190,6 +192,8 @@ message AgentRun {
   google.protobuf.Timestamp finished_at = 11;
   // The thread this run is attached to, such as "threads/webauthn-challenge" or "main".
   optional string thread_ref = 12;
+  // Stable identity paired with `thread_ref`.
+  optional string thread_id = 13;
 }
 message ListAgentTimelineEventsRequest {
   AgentRunId run_id = 1;

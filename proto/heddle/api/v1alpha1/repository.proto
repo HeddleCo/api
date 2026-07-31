@@ -66,8 +66,8 @@ enum TreeEntryKind {
   TREE_ENTRY_KIND_SYMLINK = 3;
   // Submodule pointer (git submodule commit OID).
   TREE_ENTRY_KIND_GITLINK = 4;
-  // Native child-spool edge. The entry's pointer is a spool-id + anchored
-  // state-id (both 16-byte ChangeIds), NOT a git commit OID: the link is not
+  // Native child-spool edge. The entry's pointer is a spool id plus an
+  // anchored 32-byte physical StateId, NOT a git commit OID: the link is not
   // a git submodule and cannot round-trip to a 160000 tree entry on
   // git-export. Only native spool operations produce this kind (Spool epic,
   // weft#358).
@@ -542,7 +542,7 @@ message SetContextRequest {
 }
 
 message SetContextResponse {
-  // Newly-captured ChangeId carrying the annotation.
+  // Newly-captured physical StateId carrying the annotation.
   StateId state = 1;
   uint32 annotations = 2;
 }
@@ -559,7 +559,7 @@ message ReviseContextRequest {
 }
 
 message ReviseContextResponse {
-  // Newly-captured ChangeId carrying the revision.
+  // Newly-captured physical StateId carrying the revision.
   StateId state = 1;
   uint32 revisions = 2;
 }
@@ -579,7 +579,7 @@ message SupersedeContextRequest {
 }
 
 message SupersedeContextResponse {
-  // Newly-captured ChangeId carrying the supersession.
+  // Newly-captured physical StateId carrying the supersession.
   StateId state = 1;
   string new_annotation_id = 2;
   uint32 rewrite_pct = 3;
@@ -643,6 +643,9 @@ message SubscribeRepoEventsRequest {
   string thread = 2;
   int64 after_event_id = 3;
   repeated string event_types = 4;
+  // Stable identity paired with `thread`. Both are empty for an all-thread
+  // subscription; both are present for a thread-scoped subscription.
+  string thread_id = 5;
 }
 
 message RepoEvent {
@@ -659,6 +662,8 @@ message RepoEvent {
   google.protobuf.Timestamp created_at = 11;
   // Visible path of repo_id, for multi-repo client routing.
   RepositoryRef repo_path = 12;
+  // Present exactly when this is a thread event; paired with `thread`.
+  string thread_id = 13;
 }
 
 service RepositoryService {

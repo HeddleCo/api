@@ -11,10 +11,13 @@ use heddle_api::framing::{
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ErrorDetail, ErrorReason,
-    HumanVerification, HumanVerificationChallenge, PolicyDenial, PushRequest, RequestProof,
-    ServiceMaturity, StateId, TraceContext, error_detail,
+    HumanVerification, HumanVerificationChallenge, PolicyDenial, ProviderPlanResponse,
+    ProviderPullCapabilityContext, ProviderReadRequest, PushRequest, RequestProof, ServiceMaturity,
+    StateId, TraceContext, error_detail,
 };
-use heddle_api::{ALL_METHODS, HOSTED_ALPN_V1, StreamingShape, method_descriptor};
+use heddle_api::{
+    ALL_METHODS, HOSTED_ALPN_V1, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
+};
 use prost::Message;
 use serde::Deserialize;
 
@@ -138,6 +141,37 @@ fn request_prelude_can_be_routed_before_a_bidi_stream_finishes() {
     assert_eq!(consumed, prelude.len());
     assert_eq!(decoded.method, "/heddle.api.v1alpha1.RepoSyncService/Pull");
     assert_eq!(decoded.context, context);
+}
+
+#[test]
+fn provider_contract_separates_opening_negotiation_exact_plan_consent_and_opaque_read() {
+    assert_eq!(PROVIDER_ALPN_V1, b"heddle-provider/1");
+
+    let opening = ProviderPullCapabilityContext {
+        version: 1,
+        client_endpoint_id: "11".repeat(32),
+        plan_nonce: vec![7; 16],
+    };
+    let opening =
+        ProviderPullCapabilityContext::decode(opening.encode_to_vec().as_slice()).unwrap();
+    assert_eq!(opening.plan_nonce, vec![7; 16]);
+
+    let consent = ProviderPlanResponse {
+        version: 1,
+        plan_nonce: opening.plan_nonce,
+        grant_batch_digest: vec![9; 32],
+        signature: vec![3; 64],
+        accepted: true,
+    };
+    let consent = ProviderPlanResponse::decode(consent.encode_to_vec().as_slice()).unwrap();
+    assert_eq!(consent.grant_batch_digest, vec![9; 32]);
+
+    let read = ProviderReadRequest {
+        version: 1,
+        opaque_ticket: "opaque-one-use-ticket".to_string(),
+    };
+    let read = ProviderReadRequest::decode(read.encode_to_vec().as_slice()).unwrap();
+    assert_eq!(read.opaque_ticket, "opaque-one-use-ticket");
 }
 
 #[test]

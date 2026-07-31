@@ -308,6 +308,151 @@ message StreamOpeningProof {
   bytes nonce = 6;
   bytes signature = 7;
 }
+
+// Provider support negotiated inside StreamOpeningProof.capability_context.
+//
+// The endpoint id is an echo of the endpoint that opened the authenticated
+// Iroh connection. Servers MUST compare it with the transport-observed peer
+// identity and MUST use the observed identity, never this field, when binding
+// provider grants.
+message ProviderPullCapabilityContext {
+  uint32 version = 1;
+  string client_endpoint_id = 2;
+  bytes plan_nonce = 3;
+}
+
+// Safe, storage-coordinate-free description of the exact provider handoff.
+message ProviderPlanSummary {
+  RepositoryRef repository = 1;
+  // Exact totals for the provider manifest: records, extents, and the sum of
+  // extent lengths. They exclude objects retained on the ordinary Weft pack.
+  uint64 object_count = 2;
+  uint64 extent_count = 3;
+  uint64 total_bytes = 4;
+  // No source in the resulting manifest may outlive this consent boundary.
+  uint64 expires_at_unix_millis = 5;
+}
+
+// Phase two of client-authorized exact-plan negotiation. The digest is a
+// domain-separated BLAKE3 digest over the complete private grant batch. R2
+// keys, ETags, and source offsets remain server-to-Worker data.
+message ProviderPlanChallenge {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  ProviderPlanSummary summary = 4;
+}
+
+// Consent to one exact provider handoff. The signature uses the same cnf
+// device key as StreamOpeningProof and does not confer repository access.
+message ProviderPlanResponse {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  bytes signature = 4;
+  // False declines provider installation and keeps this logical pull on Weft.
+  bool accepted = 5;
+}
+
+// One provider endpoint. direct_url is the complete broker-validated WSS URL;
+// opaque_ticket is repeated separately so clients can fail closed if its URL
+// ticket parameter differs.
+message ProviderSource {
+  string provider_id = 1;
+  string endpoint_id = 2;
+  string direct_url = 3;
+  string opaque_ticket = 4;
+  uint64 expires_at_unix_millis = 5;
+}
+
+// Index entry for one complete encoded record in the virtual native pack.
+message ProviderPackObject {
+  ObjectDescriptor object = 1;
+  uint64 output_offset = 2;
+}
+
+// Exact output placement and digest for one opaque provider grant. No backing
+// object key, ETag, source offset, or source length is exposed here.
+message ProviderPullExtent {
+  string extent_id = 1;
+  uint64 output_offset = 2;
+  uint64 length = 3;
+  bytes digest = 4;
+  ProviderSource source = 5;
+  repeated ProviderPackObject objects = 6;
+}
+
+// Scatter/gather layout for one virtual LMPK. The header is the complete
+// 16-byte native-pack header. output_pack_length includes the 32-byte BLAKE3
+// trailer that the client computes after assembling all verified extents.
+message ProviderPullManifest {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  bytes pack_header = 4;
+  uint64 output_pack_length = 5;
+  repeated ProviderPullExtent extents = 6;
+}
+
+enum ProviderPullResultStatus {
+  PROVIDER_PULL_RESULT_STATUS_UNSPECIFIED = 0;
+  PROVIDER_PULL_RESULT_STATUS_COMPLETE = 1;
+  PROVIDER_PULL_RESULT_STATUS_FALLBACK = 2;
+}
+
+// Result of the provider attempt. COMPLETE carries the exact BLAKE3 trailer
+// written into the virtual LMPK. FALLBACK asks Weft to continue the same
+// authorized multi-Want pull on its existing stream.
+message ProviderPullResponse {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  ProviderPullResultStatus status = 4;
+  bytes pack_digest = 5;
+}
+
+// Provider-connection control protocol. A client presents only the opaque
+// ticket; the provider chooses and returns the resume offset.
+message ProviderReadRequest {
+  uint32 version = 1;
+  string opaque_ticket = 2;
+}
+
+message ProviderReadReady {
+  uint64 resume_offset = 1;
+  uint64 attempt_generation = 2;
+  uint64 remaining_length = 3;
+}
+
+// Checkpoints count verified bytes within this opaque extent. A final
+// checkpoint is accepted only when final_digest is the exact 32-byte BLAKE3
+// digest of the complete retained prefix plus received suffix.
+message ProviderReadCheckpoint {
+  uint64 attempt_generation = 1;
+  uint64 acknowledged_length = 2;
+  bytes final_digest = 3;
+}
+
+message ProviderReadComplete {
+  bool success = 1;
+  uint64 committed_length = 2;
+  string error = 3;
+}
+
+message ProviderReadClientFrame {
+  oneof frame {
+    ProviderReadRequest request = 1;
+    ProviderReadCheckpoint checkpoint = 2;
+  }
+}
+
+message ProviderReadServerFrame {
+  oneof frame {
+    ProviderReadReady ready = 1;
+    ProviderReadComplete complete = 2;
+  }
+}
+
 message PushClientFrame {
   oneof frame {
     StreamOpeningProof open = 1;
@@ -331,6 +476,8 @@ message PullClientFrame {
     StreamOpeningProof open = 1;
     PullRequest request = 2;
     WantObjects want = 3;
+    ProviderPlanResponse provider_plan = 4;
+    ProviderPullResponse provider_result = 5;
   }
 }
 message PullServerFrame {
@@ -341,6 +488,8 @@ message PullServerFrame {
     RedactionTransfer redaction = 4;
     StateVisibilityTransfer state_visibility = 5;
     GitLaneTransfer git_lane = 6;
+    ProviderPlanChallenge provider_challenge = 7;
+    ProviderPullManifest provider_manifest = 8;
   }
 }
 

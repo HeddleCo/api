@@ -192,6 +192,12 @@ def audit_new_descriptor(decoded: str) -> None:
                     ("capability", 13),
                     ("policy", 14),
                     ("human_verification", 15),
+                    ("ambiguous_change_id", 16),
+                ], name
+            elif name == "AmbiguousChangeIdDetail":
+                assert fields == [
+                    ("spec", "LABEL_OPTIONAL", 1),
+                    ("candidates", "LABEL_REPEATED", 2),
                 ], name
             else:
                 highest = max(field_numbers | reserved_numbers, default=0)

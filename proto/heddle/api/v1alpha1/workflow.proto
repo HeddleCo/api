@@ -189,7 +189,8 @@ message GetWorkspaceSummaryRequest {
 
 message GetThreadRequest {
   RepositoryRef repo_path = 1;
-  // Current renameable ref, retained for human-facing routing and display.
+  // Renameable ref retained for human-facing routing and display. It may be
+  // stale after a rename; `thread_id` is authoritative.
   string name = 2;
   // Stable server-assigned identity used for lookup. Both fields are REQUIRED.
   string thread_id = 3;
@@ -215,7 +216,7 @@ service WorkflowService {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
     maturity: SERVICE_MATURITY_SHIPPED
   };
-  // Single-thread detail fetch by name (reuses the ThreadSummary shape).
+  // Single-thread detail fetch by immutable identity (reuses ThreadSummary).
   rpc GetThread(GetThreadRequest) returns (ThreadSummary) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

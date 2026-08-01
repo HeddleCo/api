@@ -248,6 +248,11 @@ message ListOperationsRequest {
   optional OperationBatchId batch_id = 3;
   uint32 page_size = 4;
   string page_token = 5;
+  // Optional repository/spool filter. The `hosted_id` arm selects a stable
+  // hosted repository ID; `canonical_path` selects its canonical spool path.
+  // When omitted, the list covers all operations owned by the authenticated
+  // caller, preserving the unscoped behavior of existing clients.
+  RepositoryRef repository = 6;
 }
 
 message ListOperationsResponse {

@@ -5,6 +5,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 OPERATION_PROTO = ROOT / "proto/heddle/api/v1alpha1/operation.proto"
+TYPES_PROTO = ROOT / "proto/heddle/api/v1alpha1/types.proto"
 
 
 def message_body(source: str, name: str) -> str:
@@ -72,6 +73,19 @@ class SharedOperationContractTest(unittest.TestCase):
         self.assertIn("authenticated subject and target", cancel_request)
         self.assertIn("operation_id", cancel_request)
         self.assertIn("different operation", cancel_request)
+
+    def test_listing_can_select_one_repository_without_narrowing_legacy_clients(self) -> None:
+        operation_source = OPERATION_PROTO.read_text()
+        types_source = TYPES_PROTO.read_text()
+        request = message_body(operation_source, "ListOperationsRequest")
+        repository = message_body(types_source, "RepositoryRef")
+
+        self.assertRegex(request, r"\bRepositoryRef\s+repository\s*=\s*6\s*;")
+        self.assertIn("When omitted", request)
+        self.assertIn("all operations owned", request)
+        self.assertIn("authenticated", request)
+        self.assertRegex(repository, r"\bstring\s+hosted_id\s*=\s*1\s*;")
+        self.assertRegex(repository, r"\bstring\s+canonical_path\s*=\s*2\s*;")
 
 
 if __name__ == "__main__":

@@ -82,6 +82,11 @@ message FeedItem {
   uint32 files_changed = 15; // count from diff (feeds card metadata line)
   uint32 breaking_changes = 16; // count from semantic diff (+200 priority boost)
   BreakingChangesComputationStatus breaking_changes_computation_status = 23; // pending, successfully computed, or unavailable
+  // Card-level projection of the targeted thread's verification summary.
+  // UNSPECIFIED means verification was not computed or could not be determined.
+  // VERIFIED requires tests_passed=true and tests_failed=0. NOT_VERIFIED means
+  // tests_passed=false or tests_failed>0; failures take precedence.
+  FeedItemVerificationStatus verification_status = 24;
   string top_annotation = 17; // most important WHY/GOTCHA annotation text (max 80 chars)
   bool confidence_computed = 18; // false in V1; true in V2 when confidence is set
   bool security_sensitive = 19; // stored for score reproducibility
@@ -95,6 +100,15 @@ enum BreakingChangesComputationStatus {
   BREAKING_CHANGES_COMPUTATION_STATUS_PENDING = 1;
   BREAKING_CHANGES_COMPUTATION_STATUS_COMPUTED = 2;
   BREAKING_CHANGES_COMPUTATION_STATUS_UNAVAILABLE = 3;
+}
+
+enum FeedItemVerificationStatus {
+  // No verification result was computed or the producer could not determine it.
+  FEED_ITEM_VERIFICATION_STATUS_UNSPECIFIED = 0;
+  // Verification explicitly reported passing tests with no failures.
+  FEED_ITEM_VERIFICATION_STATUS_VERIFIED = 1;
+  // Verification explicitly reported a non-passing result or test failures.
+  FEED_ITEM_VERIFICATION_STATUS_NOT_VERIFIED = 2;
 }
 
 message FileChangeSummary {

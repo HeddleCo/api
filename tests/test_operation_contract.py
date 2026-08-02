@@ -45,6 +45,34 @@ class SharedOperationContractTest(unittest.TestCase):
         self.assertIn("sequence >= the requested after_sequence", source)
         self.assertIn("strictly larger sequences", source)
 
+    def test_import_commit_history_and_failure_identity_are_durable(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        progress = message_body(source, "OperationProgress")
+        commit = message_body(source, "ImportCommitProgress")
+        failure = message_body(source, "ImportCommitFailure")
+
+        self.assertRegex(
+            progress,
+            r"\brepeated\s+ImportCommitProgress\s+import_commits\s*=\s*6\s*;",
+        )
+        self.assertRegex(
+            progress,
+            r"\boptional\s+ImportCommitFailure\s+failed_import_commit\s*=\s*7\s*;",
+        )
+        self.assertIn("Snapshot-first watch reconnects", progress)
+        self.assertRegex(commit, r"\buint64\s+ordinal\s*=\s*1\s*;")
+        self.assertRegex(commit, r"\bstring\s+commit_hash\s*=\s*2\s*;")
+        self.assertRegex(commit, r"\bstring\s+subject\s*=\s*3\s*;")
+        self.assertRegex(commit, r"\boptional\s+uint64\s+additions\s*=\s*4\s*;")
+        self.assertRegex(commit, r"\boptional\s+uint64\s+deletions\s*=\s*5\s*;")
+        self.assertRegex(commit, r"\bstring\s+author_name\s*=\s*6\s*;")
+        self.assertRegex(commit, r"\bstring\s+author_email\s*=\s*7\s*;")
+        self.assertRegex(commit, r"\brepeated\s+string\s+branches\s*=\s*8\s*;")
+        self.assertRegex(failure, r"\buint64\s+ordinal\s*=\s*1\s*;")
+        self.assertRegex(
+            failure, r"\boptional\s+string\s+commit_hash\s*=\s*2\s*;"
+        )
+
     def test_import_and_gateway_do_not_define_a_second_operation_lifecycle(self) -> None:
         source = OPERATION_PROTO.read_text()
         result = message_body(source, "OperationResult")

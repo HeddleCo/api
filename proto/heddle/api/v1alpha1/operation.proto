@@ -128,6 +128,33 @@ message SubmitOperationRequest {
   }
 }
 
+// One successfully converted Git commit in an import operation's durable
+// history. Ordinal is one-based in the import's deterministic conversion
+// order. Hash is the full source Git object id (SHA-1 or SHA-256).
+message ImportCommitProgress {
+  uint64 ordinal = 1;
+  string commit_hash = 2;
+  // The first line of the source commit message. This is commit data, not the
+  // generic phase summary in OperationProgress.summary.
+  string subject = 3;
+  // Textual first-parent diff totals. They are absent when the commit has no
+  // textual line statistics (for example, a binary-only change).
+  optional uint64 additions = 4;
+  optional uint64 deletions = 5;
+  string author_name = 6;
+  string author_email = 7;
+  // Source branch names whose imported tips contain this commit. A commit may
+  // be reachable from more than one branch.
+  repeated string branches = 8;
+}
+
+// Exact source commit being converted when an import failed. The ordinal is
+// sufficient identity even if malformed source data prevents reading a hash.
+message ImportCommitFailure {
+  uint64 ordinal = 1;
+  optional string commit_hash = 2;
+}
+
 message OperationProgress {
   // Machine-readable phase within the operation kind, such as "cloning" or
   // "indexing". It does not replace OperationState.
@@ -138,6 +165,12 @@ message OperationProgress {
   optional string unit = 4;
   // Sanitized human-safe summary; clients must not parse it for state.
   string summary = 5;
+  // Full durable prefix of successfully converted source commits. This field
+  // is populated only for import operations. Snapshot-first watch reconnects
+  // repeat the prefix so clients do not depend on transient stream delivery.
+  repeated ImportCommitProgress import_commits = 6;
+  // Present when an import failed while converting a known source commit.
+  optional ImportCommitFailure failed_import_commit = 7;
 }
 
 message OperationError {

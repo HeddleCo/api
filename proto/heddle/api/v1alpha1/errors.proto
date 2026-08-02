@@ -116,6 +116,30 @@ message AmbiguousChangeIdDetail {
   repeated string candidates = 2;
 }
 
+// Stable recovery categories for failures in the invite-gated signup flow.
+// This detail is carried only as ErrorDetail.context.signup; callers should
+// use this enum rather than matching CallFailure.message text. No email or
+// invite code is echoed because those values are secrets or personal data.
+// Invite lifecycle reasons must never be returned by ResolveSignupInvite,
+// whose anonymous response deliberately collapses failures to EXPIRED.
+message SignupFailure {
+  enum Reason {
+    SIGNUP_FAILURE_REASON_UNSPECIFIED = 0;
+    // No invite is assigned to the email proven by the verification token.
+    SIGNUP_FAILURE_REASON_INVITE_MISSING = 1;
+    // The matching invite was already consumed by a completed registration.
+    SIGNUP_FAILURE_REASON_INVITE_CLAIMED = 2;
+    // The matching invite was explicitly revoked before registration.
+    SIGNUP_FAILURE_REASON_INVITE_REVOKED = 3;
+    // The mailbox-verification challenge passed its expiry without use.
+    SIGNUP_FAILURE_REASON_VERIFICATION_TOKEN_EXPIRED = 4;
+    // The single-use mailbox-verification token was already redeemed.
+    SIGNUP_FAILURE_REASON_VERIFICATION_TOKEN_REPLAYED = 5;
+  }
+
+  Reason reason = 1;
+}
+
 message ErrorDetail {
   ErrorReason reason = 1;
   // Canonical path/id the failure is about; empty if none.
@@ -132,6 +156,7 @@ message ErrorDetail {
     // that CallFailure dropped the Any details channel).
     HumanVerificationChallenge human_verification = 15;
     AmbiguousChangeIdDetail ambiguous_change_id = 16;
+    SignupFailure signup = 17;
   }
 }
 

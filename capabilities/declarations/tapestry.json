@@ -311,6 +311,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BindSignupInviteEmail",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
       "layers": {
         "server_adapter": {
@@ -443,6 +454,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssueSignupEmailChallenge",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
       "layers": {
         "server_adapter": {
@@ -549,6 +571,17 @@
         },
         "ui": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ResolveSignupInvite",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },

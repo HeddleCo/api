@@ -460,7 +460,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
         self.assertEqual(len(shipped), 140)
-        self.assertEqual(len(planned), 16)
+        self.assertEqual(len(planned), 19)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

@@ -78,6 +78,9 @@ message FeedItem {
   google.protobuf.Timestamp expires_at = 12;
   // Populated by FeedMaterializer in V1 (used in priority scoring and card metadata):
   string actor_subject = 13; // who/what caused this item
+  // Deepest delegation label recorded by an agent attenuation block. Empty for
+  // an undelegated root credential; actor_subject remains the root subject.
+  string actor_agent_id = 25;
   bool has_agent_reasoning = 14; // context annotations attached? (+25 priority boost)
   uint32 files_changed = 15; // count from diff (feeds card metadata line)
   uint32 breaking_changes = 16; // count from semantic diff (+200 priority boost)

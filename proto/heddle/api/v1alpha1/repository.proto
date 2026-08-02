@@ -658,6 +658,9 @@ message RepoEvent {
   StateId old_state = 7;
   StateId new_state = 8;
   string actor_subject = 9;
+  // Deepest delegation label recorded by an agent attenuation block. Empty for
+  // an undelegated root credential; actor_subject remains the root subject.
+  string actor_agent_id = 14;
   string payload_json = 10;
   google.protobuf.Timestamp created_at = 11;
   // Visible path of repo_id, for multi-repo client routing.

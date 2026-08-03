@@ -17,6 +17,47 @@ def block_body(source: str, kind: str, name: str) -> str:
 
 
 class AttentionContractTest(unittest.TestCase):
+    def test_feed_file_capture_attribution_is_explicit_and_honest(self) -> None:
+        source = ATTENTION_PROTO.read_text()
+        item = block_body(source, "message", "FeedItem")
+        file_summary = block_body(source, "message", "FileChangeSummary")
+        status = block_body(source, "enum", "FeedFileAttributionStatus")
+        capture = block_body(source, "message", "FeedCaptureSummary")
+
+        self.assertRegex(item, r"\bFeedCaptureSummary\s+head_capture\s*=\s*26\s*;")
+        self.assertRegex(file_summary, r"\bstring\s+path\s*=\s*1\s*;")
+        self.assertRegex(file_summary, r"\bFileChangeKind\s+kind\s*=\s*2\s*;")
+        self.assertRegex(file_summary, r"\bstring\s+entry_id\s*=\s*3\s*;")
+        self.assertRegex(
+            file_summary,
+            r"\bFeedFileAttributionStatus\s+attribution_status\s*=\s*4\s*;",
+        )
+        self.assertRegex(
+            file_summary, r"\bFeedCaptureSummary\s+attribution\s*=\s*5\s*;"
+        )
+        self.assertRegex(
+            status, r"\bFEED_FILE_ATTRIBUTION_STATUS_COMPUTED\s*=\s*1\s*;"
+        )
+        self.assertRegex(
+            status, r"\bFEED_FILE_ATTRIBUTION_STATUS_UNAVAILABLE\s*=\s*2\s*;"
+        )
+        for field, tag in (
+            ("StateId state_id", 1),
+            ("ChangeId change_id", 2),
+            ("string thread", 3),
+            ("string capture_message", 4),
+            ("string author_display", 5),
+            ("google.protobuf.Timestamp captured_at", 6),
+            ("uint32 additions", 7),
+            ("uint32 deletions", 8),
+        ):
+            self.assertRegex(capture, rf"\b{re.escape(field)}\s*=\s*{tag}\s*;")
+        self.assertIn("never a FeedItem headline", source)
+        self.assertIn("never inferred from", source)
+        self.assertIn("FileChangeKind or an aggregate feed diff", source)
+        self.assertIn("attribution is", source)
+        self.assertIn("then absent", source)
+
     def test_feed_attribution_keeps_root_subject_and_adds_delegation_agent_id(self) -> None:
         item = block_body(ATTENTION_PROTO.read_text(), "message", "FeedItem")
 

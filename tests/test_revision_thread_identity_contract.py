@@ -72,7 +72,7 @@ class RevisionAndThreadIdentityContractTest(unittest.TestCase):
                 ),
             },
             "repo_sync.proto": {
-                "ListRefsResponse": ("head_thread", "head_thread_id"),
+                "ListRefsPageEnd": ("head_thread", "head_thread_id"),
                 "UpdateRefRequest": ("name", "thread_id"),
                 "UpdateRefResponse": ("thread_id",),
                 "PushRequest": ("target_thread", "target_thread_id"),

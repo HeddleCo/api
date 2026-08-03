@@ -8,13 +8,27 @@ import "heddle/api/v1alpha1/workflow.proto";
 
 message ListRefsRequest {
   RepositoryRef repo_path = 1;
+  // Zero streams all refs. A positive value streams at most this many refs.
+  uint32 page_size = 2;
+  // Opaque continuation token returned by ListRefsPageEnd.
+  string page_token = 3;
 }
 
 message ListRefsResponse {
+  reserved 1, 2, 4;
+
+  oneof frame {
+    RefEntry item = 3;
+    ListRefsPageEnd page_end = 5;
+  }
+}
+
+message ListRefsPageEnd {
+  // Empty when the last page, or the whole unpaged stream, was delivered.
+  string next_page_token = 1;
   // Renameable human-facing ref.
-  string head_thread = 1;
-  StateId head_state = 2;
-  repeated RefEntry refs = 3;
+  string head_thread = 2;
+  StateId head_state = 3;
   // Stable identity paired with `head_thread`.
   string head_thread_id = 4;
 }
@@ -516,7 +530,7 @@ service RepoSyncService {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
     maturity: SERVICE_MATURITY_SHIPPED
   };
-  rpc ListRefs(ListRefsRequest) returns (ListRefsResponse) {
+  rpc ListRefs(ListRefsRequest) returns (stream ListRefsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

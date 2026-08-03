@@ -574,12 +574,28 @@ message ListContextRequest {
   string ref = 2;
   optional string prefix = 3;
   optional string tag_filter = 4;
+  // Zero streams all files. A positive value streams at most this many files.
+  uint32 page_size = 5;
+  // Opaque continuation token returned by ListContextPageEnd.
+  string page_token = 6;
 }
 
 message ListContextResponse {
-  repeated AnnotatedFile files = 1;
-  ContextSummary summary = 2;
+  reserved 2;
+
+  oneof frame {
+    AnnotatedFile item = 1;
+    ListContextPageEnd page_end = 4;
+  }
+  // Bounded state context remains inline and is not cursor-paginated.
   repeated StateContextEntry states = 3;
+}
+
+message ListContextPageEnd {
+  // Empty when the last page, or the whole unpaged stream, was delivered.
+  string next_page_token = 1;
+  // Present on the first page end only.
+  ContextSummary summary = 2;
 }
 
 message ContextRevision {
@@ -597,11 +613,25 @@ message GetContextHistoryRequest {
   RepositoryRef repo_path = 1;
   string ref = 2;
   string annotation_id = 3;
+  // Zero streams all revisions. A positive value streams at most this many revisions.
+  uint32 page_size = 4;
+  // Opaque continuation token returned by GetContextHistoryPageEnd.
+  string page_token = 5;
 }
 
 message GetContextHistoryResponse {
-  ContextAnnotation annotation = 1;
-  repeated ContextRevision revisions = 2;
+  reserved 1, 3, 4;
+
+  oneof frame {
+    ContextRevision item = 2;
+    GetContextHistoryPageEnd page_end = 5;
+  }
+}
+
+message GetContextHistoryPageEnd {
+  // Empty when the last page, or the whole unpaged stream, was delivered.
+  string next_page_token = 1;
+  ContextAnnotation annotation = 2;
   optional string target_path = 3;
   optional StateId target_state_id = 4;
 }
@@ -806,7 +836,7 @@ service RepositoryService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc GetContextHistory(GetContextHistoryRequest) returns (GetContextHistoryResponse) {
+  rpc GetContextHistory(GetContextHistoryRequest) returns (stream GetContextHistoryResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
@@ -932,7 +962,7 @@ service RepositoryService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc ListContext(ListContextRequest) returns (ListContextResponse) {
+  rpc ListContext(ListContextRequest) returns (stream ListContextResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

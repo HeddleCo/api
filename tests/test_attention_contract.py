@@ -17,6 +17,14 @@ def block_body(source: str, kind: str, name: str) -> str:
 
 
 class AttentionContractTest(unittest.TestCase):
+    def test_feed_attribution_keeps_root_subject_and_adds_delegation_agent_id(self) -> None:
+        item = block_body(ATTENTION_PROTO.read_text(), "message", "FeedItem")
+
+        self.assertRegex(item, r"\bstring\s+actor_subject\s*=\s*13\s*;")
+        self.assertRegex(item, r"\bstring\s+actor_agent_id\s*=\s*25\s*;")
+        self.assertIn("Empty for", item)
+        self.assertIn("actor_subject remains the root subject", item)
+
     def test_feed_verification_is_an_explicit_three_state_projection(self) -> None:
         source = ATTENTION_PROTO.read_text()
         item = block_body(source, "message", "FeedItem")

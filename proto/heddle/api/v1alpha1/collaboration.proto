@@ -89,6 +89,10 @@ message ListDiscussionsByStateRequest {
   StateId state_id = 2;
   // UNSPECIFIED selects all discussions.
   DiscussionStatusFilter status = 3;
+  // Zero streams all discussions. A positive value streams at most this many discussions.
+  uint32 page_size = 4;
+  // Opaque continuation token returned by ListDiscussionsPageEnd.
+  string page_token = 5;
 }
 
 message ListDiscussionsBySymbolRequest {
@@ -99,7 +103,15 @@ message ListDiscussionsBySymbolRequest {
 }
 
 message ListDiscussionsResponse {
-  repeated Discussion discussions = 1;
+  oneof frame {
+    Discussion item = 1;
+    ListDiscussionsPageEnd page_end = 2;
+  }
+}
+
+message ListDiscussionsPageEnd {
+  // Empty when the last page, or the whole unpaged stream, was delivered.
+  string next_page_token = 1;
 }
 
 message GetDiscussionRequest {
@@ -154,7 +166,7 @@ service CollaborationService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc ListByState(ListDiscussionsByStateRequest) returns (ListDiscussionsResponse) {
+  rpc ListByState(ListDiscussionsByStateRequest) returns (stream ListDiscussionsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

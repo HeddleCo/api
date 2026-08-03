@@ -30,7 +30,7 @@ and provide a classic token with `read:packages` through `NODE_AUTH_TOKEN`:
 ```
 
 ```sh
-npm install --save-exact @heddleco/api@0.2.6
+npm install --save-exact @heddleco/api@0.3.0
 ```
 
 ## Hosted call contract

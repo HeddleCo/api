@@ -1059,6 +1059,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListExploreMetadata",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListSpools",
       "layers": {
         "client": {

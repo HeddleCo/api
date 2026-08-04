@@ -1059,6 +1059,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListExploreMetadata",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListSpools",
       "layers": {
         "server_adapter": {

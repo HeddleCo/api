@@ -6,6 +6,7 @@ buf format -d --exit-code
 buf lint
 python3 -B -m unittest tests/test_operation_contract.py
 python3 -B -m unittest tests/test_attention_contract.py
+python3 -B -m unittest tests/test_explore_contract.py
 python3 -B -m unittest tests/test_attestation_contract.py
 python3 -B -m unittest tests/test_handle_contract.py
 python3 -B -m unittest tests/test_owner_authorization_contract.py

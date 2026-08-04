@@ -189,6 +189,8 @@ message ExploreMetadata {
   ExploreLatestState latest_state = 15;
   google.protobuf.Timestamp latest_state_at = 16;
   google.protobuf.Timestamp oldest_state_at = 17;
+  // Raw push-time input used by the consumer-owned new-repository lift.
+  uint32 active_day_count = 18;
 }
 
 message ListExploreMetadataResponse {

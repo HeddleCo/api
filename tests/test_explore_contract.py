@@ -29,6 +29,7 @@ class ExploreContractTest(unittest.TestCase):
             "thread",
             "clarity",
             "burst_factor",
+            "active_day_count",
             "latest_state_at",
             "oldest_state_at",
         ):

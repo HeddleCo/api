@@ -158,6 +158,43 @@ message ListSpoolsRequest {
   bool repos_only = 1; // when true, return only content-bearing (repo) spools
 }
 
+// Bulk read of push-stable Explore inputs. Ranking weights, recency, score,
+// and lane policy deliberately remain consumer-owned.
+message ListExploreMetadataRequest {}
+
+message ExploreLatestState {
+  ChangeId change_id = 1;
+  string intent = 2;
+  string principal_name = 3;
+  string principal_email = 4;
+  string agent_provider = 5;
+  string agent_model = 6;
+}
+
+message ExploreMetadata {
+  string repo_id = 1;
+  string full_path = 2;
+  double continuity = 3;
+  double verification = 4;
+  double collaboration = 5;
+  double thread = 6;
+  double clarity = 7;
+  double burst_factor = 8;
+  uint32 state_count = 9;
+  uint32 verified_count = 10;
+  uint32 thread_count = 11;
+  uint32 unique_principals = 12;
+  uint32 unique_agents = 13;
+  double meaningful_state_ratio = 14;
+  ExploreLatestState latest_state = 15;
+  google.protobuf.Timestamp latest_state_at = 16;
+  google.protobuf.Timestamp oldest_state_at = 17;
+}
+
+message ListExploreMetadataResponse {
+  repeated ExploreMetadata repositories = 1;
+}
+
 message CreateRepositoryRequest {
   string namespace_path = 1;
   string slug = 2;
@@ -1373,6 +1410,22 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Public corpus projection only. Producers must enforce the public-visibility
+  // floor again while reading; a stale private row is never returned.
+  rpc ListExploreMetadata(ListExploreMetadataRequest) returns (ListExploreMetadataResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }

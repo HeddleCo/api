@@ -54,6 +54,21 @@ message GetTreeRequest {
   RepositoryRef repo_path = 1;
   string ref = 2;
   string path = 3;
+  // How many levels below `path` to expand. Absent = 1, the single-level
+  // listing every existing caller gets today. An explicit 0 means unbounded:
+  // walk the whole subtree, subject to the server's entry cap
+  // (TreeResponse.truncated). Explicitly optional so absent and an explicit 0
+  // stay distinguishable.
+  optional uint32 depth = 4;
+  // Additional subtrees to expand in the same round trip, each a
+  // repository-root-relative path read at the same `ref` and `depth`. Empty =
+  // only `path` is expanded, which is today's behavior. `path` is always
+  // expanded and does not need to be repeated here.
+  repeated string paths = 5;
+  // Ref or state id to classify entries against. Absent = no comparison is
+  // performed and every TreeEntry.change_status stays
+  // TREE_ENTRY_CHANGE_STATUS_UNSPECIFIED, which is today's behavior.
+  optional string status_base = 6;
 }
 
 // Closed set matching git's tree object model, plus the native SPOOLLINK edge
@@ -74,22 +89,61 @@ enum TreeEntryKind {
   TREE_ENTRY_KIND_SPOOLLINK = 5;
 }
 
+// How an entry compares with GetTreeRequest.status_base. UNSPECIFIED is both
+// the "no base was requested" case and the "unchanged against the base" case;
+// a caller that needs the distinction knows which of the two applies from
+// whether it set status_base.
+enum TreeEntryChangeStatus {
+  TREE_ENTRY_CHANGE_STATUS_UNSPECIFIED = 0;
+  TREE_ENTRY_CHANGE_STATUS_ADDED = 1;
+  TREE_ENTRY_CHANGE_STATUS_MODIFIED = 2;
+  TREE_ENTRY_CHANGE_STATUS_DELETED = 3;
+  // Rename-detected move; the counterpart path is not carried on the entry.
+  TREE_ENTRY_CHANGE_STATUS_RENAMED = 4;
+  // Present in the working tree but not tracked at the base.
+  TREE_ENTRY_CHANGE_STATUS_UNTRACKED = 5;
+  // Untracked and matched by an ignore rule.
+  TREE_ENTRY_CHANGE_STATUS_IGNORED = 6;
+}
+
 message TreeEntry {
   string name = 1;
   TreeEntryKind kind = 2;
   bytes hash = 3;
+  // Blob content length in bytes. 0 for TREE entries and for any kind whose
+  // size the server did not resolve; absent = 0 = today's behavior, where no
+  // size is carried at all.
+  uint64 size = 4;
+  // Set only when GetTreeRequest.status_base is present; UNSPECIFIED
+  // otherwise, which is today's behavior.
+  TreeEntryChangeStatus change_status = 5;
+  // Directory entries only: some entry below this tree has a change_status
+  // other than UNSPECIFIED against status_base. Always false for leaf kinds
+  // and whenever status_base is absent.
+  bool descendant_changed = 6;
 }
 
 message TreeResponse {
   StateId state_id = 1;
   string path = 2;
   repeated TreeEntry entries = 3;
+  // The server stopped short of the requested walk because it hit a depth or
+  // entry cap, so `entries` is a prefix of the full result. False = complete,
+  // which is today's behavior for the single-level listing.
+  bool truncated = 4;
 }
 
 message GetBlobRequest {
   RepositoryRef repo_path = 1;
   string ref = 2;
   string path = 3;
+  // 1-based first line of the window to return. 0 = no window: the whole blob
+  // is returned, which is today's behavior. A start_line past the end of the
+  // blob yields empty content, not an error.
+  uint32 start_line = 4;
+  // Number of lines to return from `start_line`. 0 = read to the end of the
+  // blob. Ignored when start_line is 0.
+  uint32 line_count = 5;
 }
 
 message GetCompareRequest {
@@ -108,6 +162,12 @@ message BlobResponse {
   // Leaf kinds only (BLOB / SYMLINK / GITLINK). SYMLINK content is the target-
   // path bytes; the link is NOT followed (heddle#850 semantics).
   TreeEntryKind kind = 6;
+  // 1-based first line carried in `content` when the request asked for a
+  // window. 0 = the whole blob was returned, which is today's behavior.
+  uint32 start_line = 7;
+  // Line count of the entire blob, not of the returned window. 0 when the
+  // server did not count lines — the case for every unwindowed read today.
+  uint32 total_lines = 8;
 }
 
 message DiffSpan {

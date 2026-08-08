@@ -14,11 +14,12 @@ use heddle_api::heddle::api::v1alpha1::{
     GetContextHistoryPageEnd, GetContextHistoryRequest, GetContextHistoryResponse,
     HumanVerification, HumanVerificationChallenge, ListContextPageEnd, ListContextRequest,
     ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
-    ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse, PolicyDenial,
+    ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse,
+    ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
     ProviderPlanResponse, ProviderPullCapabilityContext, ProviderReadRequest, PushRequest,
-    RequestProof, ServiceMaturity, StateId, TraceContext, error_detail,
+    RequestProof, ServiceMaturity, StateId, ThreadOrder, TraceContext, error_detail,
     get_context_history_response, list_context_response, list_discussions_response,
-    list_refs_response,
+    list_refs_response, list_threads_response, thread_state,
 };
 use heddle_api::{
     ALL_METHODS, HOSTED_ALPN_V1, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
@@ -204,6 +205,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
         "/heddle.api.v1alpha1.RepositoryService/ListContext",
         "/heddle.api.v1alpha1.RepositoryService/GetContextHistory",
         "/heddle.api.v1alpha1.CollaborationService/ListByState",
+        "/heddle.api.v1alpha1.WorkflowService/ListThreads",
     ] {
         assert_eq!(
             method_descriptor(path).expect("list descriptor").streaming,
@@ -280,6 +282,23 @@ fn hosted_list_streams_carry_cursors_and_terminal_page_frames() {
             };
             (request.page_token, request.page_size)
         },
+        {
+            let request = ListThreadsRequest {
+                page_size: 25,
+                page_token: "thread-cursor".into(),
+                states: vec![
+                    thread_state::Kind::ThreadStateActive as i32,
+                    thread_state::Kind::ThreadStateBlocked as i32,
+                ],
+                query: "api".into(),
+                order: ThreadOrder::LastActivityDesc as i32,
+                ..Default::default()
+            };
+            assert_eq!(request.states.len(), 2);
+            assert_eq!(request.query, "api");
+            assert_eq!(request.order, ThreadOrder::LastActivityDesc as i32);
+            (request.page_token, request.page_size)
+        },
     ];
     assert!(
         requests
@@ -315,6 +334,12 @@ fn hosted_list_streams_carry_cursors_and_terminal_page_frames() {
             },
         )),
     };
+    let threads = ListThreadsResponse {
+        frame: Some(list_threads_response::Frame::PageEnd(ListThreadsPageEnd {
+            next_page_token: "next-threads".into(),
+            total_count: Some(400_000),
+        })),
+    };
 
     assert!(matches!(
         refs.frame,
@@ -336,6 +361,15 @@ fn hosted_list_streams_carry_cursors_and_terminal_page_frames() {
         Some(list_discussions_response::Frame::PageEnd(
             ListDiscussionsPageEnd { ref next_page_token }
         )) if next_page_token.is_empty()
+    ));
+    assert!(matches!(
+        threads.frame,
+        Some(list_threads_response::Frame::PageEnd(
+            ListThreadsPageEnd {
+                ref next_page_token,
+                total_count: Some(400_000)
+            }
+        )) if next_page_token == "next-threads"
     ));
 }
 

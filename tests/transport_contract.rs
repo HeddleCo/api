@@ -11,9 +11,14 @@ use heddle_api::framing::{
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ErrorDetail, ErrorReason,
-    HumanVerification, HumanVerificationChallenge, PolicyDenial, ProviderPlanResponse,
-    ProviderPullCapabilityContext, ProviderReadRequest, PushRequest, RequestProof, ServiceMaturity,
-    StateId, TraceContext, error_detail,
+    GetContextHistoryPageEnd, GetContextHistoryRequest, GetContextHistoryResponse,
+    HumanVerification, HumanVerificationChallenge, ListContextPageEnd, ListContextRequest,
+    ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
+    ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse, PolicyDenial,
+    ProviderPlanResponse, ProviderPullCapabilityContext, ProviderReadRequest, PushRequest,
+    RequestProof, ServiceMaturity, StateId, TraceContext, error_detail,
+    get_context_history_response, list_context_response, list_discussions_response,
+    list_refs_response,
 };
 use heddle_api::{
     ALL_METHODS, HOSTED_ALPN_V1, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
@@ -182,7 +187,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
     assert_eq!(HOSTED_ALPN_V1, b"heddle-api/1");
     assert_eq!(descriptor.input, "heddle.api.v1alpha1.ListRefsRequest");
     assert_eq!(descriptor.output, "heddle.api.v1alpha1.ListRefsResponse");
-    assert_eq!(descriptor.streaming, StreamingShape::Unary);
+    assert_eq!(descriptor.streaming, StreamingShape::ServerStreaming);
     assert!(descriptor.allows_zero_rtt());
     assert_eq!(
         descriptor.authorization_access,
@@ -195,6 +200,16 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
         AuthorizationAccess::Public
     );
     assert_eq!(ALL_METHODS.len(), 160);
+    for path in [
+        "/heddle.api.v1alpha1.RepositoryService/ListContext",
+        "/heddle.api.v1alpha1.RepositoryService/GetContextHistory",
+        "/heddle.api.v1alpha1.CollaborationService/ListByState",
+    ] {
+        assert_eq!(
+            method_descriptor(path).expect("list descriptor").streaming,
+            StreamingShape::ServerStreaming
+        );
+    }
     for method in [
         "ClaimHandle",
         "GetHandleStatus",
@@ -228,6 +243,100 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             StreamingShape::Bidirectional
         );
     }
+}
+
+#[test]
+fn hosted_list_streams_carry_cursors_and_terminal_page_frames() {
+    let requests = [
+        {
+            let request = ListRefsRequest {
+                page_size: 25,
+                page_token: "refs-cursor".into(),
+                ..Default::default()
+            };
+            (request.page_token, request.page_size)
+        },
+        {
+            let request = ListContextRequest {
+                page_size: 25,
+                page_token: "context-cursor".into(),
+                ..Default::default()
+            };
+            (request.page_token, request.page_size)
+        },
+        {
+            let request = GetContextHistoryRequest {
+                page_size: 25,
+                page_token: "history-cursor".into(),
+                ..Default::default()
+            };
+            (request.page_token, request.page_size)
+        },
+        {
+            let request = ListDiscussionsByStateRequest {
+                page_size: 25,
+                page_token: "discussion-cursor".into(),
+                ..Default::default()
+            };
+            (request.page_token, request.page_size)
+        },
+    ];
+    assert!(
+        requests
+            .iter()
+            .all(|(page_token, page_size)| !page_token.is_empty() && *page_size == 25)
+    );
+
+    let refs = ListRefsResponse {
+        frame: Some(list_refs_response::Frame::PageEnd(ListRefsPageEnd {
+            next_page_token: "next-refs".into(),
+            ..Default::default()
+        })),
+    };
+    let context = ListContextResponse {
+        frame: Some(list_context_response::Frame::PageEnd(ListContextPageEnd {
+            next_page_token: "next-context".into(),
+            summary: Some(Default::default()),
+        })),
+        states: Vec::new(),
+    };
+    let history = GetContextHistoryResponse {
+        frame: Some(get_context_history_response::Frame::PageEnd(
+            GetContextHistoryPageEnd {
+                next_page_token: "next-history".into(),
+                ..Default::default()
+            },
+        )),
+    };
+    let discussions = ListDiscussionsResponse {
+        frame: Some(list_discussions_response::Frame::PageEnd(
+            ListDiscussionsPageEnd {
+                next_page_token: String::new(),
+            },
+        )),
+    };
+
+    assert!(matches!(
+        refs.frame,
+        Some(list_refs_response::Frame::PageEnd(_))
+    ));
+    assert!(matches!(
+        context.frame,
+        Some(list_context_response::Frame::PageEnd(ListContextPageEnd {
+            summary: Some(_),
+            ..
+        }))
+    ));
+    assert!(matches!(
+        history.frame,
+        Some(get_context_history_response::Frame::PageEnd(_))
+    ));
+    assert!(matches!(
+        discussions.frame,
+        Some(list_discussions_response::Frame::PageEnd(
+            ListDiscussionsPageEnd { ref next_page_token }
+        )) if next_page_token.is_empty()
+    ));
 }
 
 #[test]

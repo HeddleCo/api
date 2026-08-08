@@ -15,6 +15,29 @@ def message_body(source: str, name: str) -> str:
 
 
 class RevisionAndThreadIdentityContractTest(unittest.TestCase):
+    def test_thread_list_item_is_a_slim_status_and_identity_projection(self) -> None:
+        source = (PROTO / "workflow.proto").read_text()
+        item = message_body(source, "ThreadListItem")
+        fields = {
+            name
+            for name in re.findall(
+                r"(?m)^\s*(?:optional\s+)?[.\w]+\s+(\w+)\s*=\s*\d+\s*;",
+                item,
+            )
+        }
+
+        self.assertEqual(
+            fields,
+            {
+                "thread_id",
+                "name",
+                "thread_state",
+                "last_activity_at",
+                "target_thread_id",
+                "thread_health",
+            },
+        )
+
     def test_state_id_is_physical_and_distinct_from_change_id(self) -> None:
         source = (PROTO / "types.proto").read_text()
         state_id = message_body(source, "StateId").lower()

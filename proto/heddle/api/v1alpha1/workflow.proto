@@ -177,10 +177,53 @@ message ThreadMetadata {
 
 message ListThreadsRequest {
   RepositoryRef repo_path = 1;
+  // Zero streams all threads. A positive value streams at most this many threads.
+  uint32 page_size = 2;
+  // Opaque continuation token returned by ListThreadsPageEnd.
+  string page_token = 3;
+  // Empty selects all thread lifecycle states.
+  repeated ThreadState.Kind states = 4;
+  // Free-text search over thread name/title. Empty disables text filtering.
+  string query = 5;
+  // UNSPECIFIED is treated as LAST_ACTIVITY_DESC.
+  ThreadOrder order = 6;
+}
+
+enum ThreadOrder {
+  THREAD_ORDER_UNSPECIFIED = 0;
+  // Most-recently-active first, ordered by ThreadSummary.last_activity_at.
+  THREAD_ORDER_LAST_ACTIVITY_DESC = 1;
+  THREAD_ORDER_NAME_ASC = 2;
 }
 
 message ListThreadsResponse {
-  repeated ThreadSummary threads = 1;
+  oneof frame {
+    ThreadListItem item = 1;
+    ListThreadsPageEnd page_end = 2;
+  }
+}
+
+// Compact status and identity projection for thread-list rows. Fetch the full
+// ThreadSummary through GetThread when detail is needed.
+message ThreadListItem {
+  // Stable opaque server-assigned identity.
+  string thread_id = 1;
+  // Renameable human-facing thread ref/title.
+  string name = 2;
+  ThreadState.Kind thread_state = 3;
+  // Grounds LAST_ACTIVITY_DESC ordering and renders row recency.
+  optional google.protobuf.Timestamp last_activity_at = 4;
+  // Stable identity of the thread's target, when one is configured.
+  optional string target_thread_id = 5;
+  // Compact server-computed status/health rollup for the row.
+  optional string thread_health = 6;
+}
+
+message ListThreadsPageEnd {
+  // Empty when the last page, or the whole unpaged stream, was delivered.
+  string next_page_token = 1;
+  // Total threads matching states/query before pagination; present on the first page end only.
+  optional uint32 total_count = 2;
 }
 
 message GetWorkspaceSummaryRequest {
@@ -253,7 +296,7 @@ service WorkflowService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse) {
+  rpc ListThreads(ListThreadsRequest) returns (stream ListThreadsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

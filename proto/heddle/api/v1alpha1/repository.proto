@@ -8,6 +8,22 @@ import "heddle/api/v1alpha1/types.proto";
 
 message GetRefsRequest {
   RepositoryRef repo_path = 1;
+  // Sargable prefix filter over ref names, for example "refs/heads/feat".
+  // Empty = all refs, which preserves current behavior.
+  string ref_prefix = 2;
+  // Free-text substring over ref names for typeahead. Empty = no text filter.
+  string query = 3;
+  // 0 = server default cap; otherwise return at most this many refs.
+  uint32 limit = 4;
+  // UNSPECIFIED preserves the current ordering.
+  RefOrder order = 5;
+}
+
+enum RefOrder {
+  REF_ORDER_UNSPECIFIED = 0;
+  REF_ORDER_NAME_ASC = 1;
+  // Most-recently-moved first, ordered by MarkerInfo.updated_at.
+  REF_ORDER_UPDATED_DESC = 2;
 }
 
 message MarkerInfo {
@@ -22,6 +38,8 @@ message GetRefsResponse {
   string head = 1;
   repeated RefEntry threads = 2;
   repeated MarkerInfo markers = 3;
+  // Total refs matching the filters before limit is applied.
+  uint32 total_count = 4;
 }
 
 message ListStatesRequest {

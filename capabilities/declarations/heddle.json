@@ -853,7 +853,7 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
       "layers": {
         "client": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "cli": {
           "status": "intentionally-unsupported"
@@ -864,10 +864,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
       "layers": {
         "client": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "cli": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -875,10 +875,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateSpool",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -952,10 +952,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
       "layers": {
         "client": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "cli": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -963,10 +963,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserSpool",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },

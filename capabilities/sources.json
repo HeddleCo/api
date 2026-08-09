@@ -4,7 +4,7 @@
     "heddle": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/heddle.json",
-      "sha256": "8ae0f9aa6a3820c0f4ef038bf2f4dbdd6fba649d70269d1e0c30fb00d867ee4d"
+      "sha256": "d8ab473625ad367e0404a87763a07430c0f0bb3a339b819a11e0b30d5a009e5e"
     },
     "weft": {
       "kind": "consumer-derived-sanitized-declaration",

@@ -1414,14 +1414,15 @@ service IdentityService {
     };
   }
   // Creates a mailbox-possession challenge for Tapestry to deliver. Only an
-  // authenticated service account may call this RPC or receive its response;
-  // no public RPC returns IssueSignupEmailChallengeResponse. ACCEPTED is
-  // deliberately generic and does not disclose invite or account existence.
+  // authenticated service account may call this RPC or receive its response.
+  // Its bearer credential is the possession factor; no request signature is
+  // required. No public RPC returns IssueSignupEmailChallengeResponse. ACCEPTED
+  // is deliberately generic and does not disclose invite or account existence.
   rpc IssueSignupEmailChallenge(IssueSignupEmailChallengeRequest) returns (IssueSignupEmailChallengeResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true

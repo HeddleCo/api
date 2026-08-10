@@ -758,6 +758,34 @@ message ResolveSignupInviteResponse {
   string recipient_email = 4;
 }
 
+// The complete method allowlist carried by a code-claim signup bearer.
+// UNSPECIFIED is never emitted and must be rejected if received.
+enum SignupBootstrapMethod {
+  SIGNUP_BOOTSTRAP_METHOD_UNSPECIFIED = 0;
+  SIGNUP_BOOTSTRAP_METHOD_BEGIN_WEB_AUTHN_REGISTRATION = 1;
+  SIGNUP_BOOTSTRAP_METHOD_REGISTER_PUBLIC_KEY = 2;
+}
+
+message ClaimSignupInviteRequest {
+  // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
+  // Possession is the only authorization for this unsigned request. A
+  // successful claim atomically reserves the code and is not retryable.
+  string invite_code = 1;
+}
+
+message ClaimSignupInviteResponse {
+  // Opaque short-lived bearer attenuated to exactly the methods listed in
+  // allowed_methods. It must carry no other capability or account authority.
+  bytes bootstrap_token = 1;
+  // Absolute expiry enforced by the bearer itself. The server must keep this
+  // lifetime short; clients must not infer validity beyond this timestamp.
+  google.protobuf.Timestamp expires_at = 2;
+  // Exact capability projection for bootstrap_token. A successful response
+  // must contain BEGIN_WEB_AUTHN_REGISTRATION and REGISTER_PUBLIC_KEY exactly
+  // once each, and no other value. The bearer remains the authority.
+  repeated SignupBootstrapMethod allowed_methods = 3;
+}
+
 // Creates an unclaimed human account by consuming the human's signup invite.
 // The account starts with no independent root; the caller receives only the
 // pre-attenuated, agent-key-bound capability returned below.
@@ -1237,6 +1265,37 @@ service IdentityService {
         role: AUTHORIZATION_ROLE_CALLER_BOUND
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Atomically reserves an unassigned shareable invite and mints the narrowly
+  // scoped signup bearer described by ClaimSignupInviteResponse. Holding the
+  // code is the authorization; no bearer or request signature is required.
+  //
+  // Invalid (including malformed or unknown), consumed, reserved, revoked,
+  // and email-bound codes all fail identically with CALL_FAILURE_CODE_NOT_FOUND,
+  // ERROR_REASON_RESOURCE_NOT_FOUND, empty ErrorDetail.resource and .field,
+  // and SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE. The message and processing
+  // path/timing envelope must also be the same, and no invite metadata may be
+  // returned. Rate-limit and internal failures remain distinct operational
+  // failures. Because a successful claim consumes the one mint opportunity,
+  // clients must never automatically or manually retry an ambiguous outcome.
+  rpc ClaimSignupInvite(ClaimSignupInviteRequest) returns (ClaimSignupInviteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_NEVER
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "invite_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   // Claims only a verified-owner hold belonging to the authenticated subject.

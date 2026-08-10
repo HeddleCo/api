@@ -135,6 +135,12 @@ message SignupFailure {
     SIGNUP_FAILURE_REASON_VERIFICATION_TOKEN_EXPIRED = 4;
     // The single-use mailbox-verification token was already redeemed.
     SIGNUP_FAILURE_REASON_VERIFICATION_TOKEN_REPLAYED = 5;
+    // The only invite-code rejection ClaimSignupInvite may expose. Invalid
+    // (including malformed or unknown), consumed, reserved, revoked, and
+    // email-bound codes all use this one reason and the identical failure
+    // envelope documented on that RPC. No narrower invite lifecycle reason
+    // above may be returned by ClaimSignupInvite.
+    SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE = 6;
   }
 
   Reason reason = 1;

@@ -322,6 +322,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimSignupInvite",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
       "layers": {
         "implementation": {

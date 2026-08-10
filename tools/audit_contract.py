@@ -63,9 +63,9 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
-    # Two services are planned, and eight methods on otherwise-shipped services
+    # Two services are planned, and nine methods on otherwise-shipped services
     # deliberately override their inherited maturity to planned.
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 10
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 11
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
@@ -247,6 +247,10 @@ def audit_new_descriptor(decoded: str) -> None:
                     continue
                 input_type = re.search(r'^      input_type: "(.+)"$', method_text, re.MULTILINE).group(1)
                 retry_fields = [field[:2] for field in messages[input_type] if field[0] == "client_operation_id"]
+                if "retry_behavior: RETRY_BEHAVIOR_NEVER" in method_text:
+                    assert retry_fields == [], input_type
+                    assert "client_operation_id_required: true" not in method_text, input_type
+                    continue
                 assert retry_fields == [("client_operation_id", "LABEL_OPTIONAL")], input_type
 
 

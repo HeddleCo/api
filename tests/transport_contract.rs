@@ -10,10 +10,10 @@ use heddle_api::framing::{
     encode_success_response, encode_success_response_into,
 };
 use heddle_api::heddle::api::v1alpha1::{
-    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ErrorDetail, ErrorReason,
-    GetContextHistoryPageEnd, GetContextHistoryRequest, GetContextHistoryResponse,
-    HumanVerification, HumanVerificationChallenge, ListContextPageEnd, ListContextRequest,
-    ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
+    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ClaimSignupInviteRequest,
+    ErrorDetail, ErrorReason, GetContextHistoryPageEnd, GetContextHistoryRequest,
+    GetContextHistoryResponse, HumanVerification, HumanVerificationChallenge, ListContextPageEnd,
+    ListContextRequest, ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
     ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse,
     ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
     ProviderPlanResponse, ProviderPullCapabilityContext, ProviderReadRequest,
@@ -201,7 +201,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 161);
+    assert_eq!(ALL_METHODS.len(), 162);
     for path in [
         "/heddle.api.v1alpha1.RepositoryService/ListContext",
         "/heddle.api.v1alpha1.RepositoryService/GetContextHistory",
@@ -437,6 +437,34 @@ fn generated_descriptor_carries_agent_rooted_provisioning_contract() {
     assert_eq!(
         method.client_operation_id(&request).expect("valid request"),
         Some("provision-operation-123")
+    );
+}
+
+#[test]
+fn generated_descriptor_carries_code_claim_contract() {
+    let method = method_descriptor("/heddle.api.v1alpha1.IdentityService/ClaimSignupInvite")
+        .expect("code-claim signup descriptor");
+
+    assert_eq!(method.input, "heddle.api.v1alpha1.ClaimSignupInviteRequest");
+    assert_eq!(
+        method.output,
+        "heddle.api.v1alpha1.ClaimSignupInviteResponse"
+    );
+    assert_eq!(method.signing_tier, SigningTier::None);
+    assert_eq!(method.authorization_access, AuthorizationAccess::Public);
+    assert_eq!(method.effect, RpcEffect::DurableWrite);
+    assert_eq!(method.retry_behavior, RetryBehavior::Never);
+    assert!(!method.client_operation_id_required);
+    assert_eq!(method.client_operation_id_field_number, None);
+    assert_eq!(method.maturity, ServiceMaturity::Planned);
+
+    let request = ClaimSignupInviteRequest {
+        invite_code: "invite-code".to_string(),
+    }
+    .encode_to_vec();
+    assert_eq!(
+        method.client_operation_id(&request).expect("valid request"),
+        None
     );
 }
 

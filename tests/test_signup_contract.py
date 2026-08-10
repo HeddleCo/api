@@ -19,7 +19,7 @@ def fields(source: str, message: str) -> list[tuple[str, int]]:
     return [
         (name, int(tag))
         for name, tag in re.findall(
-            r"(?m)^\s*[A-Za-z][A-Za-z0-9_.]*\s+"
+            r"(?m)^\s*(?:repeated\s+)?[A-Za-z][A-Za-z0-9_.]*\s+"
             r"([a-z][a-z0-9_]*)\s*=\s*(\d+)\s*;",
             body(source, "message", message),
         )
@@ -139,6 +139,71 @@ class SignupContractTest(unittest.TestCase):
         self.assertIn("Anonymous, per-IP-rate-limited lookup", service_prefix[-800:])
         self.assertIn("same per-IP budget", service_prefix[-800:])
 
+    def test_code_claim_is_non_retryable_and_existence_hidden(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "ClaimSignupInviteRequest"),
+            [("invite_code", 1)],
+        )
+        request = body(IDENTITY, "message", "ClaimSignupInviteRequest")
+        self.assertIn("Same high-entropy opaque invite code", request)
+        self.assertIn("Possession is the only authorization", request)
+
+        methods = body(IDENTITY, "enum", "SignupBootstrapMethod")
+        self.assertEqual(
+            re.findall(r"SIGNUP_BOOTSTRAP_METHOD_(\w+)\s*=\s*(\d+)", methods),
+            [
+                ("UNSPECIFIED", "0"),
+                ("BEGIN_WEB_AUTHN_REGISTRATION", "1"),
+                ("REGISTER_PUBLIC_KEY", "2"),
+            ],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "ClaimSignupInviteResponse"),
+            [("bootstrap_token", 1), ("expires_at", 2), ("allowed_methods", 3)],
+        )
+        response = body(IDENTITY, "message", "ClaimSignupInviteResponse")
+        self.assertIn("Opaque short-lived bearer", response)
+        self.assertIn("must carry no other capability", response)
+        self.assertIn("BEGIN_WEB_AUTHN_REGISTRATION and REGISTER_PUBLIC_KEY exactly", response)
+        self.assertIn("The bearer remains the authority", response)
+
+        request_type, response_type, contract = rpc("ClaimSignupInvite")
+        self.assertEqual(request_type, "ClaimSignupInviteRequest")
+        self.assertEqual(response_type, "ClaimSignupInviteResponse")
+        for required in (
+            "maturity: SERVICE_MATURITY_PLANNED",
+            "signing_tier: SIGNING_TIER_NONE",
+            "effect: RPC_EFFECT_DURABLE_WRITE",
+            "retry_behavior: RETRY_BEHAVIOR_NEVER",
+            "client_operation_id_required: false",
+            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
+            "authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND",
+            "authorization_scope_source: "
+            "AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE",
+            'path: "invite_code"',
+            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
+        ):
+            self.assertIn(required, contract)
+
+        service_prefix = IDENTITY[: IDENTITY.index("rpc ClaimSignupInvite")]
+        public_contract = service_prefix[-1800:]
+        for hidden_state in (
+            "malformed or unknown",
+            "consumed",
+            "reserved",
+            "revoked",
+            "email-bound",
+        ):
+            self.assertIn(hidden_state, public_contract)
+        for failure_shape in (
+            "CALL_FAILURE_CODE_NOT_FOUND",
+            "ERROR_REASON_RESOURCE_NOT_FOUND",
+            "empty ErrorDetail.resource and .field",
+            "SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE",
+            "processing\n  // path/timing envelope must also be the same",
+        ):
+            self.assertIn(failure_shape, public_contract)
+
     def test_agent_rooted_provisioning_is_invite_and_key_bound(self) -> None:
         self.assertEqual(
             fields(IDENTITY, "ProvisionAgentRootedAccountRequest"),
@@ -191,6 +256,7 @@ class SignupContractTest(unittest.TestCase):
             "INVITE_REVOKED": 3,
             "VERIFICATION_TOKEN_EXPIRED": 4,
             "VERIFICATION_TOKEN_REPLAYED": 5,
+            "INVITE_UNAVAILABLE": 6,
         }
         for reason, tag in expected.items():
             self.assertIn(f"SIGNUP_FAILURE_REASON_{reason} = {tag}", signup)
@@ -199,6 +265,11 @@ class SignupContractTest(unittest.TestCase):
             body(ERRORS, "message", "ErrorDetail"),
         )
         self.assertIn("must never be returned by ResolveSignupInvite", ERRORS)
+        self.assertIn(
+            "No narrower invite lifecycle reason\n"
+            "    // above may be returned by ClaimSignupInvite",
+            ERRORS,
+        )
 
 
 if __name__ == "__main__":

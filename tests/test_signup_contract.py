@@ -58,7 +58,7 @@ class SignupContractTest(unittest.TestCase):
         self.assertEqual(response, "IssueSignupEmailChallengeResponse")
         for required in (
             "maturity: SERVICE_MATURITY_PLANNED",
-            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
+            "signing_tier: SIGNING_TIER_NONE",
             "client_operation_id_required: true",
             "authorization_access: "
             "AUTHORIZATION_ACCESS_AUTHENTICATED_SERVICE_ACCOUNT",

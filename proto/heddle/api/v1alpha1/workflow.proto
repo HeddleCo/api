@@ -205,6 +205,15 @@ message ListThreadsResponse {
 
 // Compact status and identity projection for thread-list rows. Fetch the full
 // ThreadSummary through GetThread when detail is needed.
+//
+// Field selection is driven by list consumers (notably loadTasksView), not by
+// mirroring every cheap ThreadSummary field. Do not re-add freshness,
+// current_state, or changed_paths without a concrete reader: changed_paths is
+// an unbounded repeated that regresses the streamed-list frame-size goal.
+//
+// Hosted-empty today (CLI may populate; hosted registry leaves unset so the
+// next slim must not treat these as free list-row candidates):
+//   - thread_health
 message ThreadListItem {
   // Stable opaque server-assigned identity.
   string thread_id = 1;
@@ -216,7 +225,19 @@ message ThreadListItem {
   // Stable identity of the thread's target, when one is configured.
   optional string target_thread_id = 5;
   // Compact server-computed status/health rollup for the row.
+  // Hosted-empty today: the hosted ListThreads projection leaves this unset;
+  // CLI implementations may populate it. Keep the field (consumer-read, free
+  // when absent) rather than removing it for a formal break with no wire win.
   optional string thread_health = 6;
+  // Human-facing task/title text. Same name/type as ThreadSummary.task so
+  // mappers project 1:1 from the widened list row.
+  optional string task = 7;
+  // Base revision the thread is relative to. Same name/type as
+  // ThreadSummary.base_state.
+  optional StateId base_state = 8;
+  // Renameable human-facing parent thread ref. Same name/type as
+  // ThreadSummary.parent_thread (not parent_thread_id).
+  optional string parent_thread = 9;
 }
 
 message ListThreadsPageEnd {

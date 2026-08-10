@@ -35,8 +35,31 @@ class RevisionAndThreadIdentityContractTest(unittest.TestCase):
                 "last_activity_at",
                 "target_thread_id",
                 "thread_health",
+                "task",
+                "base_state",
+                "parent_thread",
             },
         )
+        # loadTasksView consumer fields; keep thread_health (do not drop).
+        for required in (
+            "task",
+            "base_state",
+            "parent_thread",
+            "thread_health",
+        ):
+            self.assertIn(required, fields)
+        # Explicit exclusions: unread and/or frame-size regressions.
+        for excluded in ("freshness", "current_state", "changed_paths"):
+            self.assertNotIn(excluded, fields)
+        # Hosted-empty annotation must stay so the next slim does not re-pick.
+        self.assertRegex(
+            item,
+            r"(?is)hosted-empty today.*thread_health|thread_health.*hosted-empty today",
+        )
+        # Types align with ThreadSummary for 1:1 mapper projection.
+        self.assertRegex(item, r"optional\s+string\s+task\s*=\s*7\s*;")
+        self.assertRegex(item, r"optional\s+StateId\s+base_state\s*=\s*8\s*;")
+        self.assertRegex(item, r"optional\s+string\s+parent_thread\s*=\s*9\s*;")
 
     def test_state_id_is_physical_and_distinct_from_change_id(self) -> None:
         source = (PROTO / "types.proto").read_text()

@@ -7,13 +7,14 @@ import "heddle/api/v1alpha1/identity.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 // ───────────────────────────────────────────────────────────────
-// SearchService — caller-scoped global entity search (Tier 1).
-// Spike: weft#445 (docs/spikes/search-service.md §3); impl: weft#446.
-// ADDITIVE contract only; handlers land in weft (a follow-up).
+// SearchService — server-streaming federated search (Sourcegraph Stream API shape).
+// Design: weft#1241 (docs/spikes/unified-search.md §7); issue: api#104.
+// Search is UNWIRED in weft today (no production consumers); unary→stream is a
+// deliberate pre-1.0 break with no live traffic impact. See breaking/0.6.0.md.
 // ───────────────────────────────────────────────────────────────
 
-// Request-side scope filter only. The response has no entity-kind enum: the
-// SearchHit `oneof` tag IS the entity kind (no illegal kind/payload mismatch).
+// Request-side scope / domain filter. The SearchHit `oneof` tag IS the entity
+// kind on the wire (no illegal kind/payload mismatch).
 enum SearchEntityKind {
   SEARCH_ENTITY_KIND_UNSPECIFIED = 0;
   SEARCH_ENTITY_KIND_USER = 1;
@@ -21,36 +22,165 @@ enum SearchEntityKind {
   SEARCH_ENTITY_KIND_AGENT = 3;
   SEARCH_ENTITY_KIND_THREAD = 4;
   SEARCH_ENTITY_KIND_FEED = 5;
-  // 6+ reserved for Tier 2: CONTENT, MESSAGE, STATE, SYMBOL.
+  // Tier-2 / id domains:
+  SEARCH_ENTITY_KIND_STATE = 6;
+  SEARCH_ENTITY_KIND_SYMBOL = 7;
+  SEARCH_ENTITY_KIND_CONTENT = 8;
+  SEARCH_ENTITY_KIND_MESSAGE = 9;
+  SEARCH_ENTITY_KIND_ANNOTATION = 10;
+}
+
+// How a hit was produced. Used by MatchProvenance (#976).
+enum MatchKind {
+  MATCH_KIND_UNSPECIFIED = 0;
+  MATCH_KIND_EXACT = 1;
+  MATCH_KIND_PREFIX = 2;
+  MATCH_KIND_FUZZY = 3;
+  MATCH_KIND_FULLTEXT = 4;
+  MATCH_KIND_SEMANTIC = 5;
+  MATCH_KIND_HASH_EXACT = 6;
+  MATCH_KIND_HASH_PREFIX = 7;
+}
+
+// Per-domain status reported in Progress events.
+enum SourceStatus {
+  SOURCE_STATUS_UNSPECIFIED = 0;
+  SOURCE_STATUS_RUNNING = 1;
+  SOURCE_STATUS_DONE = 2;
+  SOURCE_STATUS_ERROR = 3;
+  SOURCE_STATUS_SKIPPED = 4;
+}
+
+// Inclusive opaque time window (RFC3339 strings). Empty bound = open.
+message TimeRange {
+  string from = 1;
+  string to = 2;
+}
+
+// Tri-state boolean filters: unset = no preference; true/false = require that
+// value. Matches the optional-bool convention used elsewhere (e.g. workflow
+// VerificationSummary.tests_passed).
+message SearchFlags {
+  optional bool archived = 1;
+  optional bool private = 2;
+  optional bool generated = 3;
+}
+
+// Structured filters AND'd with free-text query qualifiers. Client-known IDs
+// only — no reparse, no injection surface.
+message ScopeFilters {
+  repeated string spool_ids = 1;
+  repeated string langs = 2;
+  repeated string author_ids = 3;
+  TimeRange updated = 4;
+  SearchFlags is = 5;
 }
 
 message SearchRequest {
-  string query = 1; // freeform; empty ⇒ INVALID_ARGUMENT
-  repeated SearchEntityKind scopes = 2; // empty ⇒ all v1 kinds
-  uint32 limit = 3; // 0 ⇒ default(20); server-capped at 50
-  string cursor = 4; // opaque; from a prior SearchResponse
+  // Free-text DSL; empty ⇒ INVALID_ARGUMENT.
+  string query = 1;
+  // Legacy kinds filter. Empty ⇒ all kinds that survive the dispatcher.
+  repeated SearchEntityKind scopes = 2;
+  // Preferred explicit kinds. AND'd with `scopes` when both are set.
+  repeated SearchEntityKind kinds = 5;
+  // 0 ⇒ default(20); server-capped at 50 (per section, or total in union mode).
+  uint32 limit = 3;
+  // Opaque continuation token (sectioned = multi-domain map).
+  string cursor = 4;
+  // Structured filters; AND with query qualifiers.
+  ScopeFilters filters = 6;
+  // false ⇒ sectioned federation (default); true ⇒ RRF union when eligible.
+  bool union_rank = 7;
 }
 
-message SearchResponse {
-  repeated SearchHit hits = 1; // ranked, interleaved across kinds (desc score)
-  string next_cursor = 2; // empty ⇒ no more pages
+// One stream frame from Search. Always terminates with a Done event.
+message SearchEvent {
+  oneof event {
+    MatchBatch matches = 1;
+    Progress progress = 2;
+    Facets facets = 3;
+    Alert alert = 4;
+    Done done = 5;
+  }
+}
+
+// One or more hits for a single domain section (or the merged list in union mode).
+message MatchBatch {
+  SearchEntityKind domain = 1;
+  repeated SearchHit hits = 2;
+}
+
+// Per-domain source status + true match counts (may exceed hits emitted).
+message Progress {
+  message Source {
+    SearchEntityKind domain = 1;
+    SourceStatus status = 2;
+    uint32 match_count = 3;
+  }
+  repeated Source sources = 1;
+}
+
+// Facet counts over authorized rows only. Minimal shape for P1; may be empty.
+message Facets {
+  message ValueCount {
+    string value = 1;
+    uint32 count = 2;
+  }
+  message Field {
+    string field = 1;
+    repeated ValueCount values = 2;
+  }
+  repeated Field fields = 1;
+}
+
+// Non-fatal notice (partial timeout, skipped domain, incomplete trailing qualifier).
+message Alert {
+  string title = 1;
+  string description = 2;
+}
+
+// Terminal frame — always emitted (success, cancel, or terminal error).
+message Done {
+  bool cancelled = 1;
+  // Empty on success.
+  string error_message = 2;
 }
 
 message SearchHit {
+  // Gap between common fields (1–10) and Tier-2 entity arms (20+). Reserved so
+  // future common hit metadata can land without renumbering the oneof.
+  reserved 11 to 19;
+
   // Common to every hit — sort/link/render without unpacking the payload.
-  float score = 1; // normalized [0,1], comparable across kinds
+  float score = 1; // domain arm score or RRF; exact-pin may force 1.0
   string deep_link_target = 2; // canonical in-app route
   string snippet = 3; // ts_headline excerpt (may be empty)
+  // #976 provenance — which field matched and how.
+  MatchProvenance matched = 9;
+  // #976 raw 16-byte rewrite-stable change identity; empty unless applicable.
+  // NEVER a biscuit subject. Prefer raw bytes over the ChangeId wrapper so the
+  // wire stays a plain 16-byte blob for early clients.
+  bytes change_id = 10;
 
   // Kind-specific typed payload — the oneof tag IS the entity kind.
+  // Tags 4–8 preserved from the Tier-1 unary contract; Tier-2 arms use 20+.
   oneof entity {
     UserHit user = 4;
     RepoHit repo = 5;
     AgentHit agent = 6;
     ThreadHit thread = 7;
     FeedHit feed = 8;
-    // Tier 2 reserves 20+: ContentHit, MessageHit, StateHit, SymbolHit.
+    StateHit state = 20;
+    SymbolHit symbol = 21;
+    ContentHit content = 22;
+    MessageHit message = 23;
+    AnnotationHit annotation = 24;
   }
+}
+
+message MatchProvenance {
+  MatchKind kind = 1;
+  string matched_field = 2;
 }
 
 // handle = canonical text (gh:torvalds / torvalds / torvalds#hex); NEVER the biscuit subject.
@@ -89,12 +219,52 @@ message FeedHit {
   RepositoryRef repo_path = 2;
 }
 
+message StateHit {
+  RepositoryRef repo = 1;
+  StateId state = 2;
+  // Raw 16-byte rewrite-stable change identity; empty unless known.
+  bytes change_id = 3;
+  string intent = 4;
+}
+
+message SymbolHit {
+  RepositoryRef repo = 1;
+  string name = 2;
+  string symbol_kind = 3;
+  string symbol_id = 4;
+  string path = 5;
+  bytes object_id = 6;
+  StateId state = 7;
+}
+
+message ContentHit {
+  RepositoryRef repo = 1;
+  string path = 2;
+  uint32 line = 3;
+  bytes object_id = 4;
+  StateId state = 5;
+}
+
+message MessageHit {
+  RepositoryRef repo = 1;
+  string thread_ref = 2;
+  string entry_ref = 3;
+}
+
+message AnnotationHit {
+  RepositoryRef repo = 1;
+  string path = 2;
+  string entry_ref = 3;
+  StateId state = 4;
+}
+
 service SearchService {
   option (heddle.api.v1alpha1.service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
     maturity: SERVICE_MATURITY_SHIPPED
   };
-  rpc Search(SearchRequest) returns (SearchResponse) {
+  // Server-streaming federated search (Sourcegraph Stream API shape).
+  rpc Search(SearchRequest) returns (stream SearchEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

@@ -84,6 +84,10 @@ def audit_new_descriptor(decoded: str) -> None:
         r"authenticator_data|user_handle|biscuit.*|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"
         r"grant_batch_digest|final_digest|pack_digest|pack_header|"
+        # SearchHit.change_id / StateHit.change_id: raw 16-byte rewrite-stable id
+        # (api#104; never a biscuit subject). SymbolHit/ContentHit.object_id: raw
+        # content object digest bytes for deep-link provenance.
+        r"change_id|object_id|"
         r"agent_capability|bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )
     unaudited_bytes = sorted(

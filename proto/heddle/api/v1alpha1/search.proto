@@ -74,6 +74,9 @@ message ScopeFilters {
   repeated string author_ids = 3;
   TimeRange updated = 4;
   SearchFlags is = 5;
+  // Namespace-prefix subtree scope — matches
+  // `full_path = p OR full_path LIKE p || '/%'` server-side (weft#1270).
+  repeated string path_prefixes = 6;
 }
 
 message SearchRequest {

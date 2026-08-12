@@ -129,6 +129,7 @@ message Progress {
 //   - `kind`   — per-entity-kind counts (incl. zero-hit kinds)
 //   - `lang`   — language facet (planned)
 //   - `author` — author facet (planned)
+//
 // Additional field names may appear as the server grows; unknown names should
 // be ignored or rendered generically rather than treated as a hard error.
 message Facets {

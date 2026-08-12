@@ -91,6 +91,9 @@ def audit_new_descriptor(decoded: str) -> None:
         # ConflictSide (api#111): whole-blob ContentHash (blob_id) and
         # range-selected hunk BLAKE3 (hunk_hash) — both 32-byte digests.
         r"blob_id|hunk_hash|"
+        # StateAttachment.body.raw_object (api#114): opaque attachment bytes for
+        # kinds without a public typed body (same role as attachment_object).
+        r"raw_object|"
         r"agent_capability|bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )
     unaudited_bytes = sorted(

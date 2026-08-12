@@ -4,6 +4,7 @@ package heddle.api.v1alpha1;
 
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/repo_sync.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 message GetRefsRequest {
@@ -444,6 +445,54 @@ message StateSummary {
 
 message ListStatesResponse {
   repeated StateSummary states = 1;
+}
+
+// Hosted unary read of a state's attachments by state_id. Complements the
+// push/pull `StateAttachmentTransfer` path in repo_sync.proto (native-pack
+// object channel) with a simple fetch for clients that already hold a
+// state_id — e.g. tapestry's ConflictCard loading
+// STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS.
+//
+// CollaborationService / HeddleCo/heddle#1333 hold the dual-target question:
+// conflicts are produced locally by `heddle resolve` but are PUSHED to weft
+// as attachments, so this hosted read path serves pushed/hosted data (a
+// legitimate weft surface). A daemon equivalent for local-only states rides
+// #1333. Do not add the daemon path here.
+//
+// When the structured-conflicts attachment is returned, the body includes
+// both open AND resolved conflicts. `StructuredConflict.status` distinguishes
+// them; clients filter. The server must not prune resolved conflicts — the
+// audit story of how a collision was settled (the reason ConflictCard
+// exists) depends on them remaining in the body.
+message ListStateAttachmentsRequest {
+  RepositoryRef repo_path = 1;
+  StateId state_id = 2;
+  // Empty = every kind. When set, return ONLY the listed kinds so a review
+  // page wanting conflicts does not receive (and discard) a semantic index
+  // or signature blob that shares the attachment slot.
+  repeated StateAttachmentKind kinds = 3;
+}
+
+// Read-facing state attachment: kind + decoded body per attachment_kind.
+// Matches the transfer-path decode contract —
+// STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS → StructuredConflicts.
+// Kinds without a public typed body use raw_object (opaque bytes, same role
+// as StateAttachmentTransfer.attachment_object).
+message StateAttachment {
+  // Hex-encoded attachment object id; same identity as
+  // StateAttachmentTransfer.attachment_id.
+  string attachment_id = 1;
+  StateAttachmentKind kind = 2;
+  oneof body {
+    // STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS
+    StructuredConflicts structured_conflicts = 3;
+    // Opaque attachment object bytes for kinds without a public typed body.
+    bytes raw_object = 4;
+  }
+}
+
+message ListStateAttachmentsResponse {
+  repeated StateAttachment attachments = 1;
 }
 
 message BlameOrigin {
@@ -999,6 +1048,27 @@ service RepositoryService {
     };
   }
   rpc ListProvenanceSummaries(ListProvenanceSummariesRequest) returns (ListProvenanceSummariesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Hosted read of state attachments by state_id. See
+  // ListStateAttachmentsRequest for kinds-filter and open+resolved conflict
+  // return semantics. Weft-only surface; daemon dual-target is heddle#1333.
+  rpc ListStateAttachments(ListStateAttachmentsRequest) returns (ListStateAttachmentsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

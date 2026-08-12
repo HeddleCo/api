@@ -97,8 +97,9 @@ enum StateAttachmentKind {
   STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2;
   STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3;
   STATE_ATTACHMENT_KIND_DISCUSSIONS = 4;
-  // Payload message: `StructuredConflicts` (this file). No dedicated RPC —
-  // conflicts ride the existing state-attachment path alongside the state.
+  // Payload message: `StructuredConflicts` (this file). Hosted clients fetch
+  // via RepositoryService.ListStateAttachments; the push/pull path still uses
+  // StateAttachmentTransfer for peer sync.
   STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5;
   STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6;
   STATE_ATTACHMENT_KIND_SIGNATURE = 7;
@@ -110,8 +111,9 @@ enum StateAttachmentKind {
 //
 // Wire bridge between heddle's landed conflict payload
 // (`object-model::StructuredConflict` / CLI `ConflictRegionReport` +
-// `ConflictResolutionReport`) and tapestry's ConflictCard. Fetchable as a
-// state attachment; no new RPC.
+// `ConflictResolutionReport`) and tapestry's ConflictCard. Hosted clients
+// fetch via RepositoryService.ListStateAttachments; peer sync still uses
+// StateAttachmentTransfer.
 //
 // Design: ONE status-tagged list (not separate region + resolution lists).
 // A client answers "is this conflict still open" from a single message.

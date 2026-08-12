@@ -38,6 +38,12 @@ message AppendTurnRequest {
   string discussion_id = 2;
   string body = 3;
   string client_operation_id = 4;
+  // Structured entity mentions spanning ranges of `body`.
+  // DiscussionReference is defined in state_review.proto (imported above).
+  // CollaborationService is dual-target (DEPLOYMENT_TARGET_WEFT +
+  // DEPLOYMENT_TARGET_HEDDLE_DAEMON), so this field lands on the local
+  // daemon target too (heddle#1333).
+  repeated DiscussionReference references = 5;
 }
 
 message ResolveDiscussionRequest {

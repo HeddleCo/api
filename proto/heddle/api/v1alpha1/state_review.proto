@@ -125,11 +125,59 @@ message AnchoredDiscussion {
   string visibility = 9;
 }
 
+// Kind of entity a DiscussionReference names.
+// Snapshot-relative kinds (FILE, LINE, SYMBOL) may carry `at`; identity
+// kinds (USER, AGENT, SPOOL, THREAD, STATE) must not.
+enum ReferenceKind {
+  REFERENCE_KIND_UNSPECIFIED = 0;
+  REFERENCE_KIND_USER = 1;
+  REFERENCE_KIND_AGENT = 2;
+  REFERENCE_KIND_SPOOL = 3;
+  REFERENCE_KIND_THREAD = 4;
+  REFERENCE_KIND_STATE = 5;
+  REFERENCE_KIND_FILE = 6;
+  REFERENCE_KIND_LINE = 7;
+  REFERENCE_KIND_SYMBOL = 8;
+}
+
+// One entity a turn refers to (an `@` mention as a resolvable reference,
+// not prose that happens to look like one). Shared by DiscussionTurn and
+// AppendTurnRequest (collaboration.proto imports this file).
+//
+// Server validation (enforced at append; out of scope for this contract
+// surface but documented here):
+//   - reject [start, end) outside body, or overlapping another reference
+//   - reject empty id
+//   - reject `at` set on a non-snapshot kind (USER/AGENT/SPOOL/THREAD/STATE)
+message DiscussionReference {
+  ReferenceKind kind = 1;
+
+  // Stable identity of the referent — handle, full path, thread ref,
+  // change id. NEVER display text: a reference must survive a rename,
+  // so the label is resolved at render from current data.
+  string id = 2;
+
+  // The state this reference was known-valid at. Set ONLY for
+  // snapshot-relative kinds (FILE, LINE, SYMBOL): a path, a line number
+  // and a symbol name are meaningless without a snapshot to read them
+  // against. Absent on USER/AGENT/SPOOL/THREAD/STATE, which do not drift
+  // this way. Clients/servers must not act on `at` for those kinds.
+  optional StateId at = 3;
+
+  // Byte offsets into `body` this reference occupies, so a client can
+  // render it inline without re-parsing prose. Half-open [start, end).
+  uint32 start = 4;
+  uint32 end = 5;
+}
+
 message DiscussionTurn {
   string author_name = 1;
   string author_email = 2;
   string body = 3;
   google.protobuf.Timestamp posted_at = 4;
+  // Structured entity mentions spanning ranges of `body`. See
+  // DiscussionReference for identity / pin / offset rules.
+  repeated DiscussionReference references = 5;
 }
 
 // Resolution state of a discussion. `Open` means unresolved; the

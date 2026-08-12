@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+// Presence session fan-out events for Track B `/presence/ws`.
+//
+// Formalizes the weft-hosted hub `PresenceEvent` enum
+// (`crates/weft-hosted/src/presence/hub.rs`) so weft emitters and tapestry
+// consumers share a published contract. Field names and optionality match
+// hub.rs and tapestry `presence.ts` 1:1 so migration is field-name stable.
+//
+// Wire JSON today uses serde
+// `#[serde(tag = "kind", rename_all = "snake_case")]`, producing
+// `kind = agent_start | agent_heartbeat | agent_done`. This schema is the
+// typed contract for those event payloads. Outer WS framing (`ServerFrame`
+// ready/error wrappers) is out of scope here.
+//
+// Nested message names avoid clashing with the distinct
+// `AgentHeartbeat` on the AgentGateway daemon stream
+// (`agent_gateway.proto`).
+message PresenceEvent {
+  // Agent session started.
+  message AgentStart {
+    string session_id = 1;
+    string subject = 2;
+    string namespace = 3;
+    optional string model = 4;
+    optional string provider = 5;
+    optional string cursor_path = 6;
+    // Unix epoch milliseconds when the session started.
+    uint64 started_at_ms = 7;
+    // Thread ref when the publisher is on a thread (weft#1277 / tapestry#398).
+    // Optional — not every session is on a thread (human browsing, agent
+    // between threads). Empty string must not be used as a sentinel; omit
+    // when unattributed.
+    optional string thread = 8;
+  }
+
+  // Periodic liveness beacon; also carries a lightweight activity summary.
+  message AgentHeartbeat {
+    string session_id = 1;
+    string subject = 2;
+    string namespace = 3;
+    optional string cursor_path = 4;
+    repeated string recent_actions = 5;
+    // Unix epoch milliseconds of this heartbeat.
+    uint64 ts_ms = 6;
+    // Current thread (if any). Heartbeats carry thread so a late subscriber
+    // learns the CURRENT thread, not only where the session began
+    // (weft#1277). Optional for the same reasons as AgentStart.thread.
+    optional string thread = 7;
+  }
+
+  // Agent session ended (graceful). Browsers should drop the session on
+  // receipt.
+  message AgentDone {
+    string session_id = 1;
+    string subject = 2;
+    string namespace = 3;
+    // Unix epoch milliseconds when the session ended.
+    uint64 ts_ms = 4;
+  }
+
+  oneof event {
+    AgentStart agent_start = 1;
+    AgentHeartbeat agent_heartbeat = 2;
+    AgentDone agent_done = 3;
+  }
+}

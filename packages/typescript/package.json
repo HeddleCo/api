@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {
@@ -32,7 +32,8 @@
     "./attention": "./dist/attention_pb.js",
     "./repo-sync": "./dist/repo_sync_pb.js",
     "./agent-gateway": "./dist/agent_gateway_pb.js",
-    "./agent": "./dist/agent_pb.js"
+    "./agent": "./dist/agent_pb.js",
+    "./presence": "./dist/presence_pb.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.12.0"

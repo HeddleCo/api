@@ -1444,6 +1444,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListStateAttachments",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
       "layers": {
         "server_adapter": {

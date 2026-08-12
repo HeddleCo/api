@@ -1444,6 +1444,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListStateAttachments",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
       "layers": {
         "client": {

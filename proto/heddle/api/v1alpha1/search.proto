@@ -74,6 +74,9 @@ message ScopeFilters {
   repeated string author_ids = 3;
   TimeRange updated = 4;
   SearchFlags is = 5;
+  // Namespace-prefix subtree scope — matches
+  // `full_path = p OR full_path LIKE p || '/%'` server-side (weft#1270).
+  repeated string path_prefixes = 6;
 }
 
 message SearchRequest {
@@ -121,12 +124,21 @@ message Progress {
 }
 
 // Facet counts over authorized rows only. Minimal shape for P1; may be empty.
+//
+// Field vocabulary — clients should map these `Field.field` names to labels:
+//   - `kind`   — per-entity-kind counts (incl. zero-hit kinds)
+//   - `lang`   — language facet (planned)
+//   - `author` — author facet (planned)
+//
+// Additional field names may appear as the server grows; unknown names should
+// be ignored or rendered generically rather than treated as a hard error.
 message Facets {
   message ValueCount {
     string value = 1;
     uint32 count = 2;
   }
   message Field {
+    // Facet dimension name; see Facets vocabulary comment for expected values.
     string field = 1;
     repeated ValueCount values = 2;
   }
@@ -197,6 +209,11 @@ message RepoHit {
   string slug = 2;
   string display_name = 3;
   bool is_namespace = 4;
+  // Stable spool identity — distinct from `full_path` because spools nest and a
+  // path can change on rename/move while the id is stable; lets a client
+  // populate `ScopeFilters.spool_ids` from results. Same string encoding as
+  // `ScopeFilters.spool_ids` / registry spool ids (not opaque bytes).
+  string spool_id = 5;
 }
 
 message AgentHit {

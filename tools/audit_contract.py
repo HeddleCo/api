@@ -88,6 +88,9 @@ def audit_new_descriptor(decoded: str) -> None:
         # (api#104; never a biscuit subject). SymbolHit/ContentHit.object_id: raw
         # content object digest bytes for deep-link provenance.
         r"change_id|object_id|"
+        # ConflictSide (api#111): whole-blob ContentHash (blob_id) and
+        # range-selected hunk BLAKE3 (hunk_hash) — both 32-byte digests.
+        r"blob_id|hunk_hash|"
         r"agent_capability|bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )
     unaudited_bytes = sorted(

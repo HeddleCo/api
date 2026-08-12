@@ -97,9 +97,166 @@ enum StateAttachmentKind {
   STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2;
   STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3;
   STATE_ATTACHMENT_KIND_DISCUSSIONS = 4;
+  // Payload message: `StructuredConflicts` (this file). No dedicated RPC —
+  // conflicts ride the existing state-attachment path alongside the state.
   STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5;
   STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6;
   STATE_ATTACHMENT_KIND_SIGNATURE = 7;
+}
+
+// =====================================================================
+// Structured conflicts — payload for STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS
+// =====================================================================
+//
+// Wire bridge between heddle's landed conflict payload
+// (`object-model::StructuredConflict` / CLI `ConflictRegionReport` +
+// `ConflictResolutionReport`) and tapestry's ConflictCard. Fetchable as a
+// state attachment; no new RPC.
+//
+// Design: ONE status-tagged list (not separate region + resolution lists).
+// A client answers "is this conflict still open" from a single message.
+// Three-way sides are base / ours / theirs — not {left, right}.
+
+// Attachment body for STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS.
+// Mirrors heddle's on-disk container (`StructuredConflict { conflicts }`)
+// with each region widened to carry lifecycle status and optional resolution.
+message StructuredConflicts {
+  repeated StructuredConflict conflicts = 1;
+}
+
+// Lifecycle of one conflict region within a state attachment.
+// Maps to tapestry's open | auto_resolved | resolved vocabulary.
+enum StructuredConflictStatus {
+  STRUCTURED_CONFLICT_STATUS_UNSPECIFIED = 0;
+  // Still open — no resolution fields populated.
+  STRUCTURED_CONFLICT_STATUS_OPEN = 1;
+  // Closed by automatic resolution (`ConflictResolutionMode.AUTO`).
+  STRUCTURED_CONFLICT_STATUS_AUTO_RESOLVED = 2;
+  // Closed by an explicit choice or edit (ours / theirs / edit).
+  STRUCTURED_CONFLICT_STATUS_RESOLVED = 3;
+}
+
+// How a conflict was resolved. Mirrors heddle
+// `ConflictResolutionModeReport` / oplog `ConflictResolutionMode`.
+enum ConflictResolutionMode {
+  CONFLICT_RESOLUTION_MODE_UNSPECIFIED = 0;
+  CONFLICT_RESOLUTION_MODE_OURS = 1;
+  CONFLICT_RESOLUTION_MODE_THEIRS = 2;
+  CONFLICT_RESOLUTION_MODE_EDIT = 3;
+  CONFLICT_RESOLUTION_MODE_AUTO = 4;
+}
+
+// Human vs agent resolver kind. Mirrors heddle `ResolverKindReport`.
+enum ConflictResolverKind {
+  CONFLICT_RESOLVER_KIND_UNSPECIFIED = 0;
+  CONFLICT_RESOLVER_KIND_HUMAN = 1;
+  CONFLICT_RESOLVER_KIND_AGENT = 2;
+}
+
+// Zero-based, half-open line range `[start_line, end_line)`.
+// Mirrors heddle `ConflictRange` / `ConflictRangeReport`.
+message ConflictRange {
+  uint32 start_line = 1;
+  uint32 end_line = 2;
+}
+
+// Provenance and integrity for one side of a three-way conflict.
+// Mirrors heddle `ConflictSide` / `ConflictSideReport`.
+message ConflictSide {
+  // Physical state this side was taken from.
+  StateId source_state = 1;
+  // Whole-blob ContentHash (32-byte BLAKE3). Absent when the path was
+  // missing in this source state (heddle `blob_id: Option<ContentHash>`).
+  optional bytes blob_id = 2;
+  // Line range within the source blob that contributes this side's hunk.
+  ConflictRange range = 3;
+  // BLAKE3 of the exact bytes selected by `range` from the blob (32 bytes).
+  // Integrity pin: verifies the side independently of line shifts.
+  bytes hunk_hash = 4;
+}
+
+// Principal that owns a resolution action. Mirrors heddle `PrincipalReport`
+// / API `StatePrincipal`.
+message ConflictResolverPrincipal {
+  string name = 1;
+  string email = 2;
+}
+
+// Agent identity on a resolution. Mirrors heddle `AgentReport` (provider /
+// model required for agent resolutions; session/segment/policy optional for
+// run linkage). Narrower than gateway session identity — attribution only.
+message ConflictResolverAgent {
+  string provider = 1;
+  string model = 2;
+  optional string session_id = 3;
+  optional string segment_id = 4;
+  optional string policy_id = 5;
+}
+
+// Who/what resolved a conflict. Mirrors heddle `ResolverAttributionReport`.
+// Populated only when `StructuredConflict.status` is AUTO_RESOLVED or RESOLVED.
+message ConflictResolverAttribution {
+  ConflictResolverKind kind = 1;
+  ConflictResolverPrincipal principal = 2;
+  // Set when kind == AGENT; omit for human resolutions.
+  optional ConflictResolverAgent agent = 3;
+}
+
+// One independently addressable three-way conflict region, with lifecycle.
+//
+// Fuses heddle's `ConflictRegionReport` (region + three sides) and
+// `ConflictResolutionReport` (mode / resolution text / resolver) into a
+// single status-tagged message so clients never join two lists.
+//
+// ## Pin / addressability
+//
+// `id` is a stable, content-addressed region identity — the same
+// addressability class `DiscussionReference.id` gained. It is referenceable
+// across states: a conflict discovered in one capture and resolved in
+// another is one conflict to a human, and the same `id` is the join key.
+//
+// Heddle derives `id` as a deterministic BLAKE3 address over
+// (path, symbol, occurrence, base/ours/theirs hunk hashes) with domain
+// separator `heddle-conflict-region-v1` (format `conflict-<hex>`). That
+// derivation is content-stable: unrelated line shifts and blob rewrites that
+// leave the three hunks unchanged preserve the id (heddle object-model test
+// `stable_id_survives_unrelated_line_shifts_and_blob_rewrites`).
+//
+// Heddle follow-up (do not block this contract): producers that materialize
+// resolved status into a later state's attachment MUST keep emitting that
+// same derived `id` rather than re-keying on state id or `merged_range`.
+// Resolution rows in the CLI report already key on `conflict_id` matching
+// the region id; attachment publishers must preserve that continuity.
+message StructuredConflict {
+  // Stable conflict-region id (e.g. `conflict-<hex>`). NEVER display text:
+  // clients resolve a label at render from path / symbol / current data.
+  string id = 1;
+  // Repository-relative path of the conflicted file.
+  string path = 2;
+  // Stable semantic address when the source language can be parsed.
+  // Omit (do not send empty string) when unknown.
+  optional string symbol = 3;
+  // Disambiguates byte-identical conflicts under the same path/symbol anchor.
+  uint32 occurrence = 4;
+  // Range occupied by the rendered conflict-marker block in the merged view.
+  // Zero-based, half-open `[start_line, end_line)`.
+  ConflictRange merged_range = 5;
+  // Three-way sides. base / ours / theirs — NOT {left, right}. A three-way
+  // view is the whole reason a conflict is inspectable rather than a diff.
+  // Round-trips must carry cases where base differs from both ours and theirs.
+  ConflictSide base = 6;
+  ConflictSide ours = 7;
+  ConflictSide theirs = 8;
+  // Lifecycle. Clients read status alone to answer "is this still open".
+  StructuredConflictStatus status = 9;
+  // --- Resolution fields: populated only when status is AUTO_RESOLVED or
+  // RESOLVED; omit while OPEN. Maps heddle `ConflictResolutionReport`. ---
+  // Mode-as-string surface from heddle (`ours` / `theirs` / `edit` / `auto`).
+  // Prefer `mode` for typed consumers; `resolution` is retained for report
+  // parity and free-form edit summaries when mode == EDIT.
+  optional string resolution = 10;
+  optional ConflictResolutionMode mode = 11;
+  optional ConflictResolverAttribution resolver = 12;
 }
 
 // Hosted object discriminants from the native object-store model.
@@ -233,6 +390,10 @@ message StateVisibilityTransfer {
 // hangs off.
 // `attachment_id` is the hex-encoded id of the attachment object.
 // `attachment_kind` is the attachment body kind (see StateAttachmentKind).
+// For `STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS`, the decoded body is
+// `StructuredConflicts` (this file) — the public typed contract for that
+// kind. On-disk native encoding may differ; producers bridging to this API
+// map into `StructuredConflicts`.
 // `attachment_object` is the raw serialized StateAttachment object byte
 // payload — byte-identical to what the sender stored on disk.
 message StateAttachmentTransfer {

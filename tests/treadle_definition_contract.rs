@@ -1,8 +1,9 @@
 use heddle_api::{
     heddle::api::v1alpha1::{
-        TreadleArgv, TreadleCheck, TreadleCheckClass, TreadleDefinition, TreadleEnvEntry,
-        TreadleIsolationHints, TreadleJob, TreadleMatrixValue, TreadleNetworkAccess, TreadleRetry,
-        TreadleSecretRef, TreadleServiceContainer, TreadleTrigger, TreadleTriggerKind,
+        TreadleArgv, TreadleCheck, TreadleCheckClass, TreadleDefinition, TreadleDeterminismClass,
+        TreadleEnvEntry, TreadleIsolationHints, TreadleJob, TreadleMatrixValue,
+        TreadleNetworkAccess, TreadlePlatform, TreadleRetry, TreadleSecretRef, TreadleSecretTier,
+        TreadleServiceContainer, TreadleTargetEnvironment, TreadleTrigger, TreadleTriggerKind,
         treadle_env_entry,
     },
     treadle::{
@@ -67,6 +68,20 @@ fn isolation(
     })
 }
 
+fn sha256_digest(hex_digit: char) -> String {
+    format!("sha256:{}", hex_digit.to_string().repeat(64))
+}
+
+fn target_environment(hex_digit: char, os: &str, arch: &str) -> Option<TreadleTargetEnvironment> {
+    Some(TreadleTargetEnvironment {
+        oci_image_digest: sha256_digest(hex_digit),
+        platform: Some(TreadlePlatform {
+            os: os.into(),
+            arch: arch.into(),
+        }),
+    })
+}
+
 // This is the same logical definition as tools/verify-treadle-conformance.mjs,
 // independently built with the generated prost types and intentionally unordered.
 fn rust_definition() -> TreadleDefinition {
@@ -77,10 +92,12 @@ fn rust_definition() -> TreadleDefinition {
             TreadleSecretRef {
                 name: "registry-token".into(),
                 provider: "vault".into(),
+                tier: TreadleSecretTier::TrustedRunnerOnly as i32,
             },
             TreadleSecretRef {
                 name: "db-password".into(),
                 provider: String::new(),
+                tier: TreadleSecretTier::Standard as i32,
             },
         ],
         services: vec![TreadleServiceContainer {
@@ -95,6 +112,7 @@ fn rust_definition() -> TreadleDefinition {
                 command: "pg_isready".into(),
                 args: vec!["-U".into(), "treadle".into()],
             }),
+            oci_image_digest: sha256_digest('4'),
         }],
         jobs: vec![
             TreadleJob {
@@ -138,6 +156,8 @@ fn rust_definition() -> TreadleDefinition {
                             trigger(TreadleTriggerKind::Push, ""),
                         ],
                         supersede_older_runs: true,
+                        target_environment: target_environment('1', "linux", "amd64"),
+                        determinism_class: TreadleDeterminismClass::Deterministic as i32,
                     },
                     TreadleCheck {
                         name: "lint".into(),
@@ -149,6 +169,8 @@ fn rust_definition() -> TreadleDefinition {
                         retry: retry(0, &[]),
                         isolation: isolation(TreadleNetworkAccess::None, "", 0, 0, 0),
                         triggers: vec![trigger(TreadleTriggerKind::Push, "")],
+                        target_environment: target_environment('2', "linux", "arm64"),
+                        determinism_class: TreadleDeterminismClass::Deterministic as i32,
                         ..Default::default()
                     },
                 ],
@@ -166,6 +188,8 @@ fn rust_definition() -> TreadleDefinition {
                     isolation: isolation(TreadleNetworkAccess::Full, "", 0, 0, 0),
                     triggers: vec![trigger(TreadleTriggerKind::Manual, "")],
                     supersede_older_runs: true,
+                    target_environment: target_environment('3', "linux", "amd64"),
+                    determinism_class: TreadleDeterminismClass::Nondeterministic as i32,
                     ..Default::default()
                 }],
                 ..Default::default()
@@ -208,4 +232,71 @@ fn reader_fails_closed_on_old_and_noncanonical_definitions() {
         decode_canonical_treadle_definition(&raw_unordered),
         Err(TreadleDefinitionError::NonCanonicalBytes)
     ));
+}
+
+#[test]
+fn missing_target_environment_or_platform_fails_validation_and_decode() {
+    let mut missing_environment = rust_definition();
+    missing_environment.jobs[0].checks[0].target_environment = None;
+    assert!(matches!(
+        canonical_treadle_definition_bytes(&missing_environment),
+        Err(TreadleDefinitionError::Invalid(message))
+            if message.contains("omits target_environment")
+    ));
+    assert!(matches!(
+        decode_canonical_treadle_definition(&missing_environment.encode_to_vec()),
+        Err(TreadleDefinitionError::Invalid(message))
+            if message.contains("omits target_environment")
+    ));
+
+    let mut missing_platform = rust_definition();
+    missing_platform.jobs[0].checks[0]
+        .target_environment
+        .as_mut()
+        .expect("fixture target environment")
+        .platform = None;
+    assert!(matches!(
+        canonical_treadle_definition_bytes(&missing_platform),
+        Err(TreadleDefinitionError::Invalid(message))
+            if message.contains("omits target_environment.platform")
+    ));
+    assert!(matches!(
+        decode_canonical_treadle_definition(&missing_platform.encode_to_vec()),
+        Err(TreadleDefinitionError::Invalid(message))
+            if message.contains("omits target_environment.platform")
+    ));
+}
+
+#[test]
+fn reordered_set_like_fields_canonicalize_to_identical_bytes() {
+    let definition = rust_definition();
+    let mut reordered = definition.clone();
+    reordered.jobs.reverse();
+    reordered.services.reverse();
+    reordered.secret_refs.reverse();
+    for job in &mut reordered.jobs {
+        job.matrix.reverse();
+        job.checks.reverse();
+        for check in &mut job.checks {
+            check.env.reverse();
+            check.service_dependencies.reverse();
+            check
+                .retry
+                .as_mut()
+                .expect("fixture retry")
+                .flake_signatures
+                .reverse();
+            check.cache_paths.reverse();
+            check.triggers.reverse();
+        }
+    }
+    for service in &mut reordered.services {
+        service.ports.reverse();
+        service.env.reverse();
+    }
+
+    assert_eq!(
+        canonical_treadle_definition_bytes(&definition).expect("canonical definition"),
+        canonical_treadle_definition_bytes(&reordered).expect("canonical reordered definition")
+    );
 }

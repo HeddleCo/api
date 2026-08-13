@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { create } from "@bufbuild/protobuf";
 import {
@@ -5,14 +6,18 @@ import {
   TreadleCheckClass,
   TreadleCheckSchema,
   TreadleDefinitionSchema,
+  TreadleDeterminismClass,
   TreadleEnvEntrySchema,
   TreadleIsolationHintsSchema,
   TreadleJobSchema,
   TreadleMatrixValueSchema,
   TreadleNetworkAccess,
+  TreadlePlatformSchema,
   TreadleRetrySchema,
   TreadleSecretRefSchema,
+  TreadleSecretTier,
   TreadleServiceContainerSchema,
+  TreadleTargetEnvironmentSchema,
   TreadleTriggerKind,
   TreadleTriggerSchema,
 } from "../packages/typescript/dist/treadle_pb.js";
@@ -37,6 +42,12 @@ const retry = (maxRetries, flakeSignatures = []) =>
   create(TreadleRetrySchema, { maxRetries, flakeSignatures });
 const isolation = (networkAccess, fields = {}) =>
   create(TreadleIsolationHintsSchema, { networkAccess, ...fields });
+const sha256Digest = (hexDigit) => `sha256:${hexDigit.repeat(64)}`;
+const targetEnvironment = (hexDigit, os, arch) =>
+  create(TreadleTargetEnvironmentSchema, {
+    ociImageDigest: sha256Digest(hexDigit),
+    platform: create(TreadlePlatformSchema, { os, arch }),
+  });
 
 // Intentionally unordered: canonicalization, rather than fixture construction,
 // owns every set-like ordering decision.
@@ -44,8 +55,15 @@ const definition = create(TreadleDefinitionSchema, {
   formatVersion: 1,
   name: "heddle-ci",
   secretRefs: [
-    create(TreadleSecretRefSchema, { name: "registry-token", provider: "vault" }),
-    create(TreadleSecretRefSchema, { name: "db-password" }),
+    create(TreadleSecretRefSchema, {
+      name: "registry-token",
+      provider: "vault",
+      tier: TreadleSecretTier.TRUSTED_RUNNER_ONLY,
+    }),
+    create(TreadleSecretRefSchema, {
+      name: "db-password",
+      tier: TreadleSecretTier.STANDARD,
+    }),
   ],
   services: [
     create(TreadleServiceContainerSchema, {
@@ -60,6 +78,7 @@ const definition = create(TreadleDefinitionSchema, {
         command: "pg_isready",
         args: ["-U", "treadle"],
       }),
+      ociImageDigest: sha256Digest("4"),
     }),
   ],
   jobs: [
@@ -97,6 +116,8 @@ const definition = create(TreadleDefinitionSchema, {
             trigger(TreadleTriggerKind.PUSH),
           ],
           supersedeOlderRuns: true,
+          targetEnvironment: targetEnvironment("1", "linux", "amd64"),
+          determinismClass: TreadleDeterminismClass.DETERMINISTIC,
         }),
         create(TreadleCheckSchema, {
           name: "lint",
@@ -109,6 +130,8 @@ const definition = create(TreadleDefinitionSchema, {
           isolation: isolation(TreadleNetworkAccess.NONE),
           triggers: [trigger(TreadleTriggerKind.PUSH)],
           supersedeOlderRuns: false,
+          targetEnvironment: targetEnvironment("2", "linux", "arm64"),
+          determinismClass: TreadleDeterminismClass.DETERMINISTIC,
         }),
       ],
     }),
@@ -126,6 +149,8 @@ const definition = create(TreadleDefinitionSchema, {
           isolation: isolation(TreadleNetworkAccess.FULL),
           triggers: [trigger(TreadleTriggerKind.MANUAL)],
           supersedeOlderRuns: true,
+          targetEnvironment: targetEnvironment("3", "linux", "amd64"),
+          determinismClass: TreadleDeterminismClass.NONDETERMINISTIC,
         }),
       ],
     }),
@@ -134,6 +159,44 @@ const definition = create(TreadleDefinitionSchema, {
 
 const canonicalHex = Buffer.from(canonicalTreadleDefinitionBytes(definition)).toString("hex");
 const blake3Hex = Buffer.from(treadleDefinitionBlake3(definition)).toString("hex");
+
+const missingTargetEnvironment = structuredClone(definition);
+missingTargetEnvironment.jobs[0].checks[0].targetEnvironment = undefined;
+assert.throws(
+  () => canonicalTreadleDefinitionBytes(missingTargetEnvironment),
+  /omits targetEnvironment/,
+);
+
+const missingPlatform = structuredClone(definition);
+missingPlatform.jobs[0].checks[0].targetEnvironment.platform = undefined;
+assert.throws(
+  () => canonicalTreadleDefinitionBytes(missingPlatform),
+  /omits targetEnvironment\.platform/,
+);
+
+const reorderedDefinition = structuredClone(definition);
+reorderedDefinition.jobs.reverse();
+reorderedDefinition.services.reverse();
+reorderedDefinition.secretRefs.reverse();
+for (const job of reorderedDefinition.jobs) {
+  job.matrix.reverse();
+  job.checks.reverse();
+  for (const check of job.checks) {
+    check.env.reverse();
+    check.serviceDependencies.reverse();
+    check.retry.flakeSignatures.reverse();
+    check.cachePaths.reverse();
+    check.triggers.reverse();
+  }
+}
+for (const service of reorderedDefinition.services) {
+  service.ports.reverse();
+  service.env.reverse();
+}
+assert.equal(
+  Buffer.from(canonicalTreadleDefinitionBytes(reorderedDefinition)).toString("hex"),
+  canonicalHex,
+);
 
 if (process.argv.includes("--print")) {
   process.stdout.write(`${JSON.stringify({
@@ -154,4 +217,7 @@ if (process.argv.includes("--print")) {
   }
   process.stdout.write(`treadle TS canonical bytes: ${canonicalHex.length / 2} bytes\n`);
   process.stdout.write(`treadle TS blake3: ${blake3Hex}\n`);
+  process.stdout.write(
+    "treadle TS negative cases: missing target environment/platform rejected; reordered input matched\n",
+  );
 }

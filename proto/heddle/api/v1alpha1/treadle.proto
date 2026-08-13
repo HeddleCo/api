@@ -89,6 +89,14 @@ message TreadleCheck {
 
   // Whether a newer state of the same thread supersedes an in-flight run.
   bool supersede_older_runs = 13;
+
+  // Authoritative execution environment. Runners MUST execute against this
+  // exact platform-specific image digest and refuse incompatible platforms.
+  TreadleTargetEnvironment target_environment = 14;
+
+  // Required classification used when deciding whether an untrusted local
+  // verdict may supersede a queued run. Network isolation is not a substitute.
+  TreadleDeterminismClass determinism_class = 15;
 }
 
 enum TreadleCheckClass {
@@ -96,6 +104,27 @@ enum TreadleCheckClass {
   TREADLE_CHECK_CLASS_REQUIRED = 1;
   TREADLE_CHECK_CLASS_ADVISORY = 2;
   TREADLE_CHECK_CLASS_INFORMATIONAL = 3;
+}
+
+// Required, authoritative environment for one concrete check.
+message TreadleTargetEnvironment {
+  // Immutable OCI image digest, exactly "sha256:" plus 64 lowercase hex
+  // digits. This is a digest, not a tag or a name containing a tag.
+  string oci_image_digest = 1;
+
+  TreadlePlatform platform = 2;
+}
+
+// Required OCI/Go-style target platform. Both values are lowercase.
+message TreadlePlatform {
+  string os = 1;
+  string arch = 2;
+}
+
+enum TreadleDeterminismClass {
+  TREADLE_DETERMINISM_CLASS_UNSPECIFIED = 0;
+  TREADLE_DETERMINISM_CLASS_DETERMINISTIC = 1;
+  TREADLE_DETERMINISM_CLASS_NONDETERMINISTIC = 2;
 }
 
 // One environment value. Secret references contain a declaration name only.
@@ -154,12 +183,19 @@ enum TreadleTriggerKind {
 // A pipeline-wide service container.
 message TreadleServiceContainer {
   string name = 1;
+
+  // Registry locator used to find the image. Identity is established only by
+  // oci_image_digest; a tag in this field is never authoritative.
   string image = 2;
   repeated uint32 ports = 3;
   repeated TreadleEnvEntry env = 4;
 
   // Absent means the service has no readiness command.
   TreadleArgv readiness = 5;
+
+  // Required immutable OCI image digest, exactly "sha256:" plus 64 lowercase
+  // hex digits. Runners MUST pull and verify this digest, never trust image.
+  string oci_image_digest = 6;
 }
 
 // An argv-only command used outside the signable check atom, such as readiness.
@@ -174,4 +210,14 @@ message TreadleSecretRef {
 
   // Optional runner/provider-specific store hint. Empty means policy chooses.
   string provider = 2;
+
+  // Required execution-trust tier. The value, not the secret, is signed into
+  // the definition and participates in local-run supersede eligibility.
+  TreadleSecretTier tier = 3;
+}
+
+enum TreadleSecretTier {
+  TREADLE_SECRET_TIER_UNSPECIFIED = 0;
+  TREADLE_SECRET_TIER_STANDARD = 1;
+  TREADLE_SECRET_TIER_TRUSTED_RUNNER_ONLY = 2;
 }

@@ -7,9 +7,9 @@ use prost::Message;
 use thiserror::Error;
 
 use crate::heddle::api::v1alpha1::{
-    TreadleCheck, TreadleCheckClass, TreadleDefinition, TreadleEnvEntry, TreadleJob,
-    TreadleNetworkAccess, TreadleServiceContainer, TreadleTrigger, TreadleTriggerKind,
-    treadle_env_entry,
+    TreadleCheck, TreadleCheckClass, TreadleDefinition, TreadleDeterminismClass, TreadleEnvEntry,
+    TreadleJob, TreadleNetworkAccess, TreadleSecretTier, TreadleServiceContainer, TreadleTrigger,
+    TreadleTriggerKind, treadle_env_entry,
 };
 
 /// The only treadle definition format accepted by this release.
@@ -96,6 +96,10 @@ fn canonical_treadle_definition(
     for secret in &normalized.secret_refs {
         identifier("secret", &secret.name)?;
         no_nul("secret provider", &secret.provider)?;
+        match TreadleSecretTier::try_from(secret.tier) {
+            Ok(TreadleSecretTier::Standard | TreadleSecretTier::TrustedRunnerOnly) => {}
+            _ => return invalid(format!("secret {:?} has an invalid tier", secret.name)),
+        }
     }
 
     let service_names = unique_named(
@@ -168,12 +172,36 @@ fn normalize_check(
         ) => {}
         _ => return invalid(format!("check {:?} has an invalid class", check.name)),
     }
+    match TreadleDeterminismClass::try_from(check.determinism_class) {
+        Ok(TreadleDeterminismClass::Deterministic | TreadleDeterminismClass::Nondeterministic) => {}
+        _ => {
+            return invalid(format!(
+                "check {:?} has an invalid determinism_class",
+                check.name
+            ));
+        }
+    }
     if check.timeout_seconds == 0 {
         return invalid(format!(
             "check {:?} timeout_seconds must be positive",
             check.name
         ));
     }
+    let target_environment = check.target_environment.as_ref().ok_or_else(|| {
+        TreadleDefinitionError::Invalid(format!("check {:?} omits target_environment", check.name))
+    })?;
+    oci_image_digest(
+        "target environment OCI image digest",
+        &target_environment.oci_image_digest,
+    )?;
+    let platform = target_environment.platform.as_ref().ok_or_else(|| {
+        TreadleDefinitionError::Invalid(format!(
+            "check {:?} omits target_environment.platform",
+            check.name
+        ))
+    })?;
+    platform_value("target platform os", &platform.os)?;
+    platform_value("target platform arch", &platform.arch)?;
     normalize_env(&mut check.env, secret_names)?;
     relative_path("working_directory", &check.working_directory, true)?;
 
@@ -249,6 +277,7 @@ fn normalize_service(
 ) -> Result<(), TreadleDefinitionError> {
     identifier("service", &service.name)?;
     non_empty("service image", &service.image)?;
+    oci_image_digest("service OCI image digest", &service.oci_image_digest)?;
     service.ports.sort_unstable();
     if service
         .ports
@@ -336,6 +365,35 @@ fn non_empty(kind: &str, value: &str) -> Result<(), TreadleDefinitionError> {
 fn no_nul(kind: &str, value: &str) -> Result<(), TreadleDefinitionError> {
     if value.contains('\0') {
         return invalid(format!("{kind} must not contain NUL"));
+    }
+    Ok(())
+}
+
+fn oci_image_digest(kind: &str, value: &str) -> Result<(), TreadleDefinitionError> {
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        return invalid(format!(
+            "{kind} must be sha256: followed by 64 lowercase hexadecimal digits"
+        ));
+    };
+    if hex.len() != 64
+        || !hex
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return invalid(format!(
+            "{kind} must be sha256: followed by 64 lowercase hexadecimal digits"
+        ));
+    }
+    Ok(())
+}
+
+fn platform_value(kind: &str, value: &str) -> Result<(), TreadleDefinitionError> {
+    if value.is_empty()
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+    {
+        return invalid(format!("{kind} must match [a-z0-9]+"));
     }
     Ok(())
 }

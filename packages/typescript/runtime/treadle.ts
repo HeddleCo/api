@@ -5,14 +5,18 @@ import {
   TreadleCheckClass,
   TreadleCheckSchema,
   TreadleDefinitionSchema,
+  TreadleDeterminismClass,
   TreadleEnvEntrySchema,
   TreadleIsolationHintsSchema,
   TreadleJobSchema,
   TreadleMatrixValueSchema,
   TreadleNetworkAccess,
+  TreadlePlatformSchema,
   TreadleRetrySchema,
   TreadleSecretRefSchema,
+  TreadleSecretTier,
   TreadleServiceContainerSchema,
+  TreadleTargetEnvironmentSchema,
   TreadleTriggerKind,
   TreadleTriggerSchema,
   type TreadleCheck,
@@ -55,6 +59,11 @@ function canonicalDefinition(definition: TreadleDefinition): TreadleDefinition {
     .map((secret) => {
       identifier("secret", secret.name);
       noNul("secret provider", secret.provider);
+      if (![TreadleSecretTier.STANDARD, TreadleSecretTier.TRUSTED_RUNNER_ONLY].includes(secret.tier)) {
+        throw new TreadleDefinitionError(
+          `secret ${JSON.stringify(secret.name)} has an invalid tier`,
+        );
+      }
       return create(TreadleSecretRefSchema, secret);
     })
     .sort((left, right) => byteCompare(left.name, right.name));
@@ -119,8 +128,34 @@ function canonicalCheck(
   if (![TreadleCheckClass.REQUIRED, TreadleCheckClass.ADVISORY, TreadleCheckClass.INFORMATIONAL].includes(check.class)) {
     throw new TreadleDefinitionError(`check ${JSON.stringify(check.name)} has an invalid class`);
   }
+  if (![
+    TreadleDeterminismClass.DETERMINISTIC,
+    TreadleDeterminismClass.NONDETERMINISTIC,
+  ].includes(check.determinismClass)) {
+    throw new TreadleDefinitionError(
+      `check ${JSON.stringify(check.name)} has an invalid determinismClass`,
+    );
+  }
   positiveUint32("timeoutSeconds", check.timeoutSeconds);
   relativePath("workingDirectory", check.workingDirectory, true);
+
+  if (check.targetEnvironment === undefined) {
+    throw new TreadleDefinitionError(
+      `check ${JSON.stringify(check.name)} omits targetEnvironment`,
+    );
+  }
+  ociImageDigest("target environment OCI image digest", check.targetEnvironment.ociImageDigest);
+  if (check.targetEnvironment.platform === undefined) {
+    throw new TreadleDefinitionError(
+      `check ${JSON.stringify(check.name)} omits targetEnvironment.platform`,
+    );
+  }
+  platformValue("target platform os", check.targetEnvironment.platform.os);
+  platformValue("target platform arch", check.targetEnvironment.platform.arch);
+  const targetEnvironment = create(TreadleTargetEnvironmentSchema, {
+    ociImageDigest: check.targetEnvironment.ociImageDigest,
+    platform: create(TreadlePlatformSchema, check.targetEnvironment.platform),
+  });
 
   const env = canonicalEnv(check.env, secretNames);
   const serviceDependencies = sortedUnique("service dependency", check.serviceDependencies);
@@ -199,6 +234,8 @@ function canonicalCheck(
     isolation,
     triggers,
     supersedeOlderRuns: check.supersedeOlderRuns,
+    targetEnvironment,
+    determinismClass: check.determinismClass,
   });
 }
 
@@ -208,6 +245,7 @@ function canonicalService(
 ): TreadleServiceContainer {
   identifier("service", service.name);
   nonEmpty("service image", service.image);
+  ociImageDigest("service OCI image digest", service.ociImageDigest);
   const ports = [...service.ports].sort((left, right) => left - right);
   ports.forEach((port) => {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -232,6 +270,7 @@ function canonicalService(
     ports,
     env: canonicalEnv(service.env, secretNames),
     readiness,
+    ociImageDigest: service.ociImageDigest,
   });
 }
 
@@ -309,6 +348,20 @@ function nonEmpty(kind: string, value: string): void {
 function noNul(kind: string, value: string): void {
   if (value.includes("\u0000")) {
     throw new TreadleDefinitionError(`${kind} must not contain NUL`);
+  }
+}
+
+function ociImageDigest(kind: string, value: string): void {
+  if (!/^sha256:[0-9a-f]{64}$/.test(value)) {
+    throw new TreadleDefinitionError(
+      `${kind} must be sha256: followed by 64 lowercase hexadecimal digits`,
+    );
+  }
+}
+
+function platformValue(kind: string, value: string): void {
+  if (!/^[a-z0-9]+$/.test(value)) {
+    throw new TreadleDefinitionError(`${kind} must match [a-z0-9]+`);
   }
 }
 

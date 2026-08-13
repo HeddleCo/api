@@ -74,7 +74,11 @@ class SignupContractTest(unittest.TestCase):
     def test_verification_and_binding_use_server_verified_email(self) -> None:
         self.assertEqual(
             fields(IDENTITY, "VerifySignupEmailResponse"),
-            [("bootstrap_token", 1), ("recipient_email", 2)],
+            [
+                ("bootstrap_token", 1),
+                ("recipient_email", 2),
+                ("bound_handle", 3),
+            ],
         )
         verification = body(
             IDENTITY, "message", "VerifySignupEmailResponse"

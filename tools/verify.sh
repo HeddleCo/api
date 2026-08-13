@@ -23,3 +23,4 @@ cargo clippy --all-features --all-targets -- -D warnings
 npm run build
 npm run typecheck
 node tools/verify-ts-vectors.mjs
+node tools/verify-treadle-conformance.mjs

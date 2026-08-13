@@ -3,6 +3,7 @@
 pub mod framing;
 pub mod signing;
 mod transport;
+pub mod treadle;
 
 pub use transport::{
     ALL_METHODS, HOSTED_ALPN_V1, MethodDescriptor, MethodRoute, PROVIDER_ALPN_V1,

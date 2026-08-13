@@ -704,6 +704,9 @@ message VerifySignupEmailResponse {
   // address, so a caller may truthfully render "Invite found for <email>" only
   // after this RPC succeeds. It is never copied from a request field.
   string recipient_email = 2;
+  // Server-authoritative handle bound to the redeemed signup challenge. Clients
+  // use this to prefill and validate the subsequent registration ceremony.
+  string bound_handle = 3;
 }
 
 // Binds an unassigned shareable invite to an address that has already passed

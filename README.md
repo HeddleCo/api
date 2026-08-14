@@ -18,6 +18,10 @@ partial.
 - `@heddleco/api` — ESM and TypeScript declarations, published to GitHub
   Packages at `npm.pkg.github.com`.
 
+The versioned treadle CI definition contract and its byte-exact Rust/TypeScript
+canonicalization rule are documented in
+[`docs/treadle-definition-v1.md`](docs/treadle-definition-v1.md).
+
 Consumers must exact-pin all `0.x` versions. Generated sources live only in
 ignored build staging and release artifacts.
 

@@ -7,13 +7,14 @@ license = "Apache-2.0"
 repository = "https://github.com/HeddleCo/api"
 description = "Generated transport-neutral Rust types for the Heddle public API"
 build = "build.rs"
-include = ["/build.rs", "/build_support/**", "/src/**", "/proto/**", "/tests/fixtures/**", "/Cargo.toml", "/README.md", "/LICENSE"]
+include = ["/build.rs", "/build_support/**", "/docs/treadle-definition-v1.md", "/src/**", "/proto/**", "/tests/fixtures/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [features]
 default = []
 reflection = []
 
 [dependencies]
+blake3 = "=1.8.6"
 bytes = "=1.11.1"
 prost = "=0.14.1"
 prost-types = "=0.14.1"

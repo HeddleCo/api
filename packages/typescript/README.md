@@ -11,3 +11,11 @@ The `@heddleco/api/treadle` export provides
 `canonicalTreadleDefinitionBytes()` and `treadleDefinitionBlake3()` for the
 versioned, signed treadle CI definition contract. Construct definitions with
 the generated `Treadle*` schemas; do not hash generic protobuf output directly.
+
+The `@heddleco/api/treadle-authoring` export provides the composable authoring
+SDK: `definePipeline`, `defineCheck`, `defineService`, `secretRef`, `matrix`,
+`job`, and `emitPipeline`. Matrix jobs are expanded by typed JavaScript
+callbacks before protobuf emission; there is no expression or template
+language. `emitPipeline()` returns the canonical protobuf bytes and a
+deterministic `treadle.lock.json` artifact whose `definition_digest` is the
+BLAKE3 content address of those bytes.

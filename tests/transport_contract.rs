@@ -10,17 +10,19 @@ use heddle_api::framing::{
     encode_success_response, encode_success_response_into,
 };
 use heddle_api::heddle::api::v1alpha1::{
-    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ClaimSignupInviteRequest,
-    ErrorDetail, ErrorReason, GetContextHistoryPageEnd, GetContextHistoryRequest,
-    GetContextHistoryResponse, HumanVerification, HumanVerificationChallenge, ListContextPageEnd,
-    ListContextRequest, ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
+    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ClaimNextDropCodeRequest,
+    ClaimSignupInviteRequest, CreateSpoolRequest, ErrorDetail, ErrorReason,
+    GetContextHistoryPageEnd, GetContextHistoryRequest, GetContextHistoryResponse,
+    HumanVerification, HumanVerificationChallenge, ListContextPageEnd, ListContextRequest,
+    ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
     ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse,
     ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
     ProviderPlanResponse, ProviderPullCapabilityContext, ProviderReadRequest,
-    ProvisionAgentRootedAccountRequest, PushRequest, RequestProof, RetryBehavior, RpcEffect,
-    ServiceMaturity, SigningTier, StateId, ThreadOrder, TraceContext, error_detail,
-    get_context_history_response, list_context_response, list_discussions_response,
-    list_refs_response, list_threads_response, thread_state,
+    ProvisionAgentRootedAccountRequest, PushRequest, RemainingDropCodesRequest, RequestProof,
+    RetryBehavior, RpcEffect, ServiceMaturity, SigningTier, SpoolSettings, SpoolStateVisibility,
+    StateId, ThreadOrder, TraceContext, error_detail, get_context_history_response,
+    list_context_response, list_discussions_response, list_refs_response, list_threads_response,
+    thread_state,
 };
 use heddle_api::{
     ALL_METHODS, HOSTED_ALPN_V1, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
@@ -201,7 +203,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 163);
+    assert_eq!(ALL_METHODS.len(), 165);
     for path in [
         "/heddle.api.v1alpha1.RepositoryService/ListContext",
         "/heddle.api.v1alpha1.RepositoryService/GetContextHistory",
@@ -465,6 +467,78 @@ fn generated_descriptor_carries_code_claim_contract() {
     assert_eq!(
         method.client_operation_id(&request).expect("valid request"),
         None
+    );
+}
+
+#[test]
+fn generated_descriptor_carries_invite_drop_contracts() {
+    let claim = method_descriptor("/heddle.api.v1alpha1.IdentityService/ClaimNextDropCode")
+        .expect("drop-claim descriptor");
+    assert_eq!(claim.input, "heddle.api.v1alpha1.ClaimNextDropCodeRequest");
+    assert_eq!(
+        claim.output,
+        "heddle.api.v1alpha1.ClaimNextDropCodeResponse"
+    );
+    assert_eq!(claim.signing_tier, SigningTier::None);
+    assert_eq!(claim.authorization_access, AuthorizationAccess::Public);
+    assert_eq!(claim.effect, RpcEffect::TransientWrite);
+    assert_eq!(claim.retry_behavior, RetryBehavior::Never);
+    assert!(!claim.client_operation_id_required);
+    assert_eq!(claim.client_operation_id_field_number, None);
+    assert_eq!(claim.maturity, ServiceMaturity::Shipped);
+
+    let request = ClaimNextDropCodeRequest {
+        drop_slug: "launch".to_string(),
+        src: Some("x".to_string()),
+    };
+    let request = ClaimNextDropCodeRequest::decode(request.encode_to_vec().as_slice())
+        .expect("drop-claim request");
+    assert_eq!(request.src.as_deref(), Some("x"));
+
+    let remaining = method_descriptor("/heddle.api.v1alpha1.IdentityService/RemainingDropCodes")
+        .expect("remaining-drop-codes descriptor");
+    assert_eq!(
+        remaining.input,
+        "heddle.api.v1alpha1.RemainingDropCodesRequest"
+    );
+    assert_eq!(
+        remaining.output,
+        "heddle.api.v1alpha1.RemainingDropCodesResponse"
+    );
+    assert_eq!(remaining.signing_tier, SigningTier::None);
+    assert_eq!(remaining.authorization_access, AuthorizationAccess::Public);
+    assert_eq!(remaining.effect, RpcEffect::ReadOnly);
+    assert_eq!(remaining.retry_behavior, RetryBehavior::Safe);
+    assert!(remaining.allows_zero_rtt());
+
+    let request = RemainingDropCodesRequest {
+        drop_slug: "launch".to_string(),
+    };
+    assert_eq!(
+        RemainingDropCodesRequest::decode(request.encode_to_vec().as_slice())
+            .expect("remaining-drop-codes request")
+            .drop_slug,
+        "launch"
+    );
+}
+
+#[test]
+fn generated_create_spool_carries_state_visibility_settings() {
+    let request = CreateSpoolRequest {
+        settings: Some(SpoolSettings {
+            state_visibility: SpoolStateVisibility::Public as i32,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let request = CreateSpoolRequest::decode(request.encode_to_vec().as_slice())
+        .expect("create-spool request");
+    assert_eq!(
+        request
+            .settings
+            .expect("create-time settings")
+            .state_visibility,
+        SpoolStateVisibility::Public as i32
     );
 }
 

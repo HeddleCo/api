@@ -306,6 +306,13 @@ message SpoolSummary {
   // value in the registry (weft#457) and populates it in the follow-on handler
   // pass.
   google.protobuf.Timestamp last_activity_at = 5;
+  // Count of content-facet refs with `is_thread = true`. ListSpools carries
+  // this so listing surfaces do not fan out to per-repo GetRefs (weft#1392).
+  // Zero when the spool has no thread refs.
+  uint32 thread_count = 6;
+  // HEAD-attached thread name (the default thread). Empty when HEAD is
+  // detached or the spool has no head.
+  string head_thread = 7;
 }
 
 // ── Unified spool settings (weft#472) ────────────────────────────────────────

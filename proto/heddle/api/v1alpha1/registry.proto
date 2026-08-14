@@ -109,8 +109,12 @@ message SpoolInitialTooling {
 }
 
 message SpoolSettings {
+  reserved "default_state_visibility";
+
   SpoolVisibility visibility = 1;
-  SpoolStateVisibility default_state_visibility = 2;
+  // Spool-level baseline for state visibility. State-level overrides may only
+  // narrow this baseline.
+  SpoolStateVisibility state_visibility = 2;
   SpoolBootstrapKind bootstrap_kind = 3;
   string bootstrap_source = 4;
   SpoolWritePolicy write_policy = 5;
@@ -221,6 +225,10 @@ message CreateSpoolRequest {
   optional string display_name = 4;
   SpoolVisibility visibility = 5;
   string client_operation_id = 6;
+  // Complete create-time settings, including the spool-level state-visibility
+  // baseline. Weft must validate and persist this message rather than silently
+  // replacing it with server defaults.
+  SpoolSettings settings = 7;
 }
 
 message UpdateSpoolRequest {
@@ -323,7 +331,7 @@ message HostedSpool {
   // SpoolSummary.last_activity_at).
   google.protobuf.Timestamp last_activity_at = 5;
   // The full spool settings (visibility, description, write_policy,
-  // default_state_visibility, …). Reuses the existing SpoolSettings message.
+  // state_visibility, …). Reuses the existing SpoolSettings message.
   SpoolSettings settings = 6;
   // Most recent canonical import operation targeting this spool. Clients load
   // its durable snapshot through OperationService; absent means no known

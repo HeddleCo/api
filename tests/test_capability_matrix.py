@@ -460,7 +460,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         actual = build_inventory()
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
-        self.assertEqual(len(shipped), 142)
+        self.assertEqual(len(shipped), 144)
         self.assertEqual(len(planned), 21)
         authorization_fields = (
             "authorization_access",

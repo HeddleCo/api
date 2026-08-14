@@ -19,7 +19,7 @@ def fields(source: str, message: str) -> list[tuple[str, int]]:
     return [
         (name, int(tag))
         for name, tag in re.findall(
-            r"(?m)^\s*(?:repeated\s+)?[A-Za-z][A-Za-z0-9_.]*\s+"
+            r"(?m)^\s*(?:(?:optional|repeated)\s+)?[A-Za-z][A-Za-z0-9_.]*\s+"
             r"([a-z][a-z0-9_]*)\s*=\s*(\d+)\s*;",
             body(source, "message", message),
         )
@@ -38,6 +38,64 @@ def rpc(name: str) -> tuple[str, str, str]:
 
 
 class SignupContractTest(unittest.TestCase):
+    def test_public_drop_claim_and_count_contracts(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "ClaimNextDropCodeRequest"),
+            [("drop_slug", 1), ("src", 2)],
+        )
+        self.assertIn(
+            "optional string src = 2",
+            body(IDENTITY, "message", "ClaimNextDropCodeRequest"),
+        )
+        self.assertEqual(
+            fields(IDENTITY, "ClaimNextDropCodeResponse"),
+            [("code", 1), ("held_until", 2)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "RemainingDropCodesRequest"),
+            [("drop_slug", 1)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "RemainingDropCodesResponse"),
+            [("count", 1)],
+        )
+
+        request_type, response_type, contract = rpc("ClaimNextDropCode")
+        self.assertEqual(request_type, "ClaimNextDropCodeRequest")
+        self.assertEqual(response_type, "ClaimNextDropCodeResponse")
+        for required in (
+            "signing_tier: SIGNING_TIER_NONE",
+            "effect: RPC_EFFECT_TRANSIENT_WRITE",
+            "retry_behavior: RETRY_BEHAVIOR_NEVER",
+            "client_operation_id_required: false",
+            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
+            "authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND",
+            "authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT",
+            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
+        ):
+            self.assertIn(required, contract)
+
+        request_type, response_type, contract = rpc("RemainingDropCodes")
+        self.assertEqual(request_type, "RemainingDropCodesRequest")
+        self.assertEqual(response_type, "RemainingDropCodesResponse")
+        for required in (
+            "signing_tier: SIGNING_TIER_NONE",
+            "effect: RPC_EFFECT_READ_ONLY",
+            "retry_behavior: RETRY_BEHAVIOR_SAFE",
+            "client_operation_id_required: false",
+            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
+            "authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND",
+            "authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT",
+            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
+        ):
+            self.assertIn(required, contract)
+
+        service = body(IDENTITY, "service", "IdentityService")
+        self.assertIn("hosted Iroh ALPN", service)
+        self.assertIn("caller's Biscuit", service)
+        self.assertIn("subject-scoped anti-abuse budget", service)
+        self.assertIn("missing or revoked drop is", service)
+
     def test_mailbox_token_is_confined_to_service_account_issuance(self) -> None:
         self.assertEqual(
             fields(IDENTITY, "IssueSignupEmailChallengeRequest"),

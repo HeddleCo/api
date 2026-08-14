@@ -1,0 +1,59 @@
+from pathlib import Path
+import re
+import unittest
+
+
+ROOT = Path(__file__).resolve().parent.parent
+REGISTRY = (ROOT / "proto/heddle/api/v1alpha1/registry.proto").read_text()
+
+
+def body(name: str) -> str:
+    match = re.search(rf"(?ms)^message {name} \{{(.*?)^\}}", REGISTRY)
+    if match is None:
+        raise AssertionError(f"missing message {name}")
+    return match.group(1)
+
+
+def fields(name: str) -> list[tuple[str, str, int]]:
+    return [
+        (field_type, field_name, int(number))
+        for field_type, field_name, number in re.findall(
+            r"(?m)^\s*(?:optional\s+)?"
+            r"([A-Za-z][A-Za-z0-9_.]*)\s+([a-z][a-z0-9_]*)\s*=\s*(\d+)\s*;",
+            body(name),
+        )
+    ]
+
+
+class SpoolContractTest(unittest.TestCase):
+    def test_state_visibility_rename_preserves_wire_tag(self) -> None:
+        settings = body("SpoolSettings")
+        self.assertIn('reserved "default_state_visibility";', settings)
+        self.assertIn(
+            ("SpoolStateVisibility", "state_visibility", 2),
+            fields("SpoolSettings"),
+        )
+        self.assertNotRegex(settings, r"\bSpoolStateVisibility default_state_visibility\b")
+        self.assertIn("Spool-level baseline for state visibility", settings)
+
+    def test_create_spool_carries_complete_settings(self) -> None:
+        self.assertEqual(
+            fields("CreateSpoolRequest"),
+            [
+                ("string", "parent_path", 1),
+                ("string", "slug", 2),
+                ("bool", "is_repo", 3),
+                ("string", "display_name", 4),
+                ("SpoolVisibility", "visibility", 5),
+                ("string", "client_operation_id", 6),
+                ("SpoolSettings", "settings", 7),
+            ],
+        )
+        request = body("CreateSpoolRequest")
+        self.assertIn("Complete create-time settings", request)
+        self.assertIn("state-visibility", request)
+        self.assertIn("rather than silently", request)
+
+
+if __name__ == "__main__":
+    unittest.main()

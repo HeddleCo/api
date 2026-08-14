@@ -76,7 +76,7 @@ fn length_prefixed(value: &[u8], output: &mut Vec<u8>) {
 
 fn canonical_settings_v1(settings: &SpoolSettings, output: &mut Vec<u8>) {
     output.extend_from_slice(&settings.visibility.to_be_bytes());
-    output.extend_from_slice(&settings.default_state_visibility.to_be_bytes());
+    output.extend_from_slice(&settings.state_visibility.to_be_bytes());
     output.extend_from_slice(&settings.bootstrap_kind.to_be_bytes());
     length_prefixed(settings.bootstrap_source.as_bytes(), output);
     output.extend_from_slice(&settings.write_policy.to_be_bytes());
@@ -180,7 +180,7 @@ fn owner_governance_state_constructs_signs_serializes_and_verifies() {
             "bootstrap_source",
             "bootstrap_sync_direction",
             "child_policy",
-            "default_state_visibility",
+            "state_visibility",
             "description",
             "hold_lifecycle",
             "initial_tooling",

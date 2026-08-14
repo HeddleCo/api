@@ -322,6 +322,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimNextDropCode",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimSignupInvite",
       "layers": {
         "client": {
@@ -576,6 +587,17 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RemainingDropCodes",
       "layers": {
         "client": {
           "status": "planned"

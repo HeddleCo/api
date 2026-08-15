@@ -310,6 +310,104 @@ class SignupContractTest(unittest.TestCase):
         ):
             self.assertIn(required, contract)
 
+    def test_begin_registration_carries_adoption_pre_consent(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "BeginWebAuthnRegistrationRequest"),
+            [
+                ("username", 1),
+                ("display_name", 2),
+                ("account_id", 3),
+                ("agent_node_id", 4),
+                ("pre_consent_signature", 5),
+                ("nonce", 6),
+            ],
+        )
+        request = body(IDENTITY, "message", "BeginWebAuthnRegistrationRequest")
+        self.assertIn("pre-consent", request)
+        self.assertIn("does not bind", request)
+        self.assertIn("credentialId", request)
+
+    def test_create_agent_account_is_invite_gated_pet_name_path(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "CreateAgentAccountRequest"),
+            [
+                ("invite_code", 1),
+                ("agent_public_key", 2),
+                ("client_operation_id", 3),
+            ],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "CreateAgentAccountResponse"),
+            [
+                ("account_id", 1),
+                ("pet_name", 2),
+                ("agent_capability", 3),
+                ("claim_token", 4),
+            ],
+        )
+        response = body(IDENTITY, "message", "CreateAgentAccountResponse")
+        self.assertIn("globally-unique pet name", response)
+        self.assertIn("no handle", response)
+        self.assertIn("One-time claim token", response)
+
+        request_type, response_type, contract = rpc("CreateAgentAccount")
+        self.assertEqual(request_type, "CreateAgentAccountRequest")
+        self.assertEqual(response_type, "CreateAgentAccountResponse")
+        for required in (
+            "maturity: SERVICE_MATURITY_PLANNED",
+            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
+            "effect: RPC_EFFECT_DURABLE_WRITE",
+            "retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
+            "client_operation_id_required: true",
+            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
+            'path: "invite_code"',
+            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
+        ):
+            self.assertIn(required, contract)
+
+    def test_promote_agent_account_is_one_call_promote_consent(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "PromoteAgentAccountRequest"),
+            [
+                ("account_id", 1),
+                ("handle", 2),
+                ("credential_id", 3),
+                ("challenge_id", 4),
+                ("client_data_json", 5),
+                ("attestation_object", 6),
+                ("agent_node_id", 7),
+                ("promote_consent_signature", 8),
+                ("client_operation_id", 9),
+            ],
+        )
+        request = body(IDENTITY, "message", "PromoteAgentAccountRequest")
+        self.assertIn("credentialId", request)
+        self.assertIn("just-created passkey", request)
+        self.assertIn("anti-replay binding", IDENTITY)
+        self.assertEqual(
+            fields(IDENTITY, "PromoteAgentAccountResponse"),
+            [
+                ("session", 1),
+                ("canonical_handle", 2),
+                ("account_id", 3),
+            ],
+        )
+
+        request_type, response_type, contract = rpc("PromoteAgentAccount")
+        self.assertEqual(request_type, "PromoteAgentAccountRequest")
+        self.assertEqual(response_type, "PromoteAgentAccountResponse")
+        for required in (
+            "maturity: SERVICE_MATURITY_PLANNED",
+            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
+            "effect: RPC_EFFECT_DURABLE_WRITE",
+            "retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
+            "client_operation_id_required: true",
+            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
+            'path: "account_id"',
+            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
+        ):
+            self.assertIn(required, contract)
+
     def test_signup_failures_use_error_detail_context(self) -> None:
         signup = body(ERRORS, "message", "SignupFailure")
         expected = {

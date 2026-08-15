@@ -108,6 +108,47 @@ message ListDiscussionsBySymbolRequest {
   DiscussionStatusFilter status = 3;
 }
 
+// Batched discussion-digest read (weft#1397). One call resolves digests and
+// counts for every requested state so spool/overview surfaces do not fan out
+// per-state ListByState.
+message ListDiscussionsByStatesRequest {
+  RepositoryRef repo_path = 1;
+  repeated StateId state_ids = 2;
+  // UNSPECIFIED selects all discussions in each state's digest.
+  DiscussionStatusFilter status = 3;
+}
+
+// Lightweight per-discussion projection for overview cards. Omits turn
+// bodies; clients that need the full thread call GetDiscussion / ListByState.
+message DiscussionDigest {
+  string id = 1;
+  PathSymbolRef anchor = 2;
+  StateId opened_against_state = 3;
+  google.protobuf.Timestamp opened_at = 4;
+  uint32 turn_count = 5;
+  bool orphaned = 6;
+  bool resolved = 7;
+  string visibility = 8;
+  string thread_ref = 9;
+  string thread_id = 10;
+}
+
+message StateDiscussionDigest {
+  StateId state_id = 1;
+  uint32 discussion_count = 2;
+  uint32 open_count = 3;
+  uint32 resolved_count = 4;
+  uint32 orphaned_count = 5;
+  repeated DiscussionDigest discussions = 6;
+}
+
+message ListDiscussionsByStatesResponse {
+  // One entry per requested state_id, in request order. Unknown or
+  // unauthorized states are omitted rather than returning an empty digest,
+  // matching the existence-hidden ListByState posture.
+  repeated StateDiscussionDigest states = 1;
+}
+
 message ListDiscussionsResponse {
   oneof frame {
     Discussion item = 1;
@@ -191,6 +232,26 @@ service CollaborationService {
     };
   }
   rpc ListBySymbol(ListDiscussionsBySymbolRequest) returns (ListDiscussionsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_COLLABORATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Batched per-state discussion digests and counts (weft#1397). Unary so a
+  // page resolves every thread digest in one read.
+  rpc ListDiscussionsByStates(ListDiscussionsByStatesRequest) returns (ListDiscussionsByStatesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

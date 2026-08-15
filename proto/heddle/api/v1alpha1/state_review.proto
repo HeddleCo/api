@@ -85,6 +85,26 @@ message ReadingOrderPartition {
   repeated PathSymbolRef structural = 1;
   repeated PathSymbolRef consequence = 2;
   repeated PathSymbolRef tests_and_docs = 3;
+  // Additive reading-order entries with line ranges (api#113). Prefer these
+  // when present; the PathSymbolRef lists remain so existing clients keep
+  // decoding. Changing those field types would break the wire.
+  repeated ReadingOrderEntry structural_entries = 4;
+  repeated ReadingOrderEntry consequence_entries = 5;
+  repeated ReadingOrderEntry tests_and_docs_entries = 6;
+}
+
+// One symbol in the state-review reading order, with an optional line span
+// so a client holding the full diff can slice hunks to this symbol.
+// PathSymbolRef stays range-free: discussion anchors must not become
+// line-based (api#113).
+message ReadingOrderEntry {
+  PathSymbolRef ref = 1;
+  // Line span of this symbol in the state being reviewed, 1-based and
+  // inclusive of `start_line`, exclusive of `end_line`. Present when the
+  // symbol's extent is known; absent when it is not, so a client can fall
+  // back to showing the file rather than guessing a slice.
+  optional uint32 start_line = 2;
+  optional uint32 end_line = 3;
 }
 
 message PathSymbolRef {

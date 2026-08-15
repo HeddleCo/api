@@ -245,6 +245,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListDiscussionsByStates",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion",
       "layers": {
         "implementation": {
@@ -322,6 +333,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimNextDropCode",
       "layers": {
         "implementation": {
@@ -344,7 +366,7 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
+      "rpc": "heddle.api.v1alpha1.IdentityService/CompleteRecovery",
       "layers": {
         "implementation": {
           "status": "planned"
@@ -355,7 +377,7 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/CompleteRecovery",
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateAgentAccount",
       "layers": {
         "implementation": {
           "status": "planned"
@@ -553,6 +575,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/PromoteAgentAccount",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ProvisionAgentRootedAccount",
       "layers": {
         "implementation": {
@@ -586,7 +619,7 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName",
+      "rpc": "heddle.api.v1alpha1.IdentityService/RemainingDropCodes",
       "layers": {
         "implementation": {
           "status": "planned"
@@ -597,7 +630,7 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/RemainingDropCodes",
+      "rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName",
       "layers": {
         "implementation": {
           "status": "planned"
@@ -1070,6 +1103,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListExploreMetadata",
+      "layers": {
+        "implementation": {
+          "status": "shipped"
+        },
+        "registration": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListGrants",
       "layers": {
         "implementation": {
@@ -1099,17 +1143,6 @@
         },
         "registration": {
           "status": "planned"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/ListExploreMetadata",
-      "layers": {
-        "implementation": {
-          "status": "shipped"
-        },
-        "registration": {
-          "status": "shipped"
         }
       }
     },
@@ -1478,6 +1511,17 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListThreadHistories",
       "layers": {
         "implementation": {
           "status": "planned"

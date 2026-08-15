@@ -195,6 +195,47 @@ message ExploreMetadata {
   google.protobuf.Timestamp oldest_state_at = 17;
   // Raw push-time input used by the consumer-owned new-repository lift.
   uint32 active_day_count = 18;
+  // Adopt-time code-legibility metrics (weft#1389). Absent when the craft
+  // axis has not been computed for this repo; ranking renormalizes without it.
+  optional RepoCraftMetrics craft = 19;
+}
+
+// Percentile pair used by craft metrics. Both values are in the native unit
+// of the enclosing field (complexity points, lines, nesting levels, bytes).
+message CraftPercentiles {
+  double median = 1;
+  double p90 = 2;
+}
+
+// Distribution of a structural-shape measurement: percentiles plus the
+// sample size they were computed over. `sample_count` is 0 when unknown.
+message CraftDistribution {
+  CraftPercentiles percentiles = 1;
+  uint32 sample_count = 2;
+}
+
+// Repo-level deterministic code-legibility metrics (weft#1389). Ranking
+// reads this as the 'craft' axis, distinct from intent/clarity. Schema
+// version stamps the formula so a recompute is tractable when the metric
+// definition changes. Per-language values are not assumed comparable;
+// aggregation is over the versioned "code" language list.
+message RepoCraftMetrics {
+  // Formula/schema stamp. Bump when cognitive-complexity, structural-shape,
+  // or duplication definitions change so stored rows can be recomputed.
+  uint32 schema_version = 1;
+  // Sonar cognitive complexity, per function, as median / p90.
+  CraftPercentiles cognitive_complexity = 2;
+  // Function-length distribution (lines).
+  CraftDistribution function_length = 3;
+  // Maximum nesting-depth distribution (levels).
+  CraftDistribution nesting_depth = 4;
+  // File-size distribution (bytes).
+  CraftDistribution file_size_bytes = 5;
+  // Fraction of hashed subtrees that collide with another subtree in the
+  // same repo. Absent when duplication was not computed.
+  optional double duplication_ratio = 6;
+  // Count of distinct subtree-hash collisions. 0 when none or uncomputed.
+  uint32 duplicate_subtree_count = 7;
 }
 
 message ListExploreMetadataResponse {

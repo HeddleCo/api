@@ -32,9 +32,21 @@ class ExploreContractTest(unittest.TestCase):
             "active_day_count",
             "latest_state_at",
             "oldest_state_at",
+            "craft",
         ):
             self.assertRegex(metadata, rf"\b{field}\s*=")
         self.assertNotRegex(metadata, r"\b(?:recency|score|lane)\s*=")
+        craft = block_body(source, "message", "RepoCraftMetrics")
+        for field in (
+            "schema_version",
+            "cognitive_complexity",
+            "function_length",
+            "nesting_depth",
+            "file_size_bytes",
+            "duplication_ratio",
+            "duplicate_subtree_count",
+        ):
+            self.assertRegex(craft, rf"\b{field}\s*=")
         self.assertRegex(
             service,
             r"rpc ListExploreMetadata\(ListExploreMetadataRequest\) "

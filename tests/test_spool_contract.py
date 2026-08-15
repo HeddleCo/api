@@ -30,10 +30,13 @@ class SpoolContractTest(unittest.TestCase):
         settings = body("SpoolSettings")
         self.assertIn('reserved "default_state_visibility";', settings)
         self.assertIn(
-            ("SpoolStateVisibility", "state_visibility", 2),
+            ("Visibility", "state_visibility", 2),
             fields("SpoolSettings"),
         )
+        self.assertIn(("Visibility", "visibility", 1), fields("SpoolSettings"))
         self.assertNotRegex(settings, r"\bSpoolStateVisibility default_state_visibility\b")
+        self.assertNotRegex(settings, r"\benum SpoolVisibility\b")
+        self.assertNotRegex(settings, r"\benum SpoolStateVisibility\b")
         self.assertIn("Spool-level baseline for state visibility", settings)
 
     def test_spool_summary_carries_thread_listing_fields(self) -> None:
@@ -62,7 +65,7 @@ class SpoolContractTest(unittest.TestCase):
                 ("string", "slug", 2),
                 ("bool", "is_repo", 3),
                 ("string", "display_name", 4),
-                ("SpoolVisibility", "visibility", 5),
+                ("Visibility", "visibility", 5),
                 ("string", "client_operation_id", 6),
                 ("SpoolSettings", "settings", 7),
             ],
@@ -71,6 +74,35 @@ class SpoolContractTest(unittest.TestCase):
         self.assertIn("Complete create-time settings", request)
         self.assertIn("state-visibility", request)
         self.assertIn("rather than silently", request)
+
+    def test_unified_visibility_numbering(self) -> None:
+        visibility = re.search(r"(?ms)^enum Visibility \{(.*?)^\}", REGISTRY)
+        if visibility is None:
+            raise AssertionError("missing Visibility enum")
+        body = visibility.group(1)
+        self.assertIn("VISIBILITY_UNSPECIFIED = 0", body)
+        self.assertIn("VISIBILITY_PRIVATE = 1", body)
+        self.assertIn("VISIBILITY_INTERNAL = 2", body)
+        self.assertIn("VISIBILITY_PUBLIC = 3", body)
+        self.assertNotRegex(REGISTRY, r"(?m)^enum SpoolVisibility \{")
+        self.assertNotRegex(REGISTRY, r"(?m)^enum SpoolStateVisibility \{")
+        self.assertEqual(
+            fields("SetSpoolVisibilityRequest"),
+            [
+                ("string", "full_path", 1),
+                ("Visibility", "visibility", 2),
+                ("string", "client_operation_id", 3),
+            ],
+        )
+        self.assertEqual(
+            fields("SetNamespaceVisibilityRequest"),
+            [
+                ("string", "full_path", 1),
+                ("Visibility", "visibility", 2),
+                ("string", "client_operation_id", 3),
+            ],
+        )
+        self.assertIn(("Visibility", "visibility", 8), fields("HostedNamespace"))
 
 
 if __name__ == "__main__":

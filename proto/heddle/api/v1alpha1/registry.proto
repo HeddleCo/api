@@ -18,17 +18,34 @@ enum NamespaceKind {
   NAMESPACE_KIND_TEAM = 3;
 }
 
-enum SpoolVisibility {
-  SPOOL_VISIBILITY_UNSPECIFIED = 0;
-  SPOOL_VISIBILITY_PRIVATE = 1;
-  SPOOL_VISIBILITY_PUBLIC = 2;
-}
-
-enum SpoolStateVisibility {
-  SPOOL_STATE_VISIBILITY_UNSPECIFIED = 0;
-  SPOOL_STATE_VISIBILITY_PUBLIC = 1;
-  SPOOL_STATE_VISIBILITY_INTERNAL = 2;
-  SPOOL_STATE_VISIBILITY_PRIVATE = 3;
+// Unified three-tier visibility for both spool EXISTENCE (`visibility`)
+// and spool HISTORY (`state_visibility`). One type, one numbering.
+//
+// Canonical numbering is restrictiveness order (narrowest first):
+//   PRIVATE = 1, INTERNAL = 2, PUBLIC = 3
+//
+// This replaces the former `SpoolVisibility` {PRIVATE=1, PUBLIC=2} and
+// `SpoolStateVisibility` {PUBLIC=1, INTERNAL=2, PRIVATE=3}. Those two
+// enums were differently numbered; a numeric cast between them published
+// private history as public. Consumers MUST map by variant NAME, never by
+// discriminant. Retired type names are not reused.
+//
+// Tiers:
+//   PRIVATE  — scoped to the owning user / explicit grant holders.
+//   INTERNAL — scoped to members of the containing org/team spool.
+//              Expressible for existence only on org- or team-parented
+//              spools; rejected for user-parented and root-level
+//              (`__users` / `__orgs`) spools.
+//   PUBLIC   — everyone, including anonymous.
+//
+// Coherence: PUBLIC history requires PUBLIC existence. A PRIVATE spool
+// with INTERNAL history is the default (same grant-holder set) and is
+// legal. There is no "signed-in Heddle users only" tier.
+enum Visibility {
+  VISIBILITY_UNSPECIFIED = 0;
+  VISIBILITY_PRIVATE = 1;
+  VISIBILITY_INTERNAL = 2;
+  VISIBILITY_PUBLIC = 3;
 }
 
 enum SpoolBootstrapKind {
@@ -111,10 +128,10 @@ message SpoolInitialTooling {
 message SpoolSettings {
   reserved "default_state_visibility";
 
-  SpoolVisibility visibility = 1;
+  Visibility visibility = 1;
   // Spool-level baseline for state visibility. State-level overrides may only
-  // narrow this baseline.
-  SpoolStateVisibility state_visibility = 2;
+  // narrow this baseline. PUBLIC history requires PUBLIC existence.
+  Visibility state_visibility = 2;
   SpoolBootstrapKind bootstrap_kind = 3;
   string bootstrap_source = 4;
   SpoolWritePolicy write_policy = 5;
@@ -149,7 +166,7 @@ message UpdateNamespaceRequest {
 
 message SetNamespaceVisibilityRequest {
   string full_path = 1;
-  SpoolVisibility visibility = 2;
+  Visibility visibility = 2;
   string client_operation_id = 3;
 }
 
@@ -264,7 +281,7 @@ message CreateSpoolRequest {
   string slug = 2;
   bool is_repo = 3;
   optional string display_name = 4;
-  SpoolVisibility visibility = 5;
+  Visibility visibility = 5;
   string client_operation_id = 6;
   // Complete create-time settings, including the spool-level state-visibility
   // baseline. Weft must validate and persist this message rather than silently
@@ -322,7 +339,7 @@ message HostedNamespace {
   // Current effective visibility of the namespace's spool. Mirrors
   // `settings.visibility` for top-level reads; populated on every response
   // builder so SetNamespaceVisibility callers see the applied value.
-  SpoolVisibility visibility = 8;
+  Visibility visibility = 8;
 }
 
 message HostedRepository {
@@ -358,7 +375,7 @@ message SpoolSummary {
 
 // ── Unified spool settings (weft#472) ────────────────────────────────────────
 // One read + two writes for any spool (namespace or repo), keyed on
-// `full_path`. Reuse the existing SpoolSettings / SpoolVisibility / SpoolSummary
+// `full_path`. Reuse the existing SpoolSettings / Visibility / SpoolSummary
 // shapes — do not fork them. Handlers land in weft (a follow-up).
 
 // The unified settings-read result: SpoolSummary-style metadata plus the FULL
@@ -396,7 +413,7 @@ message GetSpoolRequest {
 // SetNamespaceVisibilityRequest but keyed on `full_path`.
 message SetSpoolVisibilityRequest {
   string full_path = 1;
-  SpoolVisibility visibility = 2; // reuses the existing enum
+  Visibility visibility = 2;
   string client_operation_id = 3;
 }
 

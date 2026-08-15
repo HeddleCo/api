@@ -20,7 +20,7 @@ use heddle_api::heddle::api::v1alpha1::{
     PromoteAgentAccountRequest, ProviderPlanResponse, ProviderPullCapabilityContext,
     ProviderReadRequest, ProvisionAgentRootedAccountRequest, PushRequest,
     RemainingDropCodesRequest, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
-    SigningTier, SpoolSettings, SpoolStateVisibility, StateId, ThreadOrder, TraceContext,
+    SigningTier, SpoolSettings, StateId, ThreadOrder, TraceContext, Visibility,
     error_detail, get_context_history_response, list_context_response, list_discussions_response,
     list_refs_response, list_threads_response, thread_state,
 };
@@ -594,7 +594,7 @@ fn generated_descriptor_carries_invite_drop_contracts() {
 fn generated_create_spool_carries_state_visibility_settings() {
     let request = CreateSpoolRequest {
         settings: Some(SpoolSettings {
-            state_visibility: SpoolStateVisibility::Public as i32,
+            state_visibility: Visibility::Public as i32,
             ..Default::default()
         }),
         ..Default::default()
@@ -606,8 +606,20 @@ fn generated_create_spool_carries_state_visibility_settings() {
             .settings
             .expect("create-time settings")
             .state_visibility,
-        SpoolStateVisibility::Public as i32
+        Visibility::Public as i32
     );
+}
+
+#[test]
+fn unified_visibility_numbering_is_restrictiveness_order() {
+    assert_eq!(Visibility::Unspecified as i32, 0);
+    assert_eq!(Visibility::Private as i32, 1);
+    assert_eq!(Visibility::Internal as i32, 2);
+    assert_eq!(Visibility::Public as i32, 3);
+    // The retired collision: SpoolStateVisibility::Public == 1 ==
+    // SpoolVisibility::Private. Wire value 1 is PRIVATE on both fields now,
+    // so a numeric 1 can never mean PUBLIC.
+    assert_ne!(Visibility::Public as i32, 1);
 }
 
 #[test]

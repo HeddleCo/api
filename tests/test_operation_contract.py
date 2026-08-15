@@ -73,6 +73,12 @@ class SharedOperationContractTest(unittest.TestCase):
             failure, r"\boptional\s+string\s+commit_hash\s*=\s*2\s*;"
         )
 
+    def test_import_requested_visibility_uses_unified_enum(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        spec = message_body(source, "ImportOperationSpec")
+        self.assertRegex(spec, r"\bVisibility\s+requested_visibility\s*=\s*4\s*;")
+        self.assertNotRegex(spec, r"\bSpoolVisibility\s+requested_visibility\b")
+
     def test_import_and_gateway_do_not_define_a_second_operation_lifecycle(self) -> None:
         source = OPERATION_PROTO.read_text()
         result = message_body(source, "OperationResult")

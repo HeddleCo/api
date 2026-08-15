@@ -107,7 +107,7 @@ message ImportOperationSpec {
     ProviderTokenImportSource provider_token = 2;
     PublicUrlImportSource public_url = 3;
   }
-  SpoolVisibility requested_visibility = 4;
+  Visibility requested_visibility = 4;
   bool adopt_on_complete = 5;
   string target_spool_path = 6;
 }

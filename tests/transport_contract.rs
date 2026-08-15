@@ -11,18 +11,18 @@ use heddle_api::framing::{
 };
 use heddle_api::heddle::api::v1alpha1::{
     AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ClaimNextDropCodeRequest,
-    ClaimSignupInviteRequest, CreateSpoolRequest, ErrorDetail, ErrorReason,
-    GetContextHistoryPageEnd, GetContextHistoryRequest, GetContextHistoryResponse,
+    ClaimSignupInviteRequest, CreateAgentAccountRequest, CreateSpoolRequest, ErrorDetail,
+    ErrorReason, GetContextHistoryPageEnd, GetContextHistoryRequest, GetContextHistoryResponse,
     HumanVerification, HumanVerificationChallenge, ListContextPageEnd, ListContextRequest,
     ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
     ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse,
     ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
-    ProviderPlanResponse, ProviderPullCapabilityContext, ProviderReadRequest,
-    ProvisionAgentRootedAccountRequest, PushRequest, RemainingDropCodesRequest, RequestProof,
-    RetryBehavior, RpcEffect, ServiceMaturity, SigningTier, SpoolSettings, SpoolStateVisibility,
-    StateId, ThreadOrder, TraceContext, error_detail, get_context_history_response,
-    list_context_response, list_discussions_response, list_refs_response, list_threads_response,
-    thread_state,
+    PromoteAgentAccountRequest, ProviderPlanResponse, ProviderPullCapabilityContext,
+    ProviderReadRequest, ProvisionAgentRootedAccountRequest, PushRequest,
+    RemainingDropCodesRequest, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
+    SigningTier, SpoolSettings, SpoolStateVisibility, StateId, ThreadOrder, TraceContext,
+    error_detail, get_context_history_response, list_context_response, list_discussions_response,
+    list_refs_response, list_threads_response, thread_state,
 };
 use heddle_api::{
     ALL_METHODS, HOSTED_ALPN_V1, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
@@ -203,7 +203,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 165);
+    assert_eq!(ALL_METHODS.len(), 169);
     for path in [
         "/heddle.api.v1alpha1.RepositoryService/ListContext",
         "/heddle.api.v1alpha1.RepositoryService/GetContextHistory",
@@ -225,7 +225,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             method_descriptor(&format!("/heddle.api.v1alpha1.IdentityService/{method}"))
                 .expect("handle method descriptor")
                 .maturity,
-            ServiceMaturity::Planned
+            ServiceMaturity::Shipped
         );
     }
     assert!(
@@ -439,6 +439,74 @@ fn generated_descriptor_carries_agent_rooted_provisioning_contract() {
     assert_eq!(
         method.client_operation_id(&request).expect("valid request"),
         Some("provision-operation-123")
+    );
+}
+
+#[test]
+fn generated_descriptor_carries_create_agent_account_contract() {
+    let method = method_descriptor("/heddle.api.v1alpha1.IdentityService/CreateAgentAccount")
+        .expect("create-agent-account descriptor");
+
+    assert_eq!(
+        method.input,
+        "heddle.api.v1alpha1.CreateAgentAccountRequest"
+    );
+    assert_eq!(
+        method.output,
+        "heddle.api.v1alpha1.CreateAgentAccountResponse"
+    );
+    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
+    assert_eq!(method.authorization_access, AuthorizationAccess::Public);
+    assert_eq!(method.effect, RpcEffect::DurableWrite);
+    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
+    assert!(method.client_operation_id_required);
+    assert_eq!(method.client_operation_id_field_number, Some(3));
+    assert_eq!(method.maturity, ServiceMaturity::Planned);
+
+    let request = CreateAgentAccountRequest {
+        invite_code: "invite-code".to_string(),
+        agent_public_key: vec![7; 32],
+        client_operation_id: "create-agent-operation-123".to_string(),
+    }
+    .encode_to_vec();
+    assert_eq!(
+        method.client_operation_id(&request).expect("valid request"),
+        Some("create-agent-operation-123")
+    );
+}
+
+#[test]
+fn generated_descriptor_carries_promote_agent_account_contract() {
+    let method = method_descriptor("/heddle.api.v1alpha1.IdentityService/PromoteAgentAccount")
+        .expect("promote-agent-account descriptor");
+
+    assert_eq!(
+        method.input,
+        "heddle.api.v1alpha1.PromoteAgentAccountRequest"
+    );
+    assert_eq!(
+        method.output,
+        "heddle.api.v1alpha1.PromoteAgentAccountResponse"
+    );
+    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
+    assert_eq!(method.authorization_access, AuthorizationAccess::Public);
+    assert_eq!(method.effect, RpcEffect::DurableWrite);
+    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
+    assert!(method.client_operation_id_required);
+    assert_eq!(method.client_operation_id_field_number, Some(9));
+    assert_eq!(method.maturity, ServiceMaturity::Planned);
+
+    let request = PromoteAgentAccountRequest {
+        account_id: "account-1".to_string(),
+        handle: "luke".to_string(),
+        credential_id: "cred-1".to_string(),
+        client_operation_id: "promote-operation-123".to_string(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    assert_eq!(
+        method.client_operation_id(&request).expect("valid request"),
+        Some("promote-operation-123")
     );
 }
 

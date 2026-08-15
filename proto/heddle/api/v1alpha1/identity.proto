@@ -35,6 +35,22 @@ enum HandleKind {
 message BeginWebAuthnRegistrationRequest {
   string username = 1;
   string display_name = 2;
+  // Adoption path for claiming an agent-created account (api#123 / weft#1357).
+  // When any adoption field is set, all four travel together: weft mints the
+  // WebAuthn challenge only after verifying `pre_consent_signature` over
+  // `(account_id, username, agent_node_id, nonce)`. This is the ratified
+  // pre-consent: it commits the handle and agent authority, and does not bind
+  // a credentialId (that id does not exist until WebAuthn create() returns).
+  string account_id = 3;
+  // Iroh node id of the authorizing agent. Empty on the ordinary
+  // verified-signup-email / unattenuated-identity begin paths.
+  string agent_node_id = 4;
+  // Agent-derived-credential signature over
+  // `(account_id, username, agent_node_id, nonce)`.
+  bytes pre_consent_signature = 5;
+  // Challenge nonce the pre-consent signature binds. Empty on non-adoption
+  // begins.
+  bytes nonce = 6;
 }
 
 message RegisterPublicKeyRequest {
@@ -850,6 +866,78 @@ message ProvisionAgentRootedAccountResponse {
   bytes agent_capability = 3;
 }
 
+// Invite-gated agent-account create (api#123 / weft#1357). Consumes a shared
+// #1356 invite and mints an agent-rooted human placeholder: no handle yet, a
+// server-generated globally-unique pet name, and a one-time claim token the
+// agent prints. Distinct from ProvisionAgentRootedAccount, which still returns
+// a generated handle (weft#1204). This is the ratified pet-name path.
+message CreateAgentAccountRequest {
+  // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
+  // Possession authorizes creating the placeholder account and consumes the
+  // invite on the first successful call.
+  string invite_code = 1;
+  // Raw Ed25519 public key for the creating agent. This field MUST contain
+  // exactly 32 bytes. The server MUST reject every other length, and the
+  // request proof MUST verify against this key.
+  bytes agent_public_key = 2;
+  // Idempotency key scoped to this agent key and RPC. Reuse with a different
+  // invite_code or agent_public_key must fail.
+  string client_operation_id = 3;
+}
+
+message CreateAgentAccountResponse {
+  // Stable account identity. Unchanged when PromoteAgentAccount later claims
+  // the handle and fills the independent-root slot.
+  string account_id = 1;
+  // Server-generated globally-unique pet name. The account has no handle
+  // until PromoteAgentAccount; uniqueness is enforced at the registry.
+  string pet_name = 2;
+  // Serialized pre-attenuated capability for the creating agent, bound to
+  // agent_public_key. Claiming the account neither revokes nor transforms
+  // this capability.
+  bytes agent_capability = 3;
+  // One-time claim token the agent prints as a claim link. Empty when the
+  // caller mints an Iroh claim link locally instead of a weft-stored token.
+  string claim_token = 4;
+}
+
+// Promote-consent half of the agent-account claim ceremony (api#123).
+// One call finishes WebAuthn registration, binds credentialId, claims the
+// handle, and flips rooting_tier agent_rooted → self_rooted. The ratified
+// promote-consent binds `(account_id, handle, credential_id)` — that is the
+// anti-replay binding, signed after WebAuthn create() has produced the id.
+message PromoteAgentAccountRequest {
+  // Placeholder account being claimed.
+  string account_id = 1;
+  // Handle chosen at claim time. Replaces the pet name.
+  string handle = 2;
+  // WebAuthn credentialId of the just-created passkey.
+  string credential_id = 3;
+  // Challenge minted by the adoption BeginWebAuthnRegistration.
+  string challenge_id = 4;
+  // Raw WebAuthn create() attestation bytes (verbatim; the lib
+  // base64url-decodes them off the wire).
+  bytes client_data_json = 5;
+  bytes attestation_object = 6;
+  // Iroh node id of the authorizing agent.
+  string agent_node_id = 7;
+  // Agent-derived-credential signature over
+  // `(account_id, handle, credential_id)`.
+  bytes promote_consent_signature = 8;
+  // Idempotency key scoped to the authorizing agent and this RPC.
+  string client_operation_id = 9;
+}
+
+message PromoteAgentAccountResponse {
+  // Browser session minted after the atomic promotion. Same shape as
+  // RegisterPublicKey / FinishWebAuthnAuthentication.
+  AccessTokenResponse session = 1;
+  // Canonical textual form of the claimed native handle.
+  string canonical_handle = 2;
+  // Echo of the promoted account identity.
+  string account_id = 3;
+}
+
 // ── External diff analysis (for PR review packets) ──────────────────────────
 
 // Public invitation-summary lookup. Never throws — unknown/malformed
@@ -1364,7 +1452,6 @@ service IdentityService {
   // returns the same NOT_FOUND status and public error shape.
   rpc ClaimHandle(ClaimHandleRequest) returns (ClaimHandleResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1393,6 +1480,33 @@ service IdentityService {
       authorization_role: AUTHORIZATION_ROLE_NONE
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Consumes a shared-pool invite to create an agent-rooted human placeholder
+  // (api#123). No established account principal exists yet: authorization
+  // comes from the held invite, while PROOF_OF_POSSESSION binds the call and
+  // returned capability to agent_public_key. The account has no handle until
+  // PromoteAgentAccount. Invalid, consumed, reserved, revoked, and
+  // email-bound codes fail identically with CALL_FAILURE_CODE_NOT_FOUND and
+  // SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE (same existence-hidden shape as
+  // ClaimSignupInvite).
+  rpc CreateAgentAccount(CreateAgentAccountRequest) returns (CreateAgentAccountResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "invite_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CreateDeviceAuthorization(CreateDeviceAuthorizationRequest) returns (DeviceAuthorizationResponse) {
@@ -1491,7 +1605,6 @@ service IdentityService {
   // to the public classification and holder-presence boolean.
   rpc GetHandleStatus(GetHandleStatusRequest) returns (GetHandleStatusResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -1697,6 +1810,32 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
+  // Atomically finishes WebAuthn registration, binds credentialId, claims
+  // the handle, and flips agent_rooted → self_rooted (api#123). Authorization
+  // is the agent's promote-consent signature over
+  // `(account_id, handle, credential_id)` plus the WebAuthn attestation weft
+  // verifies as RP. The agent's derived credential is retained underneath
+  // the new human root. No half-claimed state: never root-without-handle or
+  // handle-without-root.
+  rpc PromoteAgentAccount(PromoteAgentAccountRequest) returns (PromoteAgentAccountResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "account_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // Consumes a human's invite to create an agent-rooted human account. No
   // established account principal exists yet: authorization comes from the
   // held invite, while PROOF_OF_POSSESSION binds the call and returned
@@ -1765,7 +1904,6 @@ service IdentityService {
   // public error shape, so the RPC does not reveal which condition applied.
   rpc RequestHeldName(RequestHeldNameRequest) returns (RequestHeldNameResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1802,7 +1940,6 @@ service IdentityService {
   // NOT_FOUND.
   rpc ResolveHandle(ResolveHandleRequest) returns (ResolveHandleResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY

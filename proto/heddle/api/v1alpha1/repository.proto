@@ -447,6 +447,29 @@ message ListStatesResponse {
   repeated StateSummary states = 1;
 }
 
+// Batched per-thread history (weft#1032). One call replaces N ListStates
+// fan-outs on branches-as-threads surfaces.
+message ListThreadHistoriesRequest {
+  RepositoryRef repo_path = 1;
+  // Thread refs to read. Empty returns an empty histories list.
+  repeated string refs = 2;
+  // Per-ref cap, matching ListStatesRequest.limit. 0 = server default.
+  uint32 limit = 3;
+}
+
+message ThreadHistory {
+  // Echo of the requested ref.
+  string ref = 1;
+  // Newest-first states on this thread, truncated to `limit`.
+  repeated StateSummary states = 2;
+}
+
+message ListThreadHistoriesResponse {
+  // One entry per requested ref that exists, in request order. Missing
+  // refs are omitted (existence-hidden), matching ListStates.
+  repeated ThreadHistory histories = 1;
+}
+
 // Hosted unary read of a state's attachments by state_id. Complements the
 // push/pull `StateAttachmentTransfer` path in repo_sync.proto (native-pack
 // object channel) with a simple fetch for clients that already hold a
@@ -1087,6 +1110,26 @@ service RepositoryService {
     };
   }
   rpc ListStates(ListStatesRequest) returns (ListStatesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_RUN_HISTORY_DETAILS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Batched per-thread history (weft#1032). Same authorization and
+  // existence-hiding posture as ListStates.
+  rpc ListThreadHistories(ListThreadHistoriesRequest) returns (ListThreadHistoriesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

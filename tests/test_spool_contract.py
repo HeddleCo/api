@@ -36,6 +36,24 @@ class SpoolContractTest(unittest.TestCase):
         self.assertNotRegex(settings, r"\bSpoolStateVisibility default_state_visibility\b")
         self.assertIn("Spool-level baseline for state visibility", settings)
 
+    def test_spool_summary_carries_thread_listing_fields(self) -> None:
+        self.assertEqual(
+            fields("SpoolSummary"),
+            [
+                ("string", "spool_id", 1),
+                ("string", "full_path", 2),
+                ("string", "kind", 3),
+                ("bool", "is_repo", 4),
+                ("google.protobuf.Timestamp", "last_activity_at", 5),
+                ("uint32", "thread_count", 6),
+                ("string", "head_thread", 7),
+            ],
+        )
+        summary = body("SpoolSummary")
+        self.assertIn("is_thread = true", summary)
+        self.assertIn("GetRefs", summary)
+        self.assertIn("default thread", summary)
+
     def test_create_spool_carries_complete_settings(self) -> None:
         self.assertEqual(
             fields("CreateSpoolRequest"),

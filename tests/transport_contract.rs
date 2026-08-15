@@ -20,8 +20,8 @@ use heddle_api::heddle::api::v1alpha1::{
     PromoteAgentAccountRequest, ProviderPlanResponse, ProviderPullCapabilityContext,
     ProviderReadRequest, ProvisionAgentRootedAccountRequest, PushRequest,
     RemainingDropCodesRequest, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
-    SigningTier, SpoolSettings, StateId, ThreadOrder, TraceContext, Visibility,
-    error_detail, get_context_history_response, list_context_response, list_discussions_response,
+    SigningTier, SpoolSettings, StateId, ThreadOrder, TraceContext, Visibility, error_detail,
+    get_context_history_response, list_context_response, list_discussions_response,
     list_refs_response, list_threads_response, thread_state,
 };
 use heddle_api::{

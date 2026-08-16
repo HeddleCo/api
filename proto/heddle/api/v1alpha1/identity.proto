@@ -5,6 +5,7 @@ package heddle.api.v1alpha1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 // Device-authorization lifecycle from the identity authorization model.
@@ -108,6 +109,23 @@ message RegisterPublicKeyRequest {
   // revoked.
   bytes attesting_pubkey = 10;
   bytes cross_device_attestation = 11;
+  // Initial owner root installed atomically with this public credential. The
+  // root account_uuid MUST equal the stable owner UUID assigned to the
+  // registration challenge. Existing registration fields retain their exact
+  // meaning; these additive fields are ignored before the owner cutover.
+  SignedOwnerRoot owner_root = 12;
+  // Fresh proof by owner_root.root.authority_key over
+  // SHA-256("heddle-register-owner-root-v1" || challenge_id ||
+  //        accepted root-state hash || device_public_key). This binds root
+  // possession to this one registration rather than replaying authority_proof.
+  AuthorizationSignature owner_root_proof_of_possession = 13;
+  // Guardian M-of-N is the default. If omitted, the signed root's guardian
+  // policy is selected and must be valid; omission never selects custody.
+  // The WEFT 1-of-1 arm requires a recognized warning version and exact digest.
+  RegistrationRecoveryPolicy owner_recovery_policy = 14;
+  // Proposed authenticated UUID-to-key binding for the same root. The server
+  // fills registry_attestation only after every registration check succeeds.
+  OwnerKeyBinding owner_key_binding = 15;
 }
 
 message BeginWebAuthnAuthenticationRequest {
@@ -245,10 +263,15 @@ message AccessTokenResponse {
   // credential row (device, service-account, agent). Empty for
   // browser sessions.
   string credential_id = 6;
-  // Server-issued GrantEnvelope authenticating the client's pubkey +
-  // session for biscuit minting. Empty on legacy / unauthenticated
-  // responses.
-  bytes grant_envelope = 7;
+  // DEPRECATED, but still live and unchanged during cutover A1:
+  // Server-issued GrantEnvelope authenticating the client's pubkey + session
+  // for biscuit minting. Existing Weft/Heddle consumers continue to use this
+  // as their single old authority until the later atomic cutover.
+  bytes grant_envelope = 7 [deprecated = true];
+  // Owner-authored bundle returned without re-signing or reinterpretation.
+  // Empty until owner evidence is available; it does not supersede
+  // grant_envelope during this additive preparation step.
+  OwnerAuthorizationBundle owner_authorization = 8;
 }
 
 message ListSessionsRequest {}
@@ -278,6 +301,9 @@ message ActiveSession {
   // Last time this token was rotated (i.e. the user actively used
   // the app from this session). Zero when never rotated.
   google.protobuf.Timestamp last_used_at = 7;
+  // Typed owner evidence associated with this session. This is transport data,
+  // not a second live authorization decision during cutover A1.
+  OwnerAuthorizationBundle owner_authorization = 8;
 }
 
 message RevokeSessionRequest {

@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "heddle/api/v1alpha1/owner_authorization.proto";
+import "heddle/api/v1alpha1/registry.proto";
+
+// These existing governance symbols retain their fully-qualified names and
+// every field/tag. They are isolated only to keep the new identity -> owner
+// dependency acyclic; governance remains data-only until its atomic cutover.
+
+// ── 7. Owner-signed spool governance ────────────────────────────────────────
+//
+// These messages extend the same inert owner-anchored contract. They do not
+// alter UpdateSpoolSettings, declare a service or RPC, or appear in any live
+// request, response, CallContext, bearer, facet-sync, or verifier surface.
+// They become live only when Weft's exclusive owner-anchored cutover imports
+// and routes the read/submission types and atomically replaces the current
+// maintainer-authorized settings mutation.
+
+// The predecessor a client fetched before constructing a governance state.
+// `state_hash` is the 32-byte governance state hash; `sequence` is that state's
+// monotonic sequence. For the first state, both are their zero values.
+message GovernanceStateHead {
+  bytes state_hash = 1;
+  uint64 sequence = 2;
+}
+
+// Merge behavior is explicit signed state, not an implementation convention.
+// A verifier owns the canonical behavior for each known setting key and MUST
+// reject a state that omits it, duplicates it, or declares another behavior.
+// The signed declaration therefore cannot downgrade a grow-only key.
+enum GovernanceSettingMergeSemantics {
+  GOVERNANCE_SETTING_MERGE_SEMANTICS_UNSPECIFIED = 0;
+  GOVERNANCE_SETTING_MERGE_SEMANTICS_LAST_WRITER_WINS = 1;
+  GOVERNANCE_SETTING_MERGE_SEMANTICS_GROW_ONLY_SET_UNION = 2;
+}
+
+message GovernanceSettingMergePolicy {
+  // The canonical protobuf field name in `SpoolSettings`. Entries are sorted
+  // by UTF-8 bytes in canonical_owner_governance_state_v1. Unknown, missing,
+  // and duplicate keys fail closed.
+  string setting_key = 1;
+  GovernanceSettingMergeSemantics semantics = 2;
+}
+
+// The exact state an owner signs. The client, not Weft, supplies the
+// predecessor link, settings, owner-authority claim, sequence, and final hash.
+//
+// canonical_owner_governance_state_v1_without_governance_state_hash encodes
+// fields 1 through 8 in field-number order using the file-level canonical wire
+// rules. `expected_head` and `settings` use their field-number order;
+// `merge_parent_state_hashes` are sorted bytewise; `merge_policies` are sorted
+// by `setting_key`. `governance_state_hash` is:
+//
+//   SHA-256(
+//     "heddle-owner-governance-state-v1" ||
+//     canonical_owner_governance_state_v1_without_governance_state_hash
+//   )
+//
+// The owner signature covers canonical_owner_governance_state_v1, which adds
+// that final hash to fields 1 through 8. No protobuf serialization is signed.
+message OwnerGovernanceState {
+  // Exactly 1.
+  uint32 format_version = 1;
+  // Raw immutable 16-byte spool UUID.
+  bytes spool_uuid = 2;
+  // The compare-and-set predecessor returned by GetOwnerGovernanceHeadResponse.
+  GovernanceStateHead expected_head = 3;
+  // Exactly expected_head.sequence + 1 and strictly greater than every
+  // resolved merge parent sequence.
+  uint64 sequence = 4;
+  // Additional 32-byte parent state hashes for an explicit graph merge. The
+  // expected head is always the first parent and is not repeated here.
+  repeated bytes merge_parent_state_hashes = 5;
+  // The complete typed settings payload. Every logical key has exactly one
+  // merge policy below.
+  SpoolSettings settings = 6;
+  repeated GovernanceSettingMergePolicy merge_policies = 7;
+  // The 32-byte accepted owner-root/transition state whose active authority
+  // key is claimed to sign this governance state.
+  bytes owner_state_hash = 8;
+  // The client-computed 32-byte hash defined above.
+  bytes governance_state_hash = 9;
+}
+
+message SignedOwnerGovernanceState {
+  OwnerGovernanceState state = 1;
+  // The active authority key in state.owner_state_hash signs:
+  //
+  //   SHA-256(
+  //     "heddle-owner-governance-signature-v1" ||
+  //     canonical_owner_governance_state_v1(state)
+  //   )
+  //
+  // signer_key_id identifies the claimed current authority verification key.
+  AuthorizationSignature owner_signature = 2;
+}
+
+// Read-contract input only; no service or RPC exposes it before cutover.
+message GetOwnerGovernanceHeadRequest {
+  bytes spool_uuid = 1;
+}
+
+// Construction hint only. This unsigned response grants no authority; a client
+// verifies `owner_state_hash` through its accepted OwnerRoot/transition chain
+// before using it to construct and sign a new state.
+message GetOwnerGovernanceHeadResponse {
+  bytes spool_uuid = 1;
+  GovernanceStateHead head = 2;
+  bytes owner_state_hash = 3;
+}
+
+// Submission-contract input only; it is not an RPC input before cutover.
+message SubmitOwnerGovernanceStateRequest {
+  SignedOwnerGovernanceState governance_state = 1;
+  string client_operation_id = 2;
+}
+
+// Unsigned retry/UI receipt. It cannot authorize settings or become a bearer.
+message SubmitOwnerGovernanceStateResponse {
+  GovernanceStateHead accepted_head = 1;
+}

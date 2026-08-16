@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package heddle.api.v1alpha1;
 
+import "google/protobuf/descriptor.proto";
 import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 import "heddle/api/v1alpha1/workflow.proto";
 
@@ -91,18 +93,34 @@ message TransferCheckpoint {
   bool is_complete = 6;
 }
 
+// Generated consumers classify every attachment kind before accepting its
+// transfer. Every current client-authored kind is authoritative metadata and
+// therefore requires literal METADATA_SUPERSESSION in addition to its normal
+// schema, provenance, integrity, ownership, and predecessor validation. A new
+// enum value without a non-UNSPECIFIED option fails Rust and TypeScript
+// generation, preventing a new metadata lane from bypassing authorization.
+enum StateAttachmentAuthorizationClassification {
+  STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_UNSPECIFIED = 0;
+  STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_NOT_AUTHORITATIVE = 1;
+  STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION = 2;
+}
+
+extend google.protobuf.EnumValueOptions {
+  StateAttachmentAuthorizationClassification state_attachment_authorization_classification = 50004;
+}
+
 enum StateAttachmentKind {
   STATE_ATTACHMENT_KIND_UNSPECIFIED = 0;
-  STATE_ATTACHMENT_KIND_CONTEXT = 1;
-  STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2;
-  STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3;
-  STATE_ATTACHMENT_KIND_DISCUSSIONS = 4;
+  STATE_ATTACHMENT_KIND_CONTEXT = 1 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION];
+  STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION];
+  STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION];
+  STATE_ATTACHMENT_KIND_DISCUSSIONS = 4 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION];
   // Payload message: `StructuredConflicts` (this file). Hosted clients fetch
   // via RepositoryService.ListStateAttachments; the push/pull path still uses
   // StateAttachmentTransfer for peer sync.
-  STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5;
-  STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6;
-  STATE_ATTACHMENT_KIND_SIGNATURE = 7;
+  STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION];
+  STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION];
+  STATE_ATTACHMENT_KIND_SIGNATURE = 7 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION];
 }
 
 // =====================================================================
@@ -366,6 +384,7 @@ message PushComplete {
 message RedactionTransfer {
   string blob_hash = 1;
   bytes redactions_blob = 2;
+  SidecarAuthorization authorization = 3;
 }
 
 // Out-of-pack transport for state-visibility sidecars. State visibility
@@ -378,6 +397,7 @@ message RedactionTransfer {
 message StateVisibilityTransfer {
   StateId state_id = 1;
   bytes state_visibility_blob = 2;
+  SidecarAuthorization authorization = 3;
 }
 
 // Out-of-pack transport for state-attachment sidecars. State attachments
@@ -403,6 +423,72 @@ message StateAttachmentTransfer {
   string attachment_id = 2;
   StateAttachmentKind attachment_kind = 3;
   bytes attachment_object = 4;
+  SidecarAuthorization authorization = 5;
+}
+
+// Identity variants used only to construct the canonical operation-signing
+// body. They do not replace the identity fields on the transfer messages.
+message RedactionSidecarIdentity {
+  // Exactly 64 lower-case hexadecimal ASCII bytes.
+  string blob_hash = 1;
+}
+
+message StateVisibilitySidecarIdentity {
+  // Exactly 32 raw bytes in state_id.value.
+  StateId state_id = 1;
+}
+
+message StateAttachmentSidecarIdentity {
+  // Exactly 32 raw bytes in state_id.value.
+  StateId state_id = 1;
+  // Exactly 64 lower-case hexadecimal ASCII bytes.
+  string attachment_id = 2;
+  // UNSPECIFIED is invalid and the descriptor classification must be present.
+  StateAttachmentKind attachment_kind = 3;
+}
+
+message SidecarIdentity {
+  oneof identity {
+    RedactionSidecarIdentity redaction = 1;
+    StateVisibilitySidecarIdentity state_visibility = 2;
+    StateAttachmentSidecarIdentity state_attachment = 3;
+  }
+}
+
+// Canonical operation body reconstructed by a verifier from the transfer.
+// Protobuf serialization is NEVER signed. canonical_sidecar_operation_v1 is:
+//
+//   u32_be(format_version)
+//   u32_be(required_actions.count)
+//   repeated u32_be(action), sorted numerically and unique
+//   raw 16-byte spool_uuid
+//   u32_be(sidecar identity discriminator)
+//   identity fields in field order (fixed bytes raw; strings u32-length-prefixed)
+//   raw 32-byte payload_sha256
+//   raw 32-byte leaf_capability_id
+//
+// operation_signature is Ed25519 by the leaf capability subject key over:
+//
+//   SHA-256("heddle-sidecar-operation-v1" ||
+//          canonical_sidecar_operation_v1(body))
+//
+// v1 limits are strict: encoded OwnerAuthorizationBundle <= 1,048,576 bytes;
+// owner_state_chain <= 256; capability_chain 1..64; grants per capability
+// 1..64; path segments per selector <= 64 and each segment 1..255 UTF-8 bytes;
+// required_actions 1..2; raw sidecar payload <= 67,108,864 bytes. Redaction
+// requires exactly REDACT, plus PURGE when the payload carries purge evidence;
+// visibility requires exactly VISIBILITY; every current state attachment
+// requires exactly METADATA_SUPERSESSION. Unknown actions/versions, duplicate
+// actions, non-canonical ids, trailing bytes, oversized inputs, and a mismatch
+// with transfer identity or payload fail closed.
+message SidecarOperationSigningBody {
+  // Exactly 1.
+  uint32 format_version = 1;
+  repeated SpoolCapabilityAction required_actions = 2;
+  bytes spool_uuid = 3;
+  SidecarIdentity sidecar_identity = 4;
+  bytes payload_sha256 = 5;
+  bytes leaf_capability_id = 6;
 }
 
 enum GitRefKind {
@@ -478,6 +564,14 @@ message PullReady {
   bool full_closure_available = 6;
   uint32 object_count = 7;
   string remote_revision_address = 8;
+  // Exactly 1 for the contract introduced by cutover A1. Unknown versions
+  // fail closed; zero means the old peer did not advertise owner authz.
+  uint32 owner_authorization_protocol_version = 9;
+  // Stable 16-byte owner UUID. This anchor is persisted before any pack or
+  // sidecar and must agree with both fields below.
+  bytes stable_owner_uuid = 10;
+  OwnerKeyBinding owner_key_binding = 11;
+  CloneAuthorizationKeyring authorization_keyring = 12;
 }
 
 message WantObjects {
@@ -685,6 +779,7 @@ message PullServerFrame {
     GitLaneTransfer git_lane = 6;
     ProviderPlanChallenge provider_challenge = 7;
     ProviderPullManifest provider_manifest = 8;
+    StateAttachmentTransfer state_attachment = 9;
   }
 }
 

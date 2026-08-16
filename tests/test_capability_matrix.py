@@ -461,7 +461,9 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
         self.assertEqual(len(shipped), 150)
-        self.assertEqual(len(planned), 19)
+        # Cutover A1 adds nine explicitly classified OwnerAuthorizationService
+        # methods while leaving the 150 shipped methods unchanged.
+        self.assertEqual(len(planned), 28)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

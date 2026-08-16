@@ -1,5 +1,20 @@
 # Owner-authorization conformance gate
 
+## Cutover A1 transport corpus
+
+`node tools/verify-owner-authz-cutover.mjs` runs the additive A1 corpus against
+the generated `heddle-api` Rust types and `@heddleco/api` TypeScript types. It
+checks the canonical sidecar-operation fixture, round trips every new carrier,
+proves old Rust pull/token shapes ignore the new fields while retaining known
+fields, and compares both languages on signer mismatch, payload swapping,
+wrong-spool, transition-fork, rogue UUID binding, incomplete transfer, and
+direct/attenuated purge, visibility, and metadata-supersession cases. The
+repository-wide `tools/verify.sh` invokes it after both generated targets build.
+
+The pinned Heddle/Tapestry verifier corpus below remains the historical
+capability-chain gate. It is repinned to the published shared verifier in A2,
+after the A1 API release and downstream preparation changes exist.
+
 This CI harness generates deterministic random owner-capability graphs and
 signed child assertions, then gives the same canonical protobuf chains to
 Tapestry's browser verifier and Heddle's Rust verifier. It covers action

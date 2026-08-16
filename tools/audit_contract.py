@@ -63,11 +63,11 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
-    # Two services are planned, and seven methods on otherwise-shipped services
+    # Three services are planned, and seven methods on otherwise-shipped services
     # deliberately override their inherited maturity to planned (four handle
     # RPCs now inherit SHIPPED; CreateAgentAccount + PromoteAgentAccount are
     # the new planned ceremony methods).
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 9
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 10
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
@@ -79,6 +79,9 @@ def audit_new_descriptor(decoded: str) -> None:
         r"^(?:value|digest|hash|parent_id|parents|source_hash|base_root|"
         r"salt|argon2id_hash|challenge|"
         r"accepted_root_hash|accepted_state_hash|account_uuid|anonymous_id|capability_id|"
+        r"audit_record_hash|previous_audit_record_hash|leaf_capability_id|payload_sha256|warning_sha256|"
+        r"resource_uuid|stable_owner_uuid|source_owner_uuid|destination_owner_uuid|"
+        r"root_state_hash|source_owner_key_state_hash|destination_owner_key_state_hash|"
         r"credential_id|expected_owner_id|issuer_state_hash|owner_id|parent_capability_id|"
         r"governance_state_hash|merge_parent_state_hashes|owner_state_hash|previous_state_hash|"
         r"principal_id|root_spool_uuid|signer_key_id|spool_uuid|state_hash|"

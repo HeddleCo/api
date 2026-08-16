@@ -10,6 +10,7 @@ python3 -B -m unittest tests/test_explore_contract.py
 python3 -B -m unittest tests/test_attestation_contract.py
 python3 -B -m unittest tests/test_handle_contract.py
 python3 -B -m unittest tests/test_owner_authorization_contract.py
+python3 -B -m unittest tests/test_owner_authz_cutover_contract.py
 python3 -B -m unittest tests/test_workflow_contract.py
 python3 -B -m unittest tests/test_revision_thread_identity_contract.py
 python3 -B -m unittest tests/test_signup_contract.py
@@ -24,5 +25,6 @@ cargo test --all-features
 cargo clippy --all-features --all-targets -- -D warnings
 npm run build
 npm run typecheck
+node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs
 node tools/verify-treadle-conformance.mjs

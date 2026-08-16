@@ -14,6 +14,7 @@ lines.push('export * from "./errors.js";');
 lines.push('export * from "./signing.js";');
 lines.push('export * from "./treadle.js";');
 lines.push('export * from "./treadle-authoring.js";');
+lines.push('export * from "./attachment-authorization.js";');
 writeFileSync(join(root, "index.ts"), `${lines.join("\n")}\n`);
 writeFileSync(
   join(root, "shared.ts"),

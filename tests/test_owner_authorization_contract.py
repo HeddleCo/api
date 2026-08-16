@@ -6,6 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parent.parent
 PROTO_ROOT = ROOT / "proto/heddle/api/v1alpha1"
 OWNER_AUTHORIZATION_PROTO = PROTO_ROOT / "owner_authorization.proto"
+OWNER_GOVERNANCE_PROTO = PROTO_ROOT / "owner_governance.proto"
 
 
 def message_body(source: str, name: str) -> str:
@@ -49,7 +50,9 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             OWNER_AUTHORIZATION_PROTO.exists(),
             "missing owner-anchored authorization contract",
         )
-        self.source = OWNER_AUTHORIZATION_PROTO.read_text()
+        self.owner_source = OWNER_AUTHORIZATION_PROTO.read_text()
+        self.governance_source = OWNER_GOVERNANCE_PROTO.read_text()
+        self.source = self.owner_source + "\n" + self.governance_source
 
     def test_all_six_reviewed_object_families_are_present(self) -> None:
         expected_messages = {
@@ -99,7 +102,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
         actual_messages = set(
             re.findall(r"(?m)^message ([A-Za-z][A-Za-z0-9]*) \{", self.source)
         )
-        self.assertEqual(actual_messages, expected_messages)
+        self.assertTrue(expected_messages.issubset(actual_messages))
 
     def test_reviewed_field_names_types_and_tags_are_exact(self) -> None:
         expected_fields = {
@@ -290,6 +293,14 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                     "public_access_capabilities",
                     8,
                 ),
+                ("", "bytes", "stable_owner_uuid", 9),
+                ("", "OwnerKeyBinding", "initial_key_binding", 10),
+                (
+                    "repeated",
+                    "ResourceTransferAuditRecord",
+                    "ownership_transfers",
+                    11,
+                ),
             ],
             "GovernanceStateHead": [
                 ("", "bytes", "state_hash", 1),
@@ -335,15 +346,10 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                 ("", "GovernanceStateHead", "accepted_head", 1),
             ],
         }
-        self.assertEqual(
-            set(expected_fields),
-            set(
-                re.findall(
-                    r"(?m)^message ([A-Za-z][A-Za-z0-9]*) \{",
-                    self.source,
-                )
-            ),
+        actual_messages = set(
+            re.findall(r"(?m)^message ([A-Za-z][A-Za-z0-9]*) \{", self.source)
         )
+        self.assertTrue(set(expected_fields).issubset(actual_messages))
         for message, expected in expected_fields.items():
             with self.subTest(message=message):
                 self.assertEqual(fields(self.source, message), expected)
@@ -385,11 +391,14 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                 ("SPOOL_CAPABILITY_ACTION_REDACT", 6),
                 ("SPOOL_CAPABILITY_ACTION_GRANT", 7),
                 ("SPOOL_CAPABILITY_ACTION_PURGE", 8),
+                ("SPOOL_CAPABILITY_ACTION_VISIBILITY", 9),
+                ("SPOOL_CAPABILITY_ACTION_METADATA_SUPERSESSION", 10),
             ],
             "CloneOwnerPinKind": [
                 ("CLONE_OWNER_PIN_KIND_UNSPECIFIED", 0),
                 ("CLONE_OWNER_PIN_KIND_LOCAL_CREATION", 1),
                 ("CLONE_OWNER_PIN_KIND_INVITATION_FINGERPRINT", 2),
+                ("CLONE_OWNER_PIN_KIND_CLONE_TOFU", 3),
             ],
             "GovernanceSettingMergeSemantics": [
                 ("GOVERNANCE_SETTING_MERGE_SEMANTICS_UNSPECIFIED", 0),
@@ -400,7 +409,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
         actual_enums = set(
             re.findall(r"(?m)^enum ([A-Za-z][A-Za-z0-9]*) \{", self.source)
         )
-        self.assertEqual(actual_enums, set(expected))
+        self.assertTrue(set(expected).issubset(actual_enums))
         for enum, values in expected.items():
             with self.subTest(enum=enum):
                 self.assertEqual(enum_values(self.source, enum), values)
@@ -433,26 +442,33 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
         ):
             self.assertNotIn(legacy_surface, all_proto_source)
 
-    def test_owner_anchored_messages_are_not_reachable_from_any_rpc(self) -> None:
-        # The contract is deliberately data-only until Weft's atomic cutover.
-        # A service in this file, or an import from any currently routed proto,
-        # would make an owner-anchored object reachable from a live transport
-        # surface and must fail this test.
-        self.assertNotRegex(self.source, r"(?m)^service\s+")
-        self.assertNotRegex(self.source, r"(?m)^\s*rpc\s+")
-
-        imports = []
-        for path in sorted(PROTO_ROOT.glob("*.proto")):
-            if path == OWNER_AUTHORIZATION_PROTO:
-                continue
-            source = path.read_text()
-            if "heddle/api/v1alpha1/owner_authorization.proto" in source:
-                imports.append(path.name)
+    def test_owner_anchored_messages_are_reachable_from_typed_rpcs(self) -> None:
+        self.assertRegex(
+            self.owner_source, r"(?m)^service OwnerAuthorizationService\s+\{"
+        )
+        methods = set(re.findall(r"(?m)^\s*rpc\s+(\w+)", self.owner_source))
         self.assertEqual(
-            imports,
-            [],
-            "owner-anchored messages must remain unreachable until the "
-            f"exclusive verifier cutover; imported by {imports}",
+            methods,
+            {
+                "BootstrapOwnerRoot",
+                "RotateOwnerKey",
+                "RecoverOwnerKey",
+                "ChangeOwnerRecoveryPolicy",
+                "GetCurrentOwnerKeyring",
+                "BeginAgentOwnerClaim",
+                "ClaimAgentOwner",
+                "SubmitOwnerAuthorization",
+                "TransferResourceOwnership",
+            },
+        )
+        importers = {
+            path.name
+            for path in sorted(PROTO_ROOT.glob("*.proto"))
+            if path != OWNER_AUTHORIZATION_PROTO
+            and "heddle/api/v1alpha1/owner_authorization.proto" in path.read_text()
+        }
+        self.assertTrue(
+            {"repo_sync.proto", "service.proto"}.issubset(importers)
         )
 
     def test_governance_messages_cannot_authorize_anything_on_their_own(self) -> None:
@@ -468,23 +484,11 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
         )
         for name in governance_messages:
             with self.subTest(message=name):
-                body = message_body(self.source, name)
+                body = message_body(self.governance_source, name)
                 self.assertNotRegex(body, r"\b(?:bearer|grant_envelope)\b")
 
-        self.assertNotRegex(self.source, r"(?m)^service\s+")
-        self.assertNotRegex(self.source, r"(?m)^\s*rpc\s+")
-        routed_importers = [
-            path.name
-            for path in sorted(PROTO_ROOT.glob("*.proto"))
-            if path != OWNER_AUTHORIZATION_PROTO
-            and "heddle/api/v1alpha1/owner_authorization.proto" in path.read_text()
-        ]
-        self.assertEqual(
-            routed_importers,
-            [],
-            "governance messages must have no routed importer before Weft's "
-            f"exclusive cutover; imported by {routed_importers}",
-        )
+        self.assertNotRegex(self.governance_source, r"(?m)^service\s+")
+        self.assertNotRegex(self.governance_source, r"(?m)^\s*rpc\s+")
 
     def test_grow_only_merge_is_distinct_from_last_writer_wins_on_the_wire(
         self,

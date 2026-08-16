@@ -16,6 +16,8 @@ use heddle_api::heddle::api::v1alpha1::{
 use prost::Message;
 use sha2::{Digest, Sha256};
 
+use heddle_api::STATE_ATTACHMENT_AUTHORIZATION_CONFORMANCE;
+
 fn assert_round_trip<T>(value: T)
 where
     T: Message + Default + PartialEq + Debug,
@@ -67,6 +69,33 @@ fn generated_recovery_policy_preserves_guardian_provenance() {
     let decoded = RecoveryPolicy::decode(encoded.as_slice()).expect("recovery policy decodes");
     assert_eq!(decoded, policy);
     assert_ne!(decoded.guardians[0].kind, decoded.guardians[1].kind);
+}
+
+#[test]
+fn generated_attachment_authorization_classifies_every_current_kind() {
+    use heddle_api::heddle::api::v1alpha1::{
+        StateAttachmentAuthorizationClassification, StateAttachmentKind,
+    };
+
+    let expected = [
+        StateAttachmentKind::Context,
+        StateAttachmentKind::RiskSignals,
+        StateAttachmentKind::ReviewSignatures,
+        StateAttachmentKind::Discussions,
+        StateAttachmentKind::StructuredConflicts,
+        StateAttachmentKind::SemanticIndex,
+        StateAttachmentKind::Signature,
+    ];
+    assert_eq!(
+        STATE_ATTACHMENT_AUTHORIZATION_CONFORMANCE.len(),
+        expected.len()
+    );
+    for kind in expected {
+        assert!(STATE_ATTACHMENT_AUTHORIZATION_CONFORMANCE.contains(&(
+            kind,
+            StateAttachmentAuthorizationClassification::MetadataSupersession,
+        )));
+    }
 }
 
 fn length_prefixed(value: &[u8], output: &mut Vec<u8>) {

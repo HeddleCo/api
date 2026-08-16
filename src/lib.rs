@@ -11,6 +11,11 @@ pub use transport::{
     human_verification_error_detail, method_descriptor,
 };
 
+include!(concat!(
+    env!("OUT_DIR"),
+    "/heddle_api_attachment_authorization.rs"
+));
+
 /// Cross-product hosted-call framing and typed-failure fixture.
 pub const HOSTED_CALL_V1_FIXTURE_JSON: &str = include_str!("../tests/fixtures/hosted-call-v1.json");
 /// Cross-product canonical unary-signing fixture.

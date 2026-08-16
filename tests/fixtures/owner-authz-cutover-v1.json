@@ -1,0 +1,31 @@
+{
+  "format_version": 1,
+  "required_actions": [6, 8],
+  "spool_uuid_hex": "00112233445566778899aabbccddeeff",
+  "sidecar_kind": 1,
+  "blob_hash": "abababababababababababababababababababababababababababababababab",
+  "payload_hex": "63616e6f6e6963616c20726564616374696f6e207061796c6f6164207631",
+  "payload_sha256_hex": "2721dfbe3fb2af177b864ad055d63dc0d59ba3b03ba1be589c8fe4dbe4167a17",
+  "leaf_capability_id_hex": "5555555555555555555555555555555555555555555555555555555555555555",
+  "canonical_body_hex": "0000000100000002000000060000000800112233445566778899aabbccddeeff0000000100000040616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261622721dfbe3fb2af177b864ad055d63dc0d59ba3b03ba1be589c8fe4dbe4167a175555555555555555555555555555555555555555555555555555555555555555",
+  "signing_digest_hex": "4449590ede303a972c5d99c8fbb56d06681f57bac6e4d3bf04cf37e10632596a",
+  "signing_seed_hex": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+  "signer_public_key_hex": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "signature_hex": "a2ef9eaf0b8c6c9580f60fc090af80048acf801a1c1281ba8921678ceeb5f6ea3189ed94d83e81c13931c4a6ac3eb48202d86195bf8a93d03b8f24e8e02c9603",
+  "negative_cases": [
+    {"id": "signer-mismatch", "expected": false},
+    {"id": "payload-swapping", "expected": false},
+    {"id": "wrong-spool", "expected": false},
+    {"id": "transition-fork", "expected": false},
+    {"id": "rogue-uuid-to-key-binding", "expected": false},
+    {"id": "incomplete-transfer-source-only", "expected": false},
+    {"id": "incomplete-transfer-destination-only", "expected": false},
+    {"id": "attenuated-purge", "expected": false},
+    {"id": "attenuated-metadata-supersession", "expected": false},
+    {"id": "direct-purge", "expected": true},
+    {"id": "direct-metadata-supersession", "expected": true},
+    {"id": "direct-visibility", "expected": true},
+    {"id": "delegated-visibility", "expected": true},
+    {"id": "missing-visibility", "expected": false}
+  ]
+}

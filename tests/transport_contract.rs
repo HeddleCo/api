@@ -203,7 +203,26 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 169);
+    assert_eq!(ALL_METHODS.len(), 178);
+    for method in [
+        "BootstrapOwnerRoot",
+        "RotateOwnerKey",
+        "RecoverOwnerKey",
+        "ChangeOwnerRecoveryPolicy",
+        "GetCurrentOwnerKeyring",
+        "BeginAgentOwnerClaim",
+        "ClaimAgentOwner",
+        "SubmitOwnerAuthorization",
+        "TransferResourceOwnership",
+    ] {
+        assert!(
+            method_descriptor(&format!(
+                "/heddle.api.v1alpha1.OwnerAuthorizationService/{method}"
+            ))
+            .is_some(),
+            "owner authorization method is unreachable: {method}"
+        );
+    }
     for path in [
         "/heddle.api.v1alpha1.RepositoryService/ListContext",
         "/heddle.api.v1alpha1.RepositoryService/GetContextHistory",

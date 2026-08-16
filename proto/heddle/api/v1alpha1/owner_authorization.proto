@@ -2,15 +2,15 @@ syntax = "proto3";
 
 package heddle.api.v1alpha1;
 
-import "heddle/api/v1alpha1/registry.proto";
+import "heddle/api/v1alpha1/contract.proto";
 
 // Owner-anchored authorization transport objects.
 //
-// This file is deliberately inert before the atomic Weft cutover: it declares
-// no service or RPC, and no live request, response, CallContext, bearer, trust
-// list, or minting message imports it. Importing these objects into a routed
-// surface before the server-minted authorization path is removed would create
-// two live verifiers, allowing the weaker path to decide.
+// These objects are reachable through OwnerAuthorizationService and the
+// additive registration/session/sync carriers. Reachability transports and
+// stores owner evidence; it does not activate a second operation verifier.
+// Until the atomic Weft/Heddle cutovers, the existing authority remains the
+// only live decision path and consumers ignore these new protobuf fields.
 //
 // These protobuf messages are transport containers, not signed encodings.
 // Signatures MUST NOT cover a protobuf serialization. Every canonical_*_v1
@@ -69,6 +69,37 @@ message RecoveryPolicy {
   repeated RecoveryGuardian guardians = 2;
 }
 
+// Registration defaults to this guardian M-of-N policy. If
+// RegisterPublicKeyRequest.owner_recovery_policy is absent, the policy in the
+// signed root is treated as this branch and MUST contain a valid threshold and
+// at least one non-WEFT guardian. Absence never selects Weft custody.
+message GuardianRecoveryPolicySelection {
+  RecoveryPolicy policy = 1;
+}
+
+// Versioned evidence that the user saw and accepted the exact 1-of-1 Weft
+// custody warning. warning_sha256 is SHA-256 of the reviewed UTF-8 warning
+// text for warning_version; unknown versions and digests fail closed.
+message WeftCustodyWarningConsent {
+  uint32 warning_version = 1;
+  bytes warning_sha256 = 2;
+  int64 acknowledged_at_unix_seconds = 3;
+}
+
+// The only supported custodial recovery shape is exactly one WEFT guardian
+// with threshold one. It is never inferred from an omitted selection.
+message WeftCustodyRecoveryPolicySelection {
+  RecoveryGuardian guardian = 1;
+  WeftCustodyWarningConsent warning_consent = 2;
+}
+
+message RegistrationRecoveryPolicy {
+  oneof selection {
+    GuardianRecoveryPolicySelection guardians = 1;
+    WeftCustodyRecoveryPolicySelection weft_custody = 2;
+  }
+}
+
 // ── 1. Owner root ───────────────────────────────────────────────────────────
 
 message OwnerRoot {
@@ -95,6 +126,38 @@ message SignedOwnerRoot {
   // Every declared guardian signs the same canonical root body as proof that
   // the recovery signing material was present at declaration.
   repeated AuthorizationSignature recovery_key_proofs = 3;
+}
+
+enum OwnerKeyBindingKind {
+  OWNER_KEY_BINDING_KIND_UNSPECIFIED = 0;
+  OWNER_KEY_BINDING_KIND_SELF_ROOTED_REGISTRATION = 1;
+  OWNER_KEY_BINDING_KIND_SERVER_ROOTED_CUSTODY = 2;
+  OWNER_KEY_BINDING_KIND_AGENT_CLAIM = 3;
+}
+
+// Registry-attested attachment of a root key to the stable owner UUID.
+// `stable_owner_uuid` is exactly 16 bytes and never changes. `challenge_nonce`
+// is exactly 32 bytes, single-use, and scoped by the service to the registry
+// principal and UUID. binding_epoch begins at one and increases monotonically.
+//
+// root_proof_of_possession signs:
+//   SHA-256("heddle-owner-key-binding-v1" ||
+//          canonical_owner_key_binding_v1_without_proofs)
+//
+// registry_attestation signs the same body plus root_proof_of_possession. The
+// registry attestation key comes from pinned release trust roots; PullReady and
+// a sidecar can neither supply nor replace that key.
+message OwnerKeyBinding {
+  // Exactly 1.
+  uint32 format_version = 1;
+  bytes stable_owner_uuid = 2;
+  AuthorizationVerificationKey root_public_key = 3;
+  bytes root_state_hash = 4;
+  OwnerKeyBindingKind kind = 5;
+  uint64 binding_epoch = 6;
+  bytes challenge_nonce = 7;
+  AuthorizationSignature root_proof_of_possession = 8;
+  AuthorizationSignature registry_attestation = 9;
 }
 
 // ── 2. Bootstrap ────────────────────────────────────────────────────────────
@@ -139,6 +202,39 @@ message BootstrapOwnerRootResponse {
   bytes accepted_root_hash = 2;
 }
 
+// Starts the authenticated ceremony that attaches the first root to an
+// unclaimed agent's existing stable owner UUID. Authentication must be the
+// agent claim principal already mapped to stable_owner_uuid.
+message BeginAgentOwnerClaimRequest {
+  bytes stable_owner_uuid = 1;
+  string client_operation_id = 2;
+}
+
+message OwnerClaimChallenge {
+  string challenge_id = 1;
+  bytes stable_owner_uuid = 2;
+  // Exactly 32 random, single-use bytes.
+  bytes challenge_nonce = 3;
+  int64 expires_at_unix_seconds = 4;
+}
+
+message BeginAgentOwnerClaimResponse {
+  OwnerClaimChallenge challenge = 1;
+}
+
+message ClaimAgentOwnerRequest {
+  string challenge_id = 1;
+  SignedOwnerRoot owner_root = 2;
+  OwnerKeyBinding proposed_binding = 3;
+  RegistrationRecoveryPolicy recovery_policy = 4;
+  string client_operation_id = 5;
+}
+
+message ClaimAgentOwnerResponse {
+  OwnerKeyBinding accepted_binding = 1;
+  CloneAuthorizationKeyring current_keyring = 2;
+}
+
 // ── 3. Rotation and recovery ────────────────────────────────────────────────
 
 enum OwnerKeyTransitionKind {
@@ -181,6 +277,43 @@ message SignedOwnerKeyTransition {
   repeated AuthorizationSignature next_recovery_key_proofs = 4;
 }
 
+// The three transition RPC inputs are deliberately distinct. The transition
+// kind MUST match the routed request and cannot be selected from untyped data.
+message RotateOwnerKeyRequest {
+  SignedOwnerKeyTransition rotation = 1;
+  string client_operation_id = 2;
+}
+
+message RecoverOwnerKeyRequest {
+  SignedOwnerKeyTransition recovery = 1;
+  string client_operation_id = 2;
+}
+
+message ChangeOwnerRecoveryPolicyRequest {
+  SignedOwnerKeyTransition recovery_policy_change = 1;
+  string client_operation_id = 2;
+}
+
+message OwnerKeyTransitionResponse {
+  bytes owner_id = 1;
+  bytes accepted_state_hash = 2;
+  uint64 accepted_sequence = 3;
+}
+
+message GetCurrentOwnerKeyringRequest {
+  bytes stable_owner_uuid = 1;
+  // Optional 16-byte spool UUID. When present, the returned clone keyring is
+  // scoped to this spool and its accepted ownership-transfer continuation.
+  bytes spool_uuid = 2;
+}
+
+message GetCurrentOwnerKeyringResponse {
+  uint32 owner_authorization_protocol_version = 1;
+  bytes stable_owner_uuid = 2;
+  OwnerKeyBinding initial_key_binding = 3;
+  CloneAuthorizationKeyring keyring = 4;
+}
+
 // ── 4. Owner-anchored capability submission ────────────────────────────────
 
 enum CapabilityPrincipalKind {
@@ -201,7 +334,13 @@ enum SpoolCapabilityAction {
   SPOOL_CAPABILITY_ACTION_ADMIN = 5;
   SPOOL_CAPABILITY_ACTION_REDACT = 6;
   SPOOL_CAPABILITY_ACTION_GRANT = 7;
+  // Direct-owner only. ADMIN and GRANT do not imply or delegate PURGE.
   SPOOL_CAPABILITY_ACTION_PURGE = 8;
+  // ADMIN may imply VISIBILITY under the shared rule pack.
+  SPOOL_CAPABILITY_ACTION_VISIBILITY = 9;
+  // Direct-owner only. ADMIN and GRANT do not imply or delegate metadata
+  // supersession; ordinary attachment base validation still applies.
+  SPOOL_CAPABILITY_ACTION_METADATA_SUPERSESSION = 10;
 }
 
 message SpoolSelector {
@@ -256,6 +395,16 @@ message OwnerAuthorizationBundle {
   bytes subject_biscuit = 4;
 }
 
+// Capability evidence plus a leaf-subject operation signature. The signature
+// MUST be made by the leaf capability subject key; matching only a principal id
+// is insufficient. The signed body is reconstructed from the transfer and the
+// canonical SidecarOperationSigningBody contract in repo_sync.proto, so this
+// authorization cannot be copied beside another spool, identity, or payload.
+message SidecarAuthorization {
+  OwnerAuthorizationBundle capability = 1;
+  AuthorizationSignature operation_signature = 2;
+}
+
 message SubmitOwnerAuthorizationRequest {
   OwnerAuthorizationBundle authorization = 1;
   string client_operation_id = 2;
@@ -307,6 +456,10 @@ enum CloneOwnerPinKind {
   CLONE_OWNER_PIN_KIND_UNSPECIFIED = 0;
   CLONE_OWNER_PIN_KIND_LOCAL_CREATION = 1;
   CLONE_OWNER_PIN_KIND_INVITATION_FINGERPRINT = 2;
+  // First authenticated PullReady observed by an ordinary hosted clone. This
+  // is distinct from a spool created locally and is persisted before any pack
+  // or sidecar is accepted.
+  CLONE_OWNER_PIN_KIND_CLONE_TOFU = 3;
 }
 
 // Local provenance chosen and persisted by the client. There is no UUID-to-key
@@ -332,117 +485,208 @@ message CloneAuthorizationKeyring {
   repeated SignedOwnerKeyTransition accepted_transitions = 6;
   bytes accepted_state_hash = 7;
   repeated SignedOwnerCapability public_access_capabilities = 8;
+  // Stable 16-byte UUID authority anchor. It is not learned from a sidecar.
+  bytes stable_owner_uuid = 9;
+  OwnerKeyBinding initial_key_binding = 10;
+  // Ordered, gap-free ownership re-anchors accepted after the initial pin.
+  repeated ResourceTransferAuditRecord ownership_transfers = 11;
 }
 
-// ── 7. Owner-signed spool governance ────────────────────────────────────────
-//
-// These messages extend the same inert owner-anchored contract. They do not
-// alter UpdateSpoolSettings, declare a service or RPC, or appear in any live
-// request, response, CallContext, bearer, facet-sync, or verifier surface.
-// They become live only when Weft's exclusive owner-anchored cutover imports
-// and routes the read/submission types and atomically replaces the current
-// maintainer-authorized settings mutation.
-
-// The predecessor a client fetched before constructing a governance state.
-// `state_hash` is the 32-byte governance state hash; `sequence` is that state's
-// monotonic sequence. For the first state, both are their zero values.
-message GovernanceStateHead {
-  bytes state_hash = 1;
-  uint64 sequence = 2;
-}
-
-// Merge behavior is explicit signed state, not an implementation convention.
-// A verifier owns the canonical behavior for each known setting key and MUST
-// reject a state that omits it, duplicates it, or declares another behavior.
-// The signed declaration therefore cannot downgrade a grow-only key.
-enum GovernanceSettingMergeSemantics {
-  GOVERNANCE_SETTING_MERGE_SEMANTICS_UNSPECIFIED = 0;
-  GOVERNANCE_SETTING_MERGE_SEMANTICS_LAST_WRITER_WINS = 1;
-  GOVERNANCE_SETTING_MERGE_SEMANTICS_GROW_ONLY_SET_UNION = 2;
-}
-
-message GovernanceSettingMergePolicy {
-  // The canonical protobuf field name in `SpoolSettings`. Entries are sorted
-  // by UTF-8 bytes in canonical_owner_governance_state_v1. Unknown, missing,
-  // and duplicate keys fail closed.
-  string setting_key = 1;
-  GovernanceSettingMergeSemantics semantics = 2;
-}
-
-// The exact state an owner signs. The client, not Weft, supplies the
-// predecessor link, settings, owner-authority claim, sequence, and final hash.
-//
-// canonical_owner_governance_state_v1_without_governance_state_hash encodes
-// fields 1 through 8 in field-number order using the file-level canonical wire
-// rules. `expected_head` and `settings` use their field-number order;
-// `merge_parent_state_hashes` are sorted bytewise; `merge_policies` are sorted
-// by `setting_key`. `governance_state_hash` is:
-//
-//   SHA-256(
-//     "heddle-owner-governance-state-v1" ||
-//     canonical_owner_governance_state_v1_without_governance_state_hash
-//   )
-//
-// The owner signature covers canonical_owner_governance_state_v1, which adds
-// that final hash to fields 1 through 8. No protobuf serialization is signed.
-message OwnerGovernanceState {
+// Canonical source offer for an atomic resource ownership re-anchor.
+// canonical_resource_transfer_handoff_v1 encodes fields 1 through 8 in field
+// order using fixed-width big-endian integers and length-prefixed byte strings.
+// UUIDs are exactly 16 bytes, state hashes and nonce are exactly 32 bytes.
+message ResourceTransferHandoff {
   // Exactly 1.
   uint32 format_version = 1;
-  // Raw immutable 16-byte spool UUID.
-  bytes spool_uuid = 2;
-  // The compare-and-set predecessor returned by GetOwnerGovernanceHeadResponse.
-  GovernanceStateHead expected_head = 3;
-  // Exactly expected_head.sequence + 1 and strictly greater than every
-  // resolved merge parent sequence.
-  uint64 sequence = 4;
-  // Additional 32-byte parent state hashes for an explicit graph merge. The
-  // expected head is always the first parent and is not repeated here.
-  repeated bytes merge_parent_state_hashes = 5;
-  // The complete typed settings payload. Every logical key has exactly one
-  // merge policy below.
-  SpoolSettings settings = 6;
-  repeated GovernanceSettingMergePolicy merge_policies = 7;
-  // The 32-byte accepted owner-root/transition state whose active authority
-  // key is claimed to sign this governance state.
-  bytes owner_state_hash = 8;
-  // The client-computed 32-byte hash defined above.
-  bytes governance_state_hash = 9;
+  // Stable 16-byte resource/spool UUID; transfer never changes it.
+  bytes resource_uuid = 2;
+  // Exactly the previously committed transfer sequence plus one.
+  uint64 transfer_sequence = 3;
+  bytes source_owner_uuid = 4;
+  bytes source_owner_key_state_hash = 5;
+  bytes destination_owner_uuid = 6;
+  bytes destination_owner_key_state_hash = 7;
+  bytes nonce = 8;
 }
 
-message SignedOwnerGovernanceState {
-  OwnerGovernanceState state = 1;
-  // The active authority key in state.owner_state_hash signs:
-  //
-  //   SHA-256(
-  //     "heddle-owner-governance-signature-v1" ||
-  //     canonical_owner_governance_state_v1(state)
-  //   )
-  //
-  // signer_key_id identifies the claimed current authority verification key.
-  AuthorizationSignature owner_signature = 2;
+message SignedResourceTransferHandoff {
+  ResourceTransferHandoff handoff = 1;
+  // The active source-owner authority key signs:
+  //   SHA-256("heddle-resource-transfer-handoff-v1" ||
+  //          canonical_resource_transfer_handoff_v1(handoff))
+  AuthorizationSignature source_signature = 2;
 }
 
-// Read-contract input only; no service or RPC exposes it before cutover.
-message GetOwnerGovernanceHeadRequest {
-  bytes spool_uuid = 1;
+message ResourceTransferAcceptance {
+  SignedResourceTransferHandoff signed_handoff = 1;
+  // The active destination-owner authority key signs the domain-separated
+  // canonical handoff plus the complete source signature. This prevents an
+  // acceptance from being paired with a different or incomplete source offer.
+  AuthorizationSignature destination_signature = 2;
 }
 
-// Construction hint only. This unsigned response grants no authority; a client
-// verifies `owner_state_hash` through its accepted OwnerRoot/transition chain
-// before using it to construct and sign a new state.
-message GetOwnerGovernanceHeadResponse {
-  bytes spool_uuid = 1;
-  GovernanceStateHead head = 2;
-  bytes owner_state_hash = 3;
+// Complete client-authored transfer. Missing either signature fails closed.
+message ResourceOwnershipTransfer {
+  ResourceTransferAcceptance acceptance = 1;
 }
 
-// Submission-contract input only; it is not an RPC input before cutover.
-message SubmitOwnerGovernanceStateRequest {
-  SignedOwnerGovernanceState governance_state = 1;
+// Append-only result committed atomically with the resource-to-owner re-anchor.
+// audit_record_hash is SHA-256("heddle-resource-transfer-audit-v1" || the
+// canonical transfer, commit time, and previous audit hash).
+message ResourceTransferAuditRecord {
+  ResourceOwnershipTransfer transfer = 1;
+  int64 committed_at_unix_seconds = 2;
+  bytes previous_audit_record_hash = 3;
+  bytes audit_record_hash = 4;
+}
+
+message TransferResourceOwnershipRequest {
+  ResourceOwnershipTransfer transfer = 1;
   string client_operation_id = 2;
 }
 
-// Unsigned retry/UI receipt. It cannot authorize settings or become a bearer.
-message SubmitOwnerGovernanceStateResponse {
-  GovernanceStateHead accepted_head = 1;
+message TransferResourceOwnershipResponse {
+  ResourceTransferAuditRecord audit_record = 1;
+}
+
+// Routed owner-authorization lifecycle. The RPC surface is live contract
+// reachability only; producer implementation and authority cutover are later
+// phases. Each write carries typed signed evidence and an idempotency key.
+service OwnerAuthorizationService {
+  option (heddle.api.v1alpha1.service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_PLANNED
+  };
+
+  rpc BootstrapOwnerRoot(BootstrapOwnerRootRequest) returns (BootstrapOwnerRootResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  rpc RotateOwnerKey(RotateOwnerKeyRequest) returns (OwnerKeyTransitionResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  rpc RecoverOwnerKey(RecoverOwnerKeyRequest) returns (OwnerKeyTransitionResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  rpc ChangeOwnerRecoveryPolicy(ChangeOwnerRecoveryPolicyRequest) returns (OwnerKeyTransitionResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  rpc GetCurrentOwnerKeyring(GetCurrentOwnerKeyringRequest) returns (GetCurrentOwnerKeyringResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc BeginAgentOwnerClaim(BeginAgentOwnerClaimRequest) returns (BeginAgentOwnerClaimResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc ClaimAgentOwner(ClaimAgentOwnerRequest) returns (ClaimAgentOwnerResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc SubmitOwnerAuthorization(SubmitOwnerAuthorizationRequest) returns (SubmitOwnerAuthorizationResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  rpc TransferResourceOwnership(TransferResourceOwnershipRequest) returns (TransferResourceOwnershipResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_OWNER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "transfer.acceptance.signed_handoff.handoff.resource_uuid"
+        role: AUTHORIZATION_ROLE_RESOURCE_OWNER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
 }

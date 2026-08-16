@@ -35,7 +35,10 @@
     "./repo-sync": "./dist/repo_sync_pb.js",
     "./agent-gateway": "./dist/agent_gateway_pb.js",
     "./agent": "./dist/agent_pb.js",
-    "./presence": "./dist/presence_pb.js"
+    "./presence": "./dist/presence_pb.js",
+    "./owner-authorization": "./dist/owner_authorization_pb.js",
+    "./owner-governance": "./dist/owner_governance_pb.js",
+    "./attachment-authorization": "./dist/attachment-authorization.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.12.0",

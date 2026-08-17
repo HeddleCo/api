@@ -68,12 +68,33 @@ class SpoolContractTest(unittest.TestCase):
                 ("Visibility", "visibility", 5),
                 ("string", "client_operation_id", 6),
                 ("SpoolSettings", "settings", 7),
+                ("SignedSpoolOwnerGenesis", "owner_genesis", 8),
             ],
         )
         request = body("CreateSpoolRequest")
         self.assertIn("Complete create-time settings", request)
         self.assertIn("state-visibility", request)
         self.assertIn("rather than silently", request)
+        self.assertIn("UUIDv7", request)
+        self.assertIn(("SignedSpoolOwnerGenesis", "owner_genesis", 10), fields("HostedSpool"))
+
+    def test_every_spool_creation_shape_carries_owner_genesis(self) -> None:
+        self.assertIn(
+            ("SignedSpoolOwnerGenesis", "owner_genesis", 7),
+            fields("CreateNamespaceRequest"),
+        )
+        self.assertIn(
+            ("SignedSpoolOwnerGenesis", "owner_genesis", 4),
+            fields("CreateRepositoryRequest"),
+        )
+        self.assertIn(
+            ("SignedSpoolOwnerGenesis", "owner_genesis", 9),
+            fields("HostedNamespace"),
+        )
+        self.assertIn(
+            ("SignedSpoolOwnerGenesis", "owner_genesis", 7),
+            fields("HostedRepository"),
+        )
 
     def test_unified_visibility_numbering(self) -> None:
         visibility = re.search(r"(?ms)^enum Visibility \{(.*?)^\}", REGISTRY)

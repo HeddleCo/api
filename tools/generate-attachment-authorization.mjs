@@ -33,8 +33,7 @@ for (const match of body.matchAll(entry)) {
     );
   }
   const classificationNumber = {
-    NOT_AUTHORITATIVE: 1,
-    METADATA_SUPERSESSION: 2,
+    SPOOL_WRITE: 1,
   }[classification];
   if (classificationNumber === undefined) {
     throw new Error(`${name} has unknown classification ${classification}`);

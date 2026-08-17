@@ -31,8 +31,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config
         .boxed(".heddle.api.v1alpha1.PushClientFrame.frame.request")
         .boxed(".heddle.api.v1alpha1.BootstrapOwnerRootRequest.approval.deferred_human")
-        .boxed(".heddle.api.v1alpha1.PullReady.owner_key_binding")
-        .boxed(".heddle.api.v1alpha1.PullReady.authorization_keyring")
         .boxed(".heddle.api.v1alpha1.PullServerFrame.frame.state_attachment")
         .boxed(".heddle.api.v1alpha1.ListDiscussionsResponse.frame.item")
         .file_descriptor_set_path(&descriptor)

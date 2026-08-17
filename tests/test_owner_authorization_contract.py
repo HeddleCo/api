@@ -63,6 +63,9 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             "RecoveryPolicy",
             "OwnerRoot",
             "SignedOwnerRoot",
+            "OwnerKeyBinding",
+            "SpoolOwnerGenesis",
+            "SignedSpoolOwnerGenesis",
             # Bootstrap.
             "NewPasskeyOwnerRootApproval",
             "ExistingPasskeyOwnerRootApproval",
@@ -121,6 +124,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             "RecoveryPolicy": [
                 ("", "uint32", "threshold", 1),
                 ("repeated", "RecoveryGuardian", "guardians", 2),
+                ("optional", "uint64", "window_secs", 3),
             ],
             "OwnerRoot": [
                 ("", "uint32", "format_version", 1),
@@ -141,6 +145,24 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                     "recovery_key_proofs",
                     3,
                 ),
+            ],
+            "OwnerKeyBinding": [
+                ("", "uint32", "format_version", 1),
+                ("", "bytes", "stable_owner_uuid", 2),
+                ("", "AuthorizationVerificationKey", "root_public_key", 3),
+                ("", "bytes", "root_state_hash", 4),
+                ("", "OwnerKeyBindingKind", "kind", 5),
+                ("", "uint64", "binding_epoch", 6),
+                ("", "bytes", "challenge_nonce", 7),
+                ("", "AuthorizationSignature", "root_proof_of_possession", 8),
+            ],
+            "SpoolOwnerGenesis": [
+                ("", "bytes", "spool_uuid", 1),
+                ("", "AuthorizationVerificationKey", "owner_public_key", 2),
+            ],
+            "SignedSpoolOwnerGenesis": [
+                ("", "SpoolOwnerGenesis", "genesis", 1),
+                ("", "AuthorizationSignature", "owner_signature", 2),
             ],
             "NewPasskeyOwnerRootApproval": [
                 ("", "bytes", "client_data_json", 1),
@@ -211,7 +233,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             ],
             "SpoolCapabilityGrant": [
                 ("", "SpoolSelector", "spool", 1),
-                ("repeated", "SpoolCapabilityAction", "actions", 2),
+                ("", "SpoolCapabilityAction", "action", 2),
             ],
             "OwnerCapability": [
                 ("", "uint32", "format_version", 1),
@@ -287,19 +309,12 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                     6,
                 ),
                 ("", "bytes", "accepted_state_hash", 7),
-                (
-                    "repeated",
-                    "SignedOwnerCapability",
-                    "public_access_capabilities",
-                    8,
-                ),
-                ("", "bytes", "stable_owner_uuid", 9),
-                ("", "OwnerKeyBinding", "initial_key_binding", 10),
+                ("", "SignedSpoolOwnerGenesis", "owner_genesis", 8),
                 (
                     "repeated",
                     "ResourceTransferAuditRecord",
                     "ownership_transfers",
-                    11,
+                    9,
                 ),
             ],
             "GovernanceStateHead": [
@@ -383,16 +398,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             ],
             "SpoolCapabilityAction": [
                 ("SPOOL_CAPABILITY_ACTION_UNSPECIFIED", 0),
-                ("SPOOL_CAPABILITY_ACTION_READ", 1),
-                ("SPOOL_CAPABILITY_ACTION_WRITE", 2),
-                ("SPOOL_CAPABILITY_ACTION_MERGE", 3),
-                ("SPOOL_CAPABILITY_ACTION_APPROVE", 4),
-                ("SPOOL_CAPABILITY_ACTION_ADMIN", 5),
-                ("SPOOL_CAPABILITY_ACTION_REDACT", 6),
-                ("SPOOL_CAPABILITY_ACTION_GRANT", 7),
-                ("SPOOL_CAPABILITY_ACTION_PURGE", 8),
-                ("SPOOL_CAPABILITY_ACTION_VISIBILITY", 9),
-                ("SPOOL_CAPABILITY_ACTION_METADATA_SUPERSESSION", 10),
+                ("SPOOL_CAPABILITY_ACTION_PURGE", 1),
             ],
             "CloneOwnerPinKind": [
                 ("CLONE_OWNER_PIN_KIND_UNSPECIFIED", 0),
@@ -430,6 +436,24 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             policy,
             r"\brepeated\s+RecoveryGuardian\s+guardians\s*=\s*2\s*;",
         )
+        self.assertRegex(policy, r"\boptional\s+uint64\s+window_secs\s*=\s*3\s*;")
+        self.assertIn("604800", policy)
+
+    def test_owner_identity_is_self_rooted_and_genesis_is_tofu_pinned(self) -> None:
+        self.assertNotIn("registry_attestation", self.owner_source)
+        genesis = message_body(self.owner_source, "SpoolOwnerGenesis")
+        signed = message_body(self.owner_source, "SignedSpoolOwnerGenesis")
+        self.assertRegex(genesis, r"\bbytes\s+spool_uuid\s*=\s*1\s*;")
+        self.assertRegex(
+            genesis,
+            r"\bAuthorizationVerificationKey\s+owner_public_key\s*=\s*2\s*;",
+        )
+        self.assertRegex(
+            signed,
+            r"\bAuthorizationSignature\s+owner_signature\s*=\s*2\s*;",
+        )
+        self.assertIn("SHA-256(genesis.owner_public_key.public_key || genesis.spool_uuid)", self.owner_source)
+        self.assertIn("TOFU-pin", self.owner_source)
 
     def test_clean_cutover_contract_has_no_legacy_runtime_mode(self) -> None:
         all_proto_source = "\n".join(

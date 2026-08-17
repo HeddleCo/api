@@ -9,8 +9,8 @@ use heddle_api::heddle::api::v1alpha1::{
     GovernanceSettingMergePolicy, GovernanceSettingMergeSemantics, GovernanceStateHead,
     OwnerAuthorizationBundle, OwnerGovernanceState, OwnerKeyTransition, OwnerRoot,
     RecoveryGuardian, RecoveryGuardianKind, RecoveryPolicy, SignedOwnerCapability,
-    SignedOwnerGovernanceState, SignedOwnerKeyTransition, SignedOwnerRoot, SpoolInitialTooling,
-    SpoolSettings, SpoolWritePolicy, SubmitOwnerAuthorizationRequest,
+    SignedOwnerGovernanceState, SignedOwnerKeyTransition, SignedOwnerRoot, SignedSpoolOwnerGenesis,
+    SpoolInitialTooling, SpoolSettings, SpoolWritePolicy, SubmitOwnerAuthorizationRequest,
     SubmitOwnerGovernanceStateRequest, SubmitOwnerGovernanceStateResponse,
 };
 use prost::Message;
@@ -47,6 +47,7 @@ fn generated_rust_round_trips_all_six_owner_contract_families() {
     });
     assert_round_trip(AnonymousKeyCredential::default());
     assert_round_trip(CloneAuthorizationKeyring::default());
+    assert_round_trip(SignedSpoolOwnerGenesis::default());
 }
 
 #[test]
@@ -63,12 +64,14 @@ fn generated_recovery_policy_preserves_guardian_provenance() {
                 ..Default::default()
             },
         ],
+        window_secs: Some(604_800),
     };
 
     let encoded = policy.encode_to_vec();
     let decoded = RecoveryPolicy::decode(encoded.as_slice()).expect("recovery policy decodes");
     assert_eq!(decoded, policy);
     assert_ne!(decoded.guardians[0].kind, decoded.guardians[1].kind);
+    assert_eq!(decoded.window_secs, Some(604_800));
 }
 
 #[test]
@@ -91,10 +94,10 @@ fn generated_attachment_authorization_classifies_every_current_kind() {
         expected.len()
     );
     for kind in expected {
-        assert!(STATE_ATTACHMENT_AUTHORIZATION_CONFORMANCE.contains(&(
-            kind,
-            StateAttachmentAuthorizationClassification::MetadataSupersession,
-        )));
+        assert!(
+            STATE_ATTACHMENT_AUTHORIZATION_CONFORMANCE
+                .contains(&(kind, StateAttachmentAuthorizationClassification::SpoolWrite,))
+        );
     }
 }
 

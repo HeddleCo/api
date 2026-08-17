@@ -6,6 +6,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v1alpha1/identity.proto";
+import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 // Namespace kinds in the hosted control plane. `USER` namespaces are
@@ -154,6 +155,8 @@ message CreateNamespaceRequest {
   string display_name = 4;
   SpoolSettings settings = 5;
   string client_operation_id = 6;
+  // Required self-signed genesis for the namespace's backing spool.
+  SignedSpoolOwnerGenesis owner_genesis = 7;
 }
 
 message UpdateNamespaceRequest {
@@ -263,6 +266,8 @@ message CreateRepositoryRequest {
   string namespace_path = 1;
   string slug = 2;
   string client_operation_id = 3;
+  // Required self-signed genesis for the repository spool.
+  SignedSpoolOwnerGenesis owner_genesis = 4;
 }
 
 message UpdateRepositoryRequest {
@@ -287,6 +292,10 @@ message CreateSpoolRequest {
   // baseline. Weft must validate and persist this message rather than silently
   // replacing it with server defaults.
   SpoolSettings settings = 7;
+  // Required self-signed creation binding. genesis.spool_uuid is the UUIDv7
+  // used as the new spool id; the server verifies the owner signature before
+  // creating the spool. There is no server-assigned nonce or registry proof.
+  SignedSpoolOwnerGenesis owner_genesis = 8;
 }
 
 message UpdateSpoolRequest {
@@ -340,6 +349,8 @@ message HostedNamespace {
   // `settings.visibility` for top-level reads; populated on every response
   // builder so SetNamespaceVisibility callers see the applied value.
   Visibility visibility = 8;
+  // Immutable self-signed owner binding for the backing spool.
+  SignedSpoolOwnerGenesis owner_genesis = 9;
 }
 
 message HostedRepository {
@@ -351,6 +362,8 @@ message HostedRepository {
   // Unset when the serving registry has no activity data; populated by weft
   // from the refs/state tables (weft wiring is a separate weft-side change).
   google.protobuf.Timestamp last_activity_at = 6;
+  // Immutable self-signed owner binding for the repository spool.
+  SignedSpoolOwnerGenesis owner_genesis = 7;
 }
 
 message SpoolSummary {
@@ -403,6 +416,8 @@ message HostedSpool {
   // import operation. Handler adoption is part of the planned cutover.
   OperationId latest_import_operation_id = 8;
   string display_name = 9;
+  // Immutable self-signed owner binding accepted at spool creation.
+  SignedSpoolOwnerGenesis owner_genesis = 10;
 }
 
 message GetSpoolRequest {

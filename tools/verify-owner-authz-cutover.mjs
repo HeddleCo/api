@@ -10,7 +10,6 @@ import {
 } from "../packages/typescript/dist/identity_pb.js";
 import {
   AuthorizationSignatureSchema,
-  CloneAuthorizationKeyringSchema,
   OwnerAuthorizationBundleSchema,
   OwnerKeyBindingSchema,
   RegistrationRecoveryPolicySchema,
@@ -19,15 +18,17 @@ import {
   SidecarAuthorizationSchema,
   SignedOwnerRootSchema,
   SignedResourceTransferHandoffSchema,
+  SignedSpoolOwnerGenesisSchema,
 } from "../packages/typescript/dist/owner_authorization_pb.js";
 import {
   PullReadySchema,
   PullServerFrameSchema,
-  SidecarOperationSigningBodySchema,
+  PurgeOperationSigningBodySchema,
+  PurgeTransferSchema,
   StateAttachmentTransferSchema,
 } from "../packages/typescript/dist/repo_sync_pb.js";
 
-const fixturePath = "tests/fixtures/owner-authz-cutover-v1.json";
+const fixturePath = "tests/fixtures/owner-authz-v2.json";
 const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
 const hex = (value) => Buffer.from(value, "hex");
 const u32 = (value) => {
@@ -43,22 +44,15 @@ const sha256 = (...values) => {
 
 function canonicalBody({ spool = hex(fixture.spool_uuid_hex), payload = hex(fixture.payload_hex) } = {}) {
   if (
-    fixture.format_version !== 1 ||
-    fixture.required_actions.length < 1 ||
-    fixture.required_actions.length > 2 ||
-    fixture.required_actions.some((value, index, all) => index > 0 && all[index - 1] >= value) ||
+    fixture.format_version !== 2 ||
     spool.length !== 16 ||
-    fixture.sidecar_kind !== 1 ||
     !/^[0-9a-f]{64}$/.test(fixture.blob_hash)
   ) {
     throw new Error("non-canonical sidecar fixture");
   }
   return Buffer.concat([
     u32(fixture.format_version),
-    u32(fixture.required_actions.length),
-    ...fixture.required_actions.map(u32),
     spool,
-    u32(fixture.sidecar_kind),
     u32(Buffer.byteLength(fixture.blob_hash)),
     Buffer.from(fixture.blob_hash),
     sha256(payload),
@@ -73,7 +67,7 @@ if (canonical.toString("hex") !== fixture.canonical_body_hex) {
 if (sha256(hex(fixture.payload_hex)).toString("hex") !== fixture.payload_sha256_hex) {
   throw new Error("TypeScript payload digest differs from fixture");
 }
-const signingDigest = sha256(Buffer.from("heddle-sidecar-operation-v1"), canonical);
+const signingDigest = sha256(Buffer.from("heddle-purge-operation-v2"), canonical);
 if (signingDigest.toString("hex") !== fixture.signing_digest_hex) {
   throw new Error("TypeScript signing digest differs from fixture");
 }
@@ -87,6 +81,13 @@ const publicKey = createPublicKey({
 });
 if (!verify(null, signingDigest, publicKey, hex(fixture.signature_hex))) {
   throw new Error("TypeScript fixture signature verification failed");
+}
+const genesisDigest = sha256(hex(fixture.signer_public_key_hex), hex(fixture.spool_uuid_hex));
+if (genesisDigest.toString("hex") !== fixture.genesis_digest_hex) {
+  throw new Error("TypeScript genesis digest differs from fixture");
+}
+if (!verify(null, genesisDigest, publicKey, hex(fixture.genesis_signature_hex))) {
+  throw new Error("TypeScript genesis signature verification failed");
 }
 
 function roundTrip(schema, value) {
@@ -131,7 +132,7 @@ roundTrip(
   ActiveSessionSchema,
   create(ActiveSessionSchema, { ownerAuthorization: bundle }),
 );
-roundTrip(SidecarOperationSigningBodySchema, create(SidecarOperationSigningBodySchema));
+roundTrip(PurgeOperationSigningBodySchema, create(PurgeOperationSigningBodySchema));
 roundTrip(
   ResourceOwnershipTransferSchema,
   create(ResourceOwnershipTransferSchema, {
@@ -141,7 +142,7 @@ roundTrip(
     }),
   }),
 );
-const attachment = create(StateAttachmentTransferSchema, {
+const purge = create(PurgeTransferSchema, {
   authorization: create(SidecarAuthorizationSchema, {
     capability: bundle,
     operationSignature: signature,
@@ -150,22 +151,21 @@ const attachment = create(StateAttachmentTransferSchema, {
 roundTrip(
   PullServerFrameSchema,
   create(PullServerFrameSchema, {
-    frame: { case: "stateAttachment", value: attachment },
+    frame: { case: "purge", value: purge },
   }),
 );
+roundTrip(StateAttachmentTransferSchema, create(StateAttachmentTransferSchema));
 roundTrip(
   PullReadySchema,
   create(PullReadySchema, {
-    ownerAuthorizationProtocolVersion: 1,
-    stableOwnerUuid: new Uint8Array(16).fill(0x11),
-    ownerKeyBinding: binding,
-    authorizationKeyring: create(CloneAuthorizationKeyringSchema),
+    ownerAuthorizationProtocolVersion: 2,
+    ownerGenesis: create(SignedSpoolOwnerGenesisSchema),
   }),
 );
 
 function verifyMutation({ spool, payload, key = publicKey }) {
   const digest = sha256(
-    Buffer.from("heddle-sidecar-operation-v1"),
+    Buffer.from("heddle-purge-operation-v2"),
     canonicalBody({ spool, payload }),
   );
   return verify(null, digest, key, hex(fixture.signature_hex));
@@ -194,6 +194,16 @@ function evaluate(id) {
       spool[0] ^= 1;
       return verifyMutation({ spool });
     }
+    case "genesis-wrong-spool": {
+      const spool = hex(fixture.spool_uuid_hex);
+      spool[0] ^= 1;
+      return verify(
+        null,
+        sha256(hex(fixture.signer_public_key_hex), spool),
+        publicKey,
+        hex(fixture.genesis_signature_hex),
+      );
+    }
     case "transition-fork": {
       const rows = [
         [1, "00", "01"],
@@ -204,23 +214,14 @@ function evaluate(id) {
         row[0] === rows[index][0] + 1 && row[1] === rows[index][2]
       );
     }
-    case "rogue-uuid-to-key-binding":
-      return "11".repeat(16) === "22".repeat(16);
     case "incomplete-transfer-source-only":
       return transferIsComplete(true, false);
     case "incomplete-transfer-destination-only":
       return transferIsComplete(false, true);
     case "attenuated-purge":
-    case "attenuated-metadata-supersession":
       return directOnlyAction(false);
     case "direct-purge":
-    case "direct-metadata-supersession":
       return directOnlyAction(true);
-    case "direct-visibility":
-    case "delegated-visibility":
-      return true;
-    case "missing-visibility":
-      return false;
     default:
       throw new Error(`unknown conformance case ${id}`);
   }
@@ -249,9 +250,8 @@ if (JSON.stringify(rustOutcomes) !== JSON.stringify(typescriptOutcomes)) {
 
 const accepted = typescriptOutcomes.filter((outcome) => outcome.accepted).length;
 const rejected = typescriptOutcomes.length - accepted;
-console.log("CANONICAL_SIGNING_FIXTURE=PASS languages=rust,typescript fixture=owner-authz-cutover-v1");
-console.log("GENERATED_ROUNDTRIP=PASS rust=true typescript=true messages=registration,token,session,keyring,sidecar,transfer");
-console.log("UNKNOWN_FIELD_COMPATIBILITY=PASS old_rust_pull_and_token_clients=2 legacy_grant_envelope=preserved");
+console.log("CANONICAL_SIGNING_FIXTURE=PASS languages=rust,typescript fixture=owner-authz-v2 purge=true genesis=true");
+console.log("GENERATED_ROUNDTRIP=PASS rust=true typescript=true messages=registration,token,session,genesis,purge,transfer");
 console.log(
   `NEGATIVE_CORPUS=PASS languages=rust,typescript cases=${typescriptOutcomes.length} accepted=${accepted} rejected=${rejected} ids=${typescriptOutcomes.map((outcome) => outcome.id).join(",")}`,
 );

@@ -4,13 +4,11 @@ package heddle.api.v1alpha1;
 
 import "heddle/api/v1alpha1/contract.proto";
 
-// Owner-anchored authorization transport objects.
+// Owner-anchored purge authorization and self-rooted identity objects.
 //
-// These objects are reachable through OwnerAuthorizationService and the
-// additive registration/session/sync carriers. Reachability transports and
-// stores owner evidence; it does not activate a second operation verifier.
-// Until the atomic Weft/Heddle cutovers, the existing authority remains the
-// only live decision path and consumers ignore these new protobuf fields.
+// PURGE is the only operation authorized by an OwnerAuthorizationBundle.
+// Ordinary redaction, state-visibility, and state-attachment writes are
+// authorized by the transport's spool-write Biscuit and carry no owner sidecar.
 //
 // These protobuf messages are transport containers, not signed encodings.
 // Signatures MUST NOT cover a protobuf serialization. Every canonical_*_v1
@@ -67,6 +65,13 @@ message RecoveryGuardian {
 message RecoveryPolicy {
   uint32 threshold = 1;
   repeated RecoveryGuardian guardians = 2;
+  // Per-user veto window, in seconds, shared by account recovery and owner-key
+  // transitions. Absence selects the 7-day default (604800 seconds).
+  // ROTATE and RECOVER transitions preserve the current value. A
+  // RECOVERY_POLICY transition may change it only with the current owner
+  // authority authorization already required for that transition; lowering
+  // the value takes effect no earlier than the current window.
+  optional uint64 window_secs = 3;
 }
 
 // Registration defaults to this guardian M-of-N policy. If
@@ -135,18 +140,18 @@ enum OwnerKeyBindingKind {
   OWNER_KEY_BINDING_KIND_AGENT_CLAIM = 3;
 }
 
-// Registry-attested attachment of a root key to the stable owner UUID.
+// Self-asserted attachment of a root key to the stable owner UUID.
 // `stable_owner_uuid` is exactly 16 bytes and never changes. `challenge_nonce`
-// is exactly 32 bytes, single-use, and scoped by the service to the registry
+// is exactly 32 bytes, single-use, and scoped by the service to the authenticated
 // principal and UUID. binding_epoch begins at one and increases monotonically.
 //
 // root_proof_of_possession signs:
 //   SHA-256("heddle-owner-key-binding-v1" ||
 //          canonical_owner_key_binding_v1_without_proofs)
 //
-// registry_attestation signs the same body plus root_proof_of_possession. The
-// registry attestation key comes from pinned release trust roots; PullReady and
-// a sidecar can neither supply nor replace that key.
+// There is deliberately no registry attestation or independent release root.
+// The owner proves possession of its own root; spool consumers establish trust
+// from SignedSpoolOwnerGenesis and TOFU-pin that binding.
 message OwnerKeyBinding {
   // Exactly 1.
   uint32 format_version = 1;
@@ -157,7 +162,27 @@ message OwnerKeyBinding {
   uint64 binding_epoch = 6;
   bytes challenge_nonce = 7;
   AuthorizationSignature root_proof_of_possession = 8;
-  AuthorizationSignature registry_attestation = 9;
+}
+
+// Immutable owner-key binding created with a spool. `spool_uuid` is the raw
+// 16-byte UUIDv7 that is also the spool id. `owner_public_key` is the owner
+// authority key at creation; no registry key or nonce participates.
+message SpoolOwnerGenesis {
+  bytes spool_uuid = 1;
+  AuthorizationVerificationKey owner_public_key = 2;
+}
+
+// Self-signed genesis evidence. owner_signature.signer_key_id MUST identify
+// genesis.owner_public_key, and that key signs the exact 32-byte digest:
+//
+//   SHA-256(genesis.owner_public_key.public_key || genesis.spool_uuid)
+//
+// A cloner verifies this proof and TOFU-pins spool_uuid -> owner_public_key
+// before accepting the state tree. Later keys are learned only from the
+// owner-signed transition chain rooted here.
+message SignedSpoolOwnerGenesis {
+  SpoolOwnerGenesis genesis = 1;
+  AuthorizationSignature owner_signature = 2;
 }
 
 // ── 2. Bootstrap ────────────────────────────────────────────────────────────
@@ -269,7 +294,9 @@ message OwnerKeyTransition {
 // current recovery threshold and next key. RECOVERY_POLICY requires the
 // current authority, current recovery threshold, and possession proofs from
 // every next guardian. CLAIM_DEFERRED_HUMAN requires the origin key, the next
-// human authority key, and every next guardian.
+// human authority key, and every next guardian. These entries are appended to
+// the spool state tree and form a self-verifying chain from spool genesis;
+// neither an entry nor its verification uses a registry field or signature.
 message SignedOwnerKeyTransition {
   OwnerKeyTransition transition = 1;
   repeated AuthorizationSignature authorizations = 2;
@@ -327,20 +354,9 @@ enum CapabilityPrincipalKind {
 
 enum SpoolCapabilityAction {
   SPOOL_CAPABILITY_ACTION_UNSPECIFIED = 0;
-  SPOOL_CAPABILITY_ACTION_READ = 1;
-  SPOOL_CAPABILITY_ACTION_WRITE = 2;
-  SPOOL_CAPABILITY_ACTION_MERGE = 3;
-  SPOOL_CAPABILITY_ACTION_APPROVE = 4;
-  SPOOL_CAPABILITY_ACTION_ADMIN = 5;
-  SPOOL_CAPABILITY_ACTION_REDACT = 6;
-  SPOOL_CAPABILITY_ACTION_GRANT = 7;
-  // Direct-owner only. ADMIN and GRANT do not imply or delegate PURGE.
-  SPOOL_CAPABILITY_ACTION_PURGE = 8;
-  // ADMIN may imply VISIBILITY under the shared rule pack.
-  SPOOL_CAPABILITY_ACTION_VISIBILITY = 9;
-  // Direct-owner only. ADMIN and GRANT do not imply or delegate metadata
-  // supersession; ordinary attachment base validation still applies.
-  SPOOL_CAPABILITY_ACTION_METADATA_SUPERSESSION = 10;
+  // The sole owner-anchored capability action. Ordinary spool operations use
+  // transport Biscuits and cannot be expressed by this enum.
+  SPOOL_CAPABILITY_ACTION_PURGE = 1;
 }
 
 message SpoolSelector {
@@ -361,7 +377,8 @@ message CapabilityPrincipal {
 
 message SpoolCapabilityGrant {
   SpoolSelector spool = 1;
-  repeated SpoolCapabilityAction actions = 2;
+  // Exactly PURGE.
+  SpoolCapabilityAction action = 2;
 }
 
 message OwnerCapability {
@@ -395,10 +412,10 @@ message OwnerAuthorizationBundle {
   bytes subject_biscuit = 4;
 }
 
-// Capability evidence plus a leaf-subject operation signature. The signature
+// Purge capability evidence plus a leaf-subject operation signature. The signature
 // MUST be made by the leaf capability subject key; matching only a principal id
 // is insufficient. The signed body is reconstructed from the transfer and the
-// canonical SidecarOperationSigningBody contract in repo_sync.proto, so this
+// canonical PurgeOperationSigningBody contract in repo_sync.proto, so this
 // authorization cannot be copied beside another spool, identity, or payload.
 message SidecarAuthorization {
   OwnerAuthorizationBundle capability = 1;
@@ -470,10 +487,12 @@ message CloneOwnerPin {
   int64 first_seen_unix_seconds = 3;
 }
 
-// This wrapper is not signed. Its authority comes only from the verified
-// signed objects it contains. Loading it recomputes every id/hash and verifies
-// the full chain; unknown versions, gaps, duplicate sequences, forks, owner-id
-// mismatch, or capabilities for another spool fail closed.
+// This local persistence wrapper is not served as clone-readiness evidence.
+// PullReady carries SignedSpoolOwnerGenesis; after TOFU-pinning it, the client
+// constructs this keyring from the verified root and state-tree transition
+// entries. Loading it recomputes every id/hash and verifies the full chain;
+// unknown versions, gaps, duplicate sequences, forks, owner-id mismatch, or
+// capabilities for another spool fail closed.
 message CloneAuthorizationKeyring {
   // Exactly 1.
   uint32 format_version = 1;
@@ -484,12 +503,9 @@ message CloneAuthorizationKeyring {
   SignedOwnerRoot owner_root = 5;
   repeated SignedOwnerKeyTransition accepted_transitions = 6;
   bytes accepted_state_hash = 7;
-  repeated SignedOwnerCapability public_access_capabilities = 8;
-  // Stable 16-byte UUID authority anchor. It is not learned from a sidecar.
-  bytes stable_owner_uuid = 9;
-  OwnerKeyBinding initial_key_binding = 10;
+  SignedSpoolOwnerGenesis owner_genesis = 8;
   // Ordered, gap-free ownership re-anchors accepted after the initial pin.
-  repeated ResourceTransferAuditRecord ownership_transfers = 11;
+  repeated ResourceTransferAuditRecord ownership_transfers = 9;
 }
 
 // Canonical source offer for an atomic resource ownership re-anchor.

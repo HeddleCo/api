@@ -123,8 +123,9 @@ message RegisterPublicKeyRequest {
   // policy is selected and must be valid; omission never selects custody.
   // The WEFT 1-of-1 arm requires a recognized warning version and exact digest.
   RegistrationRecoveryPolicy owner_recovery_policy = 14;
-  // Proposed authenticated UUID-to-key binding for the same root. The server
-  // fills registry_attestation only after every registration check succeeds.
+  // Proposed self-asserted UUID-to-key binding for the same root. The root
+  // proof is verified after every registration check succeeds; no registry
+  // attestation or independent release root participates.
   OwnerKeyBinding owner_key_binding = 15;
 }
 
@@ -263,14 +264,12 @@ message AccessTokenResponse {
   // credential row (device, service-account, agent). Empty for
   // browser sessions.
   string credential_id = 6;
-  // DEPRECATED, but still live and unchanged during cutover A1:
-  // Server-issued GrantEnvelope authenticating the client's pubkey + session
-  // for biscuit minting. Existing Weft/Heddle consumers continue to use this
-  // as their single old authority until the later atomic cutover.
+  // DEPRECATED transport/session GrantEnvelope authenticating the client's
+  // pubkey for Biscuit minting. It is not owner authority; ordinary spool
+  // operations are authorized by the resulting transport Biscuit.
   bytes grant_envelope = 7 [deprecated = true];
-  // Owner-authored bundle returned without re-signing or reinterpretation.
-  // Empty until owner evidence is available; it does not supersede
-  // grant_envelope during this additive preparation step.
+  // Owner-authored purge-only bundle returned without re-signing or
+  // reinterpretation. It grants no redact, visibility, or metadata authority.
   OwnerAuthorizationBundle owner_authorization = 8;
 }
 
@@ -301,8 +300,7 @@ message ActiveSession {
   // Last time this token was rotated (i.e. the user actively used
   // the app from this session). Zero when never rotated.
   google.protobuf.Timestamp last_used_at = 7;
-  // Typed owner evidence associated with this session. This is transport data,
-  // not a second live authorization decision during cutover A1.
+  // Typed purge-only owner evidence associated with this session.
   OwnerAuthorizationBundle owner_authorization = 8;
 }
 
@@ -985,7 +983,8 @@ message InvitationSummary {
 //
 // Declaration phase (weft#182) — the generic dispatcher and per-kind requests
 // share one response. The persisted substrate is a `recovery_methods` row keyed
-// on `(user_id, kind)` with `kind_data jsonb`, `declared_at`, and `window_secs`.
+// on `(user_id, kind)` with `kind_data jsonb` and `declared_at`. The shared
+// per-user veto window lives in the signed owner RecoveryPolicy, not per method.
 
 // Canonical recovery-method kinds. Mirrors the `recovery_methods.kind`
 // column. `RECOVERY_METHOD_KIND_UNSPECIFIED` is rejected by the server.
@@ -1041,9 +1040,6 @@ message DeclareHardwareKeyRecoveryParams {
   bytes attestation_object = 3;
   // Human label for the recovery authenticator ("YubiKey 5C — backup").
   string device_label = 4;
-  // Veto window applied to a future BeginRecovery against this credential.
-  // Default 7 days; 0 = instant (the user opts out of the veto window).
-  google.protobuf.Duration window_secs = 5;
 }
 
 // Declare social guardians + an M-of-N threshold (`kind=social`). weft#185.
@@ -1120,8 +1116,9 @@ message BeginRecoveryResponse {
   // SubmitRecoveryProof / VetoRecovery / CompleteRecovery and named inside
   // the social attestation message to bind signatures to this attempt.
   string recovery_attempt_id = 1;
-  // The veto window for this attempt (copied from the declared method's
-  // `window_secs`).
+  // The account's per-user veto window from its signed owner RecoveryPolicy.
+  // The same value gates owner-key transitions; absent policy configuration
+  // selects the 7-day default (604800 seconds).
   google.protobuf.Duration window_secs = 2;
   // Wall-clock instant at which CompleteRecovery becomes eligible
   // (started_at + window_secs).

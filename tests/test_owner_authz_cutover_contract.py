@@ -30,6 +30,7 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.owner = (PROTO / "owner_authorization.proto").read_text()
         cls.identity = (PROTO / "identity.proto").read_text()
+        cls.registry = (PROTO / "registry.proto").read_text()
         cls.sync = (PROTO / "repo_sync.proto").read_text()
         cls.service = (PROTO / "service.proto").read_text()
 
@@ -59,15 +60,11 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
         )
         self.assertEqual(
             fields(self.sync, "RedactionTransfer"),
-            [("blob_hash", 1), ("redactions_blob", 2), ("authorization", 3)],
+            [("blob_hash", 1), ("redactions_blob", 2)],
         )
         self.assertEqual(
             fields(self.sync, "StateVisibilityTransfer"),
-            [
-                ("state_id", 1),
-                ("state_visibility_blob", 2),
-                ("authorization", 3),
-            ],
+            [("state_id", 1), ("state_visibility_blob", 2)],
         )
         self.assertEqual(
             fields(self.sync, "StateAttachmentTransfer"),
@@ -76,8 +73,11 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
                 ("attachment_id", 2),
                 ("attachment_kind", 3),
                 ("attachment_object", 4),
-                ("authorization", 5),
             ],
+        )
+        self.assertEqual(
+            fields(self.sync, "PurgeTransfer"),
+            [("blob_hash", 1), ("redactions_blob", 2), ("authorization", 3)],
         )
 
     def test_guardian_default_and_custody_consent_are_distinct(self) -> None:
@@ -102,6 +102,19 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
         register = block(self.identity, "message", "RegisterPublicKeyRequest")
         self.assertIn("omission never selects custody", register)
 
+    def test_recovery_window_is_per_user_not_per_method(self) -> None:
+        self.assertNotIn(
+            "window_secs",
+            dict(fields(self.identity, "DeclareHardwareKeyRecoveryParams")),
+        )
+        self.assertIn(
+            ("window_secs", 2),
+            fields(self.identity, "BeginRecoveryResponse"),
+        )
+        policy = block(self.owner, "message", "RecoveryPolicy")
+        self.assertRegex(policy, r"optional\s+uint64\s+window_secs\s*=\s*3\s*;")
+        self.assertIn("604800", policy)
+
     def test_owner_uuid_binding_claim_and_transfer_are_complete(self) -> None:
         self.assertEqual(
             fields(self.owner, "OwnerKeyBinding"),
@@ -114,9 +127,9 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
                 ("binding_epoch", 6),
                 ("challenge_nonce", 7),
                 ("root_proof_of_possession", 8),
-                ("registry_attestation", 9),
             ],
         )
+        self.assertNotIn("registry_attestation", self.owner)
         self.assertEqual(
             fields(self.owner, "ResourceTransferHandoff"),
             [
@@ -159,7 +172,7 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
             self.service,
         )
 
-    def test_every_attachment_kind_has_generated_authorization_classification(self) -> None:
+    def test_every_attachment_kind_has_generated_spool_write_classification(self) -> None:
         enum = block(self.sync, "enum", "StateAttachmentKind")
         values = re.findall(
             r"(?ms)^\s*(STATE_ATTACHMENT_KIND_[A-Z0-9_]+)\s*=\s*(\d+)\s*"
@@ -172,19 +185,29 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
                 continue
             with self.subTest(kind=name):
                 self.assertIn(
-                    "STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_METADATA_SUPERSESSION",
+                    "STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE",
                     options,
                 )
 
-    def test_pull_keyring_protocol_and_attachment_arm_are_additive(self) -> None:
+    def test_spool_creation_and_pull_ready_carry_self_signed_genesis(self) -> None:
+        self.assertEqual(
+            fields(self.owner, "SpoolOwnerGenesis"),
+            [("spool_uuid", 1), ("owner_public_key", 2)],
+        )
+        self.assertEqual(
+            fields(self.owner, "SignedSpoolOwnerGenesis"),
+            [("genesis", 1), ("owner_signature", 2)],
+        )
+        self.assertIn(("owner_genesis", 8), fields(self.registry, "CreateSpoolRequest"))
+        self.assertIn(("owner_genesis", 10), fields(self.registry, "HostedSpool"))
+        self.assertIn(("owner_genesis", 7), fields(self.registry, "CreateNamespaceRequest"))
+        self.assertIn(("owner_genesis", 4), fields(self.registry, "CreateRepositoryRequest"))
         ready = fields(self.sync, "PullReady")
         self.assertEqual(
-            ready[-4:],
+            ready[-2:],
             [
                 ("owner_authorization_protocol_version", 9),
-                ("stable_owner_uuid", 10),
-                ("owner_key_binding", 11),
-                ("authorization_keyring", 12),
+                ("owner_genesis", 10),
             ],
         )
         frame = block(self.sync, "message", "PullServerFrame")
@@ -202,34 +225,49 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
             token,
             r"OwnerAuthorizationBundle\s+owner_authorization\s*=\s*8\s*;",
         )
-        self.assertIn("still live and unchanged", token)
+        self.assertIn("It is not owner authority", token)
+        self.assertIn("purge-only bundle", token)
         session = block(self.identity, "message", "ActiveSession")
         self.assertRegex(
             session,
             r"OwnerAuthorizationBundle\s+owner_authorization\s*=\s*8\s*;",
         )
 
-    def test_canonical_sidecar_body_and_limits_are_explicit(self) -> None:
-        body = block(self.sync, "message", "SidecarOperationSigningBody")
+    def test_canonical_purge_body_and_limits_are_explicit(self) -> None:
+        body = block(self.sync, "message", "PurgeOperationSigningBody")
         self.assertEqual(
-            fields(self.sync, "SidecarOperationSigningBody"),
+            fields(self.sync, "PurgeOperationSigningBody"),
             [
                 ("format_version", 1),
-                ("required_actions", 2),
-                ("spool_uuid", 3),
-                ("sidecar_identity", 4),
-                ("payload_sha256", 5),
-                ("leaf_capability_id", 6),
+                ("spool_uuid", 2),
+                ("purge_identity", 3),
+                ("payload_sha256", 4),
+                ("leaf_capability_id", 5),
             ],
         )
         for required in (
-            "heddle-sidecar-operation-v1",
+            "heddle-purge-operation-v2",
             "1,048,576 bytes",
             "capability_chain 1..64",
-            "required_actions 1..2",
-            "raw sidecar payload <= 67,108,864 bytes",
+            "raw purge payload <= 67,108,864 bytes",
         ):
             self.assertIn(required, self.sync)
+        self.assertNotIn("SidecarOperationSigningBody", self.sync)
+
+    def test_owner_capability_action_set_is_purge_only(self) -> None:
+        actions = block(self.owner, "enum", "SpoolCapabilityAction")
+        self.assertEqual(
+            re.findall(r"(?m)^\s*(SPOOL_CAPABILITY_ACTION_[A-Z_]+)\s*=\s*(\d+)", actions),
+            [
+                ("SPOOL_CAPABILITY_ACTION_UNSPECIFIED", "0"),
+                ("SPOOL_CAPABILITY_ACTION_PURGE", "1"),
+            ],
+        )
+        self.assertNotIn("METADATA_SUPERSESSION", self.owner + self.sync)
+        self.assertNotIn("public_access_capabilities", self.owner)
+        for message in ("RedactionTransfer", "StateVisibilityTransfer", "StateAttachmentTransfer"):
+            self.assertNotIn("authorization", dict(fields(self.sync, message)))
+        self.assertIn("authorization", dict(fields(self.sync, "PurgeTransfer")))
 
 
 if __name__ == "__main__":

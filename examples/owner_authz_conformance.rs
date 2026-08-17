@@ -5,24 +5,22 @@ use std::{env, fs, process::ExitCode};
 
 use ed25519_dalek::{Signature, SigningKey, Verifier, VerifyingKey};
 use heddle_api::heddle::api::v1alpha1::{
-    AccessTokenResponse, ActiveSession, AuthorizationSignature, CloneAuthorizationKeyring,
-    OwnerAuthorizationBundle, OwnerKeyBinding, PullReady, PullServerFrame,
+    AccessTokenResponse, ActiveSession, AuthorizationSignature, OwnerAuthorizationBundle,
+    OwnerKeyBinding, PullReady, PullServerFrame, PurgeOperationSigningBody, PurgeTransfer,
     RegisterPublicKeyRequest, ResourceOwnershipTransfer, ResourceTransferAcceptance,
-    SidecarAuthorization, SidecarOperationSigningBody, SignedResourceTransferHandoff,
+    SidecarAuthorization, SignedResourceTransferHandoff, SignedSpoolOwnerGenesis,
     SpoolCapabilityAction, StateAttachmentTransfer, pull_server_frame,
 };
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const OPERATION_DOMAIN: &[u8] = b"heddle-sidecar-operation-v1";
+const OPERATION_DOMAIN: &[u8] = b"heddle-purge-operation-v2";
 
 #[derive(Deserialize)]
 struct Fixture {
     format_version: u32,
-    required_actions: Vec<u32>,
     spool_uuid_hex: String,
-    sidecar_kind: u32,
     blob_hash: String,
     payload_hex: String,
     payload_sha256_hex: String,
@@ -32,6 +30,8 @@ struct Fixture {
     signing_seed_hex: String,
     signer_public_key_hex: String,
     signature_hex: String,
+    genesis_digest_hex: String,
+    genesis_signature_hex: String,
     negative_cases: Vec<ExpectedCase>,
 }
 
@@ -45,20 +45,6 @@ struct ExpectedCase {
 struct Outcome {
     id: String,
     accepted: bool,
-}
-
-#[derive(Clone, PartialEq, Message)]
-struct LegacyPullReady {
-    #[prost(string, tag = "8")]
-    remote_revision_address: String,
-}
-
-#[derive(Clone, PartialEq, Message)]
-struct LegacyAccessTokenResponse {
-    #[prost(string, tag = "1")]
-    token: String,
-    #[prost(bytes = "vec", tag = "7")]
-    grant_envelope: Vec<u8>,
 }
 
 fn main() -> ExitCode {
@@ -88,9 +74,7 @@ fn run() -> Result<Vec<Outcome>, String> {
     equal_hex(&payload_hash, &fixture.payload_sha256_hex, "payload digest")?;
     let canonical = canonical_body(
         fixture.format_version,
-        &fixture.required_actions,
         &decode(&fixture.spool_uuid_hex)?,
-        fixture.sidecar_kind,
         &fixture.blob_hash,
         &payload_hash,
         &decode(&fixture.leaf_capability_id_hex)?,
@@ -108,13 +92,29 @@ fn run() -> Result<Vec<Outcome>, String> {
         &fixture.signer_public_key_hex,
         "signer public key",
     )?;
-    let signature = signature(&fixture.signature_hex)?;
+    let signature = parse_signature(&fixture.signature_hex)?;
     signing_key
         .verifying_key()
         .verify(&digest, &signature)
         .map_err(|error| format!("fixture signature does not verify: {error}"))?;
+    let genesis_digest = genesis_digest(
+        signing_key.verifying_key().as_bytes(),
+        &decode(&fixture.spool_uuid_hex)?,
+    )?;
+    equal_hex(
+        &genesis_digest,
+        &fixture.genesis_digest_hex,
+        "genesis digest",
+    )?;
+    signing_key
+        .verifying_key()
+        .verify(
+            &genesis_digest,
+            &parse_signature(&fixture.genesis_signature_hex)?,
+        )
+        .map_err(|error| format!("genesis signature does not verify: {error}"))?;
 
-    generated_round_trips_and_old_clients_ignore_new_fields()?;
+    generated_round_trips_v2()?;
 
     let outcomes = fixture
         .negative_cases
@@ -158,29 +158,25 @@ fn evaluate(
         "wrong-spool" => verify_mutated(fixture, signer, signature, |spool, _| {
             spool[0] ^= 0x01;
         }),
+        "genesis-wrong-spool" => {
+            let mut spool = decode(&fixture.spool_uuid_hex).expect("fixture spool");
+            spool[0] ^= 0x01;
+            signer
+                .verify(
+                    &genesis_digest(signer.as_bytes(), &spool).expect("mutated genesis"),
+                    &parse_signature(&fixture.genesis_signature_hex).expect("genesis signature"),
+                )
+                .is_ok()
+        }
         "transition-fork" => transition_chain_is_linear(&[
             (1, [0_u8; 32], [1_u8; 32]),
             (2, [1_u8; 32], [2_u8; 32]),
             (2, [1_u8; 32], [3_u8; 32]),
         ]),
-        "rogue-uuid-to-key-binding" => {
-            let expected_uuid = [0x11_u8; 16];
-            let binding_uuid = [0x22_u8; 16];
-            expected_uuid == binding_uuid
-        }
         "incomplete-transfer-source-only" => transfer_is_complete(true, false),
         "incomplete-transfer-destination-only" => transfer_is_complete(false, true),
         "attenuated-purge" => action_is_allowed(SpoolCapabilityAction::Purge, false),
-        "attenuated-metadata-supersession" => {
-            action_is_allowed(SpoolCapabilityAction::MetadataSupersession, false)
-        }
         "direct-purge" => action_is_allowed(SpoolCapabilityAction::Purge, true),
-        "direct-metadata-supersession" => {
-            action_is_allowed(SpoolCapabilityAction::MetadataSupersession, true)
-        }
-        "direct-visibility" => action_is_allowed(SpoolCapabilityAction::Visibility, true),
-        "delegated-visibility" => action_is_allowed(SpoolCapabilityAction::Visibility, false),
-        "missing-visibility" => false,
         other => panic!("unknown conformance case {other}"),
     }
 }
@@ -196,9 +192,7 @@ fn verify_mutated(
     mutate(&mut spool, &mut payload);
     let body = canonical_body(
         fixture.format_version,
-        &fixture.required_actions,
         &spool,
-        fixture.sidecar_kind,
         &fixture.blob_hash,
         &Sha256::digest(payload),
         &decode(&fixture.leaf_capability_id_hex).expect("fixture capability id"),
@@ -219,13 +213,10 @@ fn transfer_is_complete(source_signature: bool, destination_signature: bool) -> 
 }
 
 fn action_is_allowed(action: SpoolCapabilityAction, direct: bool) -> bool {
-    !matches!(
-        action,
-        SpoolCapabilityAction::Purge | SpoolCapabilityAction::MetadataSupersession
-    ) || direct
+    action == SpoolCapabilityAction::Purge && direct
 }
 
-fn generated_round_trips_and_old_clients_ignore_new_fields() -> Result<(), String> {
+fn generated_round_trips_v2() -> Result<(), String> {
     let bundle = OwnerAuthorizationBundle::default();
     let binding = OwnerKeyBinding {
         format_version: 1,
@@ -248,50 +239,32 @@ fn generated_round_trips_and_old_clients_ignore_new_fields() -> Result<(), Strin
         owner_authorization: Some(bundle.clone()),
         ..Default::default()
     })?;
-    round_trip(SidecarOperationSigningBody::default())?;
+    round_trip(PurgeOperationSigningBody::default())?;
     round_trip(ResourceOwnershipTransfer {
         acceptance: Some(ResourceTransferAcceptance {
             signed_handoff: Some(SignedResourceTransferHandoff::default()),
             destination_signature: Some(AuthorizationSignature::default()),
         }),
     })?;
-    let attachment = StateAttachmentTransfer {
+    let purge = PurgeTransfer {
         authorization: Some(SidecarAuthorization {
-            capability: Some(bundle),
+            capability: Some(bundle.clone()),
             operation_signature: Some(AuthorizationSignature::default()),
         }),
         ..Default::default()
     };
     round_trip(PullServerFrame {
-        frame: Some(pull_server_frame::Frame::StateAttachment(Box::new(
-            attachment,
-        ))),
+        frame: Some(pull_server_frame::Frame::Purge(purge)),
     })?;
+    round_trip(StateAttachmentTransfer::default())?;
 
     let pull = PullReady {
         remote_revision_address: "heddle:state".to_string(),
-        owner_authorization_protocol_version: 1,
-        stable_owner_uuid: vec![0x11; 16],
-        owner_key_binding: Some(Box::new(binding)),
-        authorization_keyring: Some(Box::new(CloneAuthorizationKeyring::default())),
+        owner_authorization_protocol_version: 2,
+        owner_genesis: Some(SignedSpoolOwnerGenesis::default()),
         ..Default::default()
     };
-    let old_pull = LegacyPullReady::decode(pull.encode_to_vec().as_slice())
-        .map_err(|error| format!("old PullReady decode failed: {error}"))?;
-    if old_pull.remote_revision_address != pull.remote_revision_address {
-        return Err("old PullReady client lost a known field".to_string());
-    }
-    let token = AccessTokenResponse {
-        token: "legacy-token".to_string(),
-        grant_envelope: b"legacy-envelope".to_vec(),
-        owner_authorization: Some(OwnerAuthorizationBundle::default()),
-        ..Default::default()
-    };
-    let old_token = LegacyAccessTokenResponse::decode(token.encode_to_vec().as_slice())
-        .map_err(|error| format!("old token decode failed: {error}"))?;
-    if old_token.token != token.token || old_token.grant_envelope != token.grant_envelope {
-        return Err("old token client lost a known field".to_string());
-    }
+    round_trip(pull)?;
     Ok(())
 }
 
@@ -308,19 +281,13 @@ where
 
 fn canonical_body(
     format_version: u32,
-    required_actions: &[u32],
     spool_uuid: &[u8],
-    sidecar_kind: u32,
     blob_hash: &str,
     payload_sha256: &[u8],
     leaf_capability_id: &[u8],
 ) -> Result<Vec<u8>, String> {
-    if format_version != 1
-        || required_actions.is_empty()
-        || required_actions.len() > 2
-        || !required_actions.windows(2).all(|pair| pair[0] < pair[1])
+    if format_version != 2
         || spool_uuid.len() != 16
-        || sidecar_kind != 1
         || blob_hash.len() != 64
         || !blob_hash
             .bytes()
@@ -328,21 +295,26 @@ fn canonical_body(
         || payload_sha256.len() != 32
         || leaf_capability_id.len() != 32
     {
-        return Err("non-canonical sidecar operation body".to_string());
+        return Err("non-canonical purge operation body".to_string());
     }
     let mut output = Vec::new();
     output.extend_from_slice(&format_version.to_be_bytes());
-    output.extend_from_slice(&(required_actions.len() as u32).to_be_bytes());
-    for action in required_actions {
-        output.extend_from_slice(&action.to_be_bytes());
-    }
     output.extend_from_slice(spool_uuid);
-    output.extend_from_slice(&sidecar_kind.to_be_bytes());
     output.extend_from_slice(&(blob_hash.len() as u32).to_be_bytes());
     output.extend_from_slice(blob_hash.as_bytes());
     output.extend_from_slice(payload_sha256);
     output.extend_from_slice(leaf_capability_id);
     Ok(output)
+}
+
+fn genesis_digest(owner_public_key: &[u8], spool_uuid: &[u8]) -> Result<Vec<u8>, String> {
+    if owner_public_key.len() != 32 || spool_uuid.len() != 16 {
+        return Err("non-canonical spool owner genesis".to_string());
+    }
+    let mut digest = Sha256::new();
+    digest.update(owner_public_key);
+    digest.update(spool_uuid);
+    Ok(digest.finalize().to_vec())
 }
 
 fn domain_hash(domain: &[u8], body: &[u8]) -> Vec<u8> {
@@ -352,7 +324,7 @@ fn domain_hash(domain: &[u8], body: &[u8]) -> Vec<u8> {
     digest.finalize().to_vec()
 }
 
-fn signature(value: &str) -> Result<Signature, String> {
+fn parse_signature(value: &str) -> Result<Signature, String> {
     let bytes: [u8; 64] = decode(value)?
         .try_into()
         .map_err(|_| "signature is not 64 bytes")?;

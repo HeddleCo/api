@@ -77,6 +77,7 @@ class SharedOperationContractTest(unittest.TestCase):
         source = OPERATION_PROTO.read_text()
         progress = message_body(source, "OperationProgress")
         timing = message_body(source, "PhaseTiming")
+        ref_summary = message_body(source, "RefSummary")
 
         self.assertRegex(
             progress,
@@ -93,6 +94,12 @@ class SharedOperationContractTest(unittest.TestCase):
             progress,
             r"\boptional\s+uint64\s+source_pack_bytes\s*=\s*11\s*;",
         )
+        self.assertRegex(
+            progress, r"\boptional\s+RefSummary\s+ref_summary\s*=\s*12\s*;"
+        )
+        self.assertRegex(
+            progress, r"\boptional\s+uint64\s+object_writes\s*=\s*13\s*;"
+        )
         self.assertRegex(timing, r"\bstring\s+phase\s*=\s*1\s*;")
         self.assertRegex(
             timing,
@@ -102,9 +109,22 @@ class SharedOperationContractTest(unittest.TestCase):
             timing,
             r"\boptional\s+google\.protobuf\.Timestamp\s+ended_at\s*=\s*3\s*;",
         )
+        self.assertRegex(
+            ref_summary, r"\buint32\s+advertised_branches\s*=\s*1\s*;"
+        )
+        self.assertRegex(ref_summary, r"\buint32\s+advertised_tags\s*=\s*2\s*;")
+        self.assertRegex(
+            ref_summary, r"\boptional\s+string\s+oldest_tag_name\s*=\s*3\s*;"
+        )
+        self.assertRegex(
+            ref_summary, r"\buint32\s+published_branches\s*=\s*4\s*;"
+        )
+        self.assertRegex(ref_summary, r"\buint32\s+published_tags\s*=\s*5\s*;")
         self.assertIn("durable job record", progress)
         self.assertIn("snapshot-repeated", progress)
         self.assertIn("ACTUAL, never projected/estimated", progress)
+        self.assertIn("Actual, never projected", progress)
+        self.assertIn("Actual, not projected", progress)
         self.assertNotRegex(progress, r"(?i)reduction(_percent|_percentage|_ratio)?\s*=")
 
     def test_import_requested_visibility_uses_unified_enum(self) -> None:

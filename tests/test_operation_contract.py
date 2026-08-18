@@ -73,6 +73,40 @@ class SharedOperationContractTest(unittest.TestCase):
             failure, r"\boptional\s+string\s+commit_hash\s*=\s*2\s*;"
         )
 
+    def test_import_observability_is_durable_actual_only_progress(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        progress = message_body(source, "OperationProgress")
+        timing = message_body(source, "PhaseTiming")
+
+        self.assertRegex(
+            progress,
+            r"\boptional\s+google\.protobuf\.Timestamp\s+started_at\s*=\s*8\s*;",
+        )
+        self.assertRegex(
+            progress, r"\brepeated\s+PhaseTiming\s+phase_timings\s*=\s*9\s*;"
+        )
+        self.assertRegex(
+            progress,
+            r"\boptional\s+uint64\s+native_bytes_written\s*=\s*10\s*;",
+        )
+        self.assertRegex(
+            progress,
+            r"\boptional\s+uint64\s+source_pack_bytes\s*=\s*11\s*;",
+        )
+        self.assertRegex(timing, r"\bstring\s+phase\s*=\s*1\s*;")
+        self.assertRegex(
+            timing,
+            r"\bgoogle\.protobuf\.Timestamp\s+started_at\s*=\s*2\s*;",
+        )
+        self.assertRegex(
+            timing,
+            r"\boptional\s+google\.protobuf\.Timestamp\s+ended_at\s*=\s*3\s*;",
+        )
+        self.assertIn("durable job record", progress)
+        self.assertIn("snapshot-repeated", progress)
+        self.assertIn("ACTUAL, never projected/estimated", progress)
+        self.assertNotRegex(progress, r"(?i)reduction(_percent|_percentage|_ratio)?\s*=")
+
     def test_import_requested_visibility_uses_unified_enum(self) -> None:
         source = OPERATION_PROTO.read_text()
         spec = message_body(source, "ImportOperationSpec")

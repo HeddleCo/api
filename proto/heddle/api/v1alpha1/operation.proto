@@ -155,6 +155,23 @@ message ImportCommitFailure {
   optional string commit_hash = 2;
 }
 
+message PhaseTiming {
+  string phase = 1; // machine-readable; matches OperationProgress.phase
+  google.protobuf.Timestamp started_at = 2;
+  optional google.protobuf.Timestamp ended_at = 3; // absent while the phase is in progress
+}
+
+message RefSummary {
+  // Advertised at ref-advertisement time (available during cloning).
+  uint32 advertised_branches = 1;
+  uint32 advertised_tags = 2;
+  optional string oldest_tag_name = 3;
+  // Published after the fetched pack is filtered to landed refs (known at Mirror).
+  // May be < advertised; a client must label which it shows.
+  uint32 published_branches = 4;
+  uint32 published_tags = 5;
+}
+
 message OperationProgress {
   // Machine-readable phase within the operation kind, such as "cloning" or
   // "indexing". It does not replace OperationState.
@@ -171,6 +188,25 @@ message OperationProgress {
   repeated ImportCommitProgress import_commits = 6;
   // Present when an import failed while converting a known source commit.
   optional ImportCommitFailure failed_import_commit = 7;
+  // Wall-clock start of the operation, so elapsed is correct for any late
+  // subscriber. Populated from the durable job record, not stream subscribe time.
+  optional google.protobuf.Timestamp started_at = 8;
+  // Durable per-phase timing for phases entered so far; snapshot-repeated on
+  // reconnect. `phase` matches OperationProgress.phase values.
+  repeated PhaseTiming phase_timings = 9;
+  // Byte values below are observed values: "so far" mid-flight and firm at
+  // terminal. Reduction percentage is client-derived at completion, not a wire field.
+  // Native store bytes durably written so far. ACTUAL, never projected/estimated.
+  optional uint64 native_bytes_written = 10;
+  // Source Git pack size in bytes (known once the fetch is sized).
+  optional uint64 source_pack_bytes = 11;
+  // Advertised + published ref topology (see RefSummary). Emitted once early in
+  // cloning (advertised_*) and updated at Mirror once the published set is known.
+  // Counts only — not a per-poll list. Actual, never projected.
+  optional RefSummary ref_summary = 12;
+  // Objects actually written to the store so far (vs `completed` = processed).
+  // completed - object_writes = deduplicated (content already present). Actual, not projected.
+  optional uint64 object_writes = 13;
 }
 
 message OperationError {

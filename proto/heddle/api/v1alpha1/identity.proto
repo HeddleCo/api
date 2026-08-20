@@ -272,7 +272,8 @@ message DeviceAuthorizationResponse {
 message AccessTokenResponse {
   // The Biscuit (base64url-encoded). Goes in the `heddle_session`
   // cookie for browser flows and in the CLI credentials store for
-  // device-bound flows.
+  // device-bound flows. Empty when weft does not mint; clients mint
+  // from the other fields, including `device_id`.
   string token = 1;
   string subject = 2;
   // Unix-seconds expiry. The Biscuit also carries this internally,
@@ -295,6 +296,11 @@ message AccessTokenResponse {
   // Owner-authored purge-only bundle returned without re-signing or
   // reinterpretation. It grants no redact, visibility, or metadata authority.
   OwnerAuthorizationBundle owner_authorization = 8;
+  // Persisted `device_roots.id` after RegisterPublicKey. Clients set
+  // `MintParams.device_id` from this field without reading Postgres. This
+  // is a mint input, not capability: it identifies the device root used
+  // when the client mints after weft leaves `token` empty.
+  string device_id = 9;
 }
 
 message ListSessionsRequest {}
@@ -874,6 +880,8 @@ message ClaimSignupInviteRequest {
 message ClaimSignupInviteResponse {
   // Opaque short-lived bearer attenuated to exactly the methods listed in
   // allowed_methods. It must carry no other capability or account authority.
+  // Empty when weft does not mint; clients mint from reservation_id and
+  // session_id.
   bytes bootstrap_token = 1;
   // Absolute expiry enforced by the bearer itself. The server must keep this
   // lifetime short; clients must not infer validity beyond this timestamp.
@@ -882,6 +890,14 @@ message ClaimSignupInviteResponse {
   // must contain BEGIN_WEB_AUTHN_REGISTRATION and REGISTER_PUBLIC_KEY exactly
   // once each, and no other value. The bearer remains the authority.
   repeated SignupBootstrapMethod allowed_methods = 3;
+  // Signup-invite reservation UUID the client embeds in the invite-bootstrap
+  // biscuit (`signup_bootstrap_invite`). This is a mint input, not
+  // capability: it identifies the reserved invite for client-side minting
+  // after weft leaves bootstrap_token empty.
+  string reservation_id = 4;
+  // The `signup_bootstrap_invite` session rev_id the client puts in that
+  // biscuit's session fact. This is a mint input, not capability.
+  string session_id = 5;
 }
 
 // Creates an unclaimed human account by consuming the human's signup invite.

@@ -225,8 +225,12 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
             token,
             r"OwnerAuthorizationBundle\s+owner_authorization\s*=\s*8\s*;",
         )
+        self.assertRegex(token, r"string\s+device_id\s*=\s*9\s*;")
         self.assertIn("It is not owner authority", token)
         self.assertIn("purge-only bundle", token)
+        self.assertIn("mint input, not capability", token)
+        self.assertIn("MintParams.device_id", token)
+        self.assertIn("device_roots.id", token)
         session = block(self.identity, "message", "ActiveSession")
         self.assertRegex(
             session,

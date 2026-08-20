@@ -388,6 +388,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateSignupInvite",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization",
       "layers": {
         "implementation": {

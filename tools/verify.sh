@@ -14,6 +14,7 @@ python3 -B -m unittest tests/test_owner_authz_cutover_contract.py
 python3 -B -m unittest tests/test_workflow_contract.py
 python3 -B -m unittest tests/test_revision_thread_identity_contract.py
 python3 -B -m unittest tests/test_signup_contract.py
+python3 -B -m unittest tests/test_discussion_severity_contract.py
 python3 -B -m unittest tests/test_additive_bundle_contract.py
 python3 -B -m unittest tests/test_spool_contract.py
 python3 -B -m unittest tests/test_transport_contract.py

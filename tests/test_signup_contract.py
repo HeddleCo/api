@@ -38,6 +38,43 @@ def rpc(name: str) -> tuple[str, str, str]:
 
 
 class SignupContractTest(unittest.TestCase):
+    def test_member_create_invite_spends_only_caller_allowance(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "CreateSignupInviteRequest"),
+            [("recipient_email", 1), ("client_operation_id", 2)],
+        )
+        request = body(IDENTITY, "message", "CreateSignupInviteRequest")
+        self.assertIn("optional string recipient_email = 1", request)
+        self.assertNotIn("referrer_user_id", request)
+        self.assertIn("same binding rules as\n  // BindSignupInviteEmail", request)
+
+        self.assertEqual(
+            fields(IDENTITY, "CreateSignupInviteResponse"),
+            [("invite_id", 1), ("invite_code", 2), ("allowance_remaining", 3)],
+        )
+        response = body(IDENTITY, "message", "CreateSignupInviteResponse")
+        self.assertIn("ResolveSignupInvite and\n  // ClaimSignupInvite", response)
+
+        request_type, response_type, contract = rpc("CreateSignupInvite")
+        self.assertEqual(request_type, "CreateSignupInviteRequest")
+        self.assertEqual(response_type, "CreateSignupInviteResponse")
+        for required in (
+            "maturity: SERVICE_MATURITY_PLANNED",
+            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
+            "effect: RPC_EFFECT_DURABLE_WRITE",
+            "retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
+            "client_operation_id_required: true",
+            "authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL",
+            "authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND",
+            "authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT",
+        ):
+            self.assertIn(required, contract)
+
+        service_prefix = IDENTITY[: IDENTITY.index("rpc CreateSignupInvite")]
+        create_contract = service_prefix[-900:]
+        self.assertIn("authenticated caller's own allowance", create_contract)
+        self.assertIn("cannot select another member's\n  // allowance", create_contract)
+
     def test_public_drop_claim_and_count_contracts(self) -> None:
         self.assertEqual(
             fields(IDENTITY, "ClaimNextDropCodeRequest"),

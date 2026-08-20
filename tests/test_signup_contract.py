@@ -320,12 +320,32 @@ class SignupContractTest(unittest.TestCase):
                 ("agent_node_id", 4),
                 ("pre_consent_signature", 5),
                 ("nonce", 6),
+                ("authorization_hash", 7),
+                ("expires_at_millis", 8),
             ],
         )
         request = body(IDENTITY, "message", "BeginWebAuthnRegistrationRequest")
         self.assertIn("pre-consent", request)
         self.assertIn("does not bind", request)
         self.assertIn("credentialId", request)
+        self.assertIn("Hex SHA-256 of the claim secret", request)
+        self.assertIn("trailing counted fields", request)
+        self.assertIn("both must travel together", request)
+        self.assertIn("Empty on non-adoption and on old clients", request)
+        self.assertIn("Zero on non-adoption and on old clients", request)
+        self.assertIn(
+            "the lowercase hex SHA-256 of the claim secret (64 hex chars)",
+            request,
+        )
+        self.assertIn("Do not send uppercase or raw 32-byte digest", request)
+        self.assertIn("On the wire this stays proto `int64`", request)
+        self.assertIn(
+            "exactly 8 big-endian two's-complement bytes of that i64 "
+            "(`i64::to_be_bytes`)",
+            request,
+        )
+        self.assertIn("Not decimal text, not protobuf varint", request)
+        self.assertIn("Empty hash + 0 is old-client v1", request)
 
     def test_create_agent_account_is_invite_gated_pet_name_path(self) -> None:
         self.assertEqual(
@@ -378,12 +398,32 @@ class SignupContractTest(unittest.TestCase):
                 ("agent_node_id", 7),
                 ("promote_consent_signature", 8),
                 ("client_operation_id", 9),
+                ("authorization_hash", 10),
+                ("expires_at_millis", 11),
             ],
         )
         request = body(IDENTITY, "message", "PromoteAgentAccountRequest")
         self.assertIn("credentialId", request)
         self.assertIn("just-created passkey", request)
         self.assertIn("anti-replay binding", IDENTITY)
+        self.assertIn("Hex SHA-256 of the claim secret", request)
+        self.assertIn("trailing counted fields", request)
+        self.assertIn("both must travel together", request)
+        self.assertIn("Empty on non-adoption and on old clients", request)
+        self.assertIn("Zero on non-adoption and on old clients", request)
+        self.assertIn(
+            "the lowercase hex SHA-256 of the claim secret (64 hex chars)",
+            request,
+        )
+        self.assertIn("Do not send uppercase or raw 32-byte digest", request)
+        self.assertIn("On the wire this stays proto `int64`", request)
+        self.assertIn(
+            "exactly 8 big-endian two's-complement bytes of that i64 "
+            "(`i64::to_be_bytes`)",
+            request,
+        )
+        self.assertIn("Not decimal text, not protobuf varint", request)
+        self.assertIn("Empty hash + 0 is old-client v1", request)
         self.assertEqual(
             fields(IDENTITY, "PromoteAgentAccountResponse"),
             [

@@ -43,9 +43,8 @@ message BeginWebAuthnRegistrationRequest {
   // two trailing counted fields `authorization_hash` and
   // `expires_at_millis`. The counted-statement encoding of those two
   // fields is defined on the fields themselves. This is the ratified
-  // pre-consent: it commits the handle and agent authority, and does not
-  // bind a credentialId (that id does not exist until WebAuthn create()
-  // returns).
+  // pre-consent: it commits the handle and agent authority, and does not bind
+  // a credentialId (that id does not exist until WebAuthn create() returns).
   string account_id = 3;
   // Iroh node id of the authorizing agent. Empty on the ordinary
   // verified-signup-email / unattenuated-identity begin paths.

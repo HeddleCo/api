@@ -41,9 +41,11 @@ message BeginWebAuthnRegistrationRequest {
   // WebAuthn challenge only after verifying `pre_consent_signature` over
   // `(account_id, username, agent_node_id, nonce)` plus, when present, the
   // two trailing counted fields `authorization_hash` and
-  // `expires_at_millis`. This is the ratified pre-consent: it commits the
-  // handle and agent authority, and does not bind a credentialId (that id
-  // does not exist until WebAuthn create() returns).
+  // `expires_at_millis`. The counted-statement encoding of those two
+  // fields is defined on the fields themselves. This is the ratified
+  // pre-consent: it commits the handle and agent authority, and does not
+  // bind a credentialId (that id does not exist until WebAuthn create()
+  // returns).
   string account_id = 3;
   // Iroh node id of the authorizing agent. Empty on the ordinary
   // verified-signup-email / unattenuated-identity begin paths.
@@ -51,19 +53,29 @@ message BeginWebAuthnRegistrationRequest {
   // Agent-derived-credential signature over
   // `(account_id, username, agent_node_id, nonce)` plus, when present, the
   // two trailing counted fields `authorization_hash` and
-  // `expires_at_millis`.
+  // `expires_at_millis`. The counted-statement encoding of those two
+  // fields is defined on the fields themselves.
   bytes pre_consent_signature = 5;
   // Challenge nonce the pre-consent signature binds. Empty on non-adoption
   // begins.
   bytes nonce = 6;
   // Hex SHA-256 of the claim secret (claim-state id / authorizationHash).
-  // Empty on non-adoption and on old clients. When either this or
+  // In the counted Ed25519 statement this field is the UTF-8 bytes of
+  // the lowercase hex SHA-256 of the claim secret (64 hex chars).
+  // Do not send uppercase or raw 32-byte digest.
+  // Empty on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
   // `expires_at_millis` is set, both must travel together with the existing
   // adoption quartet (`account_id`, `username`, `agent_node_id`, `nonce`).
   string authorization_hash = 7;
-  // Consent expiry as Unix millis. Zero on non-adoption and on old clients.
-  // When either this or `authorization_hash` is set, both must travel
-  // together with the existing adoption quartet.
+  // Consent expiry as Unix millis. On the wire this stays proto `int64`.
+  // Inside the counted Ed25519 statement it is
+  // exactly 8 big-endian two's-complement bytes of that i64 (`i64::to_be_bytes`).
+  // Not decimal text, not protobuf varint.
+  // Zero on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
+  // `authorization_hash` is set, both must travel together with the
+  // existing adoption quartet.
   int64 expires_at_millis = 8;
 }
 
@@ -944,7 +956,8 @@ message CreateAgentAccountResponse {
 // promote-consent binds `(account_id, handle, credential_id)` plus, when
 // present, the two trailing counted fields `authorization_hash` and
 // `expires_at_millis` — that is the anti-replay binding, signed after
-// WebAuthn create() has produced the id.
+// WebAuthn create() has produced the id. The counted-statement encoding
+// of those two fields is defined on the fields themselves.
 message PromoteAgentAccountRequest {
   // Placeholder account being claimed.
   string account_id = 1;
@@ -963,17 +976,28 @@ message PromoteAgentAccountRequest {
   // Agent-derived-credential signature over
   // `(account_id, handle, credential_id)` plus, when present, the two
   // trailing counted fields `authorization_hash` and `expires_at_millis`.
+  // The counted-statement encoding of those two fields is defined on the
+  // fields themselves.
   bytes promote_consent_signature = 8;
   // Idempotency key scoped to the authorizing agent and this RPC.
   string client_operation_id = 9;
   // Hex SHA-256 of the claim secret (claim-state id / authorizationHash).
-  // Empty on non-adoption and on old clients. When either this or
+  // In the counted Ed25519 statement this field is the UTF-8 bytes of
+  // the lowercase hex SHA-256 of the claim secret (64 hex chars).
+  // Do not send uppercase or raw 32-byte digest.
+  // Empty on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
   // `expires_at_millis` is set, both must travel together with the existing
   // promote triple (`account_id`, `handle`, `credential_id`).
   string authorization_hash = 10;
-  // Consent expiry as Unix millis. Zero on non-adoption and on old clients.
-  // When either this or `authorization_hash` is set, both must travel
-  // together with the existing promote triple.
+  // Consent expiry as Unix millis. On the wire this stays proto `int64`.
+  // Inside the counted Ed25519 statement it is
+  // exactly 8 big-endian two's-complement bytes of that i64 (`i64::to_be_bytes`).
+  // Not decimal text, not protobuf varint.
+  // Zero on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
+  // `authorization_hash` is set, both must travel together with the
+  // existing promote triple.
   int64 expires_at_millis = 11;
 }
 
@@ -1862,10 +1886,12 @@ service IdentityService {
   // the handle, and flips agent_rooted → self_rooted (api#123). Authorization
   // is the agent's promote-consent signature over
   // `(account_id, handle, credential_id)` plus, when present, the two
-  // trailing counted fields `authorization_hash` and `expires_at_millis`,
-  // plus the WebAuthn attestation weft verifies as RP. The agent's derived
-  // credential is retained underneath the new human root. No half-claimed
-  // state: never root-without-handle or handle-without-root.
+  // trailing counted fields `authorization_hash` and `expires_at_millis`
+  // (UTF-8 lowercase hex; 8-byte big-endian i64; encoding defined on
+  // PromoteAgentAccountRequest), plus the WebAuthn attestation weft
+  // verifies as RP. The agent's derived credential is retained underneath
+  // the new human root. No half-claimed state: never root-without-handle
+  // or handle-without-root.
   rpc PromoteAgentAccount(PromoteAgentAccountRequest) returns (PromoteAgentAccountResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       maturity: SERVICE_MATURITY_PLANNED

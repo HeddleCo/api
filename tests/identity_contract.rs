@@ -6,6 +6,59 @@ use heddle_api::heddle::api::v1alpha1::{
 };
 use prost::Message;
 
+const IDENTITY_PROTO: &str = include_str!("../proto/heddle/api/v1alpha1/identity.proto");
+
+fn message_body(name: &str) -> &str {
+    let header = format!("message {name} {{");
+    let start = IDENTITY_PROTO
+        .find(&header)
+        .unwrap_or_else(|| panic!("missing {name}"));
+    let after = start + header.len();
+    let end = IDENTITY_PROTO[after..]
+        .find("\n}")
+        .unwrap_or_else(|| panic!("unclosed {name}"));
+    &IDENTITY_PROTO[after..after + end]
+}
+
+fn assert_counted_consent_encoding(body: &str) {
+    assert!(
+        body.contains("the lowercase hex SHA-256 of the claim secret (64 hex chars)"),
+        "counted authorization_hash encoding missing:\n{body}"
+    );
+    assert!(
+        body.contains("Do not send uppercase or raw 32-byte digest"),
+        "authorization_hash forbidden encodings missing:\n{body}"
+    );
+    assert!(
+        body.contains("On the wire this stays proto `int64`"),
+        "wire expires_at_millis type missing:\n{body}"
+    );
+    assert!(
+        body.contains(
+            "exactly 8 big-endian two's-complement bytes of that i64 (`i64::to_be_bytes`)"
+        ),
+        "counted expires_at_millis encoding missing:\n{body}"
+    );
+    assert!(
+        body.contains("Not decimal text, not protobuf varint"),
+        "expires_at_millis forbidden encodings missing:\n{body}"
+    );
+    assert!(
+        body.contains("Empty hash + 0 is old-client v1"),
+        "old-client pairing rule missing:\n{body}"
+    );
+}
+
+#[test]
+fn begin_registration_documents_counted_consent_encoding() {
+    assert_counted_consent_encoding(message_body("BeginWebAuthnRegistrationRequest"));
+}
+
+#[test]
+fn promote_agent_account_documents_counted_consent_encoding() {
+    assert_counted_consent_encoding(message_body("PromoteAgentAccountRequest"));
+}
+
 #[test]
 fn begin_registration_round_trips_optional_claim_consent_issuance() {
     let expected = BeginWebAuthnRegistrationRequest {

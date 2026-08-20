@@ -333,6 +333,19 @@ class SignupContractTest(unittest.TestCase):
         self.assertIn("both must travel together", request)
         self.assertIn("Empty on non-adoption and on old clients", request)
         self.assertIn("Zero on non-adoption and on old clients", request)
+        self.assertIn(
+            "the lowercase hex SHA-256 of the claim secret (64 hex chars)",
+            request,
+        )
+        self.assertIn("Do not send uppercase or raw 32-byte digest", request)
+        self.assertIn("On the wire this stays proto `int64`", request)
+        self.assertIn(
+            "exactly 8 big-endian two's-complement bytes of that i64 "
+            "(`i64::to_be_bytes`)",
+            request,
+        )
+        self.assertIn("Not decimal text, not protobuf varint", request)
+        self.assertIn("Empty hash + 0 is old-client v1", request)
 
     def test_create_agent_account_is_invite_gated_pet_name_path(self) -> None:
         self.assertEqual(
@@ -398,6 +411,19 @@ class SignupContractTest(unittest.TestCase):
         self.assertIn("both must travel together", request)
         self.assertIn("Empty on non-adoption and on old clients", request)
         self.assertIn("Zero on non-adoption and on old clients", request)
+        self.assertIn(
+            "the lowercase hex SHA-256 of the claim secret (64 hex chars)",
+            request,
+        )
+        self.assertIn("Do not send uppercase or raw 32-byte digest", request)
+        self.assertIn("On the wire this stays proto `int64`", request)
+        self.assertIn(
+            "exactly 8 big-endian two's-complement bytes of that i64 "
+            "(`i64::to_be_bytes`)",
+            request,
+        )
+        self.assertIn("Not decimal text, not protobuf varint", request)
+        self.assertIn("Empty hash + 0 is old-client v1", request)
         self.assertEqual(
             fields(IDENTITY, "PromoteAgentAccountResponse"),
             [

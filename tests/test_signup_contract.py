@@ -221,13 +221,22 @@ class SignupContractTest(unittest.TestCase):
         )
         self.assertEqual(
             fields(IDENTITY, "ClaimSignupInviteResponse"),
-            [("bootstrap_token", 1), ("expires_at", 2), ("allowed_methods", 3)],
+            [
+                ("bootstrap_token", 1),
+                ("expires_at", 2),
+                ("allowed_methods", 3),
+                ("reservation_id", 4),
+                ("session_id", 5),
+            ],
         )
         response = body(IDENTITY, "message", "ClaimSignupInviteResponse")
         self.assertIn("Opaque short-lived bearer", response)
         self.assertIn("must carry no other capability", response)
         self.assertIn("BEGIN_WEB_AUTHN_REGISTRATION and REGISTER_PUBLIC_KEY exactly", response)
         self.assertIn("The bearer remains the authority", response)
+        self.assertIn("mint input, not", response)
+        self.assertIn("signup_bootstrap_invite", response)
+        self.assertIn("session rev_id", response)
 
         request_type, response_type, contract = rpc("ClaimSignupInvite")
         self.assertEqual(request_type, "ClaimSignupInviteRequest")

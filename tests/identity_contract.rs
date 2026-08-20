@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use heddle_api::heddle::api::v1alpha1::{
-    BeginWebAuthnRegistrationRequest, Entitlement, PromoteAgentAccountRequest, StorageUsage,
-    WhoAmIResponse,
+    AccessTokenResponse, BeginWebAuthnRegistrationRequest, ClaimSignupInviteResponse, Entitlement,
+    PromoteAgentAccountRequest, SignupBootstrapMethod, StorageUsage, WhoAmIResponse,
 };
 use prost::Message;
 
@@ -151,6 +151,49 @@ fn promote_agent_account_omits_claim_consent_issuance_for_old_clients() {
         extended.starts_with(&encoded),
         "issuance fields are trailing additions; old encodings remain a prefix"
     );
+}
+
+#[test]
+fn claim_signup_invite_response_round_trips_mint_inputs() {
+    let expected = ClaimSignupInviteResponse {
+        bootstrap_token: Vec::new(),
+        reservation_id: "11111111-2222-3333-4444-555555555555".to_string(),
+        session_id: "signup-bootstrap-session-rev".to_string(),
+        allowed_methods: vec![
+            SignupBootstrapMethod::BeginWebAuthnRegistration as i32,
+            SignupBootstrapMethod::RegisterPublicKey as i32,
+        ],
+        ..Default::default()
+    };
+
+    let decoded = ClaimSignupInviteResponse::decode(expected.encode_to_vec().as_slice())
+        .expect("decode ClaimSignupInviteResponse");
+
+    assert_eq!(decoded, expected);
+    assert!(decoded.bootstrap_token.is_empty());
+    assert_eq!(
+        decoded.reservation_id,
+        "11111111-2222-3333-4444-555555555555"
+    );
+    assert_eq!(decoded.session_id, "signup-bootstrap-session-rev");
+}
+
+#[test]
+fn access_token_response_round_trips_device_id_mint_input() {
+    let expected = AccessTokenResponse {
+        token: String::new(),
+        subject: "user:alice".to_string(),
+        session_id: "session-rev".to_string(),
+        device_id: "device-root-id".to_string(),
+        ..Default::default()
+    };
+
+    let decoded = AccessTokenResponse::decode(expected.encode_to_vec().as_slice())
+        .expect("decode AccessTokenResponse");
+
+    assert_eq!(decoded, expected);
+    assert!(decoded.token.is_empty());
+    assert_eq!(decoded.device_id, "device-root-id");
 }
 
 #[test]

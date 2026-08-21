@@ -714,6 +714,32 @@ message StoreProviderTokenRequest {
 
 message StoreProviderTokenResponse {}
 
+// Minimal repository projection returned by GitHub's installation-repository
+// API. These values are verified server-side and are never ownership claims.
+message GitHubInstallationRepository {
+  int64 id = 1;
+  string full_name = 2;
+}
+
+message RegisterGitHubInstallationRequest {
+  // GitHub App installation the authenticated caller asks Weft to register.
+  // The client-supplied installation_id is not ownership proof: Weft verifies
+  // it against the caller's linked GitHub OAuth token before any write.
+  int64 installation_id = 1;
+  // Idempotency key only. This carries no installation ownership claim.
+  string client_operation_id = 2;
+}
+
+message RegisterGitHubInstallationResponse {
+  int64 installation_id = 1;
+  // GitHub account.login for the organization or user that owns the install.
+  string account_login = 2;
+  // GitHub installation.repository_selection: "all" or "selected".
+  string repository_selection = 3;
+  // Repositories returned by GitHub for this user-accessible installation.
+  repeated GitHubInstallationRepository repositories = 4;
+}
+
 // ── Signup-email verification ───────────────────────────────────────────────
 
 // Generic acknowledgement for a syntactically valid challenge request. There
@@ -1969,6 +1995,27 @@ service IdentityService {
         role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Registers a GitHub App installation only after server-side ownership
+  // verification.
+  // Weft MUST verify that the authenticated caller administers the requested
+  // installation: load the caller's linked GitHub OAuth token,
+  // call GET /user/installations, and match installation_id before upserting
+  // ownership. The request's installation_id is never trusted as proof.
+  rpc RegisterGitHubInstallation(RegisterGitHubInstallationRequest) returns (RegisterGitHubInstallationResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc RegisterPublicKey(RegisterPublicKeyRequest) returns (AccessTokenResponse) {

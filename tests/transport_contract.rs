@@ -203,7 +203,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 178);
+    assert_eq!(ALL_METHODS.len(), 179);
     for method in [
         "BootstrapOwnerRoot",
         "RotateOwnerKey",
@@ -267,6 +267,32 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             StreamingShape::Bidirectional
         );
     }
+}
+
+#[test]
+fn generated_descriptor_carries_github_installation_registration_contract() {
+    let method =
+        method_descriptor("/heddle.api.v1alpha1.IdentityService/RegisterGitHubInstallation")
+            .expect("GitHub installation registration descriptor");
+
+    assert_eq!(
+        method.input,
+        "heddle.api.v1alpha1.RegisterGitHubInstallationRequest"
+    );
+    assert_eq!(
+        method.output,
+        "heddle.api.v1alpha1.RegisterGitHubInstallationResponse"
+    );
+    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
+    assert_eq!(
+        method.authorization_access,
+        AuthorizationAccess::AuthenticatedPrincipal
+    );
+    assert_eq!(method.effect, RpcEffect::DurableWrite);
+    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
+    assert!(method.client_operation_id_required);
+    assert_eq!(method.client_operation_id_field_number, Some(2));
+    assert_eq!(method.maturity, ServiceMaturity::Planned);
 }
 
 #[test]

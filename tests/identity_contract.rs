@@ -2,7 +2,8 @@
 
 use heddle_api::heddle::api::v1alpha1::{
     AccessTokenResponse, BeginWebAuthnRegistrationRequest, ClaimSignupInviteResponse, Entitlement,
-    PromoteAgentAccountRequest, SignupBootstrapMethod, StorageUsage, WhoAmIResponse,
+    GitHubInstallationRepository, PromoteAgentAccountRequest, RegisterGitHubInstallationRequest,
+    RegisterGitHubInstallationResponse, SignupBootstrapMethod, StorageUsage, WhoAmIResponse,
 };
 use prost::Message;
 
@@ -194,6 +195,43 @@ fn access_token_response_round_trips_device_id_mint_input() {
     assert_eq!(decoded, expected);
     assert!(decoded.token.is_empty());
     assert_eq!(decoded.device_id, "device-root-id");
+}
+
+#[test]
+fn register_github_installation_round_trips_verified_projection() {
+    let request = RegisterGitHubInstallationRequest {
+        installation_id: 12_345_678,
+        client_operation_id: "register-installation-123".to_string(),
+    };
+    let decoded_request =
+        RegisterGitHubInstallationRequest::decode(request.encode_to_vec().as_slice())
+            .expect("decode RegisterGitHubInstallationRequest");
+    assert_eq!(decoded_request, request);
+
+    let response = RegisterGitHubInstallationResponse {
+        installation_id: 12_345_678,
+        account_login: "heddleco".to_string(),
+        repository_selection: "selected".to_string(),
+        repositories: vec![GitHubInstallationRepository {
+            id: 87_654_321,
+            full_name: "HeddleCo/private-repo".to_string(),
+        }],
+    };
+    let decoded_response =
+        RegisterGitHubInstallationResponse::decode(response.encode_to_vec().as_slice())
+            .expect("decode RegisterGitHubInstallationResponse");
+    assert_eq!(decoded_response, response);
+}
+
+#[test]
+fn register_github_installation_documents_server_verified_ownership() {
+    assert!(
+        IDENTITY_PROTO
+            .contains("Weft MUST verify that the authenticated caller administers the requested")
+    );
+    assert!(IDENTITY_PROTO.contains("GET /user/installations"));
+    assert!(IDENTITY_PROTO.contains("The client-supplied installation_id is not ownership proof"));
+    assert!(IDENTITY_PROTO.contains("linked GitHub OAuth token"));
 }
 
 #[test]

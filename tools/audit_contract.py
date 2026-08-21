@@ -65,9 +65,10 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
     # Three services are planned, and eight methods on otherwise-shipped services
     # deliberately override their inherited maturity to planned (four handle
-    # RPCs now inherit SHIPPED; RegisterGitHubInstallation remains contract-first
-    # until its Weft handler lands).
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 11
+    # RPCs now inherit SHIPPED; RegisterGitHubInstallation and the two
+    # remote-link management RPCs remain contract-first until their Weft
+    # handlers land).
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 13
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
@@ -145,6 +146,8 @@ def audit_new_descriptor(decoded: str) -> None:
     operation_rpc_contracts = {
         "SubmitOperation": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
         "SubmitOperationBatch": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
+        "SetRemoteLink": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
+        "GetRemoteLink": ("NONE", "READ_ONLY", "SAFE", False),
         "GetOperation": ("NONE", "READ_ONLY", "SAFE", False),
         "BatchGetOperations": ("NONE", "READ_ONLY", "SAFE", False),
         "GetOperationBatch": ("NONE", "READ_ONLY", "SAFE", False),

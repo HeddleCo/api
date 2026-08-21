@@ -19,10 +19,12 @@ use heddle_api::heddle::api::v1alpha1::{
     ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
     PromoteAgentAccountRequest, ProviderPlanResponse, ProviderPullCapabilityContext,
     ProviderReadRequest, ProvisionAgentRootedAccountRequest, PushRequest,
-    RemainingDropCodesRequest, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
-    SigningTier, SpoolSettings, StateId, ThreadOrder, TraceContext, Visibility, error_detail,
-    get_context_history_response, list_context_response, list_discussions_response,
-    list_refs_response, list_threads_response, thread_state,
+    RemainingDropCodesRequest, RemoteLink, RemoteLinkAuthMode, RemoteLinkStatus,
+    RemoteSyncDirection, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
+    SetRemoteLinkRequest, SigningTier, SpoolSettings, StateId, ThreadOrder, TraceContext,
+    Visibility, error_detail, get_context_history_response, list_context_response,
+    list_discussions_response, list_refs_response, list_threads_response, set_remote_link_request,
+    thread_state,
 };
 use heddle_api::{
     ALL_METHODS, HOSTED_ALPN_V1, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
@@ -203,7 +205,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 179);
+    assert_eq!(ALL_METHODS.len(), 181);
     for method in [
         "BootstrapOwnerRoot",
         "RotateOwnerKey",
@@ -293,6 +295,62 @@ fn generated_descriptor_carries_github_installation_registration_contract() {
     assert!(method.client_operation_id_required);
     assert_eq!(method.client_operation_id_field_number, Some(2));
     assert_eq!(method.maturity, ServiceMaturity::Planned);
+}
+
+#[test]
+fn generated_remote_link_contract_separates_configured_and_honored_directions() {
+    let request = SetRemoteLinkRequest {
+        spool_id: "0198f00d-0000-7000-8000-000000000001".into(),
+        source: Some(set_remote_link_request::Source::PublicUrl(
+            heddle_api::heddle::api::v1alpha1::PublicUrlImportSource {
+                url: "https://example.com/acme/widgets.git".into(),
+            },
+        )),
+        direction: RemoteSyncDirection::Bidirectional as i32,
+        sync_interval: Some(prost_types::Duration {
+            seconds: 3600,
+            nanos: 0,
+        }),
+        enabled: true,
+        client_operation_id: "set-link-1".into(),
+    };
+    let request = SetRemoteLinkRequest::decode(request.encode_to_vec().as_slice())
+        .expect("decode SetRemoteLinkRequest");
+    assert_eq!(request.direction(), RemoteSyncDirection::Bidirectional);
+
+    let link = RemoteLink {
+        spool_id: request.spool_id,
+        source_url: "https://example.com/acme/widgets.git".into(),
+        direction: RemoteSyncDirection::Bidirectional as i32,
+        sync_interval: request.sync_interval,
+        auth_mode: RemoteLinkAuthMode::None as i32,
+        enabled: true,
+        status: RemoteLinkStatus::Idle as i32,
+        honored_directions: vec![RemoteSyncDirection::FetchFromRemote as i32],
+        ..Default::default()
+    };
+    let link = RemoteLink::decode(link.encode_to_vec().as_slice()).expect("decode RemoteLink");
+    assert_eq!(link.direction(), RemoteSyncDirection::Bidirectional);
+    assert_eq!(
+        link.honored_directions,
+        vec![RemoteSyncDirection::FetchFromRemote as i32]
+    );
+
+    let set_method = method_descriptor("/heddle.api.v1alpha1.OperationService/SetRemoteLink")
+        .expect("SetRemoteLink descriptor");
+    assert_eq!(set_method.effect, RpcEffect::DurableWrite);
+    assert_eq!(set_method.retry_behavior, RetryBehavior::ClientOperationId);
+    assert_eq!(set_method.signing_tier, SigningTier::ProofOfPossession);
+    assert!(set_method.client_operation_id_required);
+    assert_eq!(set_method.client_operation_id_field_number, Some(8));
+    assert_eq!(set_method.maturity, ServiceMaturity::Planned);
+
+    let get_method = method_descriptor("/heddle.api.v1alpha1.OperationService/GetRemoteLink")
+        .expect("GetRemoteLink descriptor");
+    assert_eq!(get_method.effect, RpcEffect::ReadOnly);
+    assert_eq!(get_method.retry_behavior, RetryBehavior::Safe);
+    assert!(get_method.allows_zero_rtt());
+    assert_eq!(get_method.maturity, ServiceMaturity::Planned);
 }
 
 #[test]

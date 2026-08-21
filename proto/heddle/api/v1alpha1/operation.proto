@@ -78,6 +78,25 @@ enum RemoteSyncDirection {
   REMOTE_SYNC_DIRECTION_UNSPECIFIED = 0;
   REMOTE_SYNC_DIRECTION_FETCH_FROM_REMOTE = 1;
   REMOTE_SYNC_DIRECTION_PUSH_TO_REMOTE = 2;
+  // Valid for RemoteLink.direction only. A submitted remote-sync operation
+  // executes one direction at a time and must not use this value.
+  REMOTE_SYNC_DIRECTION_BIDIRECTIONAL = 3;
+}
+
+enum RemoteLinkAuthMode {
+  REMOTE_LINK_AUTH_MODE_UNSPECIFIED = 0;
+  REMOTE_LINK_AUTH_MODE_NONE = 1;
+  REMOTE_LINK_AUTH_MODE_PROVIDER_TOKEN = 2;
+  REMOTE_LINK_AUTH_MODE_GITHUB_APP = 3;
+}
+
+enum RemoteLinkStatus {
+  REMOTE_LINK_STATUS_UNSPECIFIED = 0;
+  REMOTE_LINK_STATUS_IDLE = 1;
+  REMOTE_LINK_STATUS_SYNCING = 2;
+  REMOTE_LINK_STATUS_ERROR = 3;
+  REMOTE_LINK_STATUS_DIVERGED = 4;
+  REMOTE_LINK_STATUS_DISABLED = 5;
 }
 
 message OperationSubject {
@@ -114,7 +133,58 @@ message ImportOperationSpec {
 
 message RemoteSyncOperationSpec {
   RepositoryRef repository = 1;
+  // Selects one operation direction. BIDIRECTIONAL is configuration-only and
+  // is invalid here. PUSH_TO_REMOTE remains UNIMPLEMENTED until weft#387.
   RemoteSyncDirection direction = 2;
+}
+
+// Durable remote configuration and sync health for one spool. `direction` is
+// what the caller configured, while `honored_directions` is what the serving
+// implementation will actually execute. Saving PUSH_TO_REMOTE or
+// BIDIRECTIONAL does not activate push: until weft#387, an enabled pull or
+// bidirectional link reports only FETCH_FROM_REMOTE, and a push-only or
+// disabled link reports no honored directions. SubmitOperation with
+// PUSH_TO_REMOTE continues to return UNIMPLEMENTED.
+message RemoteLink {
+  string spool_id = 1;
+  string source_url = 2;
+  RemoteSyncDirection direction = 3;
+  // Absent means manual sync only.
+  google.protobuf.Duration sync_interval = 4;
+  // Absent when no periodic sync is scheduled.
+  google.protobuf.Timestamp next_sync_at = 5;
+  RemoteLinkAuthMode auth_mode = 6;
+  bool enabled = 7;
+  RemoteLinkStatus status = 8;
+  google.protobuf.Timestamp last_synced_at = 9;
+  string last_error = 10;
+  repeated string diverged_refs = 11;
+  repeated RemoteSyncDirection honored_directions = 12;
+}
+
+// Creates or replaces the configurable fields of a spool's one remote link.
+// A missing remote_links row is the normal create path (including adoption
+// that stops before refs publish), not an error. Source authentication details
+// are resolved through the same server-owned provider records as import; no
+// credential or token is carried by this request.
+message SetRemoteLinkRequest {
+  string spool_id = 1;
+  oneof source {
+    GitHubAppImportSource github_app = 2;
+    ProviderTokenImportSource provider_token = 3;
+    PublicUrlImportSource public_url = 4;
+  }
+  // May store FETCH_FROM_REMOTE, PUSH_TO_REMOTE, or BIDIRECTIONAL. See
+  // RemoteLink.honored_directions for the capability actually in force.
+  RemoteSyncDirection direction = 5;
+  // Absent means manual sync only and clears any prior periodic schedule.
+  google.protobuf.Duration sync_interval = 6;
+  bool enabled = 7;
+  string client_operation_id = 8;
+}
+
+message GetRemoteLinkRequest {
+  string spool_id = 1;
 }
 
 message SubmitOperationRequest {
@@ -368,7 +438,8 @@ message CancelOperationResponse {
 
 // SHIPPED: Weft exposes import operations through the shared lifecycle. Remote
 // sync, atomic batches, listing, and cancellation remain partial server
-// capabilities and return UNIMPLEMENTED until their durable semantics land.
+// capabilities. Remote-link management is contract-first and remains PLANNED
+// until its Weft handler lands.
 service OperationService {
   option (service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
@@ -400,6 +471,44 @@ service OperationService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc SetRemoteLink(SetRemoteLinkRequest) returns (RemoteLink) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      maturity: SERVICE_MATURITY_PLANNED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "spool_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc GetRemoteLink(GetRemoteLinkRequest) returns (RemoteLink) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      maturity: SERVICE_MATURITY_PLANNED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "spool_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }

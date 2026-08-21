@@ -19,6 +19,13 @@ enum DiscussionStatusFilter {
   DISCUSSION_STATUS_FILTER_ORPHANED = 3;
 }
 
+// Whether an open discussion is informational or prevents a merge.
+enum DiscussionSeverity {
+  DISCUSSION_SEVERITY_UNSPECIFIED = 0;
+  DISCUSSION_SEVERITY_INFORMATIONAL = 1;
+  DISCUSSION_SEVERITY_BLOCKING = 2;
+}
+
 message OpenDiscussionRequest {
   RepositoryRef repo_path = 1;
   StateId state_id = 2;
@@ -88,6 +95,10 @@ message Discussion {
   string resolved_annotation_id = 11;
   // Stable identity paired with `thread_ref`.
   string thread_id = 12;
+  // Actual value, no inference. UNSPECIFIED is treated as Informational
+  // (non-blocking); BLOCKING makes an open discussion an unmet merge
+  // requirement; a Reject sets Blocking.
+  DiscussionSeverity severity = 13;
 }
 
 message ListDiscussionsByStateRequest {

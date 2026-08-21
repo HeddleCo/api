@@ -275,6 +275,64 @@ message WorkspaceSummary {
   optional string current_thread_id = 5;
 }
 
+// One member of a transactional stacked-land set. The thread's target and
+// changed paths are server-derived from its current topology and state.
+message LandStackMember {
+  RepositoryRef repo_path = 1;
+  // Renameable human-facing thread ref, paired with authoritative thread_id.
+  string thread = 2;
+  // Exact head state to gate and land. A changed head makes the request stale.
+  StateId source_state = 3;
+  // Stable server-assigned identity. Both thread and thread_id are REQUIRED.
+  string thread_id = 4;
+}
+
+message LandStackRequest {
+  // A set of members, not an apply order. The server topo-sorts the set from
+  // ThreadSummary.parent_thread and applies it bottom-up; callers MUST NOT
+  // pre-order members.
+  //
+  // v1 requires every member to resolve to one spool. Cross-spool stacked land
+  // (including separate audit chains) is deliberately deferred to a later
+  // capability. Keeping repo_path on each member lets that capability be added
+  // without changing this request signature.
+  repeated LandStackMember members = 1;
+  string client_operation_id = 2;
+}
+
+enum LandStackOutcome {
+  LAND_STACK_OUTCOME_UNSPECIFIED = 0;
+  // Every requested member was durably landed in one atomic commit.
+  LAND_STACK_OUTCOME_COMMITTED = 1;
+  // No requested member was durably landed. This includes a gate abort and a
+  // rollback after an apply failure.
+  LAND_STACK_OUTCOME_ROLLED_BACK = 2;
+}
+
+message LandStackMemberResult {
+  LandStackMember member = 1;
+  // Mirrors CheckMergeEligibilityResponse.allowed for this member.
+  bool allowed = 2;
+  // Open merge-gate output reused directly; do not re-enumerate gate reasons.
+  repeated UnmetRequirement unmet = 3;
+  // Approvals the existing merge gate considered valid for this member.
+  repeated ThreadApproval valid_approvals = 4;
+  // Final durable state. False for every member when outcome is ROLLED_BACK,
+  // including members whose apply was attempted before a later failure.
+  bool landed = 5;
+  // Non-empty only on the member whose apply failure caused a rollback.
+  string failure_reason = 6;
+}
+
+message LandStackResponse {
+  // The transaction has exactly one durable outcome: all members committed or
+  // none committed.
+  LandStackOutcome outcome = 1;
+  // One result per requested member, returned in server-computed bottom-up
+  // order rather than request order.
+  repeated LandStackMemberResult results = 2;
+}
+
 service WorkflowService {
   option (heddle.api.v1alpha1.service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
@@ -421,6 +479,26 @@ service WorkflowService {
       authorization_request_targets: {
         path: "repo_path"
         role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Transactionally lands a set of stacked threads. The server reads the
+  // existing merge gate for every member and commits all members or none.
+  rpc LandStack(LandStackRequest) returns (LandStackResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_BRANCH_PROTECTION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "members.repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };

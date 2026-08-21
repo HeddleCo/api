@@ -410,6 +410,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateSignupInvite",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
       "layers": {
         "implementation": {
@@ -1896,6 +1907,17 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/LandStack",
       "layers": {
         "implementation": {
           "status": "planned"

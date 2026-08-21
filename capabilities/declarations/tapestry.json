@@ -410,6 +410,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateSignupInvite",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
       "layers": {
         "server_adapter": {
@@ -1902,6 +1913,17 @@
         },
         "ui": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/LandStack",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
         }
       }
     },

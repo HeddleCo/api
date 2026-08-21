@@ -205,7 +205,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 181);
+    assert_eq!(ALL_METHODS.len(), 183);
     for method in [
         "BootstrapOwnerRoot",
         "RotateOwnerKey",

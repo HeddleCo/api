@@ -151,6 +151,61 @@ class SharedOperationContractTest(unittest.TestCase):
         ):
             self.assertNotIn(removed, proto_sources)
 
+    def test_remote_link_management_is_create_first_and_exposes_honored_directions(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        link = message_body(source, "RemoteLink")
+        set_request = message_body(source, "SetRemoteLinkRequest")
+        get_request = message_body(source, "GetRemoteLinkRequest")
+
+        for field in (
+            "spool_id",
+            "source_url",
+            "direction",
+            "sync_interval",
+            "next_sync_at",
+            "auth_mode",
+            "enabled",
+            "status",
+            "last_synced_at",
+            "last_error",
+            "diverged_refs",
+        ):
+            self.assertRegex(link, rf"\b{field}\s*=")
+        self.assertRegex(
+            link,
+            r"\brepeated\s+RemoteSyncDirection\s+honored_directions\s*=\s*12\s*;",
+        )
+        self.assertRegex(set_request, r"\bstring\s+spool_id\s*=\s*1\s*;")
+        self.assertRegex(set_request, r"\boneof\s+source\s*\{")
+        self.assertRegex(set_request, r"\bRemoteSyncDirection\s+direction\s*=\s*5\s*;")
+        self.assertRegex(
+            set_request,
+            r"\bgoogle\.protobuf\.Duration\s+sync_interval\s*=\s*6\s*;",
+        )
+        self.assertRegex(set_request, r"\bbool\s+enabled\s*=\s*7\s*;")
+        self.assertRegex(
+            set_request, r"\bstring\s+client_operation_id\s*=\s*8\s*;"
+        )
+        self.assertRegex(get_request, r"\bstring\s+spool_id\s*=\s*1\s*;")
+        self.assertIn("missing remote_links row is the normal create path", source)
+        self.assertIn("Saving PUSH_TO_REMOTE or", source)
+        self.assertIn("does not activate push", source)
+        self.assertIn("continues to return UNIMPLEMENTED", source)
+
+    def test_remote_link_reuses_remote_sync_direction_with_bidirectional_configuration(self) -> None:
+        source = OPERATION_PROTO.read_text()
+        direction = re.search(
+            r"(?ms)^enum RemoteSyncDirection \{(.*?)^\}", source
+        )
+        self.assertIsNotNone(direction)
+        body = direction.group(1)
+        self.assertRegex(
+            body,
+            r"\bREMOTE_SYNC_DIRECTION_BIDIRECTIONAL\s*=\s*3\s*;",
+        )
+        self.assertIn("Valid for RemoteLink.direction only", body)
+        self.assertIn("PUSH_TO_REMOTE remains UNIMPLEMENTED until weft#387", source)
+
     def test_lookup_and_cancellation_do_not_create_identity_oracles(self) -> None:
         source = OPERATION_PROTO.read_text()
         batch_response = message_body(source, "BatchGetOperationsResponse")

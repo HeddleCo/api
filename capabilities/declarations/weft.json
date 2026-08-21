@@ -828,6 +828,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetRemoteLink",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
       "layers": {
         "implementation": {
@@ -835,6 +846,17 @@
         },
         "registration": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SetRemoteLink",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
         }
       }
     },

@@ -828,7 +828,29 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetRemoteLink",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SetRemoteLink",
       "layers": {
         "client": {
           "status": "planned"

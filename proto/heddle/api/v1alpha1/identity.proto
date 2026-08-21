@@ -826,6 +826,26 @@ message BindSignupInviteEmailResponse {
   string recipient_email = 1;
 }
 
+message CreateSignupInviteRequest {
+  // Optional address to bind to the new invite. When present, Weft
+  // canonicalizes and persists it using the same binding rules as
+  // BindSignupInviteEmail.
+  optional string recipient_email = 1;
+  // Idempotency key scoped to the authenticated member and this RPC. Reuse
+  // with a different recipient_email must fail without spending allowance.
+  string client_operation_id = 2;
+}
+
+message CreateSignupInviteResponse {
+  // Stable server-generated identity of the created invite.
+  string invite_id = 1;
+  // High-entropy opaque code accepted by ResolveSignupInvite and
+  // ClaimSignupInvite.
+  string invite_code = 2;
+  // Caller-owned invite allowance remaining after this invite is created.
+  uint32 allowance_remaining = 3;
+}
+
 // Public lifecycle projection for an invite code supplied by the caller. The
 // vocabulary intentionally has no missing/invalid/revoked state: those inputs
 // are represented exactly as EXPIRED.
@@ -1592,6 +1612,26 @@ service IdentityService {
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
       authorization_role: AUTHORIZATION_ROLE_NONE
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Creates a member-owned signup invite by atomically spending one unit of
+  // the authenticated caller's own allowance. The referrer is always derived
+  // from the authenticated principal; callers cannot select another member's
+  // allowance. When recipient_email is present, the new invite is bound to the
+  // canonicalized address using the BindSignupInviteEmail rules.
+  rpc CreateSignupInvite(CreateSignupInviteRequest) returns (CreateSignupInviteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }

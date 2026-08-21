@@ -1873,6 +1873,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/LandStack",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups",
       "layers": {
         "server_adapter": {

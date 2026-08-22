@@ -140,6 +140,14 @@ message TreeEntry {
   // other than UNSPECIFIED against status_base. Always false for leaf kinds
   // and whenever status_base is absent.
   bool descendant_changed = 6;
+  // When this entry last changed. Absent when the server has no provenance
+  // data for the entry; present means the commit/state time that last touched
+  // it (weft#1778).
+  optional google.protobuf.Timestamp last_changed_at = 7;
+  // Author/identity that last changed this entry, reusing the same principal
+  // shape as StateSummary.principal. Absent alongside last_changed_at when
+  // the server has no provenance data (weft#1778).
+  StatePrincipal last_changed_by = 8;
 }
 
 message TreeResponse {

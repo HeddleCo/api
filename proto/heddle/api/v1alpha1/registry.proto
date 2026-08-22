@@ -379,8 +379,9 @@ message SpoolSummary {
   google.protobuf.Timestamp last_activity_at = 5;
   // Count of content-facet refs with `is_thread = true`. ListSpools carries
   // this so listing surfaces do not fan out to per-repo GetRefs (weft#1392).
-  // Zero when the spool has no thread refs.
-  uint32 thread_count = 6;
+  // Explicit presence: absent means not measured; present zero means the spool
+  // has no thread refs (same contract as RefSummary counters).
+  optional uint32 thread_count = 6;
   // HEAD-attached thread name (the default thread). Empty when HEAD is
   // detached or the spool has no head.
   string head_thread = 7;

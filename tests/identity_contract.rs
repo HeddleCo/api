@@ -246,8 +246,8 @@ fn entitlement_round_trips_usage_and_subscription_projection() {
             ..Default::default()
         }),
         storage_usage: Some(StorageUsage {
-            current_storage_bytes: 83,
-            storage_allowance_bytes: 500_000_000_000,
+            current_storage_bytes: Some(83),
+            storage_allowance_bytes: Some(500_000_000_000),
         }),
         ..Default::default()
     };

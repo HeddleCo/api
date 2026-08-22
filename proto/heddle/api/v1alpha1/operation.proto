@@ -233,13 +233,16 @@ message PhaseTiming {
 
 message RefSummary {
   // Advertised at ref-advertisement time (available during cloning).
-  uint32 advertised_branches = 1;
-  uint32 advertised_tags = 2;
+  // Explicit presence: absent means not yet counted; present zero means the
+  // source advertised nothing.
+  optional uint32 advertised_branches = 1;
+  optional uint32 advertised_tags = 2;
   optional string oldest_tag_name = 3;
   // Published after the fetched pack is filtered to landed refs (known at Mirror).
   // May be < advertised; a client must label which it shows.
-  uint32 published_branches = 4;
-  uint32 published_tags = 5;
+  // Explicit presence, same contract as the advertised counts.
+  optional uint32 published_branches = 4;
+  optional uint32 published_tags = 5;
 }
 
 message OperationProgress {

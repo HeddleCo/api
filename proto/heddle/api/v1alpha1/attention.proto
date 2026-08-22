@@ -78,20 +78,82 @@ message FeedItem {
   google.protobuf.Timestamp expires_at = 12;
   // Populated by FeedMaterializer in V1 (used in priority scoring and card metadata):
   string actor_subject = 13; // who/what caused this item
+  // Deepest delegation label recorded by an agent attenuation block. Empty for
+  // an undelegated root credential; actor_subject remains the root subject.
+  string actor_agent_id = 25;
   bool has_agent_reasoning = 14; // context annotations attached? (+25 priority boost)
   uint32 files_changed = 15; // count from diff (feeds card metadata line)
   uint32 breaking_changes = 16; // count from semantic diff (+200 priority boost)
+  BreakingChangesComputationStatus breaking_changes_computation_status = 23; // pending, successfully computed, or unavailable
+  // Card-level projection of the targeted thread's verification summary.
+  // UNSPECIFIED means verification was not computed or could not be determined.
+  // VERIFIED requires tests_passed=true and tests_failed=0. NOT_VERIFIED means
+  // tests_passed=false or tests_failed>0; failures take precedence.
+  FeedItemVerificationStatus verification_status = 24;
   string top_annotation = 17; // most important WHY/GOTCHA annotation text (max 80 chars)
   bool confidence_computed = 18; // false in V1; true in V2 when confidence is set
   bool security_sensitive = 19; // stored for score reproducibility
   float affinity_multiplier = 20; // stored for score reproducibility (default 1.0)
   repeated FileChangeSummary top_files = 21; // top changed file paths (max 5)
   repeated BreakingChangeSummary breaking_summaries = 22; // top breaking semantic changes (max 3)
+  // The exact head capture for this item. Absent when the producer cannot
+  // resolve every field truthfully; actions remain navigation-only data.
+  FeedCaptureSummary head_capture = 26;
+}
+
+enum BreakingChangesComputationStatus {
+  BREAKING_CHANGES_COMPUTATION_STATUS_UNSPECIFIED = 0;
+  BREAKING_CHANGES_COMPUTATION_STATUS_PENDING = 1;
+  BREAKING_CHANGES_COMPUTATION_STATUS_COMPUTED = 2;
+  BREAKING_CHANGES_COMPUTATION_STATUS_UNAVAILABLE = 3;
+}
+
+enum FeedItemVerificationStatus {
+  // No verification result was computed or the producer could not determine it.
+  FEED_ITEM_VERIFICATION_STATUS_UNSPECIFIED = 0;
+  // Verification explicitly reported passing tests with no failures.
+  FEED_ITEM_VERIFICATION_STATUS_VERIFIED = 1;
+  // Verification explicitly reported a non-passing result or test failures.
+  FEED_ITEM_VERIFICATION_STATUS_NOT_VERIFIED = 2;
 }
 
 message FileChangeSummary {
   string path = 1;
   FileChangeKind kind = 2;
+  // Stable identity of this entry within its FeedItem. Consumers must not use
+  // path as the entry key because rename and future duplicate-path cases can
+  // surface more than one entry for a path.
+  string entry_id = 3;
+  // COMPUTED means attribution is present and complete. UNAVAILABLE means the
+  // producer could not truthfully map this file to a capture; attribution is
+  // then absent and consumers may use an explicitly labelled fallback.
+  FeedFileAttributionStatus attribution_status = 4;
+  FeedCaptureSummary attribution = 5;
+}
+
+enum FeedFileAttributionStatus {
+  FEED_FILE_ATTRIBUTION_STATUS_UNSPECIFIED = 0;
+  FEED_FILE_ATTRIBUTION_STATUS_COMPUTED = 1;
+  FEED_FILE_ATTRIBUTION_STATUS_UNAVAILABLE = 2;
+}
+
+// Metadata and line delta read from one exact capture. capture_message is the
+// capture's intent, never a FeedItem headline. author_display is the capture
+// State's accountable principal rendered as "Name <email>"; it is not an auth
+// subject. captured_at is the State's authored_at when present, otherwise its
+// created_at. additions/deletions are for the attributed file when nested in a
+// FileChangeSummary and aggregate all capture files when used as head_capture;
+// both are computed against that capture's first parent, never inferred from
+// FileChangeKind or an aggregate feed diff.
+message FeedCaptureSummary {
+  StateId state_id = 1;
+  ChangeId change_id = 2;
+  string thread = 3;
+  string capture_message = 4;
+  string author_display = 5;
+  google.protobuf.Timestamp captured_at = 6;
+  uint32 additions = 7;
+  uint32 deletions = 8;
 }
 
 enum FileChangeKind {
@@ -112,8 +174,9 @@ message FeedItemAction {
   string label = 2; // "Review", "Dismiss", "Pin"
   string url = 3; // url is emitted ONLY for external links (e.g. GitHub); empty for internal actions — clients compose canonical routes from state_id/thread/repo_path.
   bool is_primary = 4;
-  StateId state_id = 5; // the change/state this action targets
-  string thread = 6; // the thread the action targets
+  StateId state_id = 5; // the exact physical state this action targets
+  string thread = 6; // renameable ref of the thread the action targets
+  string thread_id = 7; // stable identity paired with thread
 }
 
 enum FeedItemKind {

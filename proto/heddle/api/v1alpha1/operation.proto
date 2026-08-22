@@ -78,6 +78,25 @@ enum RemoteSyncDirection {
   REMOTE_SYNC_DIRECTION_UNSPECIFIED = 0;
   REMOTE_SYNC_DIRECTION_FETCH_FROM_REMOTE = 1;
   REMOTE_SYNC_DIRECTION_PUSH_TO_REMOTE = 2;
+  // Valid for RemoteLink.direction only. A submitted remote-sync operation
+  // executes one direction at a time and must not use this value.
+  REMOTE_SYNC_DIRECTION_BIDIRECTIONAL = 3;
+}
+
+enum RemoteLinkAuthMode {
+  REMOTE_LINK_AUTH_MODE_UNSPECIFIED = 0;
+  REMOTE_LINK_AUTH_MODE_NONE = 1;
+  REMOTE_LINK_AUTH_MODE_PROVIDER_TOKEN = 2;
+  REMOTE_LINK_AUTH_MODE_GITHUB_APP = 3;
+}
+
+enum RemoteLinkStatus {
+  REMOTE_LINK_STATUS_UNSPECIFIED = 0;
+  REMOTE_LINK_STATUS_IDLE = 1;
+  REMOTE_LINK_STATUS_SYNCING = 2;
+  REMOTE_LINK_STATUS_ERROR = 3;
+  REMOTE_LINK_STATUS_DIVERGED = 4;
+  REMOTE_LINK_STATUS_DISABLED = 5;
 }
 
 message OperationSubject {
@@ -107,14 +126,65 @@ message ImportOperationSpec {
     ProviderTokenImportSource provider_token = 2;
     PublicUrlImportSource public_url = 3;
   }
-  SpoolVisibility requested_visibility = 4;
+  Visibility requested_visibility = 4;
   bool adopt_on_complete = 5;
   string target_spool_path = 6;
 }
 
 message RemoteSyncOperationSpec {
   RepositoryRef repository = 1;
+  // Selects one operation direction. BIDIRECTIONAL is configuration-only and
+  // is invalid here. PUSH_TO_REMOTE remains UNIMPLEMENTED until weft#387.
   RemoteSyncDirection direction = 2;
+}
+
+// Durable remote configuration and sync health for one spool. `direction` is
+// what the caller configured, while `honored_directions` is what the serving
+// implementation will actually execute. Saving PUSH_TO_REMOTE or
+// BIDIRECTIONAL does not activate push: until weft#387, an enabled pull or
+// bidirectional link reports only FETCH_FROM_REMOTE, and a push-only or
+// disabled link reports no honored directions. SubmitOperation with
+// PUSH_TO_REMOTE continues to return UNIMPLEMENTED.
+message RemoteLink {
+  string spool_id = 1;
+  string source_url = 2;
+  RemoteSyncDirection direction = 3;
+  // Absent means manual sync only.
+  google.protobuf.Duration sync_interval = 4;
+  // Absent when no periodic sync is scheduled.
+  google.protobuf.Timestamp next_sync_at = 5;
+  RemoteLinkAuthMode auth_mode = 6;
+  bool enabled = 7;
+  RemoteLinkStatus status = 8;
+  google.protobuf.Timestamp last_synced_at = 9;
+  string last_error = 10;
+  repeated string diverged_refs = 11;
+  repeated RemoteSyncDirection honored_directions = 12;
+}
+
+// Creates or replaces the configurable fields of a spool's one remote link.
+// A missing remote_links row is the normal create path (including adoption
+// that stops before refs publish), not an error. Source authentication details
+// are resolved through the same server-owned provider records as import; no
+// credential or token is carried by this request.
+message SetRemoteLinkRequest {
+  string spool_id = 1;
+  oneof source {
+    GitHubAppImportSource github_app = 2;
+    ProviderTokenImportSource provider_token = 3;
+    PublicUrlImportSource public_url = 4;
+  }
+  // May store FETCH_FROM_REMOTE, PUSH_TO_REMOTE, or BIDIRECTIONAL. See
+  // RemoteLink.honored_directions for the capability actually in force.
+  RemoteSyncDirection direction = 5;
+  // Absent means manual sync only and clears any prior periodic schedule.
+  google.protobuf.Duration sync_interval = 6;
+  bool enabled = 7;
+  string client_operation_id = 8;
+}
+
+message GetRemoteLinkRequest {
+  string spool_id = 1;
 }
 
 message SubmitOperationRequest {
@@ -128,6 +198,53 @@ message SubmitOperationRequest {
   }
 }
 
+// One successfully converted Git commit in an import operation's durable
+// history. Ordinal is one-based in the import's deterministic conversion
+// order. Hash is the full source Git object id (SHA-1 or SHA-256).
+message ImportCommitProgress {
+  uint64 ordinal = 1;
+  string commit_hash = 2;
+  // The first line of the source commit message. This is commit data, not the
+  // generic phase summary in OperationProgress.summary.
+  string subject = 3;
+  // Textual first-parent diff totals. They are absent when the commit has no
+  // textual line statistics (for example, a binary-only change).
+  optional uint64 additions = 4;
+  optional uint64 deletions = 5;
+  string author_name = 6;
+  string author_email = 7;
+  // Source branch names whose imported tips contain this commit. A commit may
+  // be reachable from more than one branch.
+  repeated string branches = 8;
+}
+
+// Exact source commit being converted when an import failed. The ordinal is
+// sufficient identity even if malformed source data prevents reading a hash.
+message ImportCommitFailure {
+  uint64 ordinal = 1;
+  optional string commit_hash = 2;
+}
+
+message PhaseTiming {
+  string phase = 1; // machine-readable; matches OperationProgress.phase
+  google.protobuf.Timestamp started_at = 2;
+  optional google.protobuf.Timestamp ended_at = 3; // absent while the phase is in progress
+}
+
+message RefSummary {
+  // Advertised at ref-advertisement time (available during cloning).
+  // Explicit presence: absent means not yet counted; present zero means the
+  // source advertised nothing.
+  optional uint32 advertised_branches = 1;
+  optional uint32 advertised_tags = 2;
+  optional string oldest_tag_name = 3;
+  // Published after the fetched pack is filtered to landed refs (known at Mirror).
+  // May be < advertised; a client must label which it shows.
+  // Explicit presence, same contract as the advertised counts.
+  optional uint32 published_branches = 4;
+  optional uint32 published_tags = 5;
+}
+
 message OperationProgress {
   // Machine-readable phase within the operation kind, such as "cloning" or
   // "indexing". It does not replace OperationState.
@@ -138,6 +255,31 @@ message OperationProgress {
   optional string unit = 4;
   // Sanitized human-safe summary; clients must not parse it for state.
   string summary = 5;
+  // Full durable prefix of successfully converted source commits. This field
+  // is populated only for import operations. Snapshot-first watch reconnects
+  // repeat the prefix so clients do not depend on transient stream delivery.
+  repeated ImportCommitProgress import_commits = 6;
+  // Present when an import failed while converting a known source commit.
+  optional ImportCommitFailure failed_import_commit = 7;
+  // Wall-clock start of the operation, so elapsed is correct for any late
+  // subscriber. Populated from the durable job record, not stream subscribe time.
+  optional google.protobuf.Timestamp started_at = 8;
+  // Durable per-phase timing for phases entered so far; snapshot-repeated on
+  // reconnect. `phase` matches OperationProgress.phase values.
+  repeated PhaseTiming phase_timings = 9;
+  // Byte values below are observed values: "so far" mid-flight and firm at
+  // terminal. Reduction percentage is client-derived at completion, not a wire field.
+  // Native store bytes durably written so far. ACTUAL, never projected/estimated.
+  optional uint64 native_bytes_written = 10;
+  // Source Git pack size in bytes (known once the fetch is sized).
+  optional uint64 source_pack_bytes = 11;
+  // Advertised + published ref topology (see RefSummary). Emitted once early in
+  // cloning (advertised_*) and updated at Mirror once the published set is known.
+  // Counts only — not a per-poll list. Actual, never projected.
+  optional RefSummary ref_summary = 12;
+  // Objects actually written to the store so far (vs `completed` = processed).
+  // completed - object_writes = deduplicated (content already present). Actual, not projected.
+  optional uint64 object_writes = 13;
 }
 
 message OperationError {
@@ -248,6 +390,11 @@ message ListOperationsRequest {
   optional OperationBatchId batch_id = 3;
   uint32 page_size = 4;
   string page_token = 5;
+  // Optional repository/spool filter. The `hosted_id` arm selects a stable
+  // hosted repository ID; `canonical_path` selects its canonical spool path.
+  // When omitted, the list covers all operations owned by the authenticated
+  // caller, preserving the unscoped behavior of existing clients.
+  RepositoryRef repository = 6;
 }
 
 message ListOperationsResponse {
@@ -294,7 +441,8 @@ message CancelOperationResponse {
 
 // SHIPPED: Weft exposes import operations through the shared lifecycle. Remote
 // sync, atomic batches, listing, and cancellation remain partial server
-// capabilities and return UNIMPLEMENTED until their durable semantics land.
+// capabilities. Remote-link management is contract-first and remains PLANNED
+// until its Weft handler lands.
 service OperationService {
   option (service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
@@ -326,6 +474,44 @@ service OperationService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc SetRemoteLink(SetRemoteLinkRequest) returns (RemoteLink) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      maturity: SERVICE_MATURITY_PLANNED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "spool_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc GetRemoteLink(GetRemoteLinkRequest) returns (RemoteLink) {
+    option (rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      maturity: SERVICE_MATURITY_PLANNED
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "spool_id"
+        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
+      }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }

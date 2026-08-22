@@ -2,18 +2,37 @@ syntax = "proto3";
 
 package heddle.api.v1alpha1;
 
+import "google/protobuf/descriptor.proto";
 import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 import "heddle/api/v1alpha1/workflow.proto";
 
 message ListRefsRequest {
   RepositoryRef repo_path = 1;
+  // Zero streams all refs. A positive value streams at most this many refs.
+  uint32 page_size = 2;
+  // Opaque continuation token returned by ListRefsPageEnd.
+  string page_token = 3;
 }
 
 message ListRefsResponse {
-  string head_thread = 1;
-  StateId head_state = 2;
-  repeated RefEntry refs = 3;
+  reserved 1, 2, 4;
+
+  oneof frame {
+    RefEntry item = 3;
+    ListRefsPageEnd page_end = 5;
+  }
+}
+
+message ListRefsPageEnd {
+  // Empty when the last page, or the whole unpaged stream, was delivered.
+  string next_page_token = 1;
+  // Renameable human-facing ref.
+  string head_thread = 2;
+  StateId head_state = 3;
+  // Stable identity paired with `head_thread`.
+  string head_thread_id = 4;
 }
 
 message UpdateRefRequest {
@@ -30,6 +49,9 @@ message UpdateRefRequest {
   string old_revision_address = 8;
   string new_revision_address = 9;
   string client_operation_id = 10;
+  // REQUIRED for an existing thread ref. Empty only while creating a thread,
+  // when the server assigns the id returned in UpdateRefResponse.
+  string thread_id = 11;
 }
 
 message UpdateRefResponse {
@@ -37,6 +59,8 @@ message UpdateRefResponse {
   string old_value = 2;
   string error = 3;
   string old_revision_address = 4;
+  // Stable server-assigned id when the updated ref is a thread.
+  string thread_id = 5;
 }
 
 enum TransportMode {
@@ -69,15 +93,189 @@ message TransferCheckpoint {
   bool is_complete = 6;
 }
 
+// Generated consumers classify every attachment kind before accepting its
+// transfer. Attachments are ordinary spool writes and require both the
+// transport's spool-write authority and the existing per-author authorship,
+// schema, provenance, integrity, ownership, and predecessor validation. A new
+// enum value without a non-UNSPECIFIED option fails Rust and TypeScript
+// generation, preventing an attachment lane from bypassing write authorization.
+enum StateAttachmentAuthorizationClassification {
+  STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_UNSPECIFIED = 0;
+  STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE = 1;
+}
+
+extend google.protobuf.EnumValueOptions {
+  StateAttachmentAuthorizationClassification state_attachment_authorization_classification = 50004;
+}
+
 enum StateAttachmentKind {
   STATE_ATTACHMENT_KIND_UNSPECIFIED = 0;
-  STATE_ATTACHMENT_KIND_CONTEXT = 1;
-  STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2;
-  STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3;
-  STATE_ATTACHMENT_KIND_DISCUSSIONS = 4;
-  STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5;
-  STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6;
-  STATE_ATTACHMENT_KIND_SIGNATURE = 7;
+  STATE_ATTACHMENT_KIND_CONTEXT = 1 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_DISCUSSIONS = 4 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  // Payload message: `StructuredConflicts` (this file). Hosted clients fetch
+  // via RepositoryService.ListStateAttachments; the push/pull path still uses
+  // StateAttachmentTransfer for peer sync.
+  STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_SIGNATURE = 7 [(heddle.api.v1alpha1.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+}
+
+// =====================================================================
+// Structured conflicts — payload for STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS
+// =====================================================================
+//
+// Wire bridge between heddle's landed conflict payload
+// (`object-model::StructuredConflict` / CLI `ConflictRegionReport` +
+// `ConflictResolutionReport`) and tapestry's ConflictCard. Hosted clients
+// fetch via RepositoryService.ListStateAttachments; peer sync still uses
+// StateAttachmentTransfer.
+//
+// Design: ONE status-tagged list (not separate region + resolution lists).
+// A client answers "is this conflict still open" from a single message.
+// Three-way sides are base / ours / theirs — not {left, right}.
+
+// Attachment body for STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS.
+// Mirrors heddle's on-disk container (`StructuredConflict { conflicts }`)
+// with each region widened to carry lifecycle status and optional resolution.
+message StructuredConflicts {
+  repeated StructuredConflict conflicts = 1;
+}
+
+// Lifecycle of one conflict region within a state attachment.
+// Maps to tapestry's open | auto_resolved | resolved vocabulary.
+enum StructuredConflictStatus {
+  STRUCTURED_CONFLICT_STATUS_UNSPECIFIED = 0;
+  // Still open — no resolution fields populated.
+  STRUCTURED_CONFLICT_STATUS_OPEN = 1;
+  // Closed by automatic resolution (`ConflictResolutionMode.AUTO`).
+  STRUCTURED_CONFLICT_STATUS_AUTO_RESOLVED = 2;
+  // Closed by an explicit choice or edit (ours / theirs / edit).
+  STRUCTURED_CONFLICT_STATUS_RESOLVED = 3;
+}
+
+// How a conflict was resolved. Mirrors heddle
+// `ConflictResolutionModeReport` / oplog `ConflictResolutionMode`.
+enum ConflictResolutionMode {
+  CONFLICT_RESOLUTION_MODE_UNSPECIFIED = 0;
+  CONFLICT_RESOLUTION_MODE_OURS = 1;
+  CONFLICT_RESOLUTION_MODE_THEIRS = 2;
+  CONFLICT_RESOLUTION_MODE_EDIT = 3;
+  CONFLICT_RESOLUTION_MODE_AUTO = 4;
+}
+
+// Human vs agent resolver kind. Mirrors heddle `ResolverKindReport`.
+enum ConflictResolverKind {
+  CONFLICT_RESOLVER_KIND_UNSPECIFIED = 0;
+  CONFLICT_RESOLVER_KIND_HUMAN = 1;
+  CONFLICT_RESOLVER_KIND_AGENT = 2;
+}
+
+// Zero-based, half-open line range `[start_line, end_line)`.
+// Mirrors heddle `ConflictRange` / `ConflictRangeReport`.
+message ConflictRange {
+  uint32 start_line = 1;
+  uint32 end_line = 2;
+}
+
+// Provenance and integrity for one side of a three-way conflict.
+// Mirrors heddle `ConflictSide` / `ConflictSideReport`.
+message ConflictSide {
+  // Physical state this side was taken from.
+  StateId source_state = 1;
+  // Whole-blob ContentHash (32-byte BLAKE3). Absent when the path was
+  // missing in this source state (heddle `blob_id: Option<ContentHash>`).
+  optional bytes blob_id = 2;
+  // Line range within the source blob that contributes this side's hunk.
+  ConflictRange range = 3;
+  // BLAKE3 of the exact bytes selected by `range` from the blob (32 bytes).
+  // Integrity pin: verifies the side independently of line shifts.
+  bytes hunk_hash = 4;
+}
+
+// Principal that owns a resolution action. Mirrors heddle `PrincipalReport`
+// / API `StatePrincipal`.
+message ConflictResolverPrincipal {
+  string name = 1;
+  string email = 2;
+}
+
+// Agent identity on a resolution. Mirrors heddle `AgentReport` (provider /
+// model required for agent resolutions; session/segment/policy optional for
+// run linkage). Narrower than gateway session identity — attribution only.
+message ConflictResolverAgent {
+  string provider = 1;
+  string model = 2;
+  optional string session_id = 3;
+  optional string segment_id = 4;
+  optional string policy_id = 5;
+}
+
+// Who/what resolved a conflict. Mirrors heddle `ResolverAttributionReport`.
+// Populated only when `StructuredConflict.status` is AUTO_RESOLVED or RESOLVED.
+message ConflictResolverAttribution {
+  ConflictResolverKind kind = 1;
+  ConflictResolverPrincipal principal = 2;
+  // Set when kind == AGENT; omit for human resolutions.
+  optional ConflictResolverAgent agent = 3;
+}
+
+// One independently addressable three-way conflict region, with lifecycle.
+//
+// Fuses heddle's `ConflictRegionReport` (region + three sides) and
+// `ConflictResolutionReport` (mode / resolution text / resolver) into a
+// single status-tagged message so clients never join two lists.
+//
+// ## Pin / addressability
+//
+// `id` is a stable, content-addressed region identity — the same
+// addressability class `DiscussionReference.id` gained. It is referenceable
+// across states: a conflict discovered in one capture and resolved in
+// another is one conflict to a human, and the same `id` is the join key.
+//
+// Heddle derives `id` as a deterministic BLAKE3 address over
+// (path, symbol, occurrence, base/ours/theirs hunk hashes) with domain
+// separator `heddle-conflict-region-v1` (format `conflict-<hex>`). That
+// derivation is content-stable: unrelated line shifts and blob rewrites that
+// leave the three hunks unchanged preserve the id (heddle object-model test
+// `stable_id_survives_unrelated_line_shifts_and_blob_rewrites`).
+//
+// Heddle follow-up (do not block this contract): producers that materialize
+// resolved status into a later state's attachment MUST keep emitting that
+// same derived `id` rather than re-keying on state id or `merged_range`.
+// Resolution rows in the CLI report already key on `conflict_id` matching
+// the region id; attachment publishers must preserve that continuity.
+message StructuredConflict {
+  // Stable conflict-region id (e.g. `conflict-<hex>`). NEVER display text:
+  // clients resolve a label at render from path / symbol / current data.
+  string id = 1;
+  // Repository-relative path of the conflicted file.
+  string path = 2;
+  // Stable semantic address when the source language can be parsed.
+  // Omit (do not send empty string) when unknown.
+  optional string symbol = 3;
+  // Disambiguates byte-identical conflicts under the same path/symbol anchor.
+  uint32 occurrence = 4;
+  // Range occupied by the rendered conflict-marker block in the merged view.
+  // Zero-based, half-open `[start_line, end_line)`.
+  ConflictRange merged_range = 5;
+  // Three-way sides. base / ours / theirs — NOT {left, right}. A three-way
+  // view is the whole reason a conflict is inspectable rather than a diff.
+  // Round-trips must carry cases where base differs from both ours and theirs.
+  ConflictSide base = 6;
+  ConflictSide ours = 7;
+  ConflictSide theirs = 8;
+  // Lifecycle. Clients read status alone to answer "is this still open".
+  StructuredConflictStatus status = 9;
+  // --- Resolution fields: populated only when status is AUTO_RESOLVED or
+  // RESOLVED; omit while OPEN. Maps heddle `ConflictResolutionReport`. ---
+  // Mode-as-string surface from heddle (`ours` / `theirs` / `edit` / `auto`).
+  // Prefer `mode` for typed consumers; `resolution` is retained for report
+  // parity and free-form edit summaries when mode == EDIT.
+  optional string resolution = 10;
+  optional ConflictResolutionMode mode = 11;
+  optional ConflictResolverAttribution resolver = 12;
 }
 
 // Hosted object discriminants from the native object-store model.
@@ -90,6 +288,7 @@ enum HostedObjectType {
   HOSTED_OBJECT_TYPE_REDACTION = 5;
   HOSTED_OBJECT_TYPE_STATE_VISIBILITY = 6;
   HOSTED_OBJECT_TYPE_STATE_ATTACHMENT = 7;
+  HOSTED_OBJECT_TYPE_PURGE = 8;
 }
 
 message ObjectDescriptor {
@@ -126,6 +325,9 @@ message PushRequest {
   bool expected_remote_head_missing = 13;
   // Idempotency on the stream-opening message. The PushMessage
   // envelope itself isn't the operation — PushRequest is.
+  // REQUIRED for an existing target thread. Empty only when `create_thread`
+  // is true, in which case the server assigns the id returned by PushComplete.
+  string target_thread_id = 14;
 }
 
 message PushReady {
@@ -161,15 +363,17 @@ message PushComplete {
   string error = 3;
   TransferCheckpoint transfer = 4;
   string new_revision_address = 5;
+  // Stable server-assigned identity paired with PushRequest.target_thread.
+  string target_thread_id = 6;
 }
 
 // Out-of-pack transport for redaction sidecars. Sidecars live
 // structurally outside `.heddle/objects/` (so GC can't reach them)
 // and therefore can't ride the native-pack object channel. The
 // sender emits one `RedactionTransfer` per blob hash with an active
-// redaction in the state closure; the receiver routes through
-// `Repository::accept_wire_redactions` for signature + trust-list
-// verification.
+// redaction in the state closure. The transport's spool-write Biscuit
+// authorizes acceptance; the payload still undergoes its ordinary integrity
+// and authorship validation, with no owner authorization sidecar.
 //
 // `blob_hash` is the hex-encoded ContentHash of the *redacted blob*
 // (the redactions store is keyed by that hash, not by the
@@ -184,9 +388,10 @@ message RedactionTransfer {
 
 // Out-of-pack transport for state-visibility sidecars. State visibility
 // records live outside `.heddle/objects/` and are keyed by the state id
-// whose audience tier they declare.
+// whose audience tier they declare. Acceptance uses ordinary spool-write
+// authority and carries no owner authorization sidecar.
 //
-// `state_id` is the hex-encoded ChangeId of the state.
+// `state_id` is the exact 32-byte physical StateId of the state.
 // `state_visibility_blob` is the rmp-encoded `StateVisibilityBlob` byte
 // payload.
 message StateVisibilityTransfer {
@@ -202,17 +407,68 @@ message StateVisibilityTransfer {
 // `StateAttachmentTransfer` per pushed attachment; the receiver
 // reconstructs and verifies the attachment from the raw object bytes.
 //
-// `state_id` is the hex-encoded ChangeId of the state the attachment
+// `state_id` is the exact 32-byte physical StateId of the state the attachment
 // hangs off.
 // `attachment_id` is the hex-encoded id of the attachment object.
 // `attachment_kind` is the attachment body kind (see StateAttachmentKind).
+// For `STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS`, the decoded body is
+// `StructuredConflicts` (this file) — the public typed contract for that
+// kind. On-disk native encoding may differ; producers bridging to this API
+// map into `StructuredConflicts`.
 // `attachment_object` is the raw serialized StateAttachment object byte
-// payload — byte-identical to what the sender stored on disk.
+// payload — byte-identical to what the sender stored on disk. Acceptance uses
+// ordinary spool-write authority plus per-author ownership validation and
+// carries no owner authorization sidecar.
 message StateAttachmentTransfer {
   StateId state_id = 1;
   string attachment_id = 2;
   StateAttachmentKind attachment_kind = 3;
   bytes attachment_object = 4;
+}
+
+// Dedicated owner-gated purge transport. It reuses the on-disk RedactionsBlob
+// payload because purge evidence is encoded there, but it is a distinct wire
+// operation from ordinary writer-authorized RedactionTransfer.
+message PurgeTransfer {
+  string blob_hash = 1;
+  bytes redactions_blob = 2;
+  SidecarAuthorization authorization = 3;
+}
+
+// Identity used only to construct the canonical purge operation-signing body.
+// It does not replace the fields on PurgeTransfer.
+message PurgeSidecarIdentity {
+  // Exactly 64 lower-case hexadecimal ASCII bytes.
+  string blob_hash = 1;
+}
+
+// Canonical purge body reconstructed by a verifier from PurgeTransfer.
+// Protobuf serialization is NEVER signed. canonical_purge_operation_v2 is:
+//
+//   u32_be(format_version)
+//   raw 16-byte spool_uuid
+//   blob_hash as a u32-length-prefixed string
+//   raw 32-byte payload_sha256
+//   raw 32-byte leaf_capability_id
+//
+// operation_signature is Ed25519 by the leaf capability subject key over:
+//
+//   SHA-256("heddle-purge-operation-v2" ||
+//          canonical_purge_operation_v2(body))
+//
+// v2 limits are strict: encoded OwnerAuthorizationBundle <= 1,048,576 bytes;
+// owner_state_chain <= 256; capability_chain 1..64; grants per capability
+// 1..64; path segments per selector <= 64 and each segment 1..255 UTF-8 bytes;
+// raw purge payload <= 67,108,864 bytes. The leaf grant requires exactly PURGE.
+// Unknown actions/versions, non-canonical ids, trailing bytes, oversized inputs,
+// and a mismatch with transfer identity or payload fail closed.
+message PurgeOperationSigningBody {
+  // Exactly 2.
+  uint32 format_version = 1;
+  bytes spool_uuid = 2;
+  PurgeSidecarIdentity purge_identity = 3;
+  bytes payload_sha256 = 4;
+  bytes leaf_capability_id = 5;
 }
 
 enum GitRefKind {
@@ -248,6 +504,8 @@ message GitCheckpointTransfer {
   GitObjectId git_commit_oid = 2;
   string thread = 3;
   string metadata_json = 4;
+  // Stable identity paired with the renameable thread ref.
+  string thread_id = 5;
 }
 
 message GitLaneTransfer {
@@ -272,6 +530,9 @@ message PullRequest {
   string target_revision_address = 11;
   // Idempotency on the stream-opening message. The PullMessage
   // envelope itself isn't the operation — PullRequest is.
+  // Stable server-assigned identity paired with `remote_thread`. The
+  // `local_thread` is a client-local destination ref, not a hosted identity.
+  string remote_thread_id = 12;
 }
 
 message PullReady {
@@ -283,6 +544,12 @@ message PullReady {
   bool full_closure_available = 6;
   uint32 object_count = 7;
   string remote_revision_address = 8;
+  // Exactly 2 for the purge-only, self-rooted contract. Unknown versions fail
+  // closed; zero means the peer did not advertise owner authorization.
+  uint32 owner_authorization_protocol_version = 9;
+  // Verified and TOFU-pinned before any pack or purge sidecar is accepted.
+  // The owner root and later transition entries ride in the state tree.
+  SignedSpoolOwnerGenesis owner_genesis = 10;
 }
 
 message WantObjects {
@@ -308,6 +575,151 @@ message StreamOpeningProof {
   bytes nonce = 6;
   bytes signature = 7;
 }
+
+// Provider support negotiated inside StreamOpeningProof.capability_context.
+//
+// The endpoint id is an echo of the endpoint that opened the authenticated
+// Iroh connection. Servers MUST compare it with the transport-observed peer
+// identity and MUST use the observed identity, never this field, when binding
+// provider grants.
+message ProviderPullCapabilityContext {
+  uint32 version = 1;
+  string client_endpoint_id = 2;
+  bytes plan_nonce = 3;
+}
+
+// Safe, storage-coordinate-free description of the exact provider handoff.
+message ProviderPlanSummary {
+  RepositoryRef repository = 1;
+  // Exact totals for the provider manifest: records, extents, and the sum of
+  // extent lengths. They exclude objects retained on the ordinary Weft pack.
+  uint64 object_count = 2;
+  uint64 extent_count = 3;
+  uint64 total_bytes = 4;
+  // No source in the resulting manifest may outlive this consent boundary.
+  uint64 expires_at_unix_millis = 5;
+}
+
+// Phase two of client-authorized exact-plan negotiation. The digest is a
+// domain-separated BLAKE3 digest over the complete private grant batch. R2
+// keys, ETags, and source offsets remain server-to-Worker data.
+message ProviderPlanChallenge {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  ProviderPlanSummary summary = 4;
+}
+
+// Consent to one exact provider handoff. The signature uses the same cnf
+// device key as StreamOpeningProof and does not confer repository access.
+message ProviderPlanResponse {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  bytes signature = 4;
+  // False declines provider installation and keeps this logical pull on Weft.
+  bool accepted = 5;
+}
+
+// One provider endpoint. direct_url is the complete broker-validated WSS URL;
+// opaque_ticket is repeated separately so clients can fail closed if its URL
+// ticket parameter differs.
+message ProviderSource {
+  string provider_id = 1;
+  string endpoint_id = 2;
+  string direct_url = 3;
+  string opaque_ticket = 4;
+  uint64 expires_at_unix_millis = 5;
+}
+
+// Index entry for one complete encoded record in the virtual native pack.
+message ProviderPackObject {
+  ObjectDescriptor object = 1;
+  uint64 output_offset = 2;
+}
+
+// Exact output placement and digest for one opaque provider grant. No backing
+// object key, ETag, source offset, or source length is exposed here.
+message ProviderPullExtent {
+  string extent_id = 1;
+  uint64 output_offset = 2;
+  uint64 length = 3;
+  bytes digest = 4;
+  ProviderSource source = 5;
+  repeated ProviderPackObject objects = 6;
+}
+
+// Scatter/gather layout for one virtual LMPK. The header is the complete
+// 16-byte native-pack header. output_pack_length includes the 32-byte BLAKE3
+// trailer that the client computes after assembling all verified extents.
+message ProviderPullManifest {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  bytes pack_header = 4;
+  uint64 output_pack_length = 5;
+  repeated ProviderPullExtent extents = 6;
+}
+
+enum ProviderPullResultStatus {
+  PROVIDER_PULL_RESULT_STATUS_UNSPECIFIED = 0;
+  PROVIDER_PULL_RESULT_STATUS_COMPLETE = 1;
+  PROVIDER_PULL_RESULT_STATUS_FALLBACK = 2;
+}
+
+// Result of the provider attempt. COMPLETE carries the exact BLAKE3 trailer
+// written into the virtual LMPK. FALLBACK asks Weft to continue the same
+// authorized multi-Want pull on its existing stream.
+message ProviderPullResponse {
+  uint32 version = 1;
+  bytes plan_nonce = 2;
+  bytes grant_batch_digest = 3;
+  ProviderPullResultStatus status = 4;
+  bytes pack_digest = 5;
+}
+
+// Provider-connection control protocol. A client presents only the opaque
+// ticket; the provider chooses and returns the resume offset.
+message ProviderReadRequest {
+  uint32 version = 1;
+  string opaque_ticket = 2;
+}
+
+message ProviderReadReady {
+  uint64 resume_offset = 1;
+  uint64 attempt_generation = 2;
+  uint64 remaining_length = 3;
+}
+
+// Checkpoints count verified bytes within this opaque extent. A final
+// checkpoint is accepted only when final_digest is the exact 32-byte BLAKE3
+// digest of the complete retained prefix plus received suffix.
+message ProviderReadCheckpoint {
+  uint64 attempt_generation = 1;
+  uint64 acknowledged_length = 2;
+  bytes final_digest = 3;
+}
+
+message ProviderReadComplete {
+  bool success = 1;
+  uint64 committed_length = 2;
+  string error = 3;
+}
+
+message ProviderReadClientFrame {
+  oneof frame {
+    ProviderReadRequest request = 1;
+    ProviderReadCheckpoint checkpoint = 2;
+  }
+}
+
+message ProviderReadServerFrame {
+  oneof frame {
+    ProviderReadReady ready = 1;
+    ProviderReadComplete complete = 2;
+  }
+}
+
 message PushClientFrame {
   oneof frame {
     StreamOpeningProof open = 1;
@@ -317,6 +729,7 @@ message PushClientFrame {
     StateVisibilityTransfer state_visibility = 5;
     GitLaneTransfer git_lane = 6;
     StateAttachmentTransfer state_attachment = 8;
+    PurgeTransfer purge = 9;
   }
   string client_operation_id = 7;
 }
@@ -331,6 +744,8 @@ message PullClientFrame {
     StreamOpeningProof open = 1;
     PullRequest request = 2;
     WantObjects want = 3;
+    ProviderPlanResponse provider_plan = 4;
+    ProviderPullResponse provider_result = 5;
   }
 }
 message PullServerFrame {
@@ -341,6 +756,10 @@ message PullServerFrame {
     RedactionTransfer redaction = 4;
     StateVisibilityTransfer state_visibility = 5;
     GitLaneTransfer git_lane = 6;
+    ProviderPlanChallenge provider_challenge = 7;
+    ProviderPullManifest provider_manifest = 8;
+    StateAttachmentTransfer state_attachment = 9;
+    PurgeTransfer purge = 10;
   }
 }
 
@@ -349,7 +768,7 @@ service RepoSyncService {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
     maturity: SERVICE_MATURITY_SHIPPED
   };
-  rpc ListRefs(ListRefsRequest) returns (ListRefsResponse) {
+  rpc ListRefs(ListRefsRequest) returns (stream ListRefsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.2.0",
+  "version": "0.13.0",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {
@@ -20,6 +20,8 @@
     ".": "./dist/index.js",
     "./shared": "./dist/shared.js",
     "./signing": "./dist/signing.js",
+    "./treadle": "./dist/treadle.js",
+    "./treadle-authoring": "./dist/treadle-authoring.js",
     "./identity": "./dist/identity_pb.js",
     "./operation": "./dist/operation_pb.js",
     "./registry": "./dist/registry_pb.js",
@@ -32,9 +34,14 @@
     "./attention": "./dist/attention_pb.js",
     "./repo-sync": "./dist/repo_sync_pb.js",
     "./agent-gateway": "./dist/agent_gateway_pb.js",
-    "./agent": "./dist/agent_pb.js"
+    "./agent": "./dist/agent_pb.js",
+    "./presence": "./dist/presence_pb.js",
+    "./owner-authorization": "./dist/owner_authorization_pb.js",
+    "./owner-governance": "./dist/owner_governance_pb.js",
+    "./attachment-authorization": "./dist/attachment-authorization.js"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "2.12.0"
+    "@bufbuild/protobuf": "2.12.0",
+    "@noble/hashes": "2.3.0"
   }
 }

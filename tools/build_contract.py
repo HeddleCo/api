@@ -17,8 +17,14 @@ from pathlib import Path
 PACKAGE = "heddle.api.v1alpha1"
 
 EXTRA_TYPES = r'''
-message StateId { bytes value = 1; }
-message ChangeId { bytes value = 1; }
+message StateId {
+  // Immutable physical revision identity: exactly 32 bytes, not a logical ChangeId.
+  bytes value = 1;
+}
+message ChangeId {
+  // Rewrite-stable logical change identity: exactly 16 bytes.
+  bytes value = 1;
+}
 message GitObjectId { GitObjectAlgorithm algorithm = 1; bytes digest = 2; }
 message RepositoryRef {
   oneof reference {

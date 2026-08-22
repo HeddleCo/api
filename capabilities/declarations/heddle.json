@@ -245,6 +245,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListDiscussionsByStates",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion",
       "layers": {
         "client": {
@@ -311,6 +322,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/BindSignupInviteEmail",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle",
       "layers": {
         "client": {
@@ -322,7 +344,40 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimNextDropCode",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ClaimSignupInvite",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/CompleteRecovery",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateAgentAccount",
       "layers": {
         "client": {
           "status": "planned"
@@ -351,6 +406,28 @@
         },
         "cli": {
           "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/CreateSignupInvite",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
         }
       }
     },
@@ -443,6 +520,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/IssueSignupEmailChallenge",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
       "layers": {
         "client": {
@@ -509,7 +597,40 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/PromoteAgentAccount",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ProvisionAgentRootedAccount",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/RecordSubscription",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RegisterGitHubInstallation",
       "layers": {
         "client": {
           "status": "planned"
@@ -527,6 +648,17 @@
         },
         "cli": {
           "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/RemainingDropCodes",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
         }
       }
     },
@@ -549,6 +681,17 @@
         },
         "cli": {
           "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ResolveSignupInvite",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -707,7 +850,29 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.OperationService/GetRemoteLink",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.OperationService/ListOperations",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OperationService/SetRemoteLink",
       "layers": {
         "client": {
           "status": "planned"
@@ -741,6 +906,105 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/BeginAgentOwnerClaim",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/BootstrapOwnerRoot",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/ChangeOwnerRecoveryPolicy",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/ClaimAgentOwner",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/GetCurrentOwnerKeyring",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/RecoverOwnerKey",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/RotateOwnerKey",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/SubmitOwnerAuthorization",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/TransferResourceOwnership",
       "layers": {
         "client": {
           "status": "planned"
@@ -820,7 +1084,7 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
       "layers": {
         "client": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "cli": {
           "status": "intentionally-unsupported"
@@ -831,10 +1095,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
       "layers": {
         "client": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "cli": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -842,10 +1106,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateSpool",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -919,10 +1183,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
       "layers": {
         "client": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "cli": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -930,10 +1194,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserSpool",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -983,6 +1247,17 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/ListChildren",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RegistryService/ListExploreMetadata",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1378,7 +1653,29 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListStateAttachments",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.RepositoryService/ListStates",
+      "layers": {
+        "client": {
+          "status": "intentionally-unsupported"
+        },
+        "cli": {
+          "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.RepositoryService/ListThreadHistories",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"
@@ -1461,7 +1758,7 @@
           "status": "intentionally-unsupported"
         },
         "cli": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -1483,7 +1780,7 @@
           "status": "intentionally-unsupported"
         },
         "cli": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -1516,7 +1813,7 @@
           "status": "intentionally-unsupported"
         },
         "cli": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -1627,6 +1924,17 @@
         },
         "cli": {
           "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.WorkflowService/LandStack",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
         }
       }
     },

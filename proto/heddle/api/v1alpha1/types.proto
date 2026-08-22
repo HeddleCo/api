@@ -3,12 +3,16 @@ syntax = "proto3";
 package heddle.api.v1alpha1;
 
 message RefEntry {
+  // Renameable human-facing ref.
   string name = 1;
   StateId state_id = 2;
   bool is_thread = 3;
   // Explicit revision address for two-lane storage. Native refs use
   // `heddle:<state_id>`; Git-overlay refs use `git:<commit_oid>`.
   string revision_address = 4;
+  // Stable opaque server-assigned identity. REQUIRED when `is_thread` is true;
+  // empty for non-thread refs. This is not a per-repository sequence number.
+  string thread_id = 5;
 }
 
 // Five-level role grants on hosted namespaces and repositories. Used
@@ -74,9 +78,14 @@ message UsageSummary {
 }
 
 message StateId {
+  // Immutable physical revision identity: the exact content-addressed state
+  // hash. `value` is exactly 32 bytes and is not a logical ChangeId. Rewrites
+  // that preserve a ChangeId still produce a different StateId.
   bytes value = 1;
 }
 message ChangeId {
+  // Rewrite-stable logical change identity. `value` is exactly 16 bytes and
+  // may be shared by physically distinct revisions after amend or rebase.
   bytes value = 1;
 }
 message GitObjectId {

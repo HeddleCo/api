@@ -19,6 +19,13 @@ enum DiscussionStatusFilter {
   DISCUSSION_STATUS_FILTER_ORPHANED = 3;
 }
 
+// Whether an open discussion is informational or prevents a merge.
+enum DiscussionSeverity {
+  DISCUSSION_SEVERITY_UNSPECIFIED = 0;
+  DISCUSSION_SEVERITY_INFORMATIONAL = 1;
+  DISCUSSION_SEVERITY_BLOCKING = 2;
+}
+
 message OpenDiscussionRequest {
   RepositoryRef repo_path = 1;
   StateId state_id = 2;
@@ -28,6 +35,9 @@ message OpenDiscussionRequest {
   string visibility = 5;
   string thread_ref = 6;
   string client_operation_id = 7;
+  // Stable identity paired with `thread_ref`; both are empty when the
+  // discussion is not attached to a thread.
+  string thread_id = 8;
 }
 
 message AppendTurnRequest {
@@ -35,6 +45,12 @@ message AppendTurnRequest {
   string discussion_id = 2;
   string body = 3;
   string client_operation_id = 4;
+  // Structured entity mentions spanning ranges of `body`.
+  // DiscussionReference is defined in state_review.proto (imported above).
+  // CollaborationService is dual-target (DEPLOYMENT_TARGET_WEFT +
+  // DEPLOYMENT_TARGET_HEDDLE_DAEMON), so this field lands on the local
+  // daemon target too (heddle#1333).
+  repeated DiscussionReference references = 5;
 }
 
 message ResolveDiscussionRequest {
@@ -77,6 +93,12 @@ message Discussion {
   bool orphaned = 9;
   string visibility = 10;
   string resolved_annotation_id = 11;
+  // Stable identity paired with `thread_ref`.
+  string thread_id = 12;
+  // Actual value, no inference. UNSPECIFIED is treated as Informational
+  // (non-blocking); BLOCKING makes an open discussion an unmet merge
+  // requirement; a Reject sets Blocking.
+  DiscussionSeverity severity = 13;
 }
 
 message ListDiscussionsByStateRequest {
@@ -84,6 +106,10 @@ message ListDiscussionsByStateRequest {
   StateId state_id = 2;
   // UNSPECIFIED selects all discussions.
   DiscussionStatusFilter status = 3;
+  // Zero streams all discussions. A positive value streams at most this many discussions.
+  uint32 page_size = 4;
+  // Opaque continuation token returned by ListDiscussionsPageEnd.
+  string page_token = 5;
 }
 
 message ListDiscussionsBySymbolRequest {
@@ -93,8 +119,57 @@ message ListDiscussionsBySymbolRequest {
   DiscussionStatusFilter status = 3;
 }
 
+// Batched discussion-digest read (weft#1397). One call resolves digests and
+// counts for every requested state so spool/overview surfaces do not fan out
+// per-state ListByState.
+message ListDiscussionsByStatesRequest {
+  RepositoryRef repo_path = 1;
+  repeated StateId state_ids = 2;
+  // UNSPECIFIED selects all discussions in each state's digest.
+  DiscussionStatusFilter status = 3;
+}
+
+// Lightweight per-discussion projection for overview cards. Omits turn
+// bodies; clients that need the full thread call GetDiscussion / ListByState.
+message DiscussionDigest {
+  string id = 1;
+  PathSymbolRef anchor = 2;
+  StateId opened_against_state = 3;
+  google.protobuf.Timestamp opened_at = 4;
+  uint32 turn_count = 5;
+  bool orphaned = 6;
+  bool resolved = 7;
+  string visibility = 8;
+  string thread_ref = 9;
+  string thread_id = 10;
+}
+
+message StateDiscussionDigest {
+  StateId state_id = 1;
+  uint32 discussion_count = 2;
+  uint32 open_count = 3;
+  uint32 resolved_count = 4;
+  uint32 orphaned_count = 5;
+  repeated DiscussionDigest discussions = 6;
+}
+
+message ListDiscussionsByStatesResponse {
+  // One entry per requested state_id, in request order. Unknown or
+  // unauthorized states are omitted rather than returning an empty digest,
+  // matching the existence-hidden ListByState posture.
+  repeated StateDiscussionDigest states = 1;
+}
+
 message ListDiscussionsResponse {
-  repeated Discussion discussions = 1;
+  oneof frame {
+    Discussion item = 1;
+    ListDiscussionsPageEnd page_end = 2;
+  }
+}
+
+message ListDiscussionsPageEnd {
+  // Empty when the last page, or the whole unpaged stream, was delivered.
+  string next_page_token = 1;
 }
 
 message GetDiscussionRequest {
@@ -149,7 +224,7 @@ service CollaborationService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc ListByState(ListDiscussionsByStateRequest) returns (ListDiscussionsResponse) {
+  rpc ListByState(ListDiscussionsByStateRequest) returns (stream ListDiscussionsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
@@ -168,6 +243,26 @@ service CollaborationService {
     };
   }
   rpc ListBySymbol(ListDiscussionsBySymbolRequest) returns (ListDiscussionsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_COLLABORATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Batched per-state discussion digests and counts (weft#1397). Unary so a
+  // page resolves every thread digest in one read.
+  rpc ListDiscussionsByStates(ListDiscussionsByStatesRequest) returns (ListDiscussionsByStatesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

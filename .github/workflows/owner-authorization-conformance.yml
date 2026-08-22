@@ -1,0 +1,200 @@
+name: Owner authorization conformance
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  GITHUB_PACKAGE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Pre-fix Tapestry accepts delegated purge; retained to prove the gate catches it.
+  TAPESTRY_PRE_FIX_REV: 88d00a6fd5d4dc9b9a091a48992978966e40bb4f
+  # Current Tapestry rejects delegated purge after HeddleCo/tapestry#248.
+  TAPESTRY_CURRENT_REV: 62f93a187dff4c1e6746b2332f3dcec3f0f52c87
+  # Pre-fix Heddle accepts delegated purge; retained to prove the gate catches it.
+  HEDDLE_PRE_FIX_REV: 68d10ba27a72638a2f8bdd95086c7a2dff79e2e6
+  # Current Heddle rejects delegated purge after HeddleCo/heddle#1140.
+  HEDDLE_CURRENT_REV: ca8a78141c459b95229df2afa25b1c9934f5377c
+
+jobs:
+  build-heddle-verifiers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Start Heddle verifier preparation timer
+        run: echo "HEDDLE_PREP_STARTED_AT=$(date +%s%3N)" >> "$GITHUB_ENV"
+
+      - name: Restore pinned Heddle verifier builds
+        id: heddle-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/owner-auth-verifiers
+          key: owner-auth-heddle-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.HEDDLE_PRE_FIX_REV }}-${{ env.HEDDLE_CURRENT_REV }}-${{ hashFiles('owner-authorization-conformance/heddle-verifier/**', 'owner-authorization-conformance/scripts/build-heddle-verifier.sh') }}
+
+      - name: Check out public pinned Heddle sources into runner scratch
+        if: steps.heddle-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          source_root="${{ runner.temp }}/owner-auth-heddle-source"
+
+          checkout_pin() {
+            revision=$1
+            destination=$2
+            git init --quiet "$destination"
+            git -C "$destination" remote add origin \
+              https://github.com/HeddleCo/heddle
+            git -C "$destination" fetch --quiet --depth=1 origin "$revision"
+            git -C "$destination" checkout --quiet --detach FETCH_HEAD
+            test "$(git -C "$destination" rev-parse HEAD)" = "$revision"
+          }
+
+          checkout_pin "$HEDDLE_CURRENT_REV" "$source_root/current"
+          checkout_pin "$HEDDLE_PRE_FIX_REV" "$source_root/pre-fix"
+
+      - name: Build both pinned Heddle verifiers into runner scratch
+        if: steps.heddle-cache.outputs.cache-hit != 'true'
+        env:
+          CARGO_HOME: ${{ runner.temp }}/owner-auth-cargo
+        run: |
+          set -euo pipefail
+          source_root="${{ runner.temp }}/owner-auth-heddle-source"
+          verifier_root="${{ runner.temp }}/owner-auth-verifiers"
+
+          owner-authorization-conformance/scripts/build-heddle-verifier.sh \
+            current "$HEDDLE_CURRENT_REV" "$source_root/current" "$verifier_root"
+          owner-authorization-conformance/scripts/build-heddle-verifier.sh \
+            pre-fix "$HEDDLE_PRE_FIX_REV" "$source_root/pre-fix" "$verifier_root"
+
+      - name: Validate and report Heddle verifier preparation
+        run: |
+          set -euo pipefail
+          verifier_root="${{ runner.temp }}/owner-auth-verifiers"
+          test -x "$verifier_root/current-heddle"
+          test -x "$verifier_root/pre-fix-heddle"
+          elapsed_ms=$(($(date +%s%3N) - HEDDLE_PREP_STARTED_AT))
+          cache_hit="${{ steps.heddle-cache.outputs.cache-hit }}"
+          if [[ "$cache_hit" == true ]]; then
+            mode=warm
+          else
+            mode=cold
+          fi
+          result="HEDDLE_VERIFIER_PREP mode=$mode cache_hit=${cache_hit:-false} elapsed_ms=$elapsed_ms"
+          echo "$result"
+          echo "$result" >> "$GITHUB_STEP_SUMMARY"
+
+  cross-client:
+    needs: build-heddle-verifiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Restore pinned Heddle verifier builds
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/owner-auth-verifiers
+          key: owner-auth-heddle-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.HEDDLE_PRE_FIX_REV }}-${{ env.HEDDLE_CURRENT_REV }}-${{ hashFiles('owner-authorization-conformance/heddle-verifier/**', 'owner-authorization-conformance/scripts/build-heddle-verifier.sh') }}
+          fail-on-cache-miss: true
+
+      - name: Require private Tapestry read credential
+        env:
+          TAPESTRY_READ_TOKEN: ${{ secrets.PROJECT_PAT }}
+        run: |
+          if [[ -z "$TAPESTRY_READ_TOKEN" ]]; then
+            message="CROSS_CLIENT_CONFORMANCE=UNAVAILABLE: secrets.PROJECT_PAT is absent; Tapestry is private and the comparison requires a token scoped only to Contents: read on HeddleCo/tapestry"
+            echo "::error title=Tapestry verifier unavailable::$message"
+            echo "$message" | tee -a "$GITHUB_STEP_SUMMARY" >&2
+            exit 1
+          fi
+
+      - name: Restore pinned Tapestry verifier builds
+        id: tapestry-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/owner-auth-verifiers/current-tapestry.mjs
+            ${{ runner.temp }}/owner-auth-verifiers/pre-fix-tapestry.mjs
+          key: owner-auth-tapestry-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.TAPESTRY_PRE_FIX_REV }}-${{ env.TAPESTRY_CURRENT_REV }}-${{ hashFiles('owner-authorization-conformance/artifact-source/**', 'owner-authorization-conformance/scripts/build-tapestry-verifier.sh') }}
+
+      - name: Check out private pinned Tapestry sources into runner scratch
+        if: steps.tapestry-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_PAT }}
+        run: |
+          set -euo pipefail
+          source_root="${{ runner.temp }}/owner-auth-tapestry-source"
+
+          checkout_pin() {
+            revision=$1
+            destination=$2
+            git init --quiet "$destination"
+            git -C "$destination" remote add origin \
+              https://github.com/HeddleCo/tapestry
+            git -C "$destination" fetch --quiet --depth=1 origin "$revision"
+            git -C "$destination" checkout --quiet --detach FETCH_HEAD
+            test "$(git -C "$destination" rev-parse HEAD)" = "$revision"
+          }
+
+          gh auth setup-git
+          checkout_pin "$TAPESTRY_CURRENT_REV" "$source_root/current"
+          checkout_pin "$TAPESTRY_PRE_FIX_REV" "$source_root/pre-fix"
+
+      - name: Build both pinned Tapestry verifiers into runner scratch
+        if: steps.tapestry-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          source_root="${{ runner.temp }}/owner-auth-tapestry-source"
+          verifier_root="${{ runner.temp }}/owner-auth-verifiers"
+
+          owner-authorization-conformance/scripts/build-tapestry-verifier.sh \
+            current "$TAPESTRY_CURRENT_REV" "$source_root/current" "$verifier_root"
+          owner-authorization-conformance/scripts/build-tapestry-verifier.sh \
+            pre-fix "$TAPESTRY_PRE_FIX_REV" "$source_root/pre-fix" "$verifier_root"
+
+      - name: Report Tapestry verifier cache status
+        run: echo "TAPESTRY_VERIFIER_CACHE_HIT=${{ steps.tapestry-cache.outputs.cache-hit }}"
+
+      - name: Verify current pinned clients
+        env:
+          TAPESTRY_REV: ${{ env.TAPESTRY_CURRENT_REV }}
+          HEDDLE_REV: ${{ env.HEDDLE_CURRENT_REV }}
+          OWNER_AUTH_VERIFIER_ROOT: ${{ runner.temp }}/owner-auth-verifiers
+          OWNER_AUTH_SCRATCH: ${{ runner.temp }}/owner-auth-corpus
+        run: |
+          while read -r seed; do
+            OWNER_AUTH_CASE_SEED="$seed" \
+              scripts/owner-authorization-conformance.sh
+          done < owner-authorization-conformance/seeds.txt
+
+      - name: Replay the seeded violation against pre-fix clients
+        env:
+          TAPESTRY_REV: ${{ env.TAPESTRY_PRE_FIX_REV }}
+          HEDDLE_REV: ${{ env.HEDDLE_PRE_FIX_REV }}
+          OWNER_AUTH_PROFILE: pre-fix
+          OWNER_AUTH_GRAPH_COUNT: "0"
+          OWNER_AUTH_VERIFIER_ROOT: ${{ runner.temp }}/owner-auth-verifiers
+          OWNER_AUTH_SCRATCH: ${{ runner.temp }}/owner-auth-pre-fix
+        run: |
+          set +e
+          output=$(scripts/owner-authorization-conformance.sh 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [[ $status -eq 0 ]]; then
+            echo "pre-fix verifier unexpectedly passed conformance" >&2
+            exit 1
+          fi
+          grep -F \
+            "SEEDED_VIOLATION=CAUGHT id=seeded-delegated-purge expected=REJECT tapestry=ACCEPT heddle=ACCEPT" \
+            <<<"$output"

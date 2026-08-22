@@ -63,9 +63,12 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
-    # Two services are planned, and four methods on otherwise-shipped services
-    # deliberately override their inherited maturity to planned.
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 6
+    # Three services are planned, and methods on otherwise-shipped services
+    # deliberately override their inherited maturity to planned (four handle
+    # RPCs now inherit SHIPPED; CreateSignupInvite, ListSignupInvites,
+    # RegisterGitHubInstallation, and the two remote-link management RPCs
+    # remain contract-first until their Weft handlers land).
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 15
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded
@@ -76,10 +79,28 @@ def audit_new_descriptor(decoded: str) -> None:
     allowed_byte_field = re.compile(
         r"^(?:value|digest|hash|parent_id|parents|source_hash|base_root|"
         r"salt|argon2id_hash|challenge|"
+        r"accepted_root_hash|accepted_state_hash|account_uuid|anonymous_id|capability_id|"
+        r"audit_record_hash|previous_audit_record_hash|leaf_capability_id|payload_sha256|warning_sha256|"
+        r"resource_uuid|stable_owner_uuid|source_owner_uuid|destination_owner_uuid|"
+        r"root_state_hash|source_owner_key_state_hash|destination_owner_key_state_hash|"
+        r"credential_id|expected_owner_id|issuer_state_hash|owner_id|parent_capability_id|"
+        r"governance_state_hash|merge_parent_state_hashes|owner_state_hash|previous_state_hash|"
+        r"principal_id|root_spool_uuid|signer_key_id|spool_uuid|state_hash|"
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit.*|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"
-        r"bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
+        r"grant_batch_digest|final_digest|pack_digest|pack_header|"
+        # SearchHit.change_id / StateHit.change_id: raw 16-byte rewrite-stable id
+        # (api#104; never a biscuit subject). SymbolHit/ContentHit.object_id: raw
+        # content object digest bytes for deep-link provenance.
+        r"change_id|object_id|"
+        # ConflictSide (api#111): whole-blob ContentHash (blob_id) and
+        # range-selected hunk BLAKE3 (hunk_hash) — both 32-byte digests.
+        r"blob_id|hunk_hash|"
+        # StateAttachment.body.raw_object (api#114): opaque attachment bytes for
+        # kinds without a public typed body (same role as attachment_object).
+        r"raw_object|"
+        r"agent_capability|bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )
     unaudited_bytes = sorted(
         name for name in byte_field_pattern.findall(proto_sources) if not allowed_byte_field.fullmatch(name)
@@ -125,6 +146,8 @@ def audit_new_descriptor(decoded: str) -> None:
     operation_rpc_contracts = {
         "SubmitOperation": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
         "SubmitOperationBatch": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
+        "SetRemoteLink": ("PROOF_OF_POSSESSION", "DURABLE_WRITE", "CLIENT_OPERATION_ID", True),
+        "GetRemoteLink": ("NONE", "READ_ONLY", "SAFE", False),
         "GetOperation": ("NONE", "READ_ONLY", "SAFE", False),
         "BatchGetOperations": ("NONE", "READ_ONLY", "SAFE", False),
         "GetOperationBatch": ("NONE", "READ_ONLY", "SAFE", False),
@@ -187,8 +210,15 @@ def audit_new_descriptor(decoded: str) -> None:
                     ("capability", 13),
                     ("policy", 14),
                     ("human_verification", 15),
+                    ("ambiguous_change_id", 16),
+                    ("signup", 17),
                     ("stream", 18),
                     ("unknown", 19),
+                ], name
+            elif name == "AmbiguousChangeIdDetail":
+                assert fields == [
+                    ("spec", "LABEL_OPTIONAL", 1),
+                    ("candidates", "LABEL_REPEATED", 2),
                 ], name
             else:
                 highest = max(field_numbers | reserved_numbers, default=0)
@@ -237,6 +267,10 @@ def audit_new_descriptor(decoded: str) -> None:
                     continue
                 input_type = re.search(r'^      input_type: "(.+)"$', method_text, re.MULTILINE).group(1)
                 retry_fields = [field[:2] for field in messages[input_type] if field[0] == "client_operation_id"]
+                if "retry_behavior: RETRY_BEHAVIOR_NEVER" in method_text:
+                    assert retry_fields == [], input_type
+                    assert "client_operation_id_required: true" not in method_text, input_type
+                    continue
                 assert retry_fields == [("client_operation_id", "LABEL_OPTIONAL")], input_type
 
 

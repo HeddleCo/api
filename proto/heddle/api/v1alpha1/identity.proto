@@ -5,6 +5,7 @@ package heddle.api.v1alpha1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 // Device-authorization lifecycle from the identity authorization model.
@@ -35,6 +36,46 @@ enum HandleKind {
 message BeginWebAuthnRegistrationRequest {
   string username = 1;
   string display_name = 2;
+  // Adoption path for claiming an agent-created account (api#123 / weft#1357).
+  // When any adoption field is set, all four travel together: weft mints the
+  // WebAuthn challenge only after verifying `pre_consent_signature` over
+  // `(account_id, username, agent_node_id, nonce)` plus, when present, the
+  // two trailing counted fields `authorization_hash` and
+  // `expires_at_millis`. The counted-statement encoding of those two
+  // fields is defined on the fields themselves. This is the ratified
+  // pre-consent: it commits the handle and agent authority, and does not bind
+  // a credentialId (that id does not exist until WebAuthn create() returns).
+  string account_id = 3;
+  // Iroh node id of the authorizing agent. Empty on the ordinary
+  // verified-signup-email / unattenuated-identity begin paths.
+  string agent_node_id = 4;
+  // Agent-derived-credential signature over
+  // `(account_id, username, agent_node_id, nonce)` plus, when present, the
+  // two trailing counted fields `authorization_hash` and
+  // `expires_at_millis`. The counted-statement encoding of those two
+  // fields is defined on the fields themselves.
+  bytes pre_consent_signature = 5;
+  // Challenge nonce the pre-consent signature binds. Empty on non-adoption
+  // begins.
+  bytes nonce = 6;
+  // Hex SHA-256 of the claim secret (claim-state id / authorizationHash).
+  // In the counted Ed25519 statement this field is the UTF-8 bytes of
+  // the lowercase hex SHA-256 of the claim secret (64 hex chars).
+  // Do not send uppercase or raw 32-byte digest.
+  // Empty on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
+  // `expires_at_millis` is set, both must travel together with the existing
+  // adoption quartet (`account_id`, `username`, `agent_node_id`, `nonce`).
+  string authorization_hash = 7;
+  // Consent expiry as Unix millis. On the wire this stays proto `int64`.
+  // Inside the counted Ed25519 statement it is
+  // exactly 8 big-endian two's-complement bytes of that i64 (`i64::to_be_bytes`).
+  // Not decimal text, not protobuf varint.
+  // Zero on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
+  // `authorization_hash` is set, both must travel together with the
+  // existing adoption quartet.
+  int64 expires_at_millis = 8;
 }
 
 message RegisterPublicKeyRequest {
@@ -92,6 +133,24 @@ message RegisterPublicKeyRequest {
   // revoked.
   bytes attesting_pubkey = 10;
   bytes cross_device_attestation = 11;
+  // Initial owner root installed atomically with this public credential. The
+  // root account_uuid MUST equal the stable owner UUID assigned to the
+  // registration challenge. Existing registration fields retain their exact
+  // meaning; these additive fields are ignored before the owner cutover.
+  SignedOwnerRoot owner_root = 12;
+  // Fresh proof by owner_root.root.authority_key over
+  // SHA-256("heddle-register-owner-root-v1" || challenge_id ||
+  //        accepted root-state hash || device_public_key). This binds root
+  // possession to this one registration rather than replaying authority_proof.
+  AuthorizationSignature owner_root_proof_of_possession = 13;
+  // Guardian M-of-N is the default. If omitted, the signed root's guardian
+  // policy is selected and must be valid; omission never selects custody.
+  // The WEFT 1-of-1 arm requires a recognized warning version and exact digest.
+  RegistrationRecoveryPolicy owner_recovery_policy = 14;
+  // Proposed self-asserted UUID-to-key binding for the same root. The root
+  // proof is verified after every registration check succeeds; no registry
+  // attestation or independent release root participates.
+  OwnerKeyBinding owner_key_binding = 15;
 }
 
 message BeginWebAuthnAuthenticationRequest {
@@ -213,7 +272,8 @@ message DeviceAuthorizationResponse {
 message AccessTokenResponse {
   // The Biscuit (base64url-encoded). Goes in the `heddle_session`
   // cookie for browser flows and in the CLI credentials store for
-  // device-bound flows.
+  // device-bound flows. Empty when weft does not mint; clients mint
+  // from the other fields, including `device_id`.
   string token = 1;
   string subject = 2;
   // Unix-seconds expiry. The Biscuit also carries this internally,
@@ -229,10 +289,18 @@ message AccessTokenResponse {
   // credential row (device, service-account, agent). Empty for
   // browser sessions.
   string credential_id = 6;
-  // Server-issued GrantEnvelope authenticating the client's pubkey +
-  // session for biscuit minting. Empty on legacy / unauthenticated
-  // responses.
-  bytes grant_envelope = 7;
+  // DEPRECATED transport/session GrantEnvelope authenticating the client's
+  // pubkey for Biscuit minting. It is not owner authority; ordinary spool
+  // operations are authorized by the resulting transport Biscuit.
+  bytes grant_envelope = 7 [deprecated = true];
+  // Owner-authored purge-only bundle returned without re-signing or
+  // reinterpretation. It grants no redact, visibility, or metadata authority.
+  OwnerAuthorizationBundle owner_authorization = 8;
+  // Persisted `device_roots.id` after RegisterPublicKey. Clients set
+  // `MintParams.device_id` from this field without reading Postgres. This
+  // is a mint input, not capability: it identifies the device root used
+  // when the client mints after weft leaves `token` empty.
+  string device_id = 9;
 }
 
 message ListSessionsRequest {}
@@ -262,6 +330,8 @@ message ActiveSession {
   // Last time this token was rotated (i.e. the user actively used
   // the app from this session). Zero when never rotated.
   google.protobuf.Timestamp last_used_at = 7;
+  // Typed purge-only owner evidence associated with this session.
+  OwnerAuthorizationBundle owner_authorization = 8;
 }
 
 message RevokeSessionRequest {
@@ -494,8 +564,10 @@ message Entitlement {
 
 // Caller-bound retained-storage projection returned by WhoAmI.
 message StorageUsage {
-  uint64 current_storage_bytes = 1;
-  uint64 storage_allowance_bytes = 2;
+  // Explicit presence: absent means not measured; present zero means the
+  // measured usage is genuinely zero (same contract as RefSummary counters).
+  optional uint64 current_storage_bytes = 1;
+  optional uint64 storage_allowance_bytes = 2;
 }
 
 // Records/updates a subject's paid entitlement. A privilege-granting write —
@@ -564,10 +636,20 @@ message RevokeServiceAccountRequest {
   string client_operation_id = 2;
 }
 
-message ListServiceAccountsRequest {}
+message ListServiceAccountsRequest {
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 1;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to the calling principal's account set; a token minted for another
+  // caller is rejected.
+  string page_token = 2;
+}
 
 message ListServiceAccountsResponse {
   repeated ServiceAccountWithCredentials service_accounts = 1;
+  // Empty when the last page was delivered.
+  string next_page_token = 2;
 }
 
 message ServiceAccountWithCredentials {
@@ -644,7 +726,70 @@ message StoreProviderTokenRequest {
 
 message StoreProviderTokenResponse {}
 
+// Minimal repository projection returned by GitHub's installation-repository
+// API. These values are verified server-side and are never ownership claims.
+message GitHubInstallationRepository {
+  int64 id = 1;
+  string full_name = 2;
+}
+
+message RegisterGitHubInstallationRequest {
+  // GitHub App installation the authenticated caller asks Weft to register.
+  // The client-supplied installation_id is not ownership proof: Weft verifies
+  // it against the caller's linked GitHub OAuth token before any write.
+  int64 installation_id = 1;
+  // Idempotency key only. This carries no installation ownership claim.
+  string client_operation_id = 2;
+}
+
+message RegisterGitHubInstallationResponse {
+  int64 installation_id = 1;
+  // GitHub account.login for the organization or user that owns the install.
+  string account_login = 2;
+  // GitHub installation.repository_selection: "all" or "selected".
+  string repository_selection = 3;
+  // Repositories returned by GitHub for this user-accessible installation.
+  repeated GitHubInstallationRepository repositories = 4;
+}
+
 // ── Signup-email verification ───────────────────────────────────────────────
+
+// Generic acknowledgement for a syntactically valid challenge request. There
+// is deliberately no rejected/no-invite state: challenge acceptance does not
+// disclose whether recipient_email has a usable invite.
+enum SignupEmailChallengeAcceptanceStatus {
+  SIGNUP_EMAIL_CHALLENGE_ACCEPTANCE_STATUS_UNSPECIFIED = 0;
+  SIGNUP_EMAIL_CHALLENGE_ACCEPTANCE_STATUS_ACCEPTED = 1;
+}
+
+// Service-to-service request to create the pending mailbox-possession
+// challenge used by VerifySignupEmail. This request is not a browser API.
+message IssueSignupEmailChallengeRequest {
+  // Candidate signup handle associated with the challenge for audit and
+  // ceremony continuity. This is not an email field and is not rewritten from
+  // recipient_email.
+  string username = 1;
+  // Mailbox to which the authenticated service caller will deliver the proof
+  // token. The server canonicalizes this address before storing it in challenge
+  // metadata; the client must not infer invite existence from acceptance.
+  string recipient_email = 2;
+  // Idempotency key scoped to the authenticated service account and this RPC.
+  // Reuse with different username or recipient_email must fail.
+  string client_operation_id = 3;
+}
+
+message IssueSignupEmailChallengeResponse {
+  // Always ACCEPTED for a syntactically valid request, independent of invite or
+  // account existence. Other outcomes are CallFailure values, not extra states.
+  SignupEmailChallengeAcceptanceStatus status = 1;
+  // Hard expiry of verification_token and its persisted challenge row.
+  google.protobuf.Timestamp expires_at = 2;
+  // Single-use mailbox-possession proof for the authenticated Tapestry service
+  // caller to deliver out of band. This field exists only on the response of
+  // the AUTHENTICATED_SERVICE_ACCOUNT RPC; it must never be returned by a
+  // browser-facing endpoint or treated as browser-readable challenge data.
+  string verification_token = 3;
+}
 
 message VerifySignupEmailRequest {
   // The single-use token emailed to the signup address (opaque to
@@ -662,6 +807,324 @@ message VerifySignupEmailResponse {
   // future fields (expiry, refresh window) extend the response
   // additively without breaking the wire format.
   bytes bootstrap_token = 1;
+  // Server-canonicalized address from the redeemed challenge metadata. This is
+  // populated only after Weft finds an unused, non-revoked invite for the same
+  // address, so a caller may truthfully render "Invite found for <email>" only
+  // after this RPC succeeds. It is never copied from a request field.
+  string recipient_email = 2;
+  // Server-authoritative handle bound to the redeemed signup challenge. Clients
+  // use this to prefill and validate the subsequent registration ceremony.
+  string bound_handle = 3;
+}
+
+// Binds an unassigned shareable invite to an address that has already passed
+// VerifySignupEmail. The invite UUID selects the invite; it is never accepted
+// as a mailbox-verification token.
+message BindSignupInviteEmailRequest {
+  // Opaque shareable invite code. Possession selects an invite but does not
+  // prove control of recipient_email.
+  string invite_code = 1;
+  // Address to assign. After canonicalization this must exactly match the
+  // signup_bootstrap_email fact in the caller's bootstrap bearer.
+  string recipient_email = 2;
+  // Idempotency key scoped to the verified bootstrap subject and this RPC.
+  // Reuse with different invite_code or recipient_email must fail.
+  string client_operation_id = 3;
+}
+
+message BindSignupInviteEmailResponse {
+  // Canonical address persisted on the invite. Populated only after successful
+  // binding; failures use ErrorDetail.context.signup.
+  string recipient_email = 1;
+}
+
+message CreateSignupInviteRequest {
+  // Optional address to bind to the new invite. When present, Weft
+  // canonicalizes and persists it using the same binding rules as
+  // BindSignupInviteEmail.
+  optional string recipient_email = 1;
+  // Idempotency key scoped to the authenticated member and this RPC. Reuse
+  // with a different recipient_email must fail without spending allowance.
+  string client_operation_id = 2;
+}
+
+message CreateSignupInviteResponse {
+  // Stable server-generated identity of the created invite.
+  string invite_id = 1;
+  // High-entropy opaque code accepted by ResolveSignupInvite and
+  // ClaimSignupInvite.
+  string invite_code = 2;
+  // Caller-owned invite allowance remaining after this invite is created.
+  uint32 allowance_remaining = 3;
+}
+
+// Owner-view lifecycle of an invite listed by its creator. Distinct from
+// SignupInviteResolutionStatus, which is the public code-resolution
+// projection and folds unknown, malformed, and revoked codes into EXPIRED:
+// an owner listing always refers to a live row, so it needs only open
+// versus consumed.
+enum SignupInviteOwnerStatus {
+  SIGNUP_INVITE_OWNER_STATUS_UNSPECIFIED = 0;
+  SIGNUP_INVITE_OWNER_STATUS_OPEN = 1;
+  SIGNUP_INVITE_OWNER_STATUS_CONSUMED = 2;
+}
+
+message SignupInviteSummary {
+  // High-entropy opaque code (the same value CreateSignupInvite returned).
+  string invite_code = 1;
+  SignupInviteOwnerStatus status = 2;
+  google.protobuf.Timestamp created_at = 3;
+  // Consumed state carries no claimer identity anywhere: no claimer handle,
+  // subject, or account reference exists on this message or anywhere else in
+  // the response. Boolean + timestamp is sufficient to count and credit
+  // referrals without disclosing who claimed.
+  bool consumed = 4;
+  // Present when consumed.
+  optional google.protobuf.Timestamp consumed_at = 5;
+}
+
+message ListSignupInvitesRequest {
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 1;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to the calling principal's invite set; a token minted for another
+  // caller is rejected.
+  string page_token = 2;
+}
+
+message ListSignupInvitesResponse {
+  repeated SignupInviteSummary invites = 1;
+  // Caller-owned allowance remaining, readable without spending an invite.
+  uint32 allowance_remaining = 2;
+  // Empty when the last page was delivered.
+  string next_page_token = 3;
+}
+
+// Public lifecycle projection for an invite code supplied by the caller. The
+// vocabulary intentionally has no missing/invalid/revoked state: those inputs
+// are represented exactly as EXPIRED.
+enum SignupInviteResolutionStatus {
+  SIGNUP_INVITE_RESOLUTION_STATUS_UNSPECIFIED = 0;
+  SIGNUP_INVITE_RESOLUTION_STATUS_VALID = 1;
+  SIGNUP_INVITE_RESOLUTION_STATUS_CONSUMED = 2;
+  SIGNUP_INVITE_RESOLUTION_STATUS_EXPIRED = 3;
+}
+
+message ResolveSignupInviteRequest {
+  // High-entropy opaque code from the /join/<code> URL. This is a lookup key,
+  // not a VerifySignupEmail verification_token and not mailbox proof.
+  string invite_code = 1;
+}
+
+message ResolveSignupInviteResponse {
+  // VALID and CONSUMED describe a resolved code. EXPIRED also covers unknown,
+  // malformed, and revoked codes; UNSPECIFIED must never be returned.
+  SignupInviteResolutionStatus status = 1;
+  // Inviter's public display handle. For EXPIRED this must be empty, including
+  // when a real invite once existed, so invalid and expired serialize alike.
+  string inviter_display_handle = 2;
+  // Public member ordinal used with inviter_display_handle. Zero for EXPIRED;
+  // no inviter subject, email, or other identity field is exposed.
+  uint64 inviter_member_ordinal = 3;
+  // Canonical invited mailbox for VALID or CONSUMED. Empty for EXPIRED. Seeing
+  // this address through a held code does not itself verify mailbox possession.
+  string recipient_email = 4;
+}
+
+// Selects the next currently available invite code from a public drop. A live
+// drop hold makes a code unavailable until held_until; expired holds are
+// eligible again without a background reaper.
+message ClaimNextDropCodeRequest {
+  // URL-safe public drop identifier from /join?drop=<drop_slug>.
+  string drop_slug = 1;
+  // Opaque channel attribution (for example, "x"). Weft records this on the
+  // held invite without interpreting it.
+  optional string src = 2;
+}
+
+message ClaimNextDropCodeResponse {
+  // Opaque invite code to carry into the normal signup-invite ceremony.
+  string code = 1;
+  // Absolute expiry of this drop assignment. This hold does not consume the
+  // invite and is distinct from the signup ceremony's reservation.
+  google.protobuf.Timestamp held_until = 2;
+}
+
+message RemainingDropCodesRequest {
+  // URL-safe public drop identifier from /join?drop=<drop_slug>.
+  string drop_slug = 1;
+}
+
+message RemainingDropCodesResponse {
+  // Codes currently available to hand out. Codes under a live drop hold or a
+  // live signup reservation are excluded; expired holds count again. Missing
+  // and revoked drops return zero.
+  uint32 count = 1;
+}
+
+// The complete method allowlist carried by a code-claim signup bearer.
+// UNSPECIFIED is never emitted and must be rejected if received.
+enum SignupBootstrapMethod {
+  SIGNUP_BOOTSTRAP_METHOD_UNSPECIFIED = 0;
+  SIGNUP_BOOTSTRAP_METHOD_BEGIN_WEB_AUTHN_REGISTRATION = 1;
+  SIGNUP_BOOTSTRAP_METHOD_REGISTER_PUBLIC_KEY = 2;
+}
+
+message ClaimSignupInviteRequest {
+  // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
+  // Possession is the only authorization for this unsigned request. A
+  // successful claim atomically reserves the code and is not retryable.
+  string invite_code = 1;
+}
+
+message ClaimSignupInviteResponse {
+  // Opaque short-lived bearer attenuated to exactly the methods listed in
+  // allowed_methods. It must carry no other capability or account authority.
+  // Empty when weft does not mint; clients mint from reservation_id and
+  // session_id.
+  bytes bootstrap_token = 1;
+  // Absolute expiry enforced by the bearer itself. The server must keep this
+  // lifetime short; clients must not infer validity beyond this timestamp.
+  google.protobuf.Timestamp expires_at = 2;
+  // Exact capability projection for bootstrap_token. A successful response
+  // must contain BEGIN_WEB_AUTHN_REGISTRATION and REGISTER_PUBLIC_KEY exactly
+  // once each, and no other value. The bearer remains the authority.
+  repeated SignupBootstrapMethod allowed_methods = 3;
+  // Signup-invite reservation UUID the client embeds in the invite-bootstrap
+  // biscuit (`signup_bootstrap_invite`). This is a mint input, not
+  // capability: it identifies the reserved invite for client-side minting
+  // after weft leaves bootstrap_token empty.
+  string reservation_id = 4;
+  // The `signup_bootstrap_invite` session rev_id the client puts in that
+  // biscuit's session fact. This is a mint input, not capability.
+  string session_id = 5;
+}
+
+// Creates an unclaimed human account by consuming the human's signup invite.
+// The account starts with no independent root; the caller receives only the
+// pre-attenuated, agent-key-bound capability returned below.
+message ProvisionAgentRootedAccountRequest {
+  // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
+  // Possession authorizes provisioning the human account and consumes the
+  // invite on the first successful call.
+  string invite_code = 1;
+  // Raw Ed25519 public key for the creating agent. This field MUST contain
+  // exactly 32 bytes. The server MUST reject every other length, and the
+  // request proof MUST verify against this key.
+  bytes agent_public_key = 2;
+  // Idempotency key scoped to this agent key and RPC. Reuse with a different
+  // invite_code or agent_public_key must fail.
+  string client_operation_id = 3;
+}
+
+message ProvisionAgentRootedAccountResponse {
+  // Server-generated canonical native handle for the new human account.
+  string handle = 1;
+  // Stable account identity. This remains unchanged when ClaimAccount later
+  // replaces the generated handle and fills the independent-root slot.
+  string account_id = 2;
+  // Serialized pre-attenuated capability for the creating agent, bound to
+  // agent_public_key. It carries ordinary human-account authority except for
+  // operations requiring an independent root. Claiming the account neither
+  // revokes nor transforms this capability.
+  bytes agent_capability = 3;
+}
+
+// Invite-gated agent-account create (api#123 / weft#1357). Consumes a shared
+// #1356 invite and mints an agent-rooted human placeholder: no handle yet, a
+// server-generated globally-unique pet name, and a one-time claim token the
+// agent prints. Distinct from ProvisionAgentRootedAccount, which still returns
+// a generated handle (weft#1204). This is the ratified pet-name path.
+message CreateAgentAccountRequest {
+  // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
+  // Possession authorizes creating the placeholder account and consumes the
+  // invite on the first successful call.
+  string invite_code = 1;
+  // Raw Ed25519 public key for the creating agent. This field MUST contain
+  // exactly 32 bytes. The server MUST reject every other length, and the
+  // request proof MUST verify against this key.
+  bytes agent_public_key = 2;
+  // Idempotency key scoped to this agent key and RPC. Reuse with a different
+  // invite_code or agent_public_key must fail.
+  string client_operation_id = 3;
+}
+
+message CreateAgentAccountResponse {
+  // Stable account identity. Unchanged when PromoteAgentAccount later claims
+  // the handle and fills the independent-root slot.
+  string account_id = 1;
+  // Server-generated globally-unique pet name. The account has no handle
+  // until PromoteAgentAccount; uniqueness is enforced at the registry.
+  string pet_name = 2;
+  // Serialized pre-attenuated capability for the creating agent, bound to
+  // agent_public_key. Claiming the account neither revokes nor transforms
+  // this capability.
+  bytes agent_capability = 3;
+  // One-time claim token the agent prints as a claim link. Empty when the
+  // caller mints an Iroh claim link locally instead of a weft-stored token.
+  string claim_token = 4;
+}
+
+// Promote-consent half of the agent-account claim ceremony (api#123).
+// One call finishes WebAuthn registration, binds credentialId, claims the
+// handle, and flips rooting_tier agent_rooted → self_rooted. The ratified
+// promote-consent binds `(account_id, handle, credential_id)` plus, when
+// present, the two trailing counted fields `authorization_hash` and
+// `expires_at_millis` — that is the anti-replay binding, signed after
+// WebAuthn create() has produced the id. The counted-statement encoding
+// of those two fields is defined on the fields themselves.
+message PromoteAgentAccountRequest {
+  // Placeholder account being claimed.
+  string account_id = 1;
+  // Handle chosen at claim time. Replaces the pet name.
+  string handle = 2;
+  // WebAuthn credentialId of the just-created passkey.
+  string credential_id = 3;
+  // Challenge minted by the adoption BeginWebAuthnRegistration.
+  string challenge_id = 4;
+  // Raw WebAuthn create() attestation bytes (verbatim; the lib
+  // base64url-decodes them off the wire).
+  bytes client_data_json = 5;
+  bytes attestation_object = 6;
+  // Iroh node id of the authorizing agent.
+  string agent_node_id = 7;
+  // Agent-derived-credential signature over
+  // `(account_id, handle, credential_id)` plus, when present, the two
+  // trailing counted fields `authorization_hash` and `expires_at_millis`.
+  // The counted-statement encoding of those two fields is defined on the
+  // fields themselves.
+  bytes promote_consent_signature = 8;
+  // Idempotency key scoped to the authorizing agent and this RPC.
+  string client_operation_id = 9;
+  // Hex SHA-256 of the claim secret (claim-state id / authorizationHash).
+  // In the counted Ed25519 statement this field is the UTF-8 bytes of
+  // the lowercase hex SHA-256 of the claim secret (64 hex chars).
+  // Do not send uppercase or raw 32-byte digest.
+  // Empty on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
+  // `expires_at_millis` is set, both must travel together with the existing
+  // promote triple (`account_id`, `handle`, `credential_id`).
+  string authorization_hash = 10;
+  // Consent expiry as Unix millis. On the wire this stays proto `int64`.
+  // Inside the counted Ed25519 statement it is
+  // exactly 8 big-endian two's-complement bytes of that i64 (`i64::to_be_bytes`).
+  // Not decimal text, not protobuf varint.
+  // Zero on non-adoption and on old clients.
+  // Empty hash + 0 is old-client v1; when either this or
+  // `authorization_hash` is set, both must travel together with the
+  // existing promote triple.
+  int64 expires_at_millis = 11;
+}
+
+message PromoteAgentAccountResponse {
+  // Browser session minted after the atomic promotion. Same shape as
+  // RegisterPublicKey / FinishWebAuthnAuthentication.
+  AccessTokenResponse session = 1;
+  // Canonical textual form of the claimed native handle.
+  string canonical_handle = 2;
+  // Echo of the promoted account identity.
+  string account_id = 3;
 }
 
 // ── External diff analysis (for PR review packets) ──────────────────────────
@@ -685,7 +1148,8 @@ message InvitationSummary {
 //
 // Declaration phase (weft#182) — the generic dispatcher and per-kind requests
 // share one response. The persisted substrate is a `recovery_methods` row keyed
-// on `(user_id, kind)` with `kind_data jsonb`, `declared_at`, and `window_secs`.
+// on `(user_id, kind)` with `kind_data jsonb` and `declared_at`. The shared
+// per-user veto window lives in the signed owner RecoveryPolicy, not per method.
 
 // Canonical recovery-method kinds. Mirrors the `recovery_methods.kind`
 // column. `RECOVERY_METHOD_KIND_UNSPECIFIED` is rejected by the server.
@@ -741,9 +1205,6 @@ message DeclareHardwareKeyRecoveryParams {
   bytes attestation_object = 3;
   // Human label for the recovery authenticator ("YubiKey 5C — backup").
   string device_label = 4;
-  // Veto window applied to a future BeginRecovery against this credential.
-  // Default 7 days; 0 = instant (the user opts out of the veto window).
-  google.protobuf.Duration window_secs = 5;
 }
 
 // Declare social guardians + an M-of-N threshold (`kind=social`). weft#185.
@@ -820,8 +1281,9 @@ message BeginRecoveryResponse {
   // SubmitRecoveryProof / VetoRecovery / CompleteRecovery and named inside
   // the social attestation message to bind signatures to this attempt.
   string recovery_attempt_id = 1;
-  // The veto window for this attempt (copied from the declared method's
-  // `window_secs`).
+  // The account's per-user veto window from its signed owner RecoveryPolicy.
+  // The same value gates owner-key transitions; absent policy configuration
+  // selects the 7-day default (604800 seconds).
   google.protobuf.Duration window_secs = 2;
   // Wall-clock instant at which CompleteRecovery becomes eligible
   // (started_at + window_secs).
@@ -1092,6 +1554,83 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
+  // Assigns a shareable invite only after the caller proves recipient_email
+  // through the signup_bootstrap_email fact minted by VerifySignupEmail. The
+  // invite code is a selector, never mailbox proof. Missing, claimed, and
+  // revoked invites use ErrorDetail.context.signup.
+  rpc BindSignupInviteEmail(BindSignupInviteEmailRequest) returns (BindSignupInviteEmailResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "recipient_email"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Atomically places a short hold on one currently available code from the
+  // named public drop. The request is unsigned and anonymously callable over
+  // the hosted Iroh ALPN. Weft still verifies the caller's Biscuit so a
+  // verified agent or user receives the subject-scoped anti-abuse budget
+  // instead of the anonymous per-IP budget.
+  //
+  // A successful call is not retryable: retrying can hold a second code after
+  // an ambiguous response. Empty, missing, and revoked drops fail with the
+  // same existence-hidden response shape and disclose no pool metadata.
+  rpc ClaimNextDropCode(ClaimNextDropCodeRequest) returns (ClaimNextDropCodeResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_NEVER
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Atomically reserves an unassigned shareable invite and mints the narrowly
+  // scoped signup bearer described by ClaimSignupInviteResponse. Holding the
+  // code is the authorization; no bearer or request signature is required.
+  //
+  // Invalid (including malformed or unknown), consumed, reserved, revoked,
+  // and email-bound codes all fail identically with CALL_FAILURE_CODE_NOT_FOUND,
+  // ERROR_REASON_RESOURCE_NOT_FOUND, empty ErrorDetail.resource and .field,
+  // and SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE. The message and processing
+  // path/timing envelope must also be the same, and no invite metadata may be
+  // returned. Rate-limit and internal failures remain distinct operational
+  // failures. Because a successful claim consumes the one mint opportunity,
+  // clients must never automatically or manually retry an ambiguous outcome.
+  rpc ClaimSignupInvite(ClaimSignupInviteRequest) returns (ClaimSignupInviteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_NEVER
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "invite_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // Claims only a verified-owner hold belonging to the authenticated subject.
   // ClaimHandle is the successful path for AVAILABLE with
   // `held_for_verified_owner = true`; genuinely free AVAILABLE names are
@@ -1101,7 +1640,6 @@ service IdentityService {
   // returns the same NOT_FOUND status and public error shape.
   rpc ClaimHandle(ClaimHandleRequest) returns (ClaimHandleResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1130,6 +1668,73 @@ service IdentityService {
       authorization_role: AUTHORIZATION_ROLE_NONE
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Creates a member-owned signup invite by atomically spending one unit of
+  // the authenticated caller's own allowance. The referrer is always derived
+  // from the authenticated principal; callers cannot select another member's
+  // allowance. When recipient_email is present, the new invite is bound to the
+  // canonicalized address using the BindSignupInviteEmail rules.
+  rpc CreateSignupInvite(CreateSignupInviteRequest) returns (CreateSignupInviteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Lists the signup invites owned by the authenticated caller. The owner is
+  // always derived from the bearer; there is no user selector, so a member
+  // can only ever enumerate their own invites. Consumed invites expose a
+  // boolean and timestamp only — no claimer handle or other claimer identity
+  // is returned. allowance_remaining is reported without spending an invite.
+  rpc ListSignupInvites(ListSignupInvitesRequest) returns (ListSignupInvitesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Consumes a shared-pool invite to create an agent-rooted human placeholder
+  // (api#123). No established account principal exists yet: authorization
+  // comes from the held invite, while PROOF_OF_POSSESSION binds the call and
+  // returned capability to agent_public_key. The account has no handle until
+  // PromoteAgentAccount. Invalid, consumed, reserved, revoked, and
+  // email-bound codes fail identically with CALL_FAILURE_CODE_NOT_FOUND and
+  // SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE (same existence-hidden shape as
+  // ClaimSignupInvite).
+  rpc CreateAgentAccount(CreateAgentAccountRequest) returns (CreateAgentAccountResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "invite_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CreateDeviceAuthorization(CreateDeviceAuthorizationRequest) returns (DeviceAuthorizationResponse) {
@@ -1228,7 +1833,6 @@ service IdentityService {
   // to the public classification and holder-presence boolean.
   rpc GetHandleStatus(GetHandleStatusRequest) returns (GetHandleStatusResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -1294,6 +1898,26 @@ service IdentityService {
       }
       authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Creates a mailbox-possession challenge for Tapestry to deliver. Only an
+  // authenticated service account may call this RPC or receive its response.
+  // Its bearer credential is the possession factor; no request signature is
+  // required. No public RPC returns IssueSignupEmailChallengeResponse. ACCEPTED
+  // is deliberately generic and does not disclose invite or account existence.
+  rpc IssueSignupEmailChallenge(IssueSignupEmailChallengeRequest) returns (IssueSignupEmailChallengeResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_SERVICE_ACCOUNT
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc LinkOAuthIdentity(LinkOAuthIdentityRequest) returns (AccessTokenResponse) {
@@ -1414,6 +2038,59 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
+  // Atomically finishes WebAuthn registration, binds credentialId, claims
+  // the handle, and flips agent_rooted → self_rooted (api#123). Authorization
+  // is the agent's promote-consent signature over
+  // `(account_id, handle, credential_id)` plus, when present, the two
+  // trailing counted fields `authorization_hash` and `expires_at_millis`
+  // (UTF-8 lowercase hex; 8-byte big-endian i64; encoding defined on
+  // PromoteAgentAccountRequest), plus the WebAuthn attestation weft
+  // verifies as RP. The agent's derived credential is retained underneath
+  // the new human root. No half-claimed state: never root-without-handle
+  // or handle-without-root.
+  rpc PromoteAgentAccount(PromoteAgentAccountRequest) returns (PromoteAgentAccountResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "account_id"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Consumes a human's invite to create an agent-rooted human account. No
+  // established account principal exists yet: authorization comes from the
+  // held invite, while PROOF_OF_POSSESSION binds the call and returned
+  // capability to agent_public_key. The account's independent-root slot stays
+  // empty until a later ClaimAccount ceremony.
+  rpc ProvisionAgentRootedAccount(ProvisionAgentRootedAccountRequest) returns (ProvisionAgentRootedAccountResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "invite_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // Record/update a subject's paid entitlement. Privilege-granting write gated
   // on the billing service account's administrative right over `subject`; weft
   // maps `product_id → plan` from checked-in, fail-closed config.
@@ -1433,6 +2110,27 @@ service IdentityService {
         role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Registers a GitHub App installation only after server-side ownership
+  // verification.
+  // Weft MUST verify that the authenticated caller administers the requested
+  // installation: load the caller's linked GitHub OAuth token,
+  // call GET /user/installations, and match installation_id before upserting
+  // ownership. The request's installation_id is never trusted as proof.
+  rpc RegisterGitHubInstallation(RegisterGitHubInstallationRequest) returns (RegisterGitHubInstallationResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc RegisterPublicKey(RegisterPublicKeyRequest) returns (AccessTokenResponse) {
@@ -1458,7 +2156,6 @@ service IdentityService {
   // public error shape, so the RPC does not reveal which condition applied.
   rpc RequestHeldName(RequestHeldNameRequest) returns (RequestHeldNameResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1471,6 +2168,23 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  // Anonymous, leak-free availability count for a public drop. The response
+  // contains only the currently available count; a missing or revoked drop is
+  // indistinguishable from an exhausted one.
+  rpc RemainingDropCodes(RemainingDropCodesRequest) returns (RemainingDropCodesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // Directory lookup requires a valid bearer but is not gated by the caller's
   // readable-resource set. Canonical handles, bare native names, and legacy
   // `/u:<subject>` request routes return the same subject-free projection;
@@ -1478,7 +2192,6 @@ service IdentityService {
   // NOT_FOUND.
   rpc ResolveHandle(ResolveHandleRequest) returns (ResolveHandleResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -1489,6 +2202,33 @@ service IdentityService {
       authorization_role: AUTHORIZATION_ROLE_NONE
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Anonymous, per-IP-rate-limited lookup for /join/<code>. Unknown,
+  // malformed, revoked, and expired codes all return the same EXPIRED response:
+  // empty projection fields and zero ordinal. Implementations must use the same
+  // processing path and timing envelope for those cases. There is no NOT_FOUND
+  // response, so callers cannot distinguish an invalid code from an expired
+  // one; the high-entropy code plus the anonymous budget limits probing. Apply
+  // the same per-IP budget as other anonymous identity endpoints; exhaustion
+  // returns ERROR_REASON_RATE_LIMITED with ErrorDetail.context.retry.
+  rpc ResolveSignupInvite(ResolveSignupInviteRequest) returns (ResolveSignupInviteResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "invite_code"
+        role: AUTHORIZATION_ROLE_CALLER_BOUND
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc RevokeCredential(RevokeCredentialRequest) returns (RevokeCredentialResponse) {
@@ -1590,6 +2330,10 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
+  // Redeems a mailbox token once, checks the canonical challenge email against
+  // the invite ledger, and only then returns its bootstrap bearer and canonical
+  // recipient_email. Invite and token lifecycle failures are distinguished by
+  // ErrorDetail.context.signup, never by parsing the human message.
   rpc VerifySignupEmail(VerifySignupEmailRequest) returns (VerifySignupEmailResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

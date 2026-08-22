@@ -144,6 +144,10 @@ enum AuthorizationAccess {
   // The service is planned, but its authorization policy has not been
   // decided. This value is invalid for shipped services.
   AUTHORIZATION_ACCESS_PLANNED_UNDECIDED = 3;
+  // A cryptographically authenticated service-account principal is required.
+  // Human, agent, and anonymous principals are denied even when they otherwise
+  // carry a valid authenticated bearer.
+  AUTHORIZATION_ACCESS_AUTHENTICATED_SERVICE_ACCOUNT = 4;
 }
 
 enum AuthorizationRole {

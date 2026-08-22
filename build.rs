@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 use std::{env, fs, path::PathBuf};
 
+#[path = "build_support/attachment_generation.rs"]
+mod attachment_generation;
 #[path = "build_support/method_generation.rs"]
 mod method_generation;
 
@@ -28,8 +30,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = prost_build::Config::new();
     config
         .boxed(".heddle.api.v1alpha1.PushClientFrame.frame.request")
+        .boxed(".heddle.api.v1alpha1.BootstrapOwnerRootRequest.approval.deferred_human")
+        .boxed(".heddle.api.v1alpha1.PullServerFrame.frame.state_attachment")
+        .boxed(".heddle.api.v1alpha1.ListDiscussionsResponse.frame.item")
         .file_descriptor_set_path(&descriptor)
         .compile_protos(&protos, &[proto_root])?;
     method_generation::write(&descriptor, &output.join("heddle_api_methods.rs"))?;
+    attachment_generation::write(
+        &descriptor,
+        &output.join("heddle_api_attachment_authorization.rs"),
+    )?;
     Ok(())
 }

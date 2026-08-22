@@ -6,6 +6,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v1alpha1/identity.proto";
+import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 
 // Namespace kinds in the hosted control plane. `USER` namespaces are
@@ -18,17 +19,34 @@ enum NamespaceKind {
   NAMESPACE_KIND_TEAM = 3;
 }
 
-enum SpoolVisibility {
-  SPOOL_VISIBILITY_UNSPECIFIED = 0;
-  SPOOL_VISIBILITY_PRIVATE = 1;
-  SPOOL_VISIBILITY_PUBLIC = 2;
-}
-
-enum SpoolStateVisibility {
-  SPOOL_STATE_VISIBILITY_UNSPECIFIED = 0;
-  SPOOL_STATE_VISIBILITY_PUBLIC = 1;
-  SPOOL_STATE_VISIBILITY_INTERNAL = 2;
-  SPOOL_STATE_VISIBILITY_PRIVATE = 3;
+// Unified three-tier visibility for both spool EXISTENCE (`visibility`)
+// and spool HISTORY (`state_visibility`). One type, one numbering.
+//
+// Canonical numbering is restrictiveness order (narrowest first):
+//   PRIVATE = 1, INTERNAL = 2, PUBLIC = 3
+//
+// This replaces the former `SpoolVisibility` {PRIVATE=1, PUBLIC=2} and
+// `SpoolStateVisibility` {PUBLIC=1, INTERNAL=2, PRIVATE=3}. Those two
+// enums were differently numbered; a numeric cast between them published
+// private history as public. Consumers MUST map by variant NAME, never by
+// discriminant. Retired type names are not reused.
+//
+// Tiers:
+//   PRIVATE  — scoped to the owning user / explicit grant holders.
+//   INTERNAL — scoped to members of the containing org/team spool.
+//              Expressible for existence only on org- or team-parented
+//              spools; rejected for user-parented and root-level
+//              (`__users` / `__orgs`) spools.
+//   PUBLIC   — everyone, including anonymous.
+//
+// Coherence: PUBLIC history requires PUBLIC existence. A PRIVATE spool
+// with INTERNAL history is the default (same grant-holder set) and is
+// legal. There is no "signed-in Heddle users only" tier.
+enum Visibility {
+  VISIBILITY_UNSPECIFIED = 0;
+  VISIBILITY_PRIVATE = 1;
+  VISIBILITY_INTERNAL = 2;
+  VISIBILITY_PUBLIC = 3;
 }
 
 enum SpoolBootstrapKind {
@@ -109,8 +127,12 @@ message SpoolInitialTooling {
 }
 
 message SpoolSettings {
-  SpoolVisibility visibility = 1;
-  SpoolStateVisibility default_state_visibility = 2;
+  reserved "default_state_visibility";
+
+  Visibility visibility = 1;
+  // Spool-level baseline for state visibility. State-level overrides may only
+  // narrow this baseline. PUBLIC history requires PUBLIC existence.
+  Visibility state_visibility = 2;
   SpoolBootstrapKind bootstrap_kind = 3;
   string bootstrap_source = 4;
   SpoolWritePolicy write_policy = 5;
@@ -133,6 +155,8 @@ message CreateNamespaceRequest {
   string display_name = 4;
   SpoolSettings settings = 5;
   string client_operation_id = 6;
+  // Required self-signed genesis for the namespace's backing spool.
+  SignedSpoolOwnerGenesis owner_genesis = 7;
 }
 
 message UpdateNamespaceRequest {
@@ -145,7 +169,7 @@ message UpdateNamespaceRequest {
 
 message SetNamespaceVisibilityRequest {
   string full_path = 1;
-  SpoolVisibility visibility = 2;
+  Visibility visibility = 2;
   string client_operation_id = 3;
 }
 
@@ -158,10 +182,92 @@ message ListSpoolsRequest {
   bool repos_only = 1; // when true, return only content-bearing (repo) spools
 }
 
+// Bulk read of push-stable Explore inputs. Ranking weights, recency, score,
+// and lane policy deliberately remain consumer-owned.
+message ListExploreMetadataRequest {}
+
+message ExploreLatestState {
+  ChangeId change_id = 1;
+  string intent = 2;
+  string principal_name = 3;
+  string principal_email = 4;
+  string agent_provider = 5;
+  string agent_model = 6;
+}
+
+message ExploreMetadata {
+  string repo_id = 1;
+  string full_path = 2;
+  double continuity = 3;
+  double verification = 4;
+  double collaboration = 5;
+  double thread = 6;
+  double clarity = 7;
+  double burst_factor = 8;
+  uint32 state_count = 9;
+  uint32 verified_count = 10;
+  uint32 thread_count = 11;
+  uint32 unique_principals = 12;
+  uint32 unique_agents = 13;
+  double meaningful_state_ratio = 14;
+  ExploreLatestState latest_state = 15;
+  google.protobuf.Timestamp latest_state_at = 16;
+  google.protobuf.Timestamp oldest_state_at = 17;
+  // Raw push-time input used by the consumer-owned new-repository lift.
+  uint32 active_day_count = 18;
+  // Adopt-time code-legibility metrics (weft#1389). Absent when the craft
+  // axis has not been computed for this repo; ranking renormalizes without it.
+  optional RepoCraftMetrics craft = 19;
+}
+
+// Percentile pair used by craft metrics. Both values are in the native unit
+// of the enclosing field (complexity points, lines, nesting levels, bytes).
+message CraftPercentiles {
+  double median = 1;
+  double p90 = 2;
+}
+
+// Distribution of a structural-shape measurement: percentiles plus the
+// sample size they were computed over. `sample_count` is 0 when unknown.
+message CraftDistribution {
+  CraftPercentiles percentiles = 1;
+  uint32 sample_count = 2;
+}
+
+// Repo-level deterministic code-legibility metrics (weft#1389). Ranking
+// reads this as the 'craft' axis, distinct from intent/clarity. Schema
+// version stamps the formula so a recompute is tractable when the metric
+// definition changes. Per-language values are not assumed comparable;
+// aggregation is over the versioned "code" language list.
+message RepoCraftMetrics {
+  // Formula/schema stamp. Bump when cognitive-complexity, structural-shape,
+  // or duplication definitions change so stored rows can be recomputed.
+  uint32 schema_version = 1;
+  // Sonar cognitive complexity, per function, as median / p90.
+  CraftPercentiles cognitive_complexity = 2;
+  // Function-length distribution (lines).
+  CraftDistribution function_length = 3;
+  // Maximum nesting-depth distribution (levels).
+  CraftDistribution nesting_depth = 4;
+  // File-size distribution (bytes).
+  CraftDistribution file_size_bytes = 5;
+  // Fraction of hashed subtrees that collide with another subtree in the
+  // same repo. Absent when duplication was not computed.
+  optional double duplication_ratio = 6;
+  // Count of distinct subtree-hash collisions. 0 when none or uncomputed.
+  uint32 duplicate_subtree_count = 7;
+}
+
+message ListExploreMetadataResponse {
+  repeated ExploreMetadata repositories = 1;
+}
+
 message CreateRepositoryRequest {
   string namespace_path = 1;
   string slug = 2;
   string client_operation_id = 3;
+  // Required self-signed genesis for the repository spool.
+  SignedSpoolOwnerGenesis owner_genesis = 4;
 }
 
 message UpdateRepositoryRequest {
@@ -180,8 +286,16 @@ message CreateSpoolRequest {
   string slug = 2;
   bool is_repo = 3;
   optional string display_name = 4;
-  SpoolVisibility visibility = 5;
+  Visibility visibility = 5;
   string client_operation_id = 6;
+  // Complete create-time settings, including the spool-level state-visibility
+  // baseline. Weft must validate and persist this message rather than silently
+  // replacing it with server defaults.
+  SpoolSettings settings = 7;
+  // Required self-signed creation binding. genesis.spool_uuid is the UUIDv7
+  // used as the new spool id; the server verifies the owner signature before
+  // creating the spool. There is no server-assigned nonce or registry proof.
+  SignedSpoolOwnerGenesis owner_genesis = 8;
 }
 
 message UpdateSpoolRequest {
@@ -234,7 +348,9 @@ message HostedNamespace {
   // Current effective visibility of the namespace's spool. Mirrors
   // `settings.visibility` for top-level reads; populated on every response
   // builder so SetNamespaceVisibility callers see the applied value.
-  SpoolVisibility visibility = 8;
+  Visibility visibility = 8;
+  // Immutable self-signed owner binding for the backing spool.
+  SignedSpoolOwnerGenesis owner_genesis = 9;
 }
 
 message HostedRepository {
@@ -246,6 +362,8 @@ message HostedRepository {
   // Unset when the serving registry has no activity data; populated by weft
   // from the refs/state tables (weft wiring is a separate weft-side change).
   google.protobuf.Timestamp last_activity_at = 6;
+  // Immutable self-signed owner binding for the repository spool.
+  SignedSpoolOwnerGenesis owner_genesis = 7;
 }
 
 message SpoolSummary {
@@ -259,11 +377,19 @@ message SpoolSummary {
   // value in the registry (weft#457) and populates it in the follow-on handler
   // pass.
   google.protobuf.Timestamp last_activity_at = 5;
+  // Count of content-facet refs with `is_thread = true`. ListSpools carries
+  // this so listing surfaces do not fan out to per-repo GetRefs (weft#1392).
+  // Explicit presence: absent means not measured; present zero means the spool
+  // has no thread refs (same contract as RefSummary counters).
+  optional uint32 thread_count = 6;
+  // HEAD-attached thread name (the default thread). Empty when HEAD is
+  // detached or the spool has no head.
+  string head_thread = 7;
 }
 
 // ── Unified spool settings (weft#472) ────────────────────────────────────────
 // One read + two writes for any spool (namespace or repo), keyed on
-// `full_path`. Reuse the existing SpoolSettings / SpoolVisibility / SpoolSummary
+// `full_path`. Reuse the existing SpoolSettings / Visibility / SpoolSummary
 // shapes — do not fork them. Handlers land in weft (a follow-up).
 
 // The unified settings-read result: SpoolSummary-style metadata plus the FULL
@@ -284,13 +410,15 @@ message HostedSpool {
   // SpoolSummary.last_activity_at).
   google.protobuf.Timestamp last_activity_at = 5;
   // The full spool settings (visibility, description, write_policy,
-  // default_state_visibility, …). Reuses the existing SpoolSettings message.
+  // state_visibility, …). Reuses the existing SpoolSettings message.
   SpoolSettings settings = 6;
   // Most recent canonical import operation targeting this spool. Clients load
   // its durable snapshot through OperationService; absent means no known
   // import operation. Handler adoption is part of the planned cutover.
   OperationId latest_import_operation_id = 8;
   string display_name = 9;
+  // Immutable self-signed owner binding accepted at spool creation.
+  SignedSpoolOwnerGenesis owner_genesis = 10;
 }
 
 message GetSpoolRequest {
@@ -301,7 +429,7 @@ message GetSpoolRequest {
 // SetNamespaceVisibilityRequest but keyed on `full_path`.
 message SetSpoolVisibilityRequest {
   string full_path = 1;
-  SpoolVisibility visibility = 2; // reuses the existing enum
+  Visibility visibility = 2;
   string client_operation_id = 3;
 }
 
@@ -362,6 +490,8 @@ message WorktreeSummary {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp modified_at = 8;
   bool is_current = 9;
+  // Present exactly when `thread` is present; immutable across thread rename.
+  optional string thread_id = 10;
 }
 
 message ActorSummary {
@@ -385,6 +515,8 @@ message ActorSummary {
   optional string native_parent_actor_key = 18;
   optional string probe_source = 19;
   optional float probe_confidence = 20;
+  // Stable identity paired with the renameable `thread` ref.
+  string thread_id = 21;
 }
 
 message ListActorsRequest {}
@@ -454,10 +586,19 @@ message MemberEntry {
 message ListMembersRequest {
   string namespace_path = 1;
   bool include_descendants = 2; // include grants on child namespaces + repos
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 3;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to this request's namespace scope; a token minted for another listing
+  // is rejected.
+  string page_token = 4;
 }
 
 message ListMembersResponse {
   repeated MemberEntry entries = 1;
+  // Empty when the last page was delivered.
+  string next_page_token = 2;
 }
 
 message ListSpoolsResponse {
@@ -526,8 +667,8 @@ message ResolvedPrincipal {
 // ============================================================================
 // Spool child edges + monorepo resolution + facet history (Spool epic P8a,
 // weft#358). ADDITIVE. Message shapes mirror weft's registry return types so
-// the P8b handler phase maps 1:1. State/change ids are `bytes` (16-byte
-// ChangeId), matching the package-wide wire convention.
+// the P8b handler phase maps 1:1. State ids use the package's typed 32-byte
+// physical StateId; logical rewrite-stable identity uses ChangeId separately.
 // ============================================================================
 
 // Who committed a facet change (audit trail). Mirrors heddle's
@@ -556,8 +697,8 @@ message ChildEdge {
   string parent_spool_id = 1;
   string child_spool_id = 2;
   string mount_name = 3;
-  // The child content state-id this edge is currently anchored to (16-byte
-  // ChangeId).
+  // The child content state this edge is currently anchored to (32-byte
+  // physical StateId).
   StateId anchored_state_id = 4;
   // The child's latest content-facet head, if any (absent = child has no
   // content head yet).
@@ -590,10 +731,19 @@ message DetachChildResponse {
 
 message ListChildrenRequest {
   string parent_path = 1;
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 2;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to this request's parent scope; a token minted for another listing is
+  // rejected.
+  string page_token = 3;
 }
 
 message ListChildrenResponse {
   repeated ChildEdge children = 1;
+  // Empty when the last page was delivered.
+  string next_page_token = 2;
 }
 
 // Why a child edge in a resolved monorepo was NOT descended into. A resolved
@@ -842,8 +992,9 @@ message ThreadApproval {
   RepositoryRef repo_path = 2;
   string source_thread = 3;
   string target_thread = 4;
-  // Change id at source thread's head when this approval was
-  // recorded. Used for stale-on-update detection.
+  // Physical StateId at source thread's head when this approval was recorded.
+  // Amend-in-place and rewrite both stale the approval because exact reviewed
+  // bytes changed.
   StateId source_state = 5;
   string approver_user_id = 6;
   // Biscuit session id of the approver — full audit attribution.
@@ -852,6 +1003,9 @@ message ThreadApproval {
   google.protobuf.Timestamp approved_at = 9;
   // 0 when the policy did not specify a TTL.
   google.protobuf.Timestamp expires_at = 10;
+  // Stable identities paired with the renameable refs above.
+  string source_thread_id = 11;
+  string target_thread_id = 12;
 }
 
 message ApproveThreadRequest {
@@ -861,6 +1015,10 @@ message ApproveThreadRequest {
   StateId source_state = 4;
   string note = 5;
   string client_operation_id = 6;
+  // Stable identities paired with the renameable refs above. Both are
+  // REQUIRED; identity, not ref text, is authoritative.
+  string source_thread_id = 7;
+  string target_thread_id = 8;
 }
 
 message RevokeApprovalRequest {
@@ -872,6 +1030,8 @@ message ListThreadApprovalsRequest {
   RepositoryRef repo_path = 1;
   string source_thread = 2;
   string target_thread = 3;
+  string source_thread_id = 4;
+  string target_thread_id = 5;
 }
 
 message ListThreadApprovalsResponse {
@@ -897,6 +1057,8 @@ message CheckMergeEligibilityRequest {
   // Optional: the user_id of the change author. Used for
   // forbid_author_approval. Empty = unknown / not enforced.
   string author_user_id = 7;
+  string source_thread_id = 8;
+  string target_thread_id = 9;
 }
 
 message CheckMergeEligibilityResponse {
@@ -1357,6 +1519,22 @@ service RegistryService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Public corpus projection only. Producers must enforce the public-visibility
+  // floor again while reading; a stale private row is never returned.
+  rpc ListExploreMetadata(ListExploreMetadataRequest) returns (ListExploreMetadataResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }

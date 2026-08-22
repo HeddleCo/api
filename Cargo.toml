@@ -1,19 +1,20 @@
 [package]
 name = "heddle-api"
-version = "0.2.0"
+version = "0.13.0"
 edition = "2024"
 authors = ["HeddleCo"]
 license = "Apache-2.0"
 repository = "https://github.com/HeddleCo/api"
 description = "Generated transport-neutral Rust types for the Heddle public API"
 build = "build.rs"
-include = ["/build.rs", "/build_support/**", "/src/**", "/proto/**", "/tests/fixtures/**", "/Cargo.toml", "/README.md", "/LICENSE"]
+include = ["/build.rs", "/build_support/**", "/docs/treadle-definition-v1.md", "/src/**", "/proto/**", "/tests/fixtures/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [features]
 default = []
 reflection = []
 
 [dependencies]
+blake3 = "=1.8.7"
 bytes = "=1.11.1"
 prost = "=0.14.1"
 prost-types = "=0.14.1"
@@ -27,6 +28,7 @@ prost-build = "=0.14.1"
 prost-reflect = "=0.16.5"
 
 [dev-dependencies]
+ed25519-dalek = "=3.0.0"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.149"
 

@@ -1,0 +1,223 @@
+// SPDX-License-Identifier: Apache-2.0
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+// A fully-expanded, content-addressed treadle CI definition.
+//
+// Version 1 is intentionally strict: producers MUST populate every required
+// scalar/message described below, MUST NOT emit unresolved matrix variables,
+// and MUST use the canonical encoding in docs/treadle-definition-v1.md before
+// hashing or signing. Readers accept only their current format version.
+message TreadleDefinition {
+  // Definition-format version. Version 1 readers accept exactly 1.
+  uint32 format_version = 1;
+
+  // Stable human-readable pipeline name.
+  string name = 2;
+
+  // Concrete jobs. Matrix expansion has already happened before this message
+  // is built; each job contains only its concrete matrix bindings.
+  repeated TreadleJob jobs = 3;
+
+  // Pipeline-wide service-container declarations referenced by checks by name.
+  repeated TreadleServiceContainer services = 4;
+
+  // Names-only secret declarations. Secret values never enter the definition.
+  repeated TreadleSecretRef secret_refs = 5;
+}
+
+// One concrete job in a pipeline.
+message TreadleJob {
+  // Stable job name.
+  string name = 1;
+
+  // Concrete author-time-expanded matrix bindings. Values are literals, not
+  // expressions or interpolation templates.
+  repeated TreadleMatrixValue matrix = 2;
+
+  // Signable argv-only checks belonging to this job.
+  repeated TreadleCheck checks = 3;
+}
+
+// One concrete matrix coordinate.
+message TreadleMatrixValue {
+  string name = 1;
+  string value = 2;
+}
+
+// A check is treadle's smallest independently signable execution atom.
+message TreadleCheck {
+  // Stable name, unique within its concrete job.
+  string name = 1;
+
+  // Executable name/path. This is never a shell command string.
+  string command = 2;
+
+  // Ordered arguments passed directly to command. No shell interpretation or
+  // variable interpolation is performed.
+  repeated string args = 3;
+
+  // Requested gating class. This is only a hint; protected policy remains the
+  // authority that decides whether a result gates acceptance.
+  TreadleCheckClass class = 4;
+
+  // Positive wall-clock timeout in whole seconds.
+  uint32 timeout_seconds = 5;
+
+  // Environment entries keyed by name. Values are literal or names-only secret
+  // references; bare protobuf maps are deliberately forbidden.
+  repeated TreadleEnvEntry env = 6;
+
+  // Repository-relative working directory. Empty means repository root.
+  string working_directory = 7;
+
+  // Names of pipeline-wide service containers required by this check.
+  repeated string service_dependencies = 8;
+
+  // Always present, including when max_retries is zero.
+  TreadleRetry retry = 9;
+
+  // Repository-relative paths eligible for restore/persist.
+  repeated string cache_paths = 10;
+
+  // Always present. Every field is a non-authoritative runner request.
+  TreadleIsolationHints isolation = 11;
+
+  // Events that request this check. At least one trigger is required.
+  repeated TreadleTrigger triggers = 12;
+
+  // Whether a newer state of the same thread supersedes an in-flight run.
+  bool supersede_older_runs = 13;
+
+  // Authoritative execution environment. Runners MUST execute against this
+  // exact platform-specific image digest and refuse incompatible platforms.
+  TreadleTargetEnvironment target_environment = 14;
+
+  // Required classification used when deciding whether an untrusted local
+  // verdict may supersede a queued run. Network isolation is not a substitute.
+  TreadleDeterminismClass determinism_class = 15;
+}
+
+enum TreadleCheckClass {
+  TREADLE_CHECK_CLASS_UNSPECIFIED = 0;
+  TREADLE_CHECK_CLASS_REQUIRED = 1;
+  TREADLE_CHECK_CLASS_ADVISORY = 2;
+  TREADLE_CHECK_CLASS_INFORMATIONAL = 3;
+}
+
+// Required, authoritative environment for one concrete check.
+message TreadleTargetEnvironment {
+  // Immutable OCI image digest, exactly "sha256:" plus 64 lowercase hex
+  // digits. This is a digest, not a tag or a name containing a tag.
+  string oci_image_digest = 1;
+
+  TreadlePlatform platform = 2;
+}
+
+// Required OCI/Go-style target platform. Both values are lowercase.
+message TreadlePlatform {
+  string os = 1;
+  string arch = 2;
+}
+
+enum TreadleDeterminismClass {
+  TREADLE_DETERMINISM_CLASS_UNSPECIFIED = 0;
+  TREADLE_DETERMINISM_CLASS_DETERMINISTIC = 1;
+  TREADLE_DETERMINISM_CLASS_NONDETERMINISTIC = 2;
+}
+
+// One environment value. Secret references contain a declaration name only.
+message TreadleEnvEntry {
+  string name = 1;
+
+  oneof source {
+    string literal_value = 2;
+    string secret_ref = 3;
+  }
+}
+
+message TreadleRetry {
+  // Additional attempts after the initial attempt.
+  uint32 max_retries = 1;
+
+  // Regex source strings used to classify retryable flakes.
+  repeated string flake_signatures = 2;
+}
+
+// Non-authoritative resource/isolation requests interpreted by runner policy.
+message TreadleIsolationHints {
+  // Named runner lane/profile, for example "bench". Empty requests no profile.
+  string profile = 1;
+
+  TreadleNetworkAccess network_access = 2;
+
+  // Zero means no requested limit for numeric hints.
+  uint32 cpu_millis = 3;
+  uint64 memory_bytes = 4;
+  uint32 process_limit = 5;
+}
+
+enum TreadleNetworkAccess {
+  TREADLE_NETWORK_ACCESS_UNSPECIFIED = 0;
+  TREADLE_NETWORK_ACCESS_NONE = 1;
+  TREADLE_NETWORK_ACCESS_SERVICES_ONLY = 2;
+  TREADLE_NETWORK_ACCESS_FULL = 3;
+}
+
+message TreadleTrigger {
+  TreadleTriggerKind kind = 1;
+
+  // Required only for CRON and forbidden for all other kinds. Cron grammar is
+  // validated by the authoring SDK before canonical encoding.
+  string cron_expression = 2;
+}
+
+enum TreadleTriggerKind {
+  TREADLE_TRIGGER_KIND_UNSPECIFIED = 0;
+  TREADLE_TRIGGER_KIND_PUSH = 1;
+  TREADLE_TRIGGER_KIND_MANUAL = 2;
+  TREADLE_TRIGGER_KIND_CRON = 3;
+}
+
+// A pipeline-wide service container.
+message TreadleServiceContainer {
+  string name = 1;
+
+  // Registry locator used to find the image. Identity is established only by
+  // oci_image_digest; a tag in this field is never authoritative.
+  string image = 2;
+  repeated uint32 ports = 3;
+  repeated TreadleEnvEntry env = 4;
+
+  // Absent means the service has no readiness command.
+  TreadleArgv readiness = 5;
+
+  // Required immutable OCI image digest, exactly "sha256:" plus 64 lowercase
+  // hex digits. Runners MUST pull and verify this digest, never trust image.
+  string oci_image_digest = 6;
+}
+
+// An argv-only command used outside the signable check atom, such as readiness.
+message TreadleArgv {
+  string command = 1;
+  repeated string args = 2;
+}
+
+// A names-only secret grant requested by the pipeline.
+message TreadleSecretRef {
+  string name = 1;
+
+  // Optional runner/provider-specific store hint. Empty means policy chooses.
+  string provider = 2;
+
+  // Required execution-trust tier. The value, not the secret, is signed into
+  // the definition and participates in local-run supersede eligibility.
+  TreadleSecretTier tier = 3;
+}
+
+enum TreadleSecretTier {
+  TREADLE_SECRET_TIER_UNSPECIFIED = 0;
+  TREADLE_SECRET_TIER_STANDARD = 1;
+  TREADLE_SECRET_TIER_TRUSTED_RUNNER_ONLY = 2;
+}

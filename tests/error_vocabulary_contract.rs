@@ -42,9 +42,7 @@ fn stream_detail_round_trips_inside_error_detail() {
     let decoded = CallFailure::decode(encoded.as_slice()).expect("decode CallFailure");
     assert_eq!(decoded, failure);
 
-    let Some(error_detail::Context::Stream(stream)) =
-        decoded.error.expect("error").context
-    else {
+    let Some(error_detail::Context::Stream(stream)) = decoded.error.expect("error").context else {
         panic!("stream arm must survive the wire trip");
     };
     assert_eq!(stream.code, CallFailureCode::Internal as i32);
@@ -122,8 +120,7 @@ fn unknown_context_round_trips_losslessly() {
     let decoded = CallFailure::decode(encoded.as_slice()).expect("decode CallFailure");
     assert_eq!(decoded, failure);
 
-    let Some(error_detail::Context::Unknown(preserved)) =
-        decoded.error.expect("error").context
+    let Some(error_detail::Context::Unknown(preserved)) = decoded.error.expect("error").context
     else {
         panic!("unknown arm must survive the wire trip");
     };

@@ -8,8 +8,13 @@ const modules = readdirSync(root)
 const lines = modules.map((name) => `export * from "./${name.replace(/\.ts$/, ".js")}";`);
 copyFileSync("packages/typescript/runtime/errors.ts", join(root, "errors.ts"));
 copyFileSync("packages/typescript/runtime/signing.ts", join(root, "signing.ts"));
+copyFileSync("packages/typescript/runtime/treadle.ts", join(root, "treadle.ts"));
+copyFileSync("packages/typescript/runtime/treadle-authoring.ts", join(root, "treadle-authoring.ts"));
 lines.push('export * from "./errors.js";');
 lines.push('export * from "./signing.js";');
+lines.push('export * from "./treadle.js";');
+lines.push('export * from "./treadle-authoring.js";');
+lines.push('export * from "./attachment-authorization.js";');
 writeFileSync(join(root, "index.ts"), `${lines.join("\n")}\n`);
 writeFileSync(
   join(root, "shared.ts"),

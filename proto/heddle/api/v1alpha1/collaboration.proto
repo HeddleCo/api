@@ -38,6 +38,7 @@ message OpenDiscussionRequest {
   // Stable identity paired with `thread_ref`; both are empty when the
   // discussion is not attached to a thread.
   string thread_id = 8;
+  DiscussionSeverity severity = 9;
 }
 
 message AppendTurnRequest {

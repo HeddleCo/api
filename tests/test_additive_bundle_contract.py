@@ -5,6 +5,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 COLLABORATION = (ROOT / "proto/heddle/api/v1alpha1/collaboration.proto").read_text()
+IDENTITY = (ROOT / "proto/heddle/api/v1alpha1/identity.proto").read_text()
+REGISTRY = (ROOT / "proto/heddle/api/v1alpha1/registry.proto").read_text()
 REPOSITORY = (ROOT / "proto/heddle/api/v1alpha1/repository.proto").read_text()
 STATE_REVIEW = (ROOT / "proto/heddle/api/v1alpha1/state_review.proto").read_text()
 
@@ -28,6 +30,86 @@ def fields(source: str, message: str) -> list[tuple[str, int]]:
 
 
 class AdditiveBundleContractTest(unittest.TestCase):
+    def test_open_discussion_severity_binds_to_merge_requirement_kind(self) -> None:
+        self.assertEqual(
+            fields(COLLABORATION, "OpenDiscussionRequest")[-1],
+            ("severity", 9),
+        )
+        requirement_kinds = body(REGISTRY, "enum", "UnmetRequirementKind")
+        self.assertIn("UNMET_REQUIREMENT_KIND_OPEN_DISCUSSION = 3", requirement_kinds)
+
+    def test_github_app_installation_repository_listing_and_setup_mint(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "ListInstallationRepositoriesRequest"),
+            [("installation_id", 1), ("page_size", 2), ("page_token", 3)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "ListInstallationRepositoriesResponse"),
+            [("repositories", 1), ("next_page_token", 2)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "InstallationRepository"),
+            [("id", 1), ("full_name", 2), ("installation_granted", 3)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "MintGitHubAppSetupChallengeRequest"),
+            [("client_operation_id", 1)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "MintGitHubAppSetupChallengeResponse"),
+            [("state", 1)],
+        )
+        service = body(IDENTITY, "service", "IdentityService")
+        self.assertIn(
+            "rpc ListInstallationRepositories(ListInstallationRepositoriesRequest) "
+            "returns (ListInstallationRepositoriesResponse)",
+            service,
+        )
+        self.assertIn(
+            "rpc MintGitHubAppSetupChallenge(MintGitHubAppSetupChallengeRequest) "
+            "returns (MintGitHubAppSetupChallengeResponse)",
+            service,
+        )
+        list_rpc = re.search(
+            r"(?ms)rpc ListInstallationRepositories\(.*?\n  \}", service
+        )
+        self.assertIsNotNone(list_rpc)
+        self.assertIn("RPC_EFFECT_READ_ONLY", list_rpc.group(0))
+        self.assertIn("RETRY_BEHAVIOR_SAFE", list_rpc.group(0))
+        self.assertIn("client_operation_id_required: false", list_rpc.group(0))
+        mint_rpc = re.search(
+            r"(?ms)rpc MintGitHubAppSetupChallenge\(.*?\n  \}", service
+        )
+        self.assertIsNotNone(mint_rpc)
+        self.assertIn("RPC_EFFECT_TRANSIENT_WRITE", mint_rpc.group(0))
+        self.assertIn("RETRY_BEHAVIOR_CLIENT_OPERATION_ID", mint_rpc.group(0))
+        self.assertIn("client_operation_id_required: true", mint_rpc.group(0))
+
+    def test_retired_rpcs_and_private_messages_are_absent(self) -> None:
+        for source, service_name, methods in (
+            (IDENTITY, "IdentityService", ("MintBiscuit", "RecordSubscription")),
+            (
+                REGISTRY,
+                "RegistryService",
+                ("CreateNamespace", "CreateRepository", "GetCurrentUserNamespace"),
+            ),
+        ):
+            service = body(source, "service", service_name)
+            for method in methods:
+                self.assertNotRegex(service, rf"\brpc {method}\(")
+        for message in (
+            "MintBiscuitRequest",
+            "RecordSubscriptionRequest",
+            "RecordSubscriptionResponse",
+        ):
+            self.assertNotRegex(IDENTITY, rf"(?m)^message {message} \{{")
+        for message in (
+            "CreateNamespaceRequest",
+            "CreateRepositoryRequest",
+            "GetCurrentUserNamespaceRequest",
+        ):
+            self.assertNotRegex(REGISTRY, rf"(?m)^message {message} \{{")
+
     def test_list_discussions_by_states_is_batched_digest_read(self) -> None:
         self.assertEqual(
             fields(COLLABORATION, "ListDiscussionsByStatesRequest"),

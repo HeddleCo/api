@@ -78,6 +78,7 @@ enum UnmetRequirementKind {
   UNMET_REQUIREMENT_KIND_UNSPECIFIED = 0;
   UNMET_REQUIREMENT_KIND_FLAT_ROLE = 1;
   UNMET_REQUIREMENT_KIND_GROUP = 2;
+  UNMET_REQUIREMENT_KIND_OPEN_DISCUSSION = 3;
 }
 
 enum SpoolBootstrapSyncDirection {
@@ -144,20 +145,7 @@ message SpoolSettings {
   SpoolHoldLifecycle hold_lifecycle = 11; // +weft#481: inheritable HOLD lifecycle policy
 }
 
-message GetCurrentUserNamespaceRequest {}
-
 message GetCurrentUserSpoolRequest {}
-
-message CreateNamespaceRequest {
-  NamespaceKind kind = 1;
-  string slug = 2;
-  string parent_path = 3;
-  string display_name = 4;
-  SpoolSettings settings = 5;
-  string client_operation_id = 6;
-  // Required self-signed genesis for the namespace's backing spool.
-  SignedSpoolOwnerGenesis owner_genesis = 7;
-}
 
 message UpdateNamespaceRequest {
   string full_path = 1;
@@ -260,14 +248,6 @@ message RepoCraftMetrics {
 
 message ListExploreMetadataResponse {
   repeated ExploreMetadata repositories = 1;
-}
-
-message CreateRepositoryRequest {
-  string namespace_path = 1;
-  string slug = 2;
-  string client_operation_id = 3;
-  // Required self-signed genesis for the repository spool.
-  SignedSpoolOwnerGenesis owner_genesis = 4;
 }
 
 message UpdateRepositoryRequest {
@@ -1204,42 +1184,6 @@ service RegistryService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
-  rpc CreateNamespace(CreateNamespaceRequest) returns (HostedNamespace) {
-    option (heddle.api.v1alpha1.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
-      effect: RPC_EFFECT_DURABLE_WRITE
-      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
-      client_operation_id_required: true
-      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
-      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
-      authorization_request_targets: {
-        path: "parent_path"
-        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
-      }
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
-    };
-  }
-  rpc CreateRepository(CreateRepositoryRequest) returns (HostedRepository) {
-    option (heddle.api.v1alpha1.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
-      effect: RPC_EFFECT_DURABLE_WRITE
-      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
-      client_operation_id_required: true
-      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
-      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_MAINTAINER
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
-      authorization_request_targets: {
-        path: "namespace_path"
-        role: AUTHORIZATION_ROLE_RESOURCE_MAINTAINER
-      }
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
-    };
-  }
   rpc CreateSpool(CreateSpoolRequest) returns (HostedSpool) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -1359,20 +1303,6 @@ service RegistryService {
         path: "parent_path"
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
-    };
-  }
-  rpc GetCurrentUserNamespace(GetCurrentUserNamespaceRequest) returns (HostedNamespace) {
-    option (heddle.api.v1alpha1.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_NONE
-      effect: RPC_EFFECT_READ_ONLY
-      retry_behavior: RETRY_BEHAVIOR_SAFE
-      client_operation_id_required: false
-      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
-      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }

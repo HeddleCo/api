@@ -564,8 +564,10 @@ message Entitlement {
 
 // Caller-bound retained-storage projection returned by WhoAmI.
 message StorageUsage {
-  uint64 current_storage_bytes = 1;
-  uint64 storage_allowance_bytes = 2;
+  // Explicit presence: absent means not measured; present zero means the
+  // measured usage is genuinely zero (same contract as RefSummary counters).
+  optional uint64 current_storage_bytes = 1;
+  optional uint64 storage_allowance_bytes = 2;
 }
 
 // Records/updates a subject's paid entitlement. A privilege-granting write —

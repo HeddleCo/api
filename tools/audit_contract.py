@@ -172,6 +172,19 @@ def audit_new_descriptor(decoded: str) -> None:
         "ImportProgressEvent",
         "ImportJobSummary",
         'name: "OperationReceipt"',
+        'name: "GetCurrentUserNamespace"',
+        'name: "CreateNamespace"',
+        'name: "CreateRepository"',
+        'name: "RecordSubscription"',
+        'name: "MintBiscuit"',
+        'name: "GetCurrentUserNamespaceRequest"',
+        'name: "CreateNamespaceRequest"',
+        'name: "CreateRepositoryRequest"',
+        'name: "RecordSubscriptionRequest"',
+        'name: "RecordSubscriptionResponse"',
+        'name: "MintBiscuitRequest"',
+        'name: "KeypairProof"',
+        'name: "DeviceAuthProof"',
     ):
         assert removed not in decoded
 

@@ -90,9 +90,8 @@ message RegisterPublicKeyRequest {
   // renewal anchor for this device. Distinct from the WebAuthn
   // credential's attested public key (COSE-encoded, lives in
   // `webauthn_credentials`): this key lives in `device_roots` and
-  // is the one `mint_biscuit_keypair` calls
-  // `Ed25519Signer::verify_with_public_key` against on every
-  // `KeypairProof` renewal. Leave empty for browser-only flows.
+  // is the one used to verify device-key renewal proofs. Leave empty for
+  // browser-only flows.
   //
   // When non-empty, MUST be accompanied by a binding signature
   // (see the three `device_binding_*` fields). Closes
@@ -210,8 +209,7 @@ message RotateCredentialRequest {
   //         u64_be(proof_timestamp_seconds) || 0x00 ||
   //         credential_id || 0x00 || public_key)`.
   // The timestamp is Unix seconds and the signature is 64 raw bytes. The
-  // server rejects proofs whose timestamp is outside ±60s of now (same
-  // window as KeypairProof).
+  // server rejects proofs whose timestamp is outside ±60s of now.
   uint64 proof_timestamp_seconds = 4;
   bytes proof_signature = 5;
 }
@@ -359,73 +357,6 @@ message IssuePresenceTokenResponse {
   google.protobuf.Timestamp expires_at = 2;
 }
 
-// MintBiscuit is the unified renewal endpoint for long-lived
-// processes. The caller proves they're entitled to a fresh Biscuit
-// via one of the proof variants below. See `AuthService.MintBiscuit`
-// for the full semantic note.
-message MintBiscuitRequest {
-  // The principal subject that the new Biscuit should bind to. Must
-  // match the keypair's recorded subject (or the device_root's
-  // user). Server rejects mismatches as `permission_denied` rather
-  // than minting a token for an arbitrary subject.
-  string subject = 1;
-
-  // Attenuation hint: when set, the server intersects the requested
-  // scope with the keypair-owner's original grant. Empty == reuse
-  // the original scope.
-  string requested_scope = 2;
-
-  // UA / IP captured by the caller. Same shape and intent as
-  // `RefreshSessionRequest` had — usually empty (the web layer's
-  // `x-forwarded-*` metadata path is preferred), but kept available
-  // for direct CLI callers that don't speak the proxy convention.
-  string user_agent = 3;
-  string ip = 4;
-
-  oneof proof {
-    KeypairProof keypair = 5;
-    DeviceAuthProof device_auth = 6;
-    // OidcProof oidc = 12;  // Future: federated CI token exchange.
-  }
-
-  string client_operation_id = 7;
-}
-
-// Proof of possession via Ed25519 signature. The server looks up
-// `public_key_id` in `device_roots` first (CLI device flow) and then
-// in `issued_credentials` (service-account credential renewal). The
-// signature is over the canonical bytes
-// `f"{timestamp}\n{public_key_id}\n{requested_scope}"` (UTF-8). The
-// timestamp window is ±60s — replay attempts older than that are
-// rejected without touching the keypair lookup.
-message KeypairProof {
-  // Stable id of the public key. Matches `device_roots.id` or
-  // `issued_credentials.id`.
-  string public_key_id = 1;
-  // Unix-seconds when the signature was produced. Signed input.
-  uint64 timestamp = 2;
-  // Ed25519 signature over the canonical bytes.
-  bytes signature = 3;
-}
-
-// Proof that a user-approved device authorization completed. The
-// CLI presents the device_code returned by
-// `CreateDeviceAuthorization` plus a signature over `device:{code}`
-// using the device keypair generated locally. Server completes the
-// hand-off: registers the device_root row if not present, mints a
-// fresh Biscuit bound to the device pop key.
-message DeviceAuthProof {
-  string device_code = 1;
-  // Raw Ed25519 public-key bytes. Server stores it on first hand-off
-  // (`device_roots` row) and signs subsequent renewals against it via
-  // `KeypairProof`.
-  bytes device_public_key = 2;
-  // Signature over the bytes `device:{device_code}` using the
-  // device's private key. Replaces the old proof field on
-  // `ExchangeDeviceAuthorizationRequest`.
-  bytes signature = 3;
-}
-
 // Mint a fresh anonymous Biscuit. Unauthenticated; per-IP
 // rate-limited server-side (see `docs/auth/anon-biscuit-spike.md`
 // §7.1: 10/hour/IP). When `WEFT_MINT_TURNSTILE_REQUIRED=true` on
@@ -566,39 +497,6 @@ message Entitlement {
 message StorageUsage {
   uint64 current_storage_bytes = 1;
   uint64 storage_allowance_bytes = 2;
-}
-
-// Records/updates a subject's paid entitlement. A privilege-granting write —
-// weft gates it on the billing service account's `billing:write` Right and
-// maps `product_id → plan` from checked-in, fail-closed config.
-message RecordSubscriptionRequest {
-  string subject = 1;
-  string product_id = 2;
-  SubscriptionStatus status = 3;
-  string provider = 4;
-  string provider_customer_id = 5;
-  string provider_subscription_id = 6;
-  google.protobuf.Timestamp current_period_end = 7;
-  // Provider webhook event id — the natural idempotency key for the upstream
-  // billing event. Retained for handler-side dedup alongside the transport
-  // `client_operation_id`.
-  string event_id = 8;
-  string client_operation_id = 9;
-  // Provider version stamp for the state this write carries: Polar's
-  // `modified_at`, falling back to `created_at` while the object has never
-  // been mutated. Monotonically non-decreasing over the subscription's
-  // lifetime, so weft compares it against the stored stamp inside the upsert
-  // and rejects writes older than what is already recorded — a delayed
-  // `order.paid` can no longer undo a `subscription.revoked`. Absent means
-  // unstamped: the write applies without an ordering check and preserves any
-  // stamp already stored. Do not send `current_period_end` here; it is a
-  // business date, not a version, and is unchanged across a
-  // `past_due` -> `active` retry.
-  optional google.protobuf.Timestamp provider_modified_at = 10;
-}
-
-message RecordSubscriptionResponse {
-  Entitlement entitlement = 1;
 }
 
 message IntrospectCredentialRequest {
@@ -2005,37 +1903,6 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
-  rpc MintBiscuit(MintBiscuitRequest) returns (AccessTokenResponse) {
-    option (heddle.api.v1alpha1.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_NONE
-      effect: RPC_EFFECT_TRANSIENT_WRITE
-      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
-      client_operation_id_required: false
-      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
-      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
-      authorization_request_targets: {
-        path: "subject"
-        role: AUTHORIZATION_ROLE_CALLER_BOUND
-      }
-      authorization_request_targets: {
-        path: "requested_scope"
-        role: AUTHORIZATION_ROLE_CALLER_BOUND
-      }
-      authorization_request_targets: {
-        path: "keypair.public_key_id"
-        role: AUTHORIZATION_ROLE_CALLER_BOUND
-      }
-      authorization_request_targets: {
-        path: "device_auth.device_code"
-        role: AUTHORIZATION_ROLE_CALLER_BOUND
-      }
-      authorization_multi_target: true
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
-    };
-  }
   // Atomically finishes WebAuthn registration, binds credentialId, claims
   // the handle, and flips agent_rooted → self_rooted (api#123). Authorization
   // is the agent's promote-consent signature over
@@ -2087,27 +1954,6 @@ service IdentityService {
         role: AUTHORIZATION_ROLE_CALLER_BOUND
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-    };
-  }
-  // Record/update a subject's paid entitlement. Privilege-granting write gated
-  // on the billing service account's administrative right over `subject`; weft
-  // maps `product_id → plan` from checked-in, fail-closed config.
-  rpc RecordSubscription(RecordSubscriptionRequest) returns (RecordSubscriptionResponse) {
-    option (heddle.api.v1alpha1.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
-      effect: RPC_EFFECT_DURABLE_WRITE
-      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
-      client_operation_id_required: true
-      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
-      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
-      authorization_request_targets: {
-        path: "subject"
-        role: AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR
-      }
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
   // Registers a GitHub App installation only after server-side ownership

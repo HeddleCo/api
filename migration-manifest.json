@@ -135,9 +135,8 @@
     },
     {
       "old_rpc": "heddle.v1.AuthService/MintBiscuit",
-      "classification": "renamed",
-      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit"
+      "classification": "dropped",
+      "reason": "retired in 0.14.0; clients mint biscuits locally and weft verifies device keys"
     },
     {
       "old_rpc": "heddle.v1.AuthService/RecordSubscription",
@@ -457,15 +456,13 @@
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateNamespace",
-      "classification": "renamed",
-      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace"
+      "classification": "dropped",
+      "reason": "retired in 0.14.0; superseded by RegistryService/CreateSpool"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateRepository",
-      "classification": "renamed",
-      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository"
+      "classification": "dropped",
+      "reason": "retired in 0.14.0; superseded by RegistryService/CreateSpool"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateThreadPolicy",
@@ -517,9 +514,8 @@
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GetCurrentUserNamespace",
-      "classification": "renamed",
-      "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace"
+      "classification": "dropped",
+      "reason": "retired in 0.14.0; superseded by RegistryService/GetCurrentUserSpool"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GetGovernanceHistory",

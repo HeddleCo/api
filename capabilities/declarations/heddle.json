@@ -586,17 +586,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit",
-      "layers": {
-        "client": {
-          "status": "shipped"
-        },
-        "cli": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.IdentityService/PromoteAgentAccount",
       "layers": {
         "client": {
@@ -609,17 +598,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ProvisionAgentRootedAccount",
-      "layers": {
-        "client": {
-          "status": "planned"
-        },
-        "cli": {
-          "status": "planned"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.IdentityService/RecordSubscription",
       "layers": {
         "client": {
           "status": "planned"
@@ -1081,28 +1059,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
-      "layers": {
-        "client": {
-          "status": "intentionally-unsupported"
-        },
-        "cli": {
-          "status": "intentionally-unsupported"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
-      "layers": {
-        "client": {
-          "status": "intentionally-unsupported"
-        },
-        "cli": {
-          "status": "intentionally-unsupported"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateSpool",
       "layers": {
         "client": {
@@ -1170,17 +1126,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/DetachChild",
-      "layers": {
-        "client": {
-          "status": "intentionally-unsupported"
-        },
-        "cli": {
-          "status": "intentionally-unsupported"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
       "layers": {
         "client": {
           "status": "intentionally-unsupported"

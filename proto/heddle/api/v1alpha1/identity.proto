@@ -856,6 +856,49 @@ message CreateSignupInviteResponse {
   uint32 allowance_remaining = 3;
 }
 
+// Owner-view lifecycle of an invite listed by its creator. Distinct from
+// SignupInviteResolutionStatus, which is the public code-resolution
+// projection and folds unknown, malformed, and revoked codes into EXPIRED:
+// an owner listing always refers to a live row, so it needs only open
+// versus consumed.
+enum SignupInviteOwnerStatus {
+  SIGNUP_INVITE_OWNER_STATUS_UNSPECIFIED = 0;
+  SIGNUP_INVITE_OWNER_STATUS_OPEN = 1;
+  SIGNUP_INVITE_OWNER_STATUS_CONSUMED = 2;
+}
+
+message SignupInviteSummary {
+  // High-entropy opaque code (the same value CreateSignupInvite returned).
+  string invite_code = 1;
+  SignupInviteOwnerStatus status = 2;
+  google.protobuf.Timestamp created_at = 3;
+  // Consumed state carries no claimer identity anywhere: no claimer handle,
+  // subject, or account reference exists on this message or anywhere else in
+  // the response. Boolean + timestamp is sufficient to count and credit
+  // referrals without disclosing who claimed.
+  bool consumed = 4;
+  // Present when consumed.
+  optional google.protobuf.Timestamp consumed_at = 5;
+}
+
+message ListSignupInvitesRequest {
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 1;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to the calling principal's invite set; a token minted for another
+  // caller is rejected.
+  string page_token = 2;
+}
+
+message ListSignupInvitesResponse {
+  repeated SignupInviteSummary invites = 1;
+  // Caller-owned allowance remaining, readable without spending an invite.
+  uint32 allowance_remaining = 2;
+  // Empty when the last page was delivered.
+  string next_page_token = 3;
+}
+
 // Public lifecycle projection for an invite code supplied by the caller. The
 // vocabulary intentionally has no missing/invalid/revoked state: those inputs
 // are represented exactly as EXPIRED.
@@ -1638,6 +1681,26 @@ service IdentityService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Lists the signup invites owned by the authenticated caller. The owner is
+  // always derived from the bearer; there is no user selector, so a member
+  // can only ever enumerate their own invites. Consumed invites expose a
+  // boolean and timestamp only — no claimer handle or other claimer identity
+  // is returned. allowance_remaining is reported without spending an invite.
+  rpc ListSignupInvites(ListSignupInvitesRequest) returns (ListSignupInvitesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND

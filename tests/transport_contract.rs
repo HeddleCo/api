@@ -205,7 +205,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 184);
+    assert_eq!(ALL_METHODS.len(), 179);
     for method in [
         "BootstrapOwnerRoot",
         "RotateOwnerKey",
@@ -496,11 +496,11 @@ fn push_request_carries_an_explicit_remote_head_precondition() {
 
 #[test]
 fn generated_descriptor_extracts_client_operation_id_without_route_specific_code() {
-    let method = method_descriptor("/heddle.api.v1alpha1.RegistryService/CreateRepository")
-        .expect("create repository descriptor");
+    let method = method_descriptor("/heddle.api.v1alpha1.RegistryService/CreateSpool")
+        .expect("create spool descriptor");
     assert!(method.client_operation_id_required);
     assert!(method.client_operation_id_field_number.is_some());
-    let request = heddle_api::heddle::api::v1alpha1::CreateRepositoryRequest {
+    let request = heddle_api::heddle::api::v1alpha1::CreateSpoolRequest {
         client_operation_id: "operation-123".to_string(),
         ..Default::default()
     }

@@ -78,15 +78,7 @@ class SpoolContractTest(unittest.TestCase):
         self.assertIn("UUIDv7", request)
         self.assertIn(("SignedSpoolOwnerGenesis", "owner_genesis", 10), fields("HostedSpool"))
 
-    def test_every_spool_creation_shape_carries_owner_genesis(self) -> None:
-        self.assertIn(
-            ("SignedSpoolOwnerGenesis", "owner_genesis", 7),
-            fields("CreateNamespaceRequest"),
-        )
-        self.assertIn(
-            ("SignedSpoolOwnerGenesis", "owner_genesis", 4),
-            fields("CreateRepositoryRequest"),
-        )
+    def test_live_spool_shapes_carry_owner_genesis(self) -> None:
         self.assertIn(
             ("SignedSpoolOwnerGenesis", "owner_genesis", 9),
             fields("HostedNamespace"),

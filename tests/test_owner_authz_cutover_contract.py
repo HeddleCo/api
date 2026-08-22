@@ -200,8 +200,6 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
         )
         self.assertIn(("owner_genesis", 8), fields(self.registry, "CreateSpoolRequest"))
         self.assertIn(("owner_genesis", 10), fields(self.registry, "HostedSpool"))
-        self.assertIn(("owner_genesis", 7), fields(self.registry, "CreateNamespaceRequest"))
-        self.assertIn(("owner_genesis", 4), fields(self.registry, "CreateRepositoryRequest"))
         ready = fields(self.sync, "PullReady")
         self.assertEqual(
             ready[-2:],

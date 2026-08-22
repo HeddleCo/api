@@ -105,7 +105,7 @@ RETAINED = {
         "IssueServiceAccountCredential", "RevokeServiceAccount", "WhoAmI",
         "IntrospectCredential", "ListServiceAccounts", "ListScopeCapabilities",
         "LinkOAuthIdentity", "StoreProviderToken", "VerifySignupEmail",
-        "GetInvitationSummary", "ListSessions", "RevokeSession", "MintBiscuit",
+        "GetInvitationSummary", "ListSessions", "RevokeSession",
         "IssuePresenceToken", "MintAnonBiscuit",
     },
     "ContentService": {
@@ -123,8 +123,7 @@ RETAINED = {
         "StreamFeed", "GetFeedSnapshot", "RecordInteraction", "UpdateFeedItem",
     },
     "HostedUserService": {
-        "GetCurrentUserNamespace", "CreateNamespace", "UpdateNamespace",
-        "SetNamespaceVisibility", "DeleteNamespace", "CreateRepository",
+        "UpdateNamespace", "SetNamespaceVisibility", "DeleteNamespace",
         "ListSpools", "UpdateRepository", "DeleteRepository", "GetSpool",
         "SetSpoolVisibility", "UpdateSpoolSettings", "CreateGrant", "ListGrants",
         "UpdateGrant", "DeleteGrant", "ResolveSubjects", "CreateInvitation",

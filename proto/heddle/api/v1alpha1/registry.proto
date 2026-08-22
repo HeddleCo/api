@@ -585,10 +585,19 @@ message MemberEntry {
 message ListMembersRequest {
   string namespace_path = 1;
   bool include_descendants = 2; // include grants on child namespaces + repos
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 3;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to this request's namespace scope; a token minted for another listing
+  // is rejected.
+  string page_token = 4;
 }
 
 message ListMembersResponse {
   repeated MemberEntry entries = 1;
+  // Empty when the last page was delivered.
+  string next_page_token = 2;
 }
 
 message ListSpoolsResponse {
@@ -721,10 +730,19 @@ message DetachChildResponse {
 
 message ListChildrenRequest {
   string parent_path = 1;
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 2;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to this request's parent scope; a token minted for another listing is
+  // rejected.
+  string page_token = 3;
 }
 
 message ListChildrenResponse {
   repeated ChildEdge children = 1;
+  // Empty when the last page was delivered.
+  string next_page_token = 2;
 }
 
 // Why a child edge in a resolved monorepo was NOT descended into. A resolved

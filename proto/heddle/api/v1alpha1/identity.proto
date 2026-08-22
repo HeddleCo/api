@@ -634,10 +634,20 @@ message RevokeServiceAccountRequest {
   string client_operation_id = 2;
 }
 
-message ListServiceAccountsRequest {}
+message ListServiceAccountsRequest {
+  // Zero selects the server default page size; larger requests are clamped
+  // to the server maximum (200).
+  uint32 page_size = 1;
+  // Opaque continuation token returned by a previous next_page_token. Bound
+  // to the calling principal's account set; a token minted for another
+  // caller is rejected.
+  string page_token = 2;
+}
 
 message ListServiceAccountsResponse {
   repeated ServiceAccountWithCredentials service_accounts = 1;
+  // Empty when the last page was delivered.
+  string next_page_token = 2;
 }
 
 message ServiceAccountWithCredentials {

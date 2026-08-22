@@ -187,6 +187,8 @@ def audit_new_descriptor(decoded: str) -> None:
                     ("capability", 13),
                     ("policy", 14),
                     ("human_verification", 15),
+                    ("stream", 18),
+                    ("unknown", 19),
                 ], name
             else:
                 highest = max(field_numbers | reserved_numbers, default=0)

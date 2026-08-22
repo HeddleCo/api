@@ -212,6 +212,8 @@ def audit_new_descriptor(decoded: str) -> None:
                     ("human_verification", 15),
                     ("ambiguous_change_id", 16),
                     ("signup", 17),
+                    ("stream", 18),
+                    ("unknown", 19),
                 ], name
             elif name == "AmbiguousChangeIdDetail":
                 assert fields == [

@@ -462,8 +462,8 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
         self.assertEqual(len(shipped), 151)
         # LandStack adds one shipped method; contract-first additions including
-        # CreateSignupInvite remain explicitly planned.
-        self.assertEqual(len(planned), 32)
+        # CreateSignupInvite and ListSignupInvites remain explicitly planned.
+        self.assertEqual(len(planned), 33)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

@@ -110,16 +110,20 @@ class SharedOperationContractTest(unittest.TestCase):
             r"\boptional\s+google\.protobuf\.Timestamp\s+ended_at\s*=\s*3\s*;",
         )
         self.assertRegex(
-            ref_summary, r"\buint32\s+advertised_branches\s*=\s*1\s*;"
+            ref_summary, r"\boptional\s+uint32\s+advertised_branches\s*=\s*1\s*;"
         )
-        self.assertRegex(ref_summary, r"\buint32\s+advertised_tags\s*=\s*2\s*;")
+        self.assertRegex(
+            ref_summary, r"\boptional\s+uint32\s+advertised_tags\s*=\s*2\s*;"
+        )
         self.assertRegex(
             ref_summary, r"\boptional\s+string\s+oldest_tag_name\s*=\s*3\s*;"
         )
         self.assertRegex(
-            ref_summary, r"\buint32\s+published_branches\s*=\s*4\s*;"
+            ref_summary, r"\boptional\s+uint32\s+published_branches\s*=\s*4\s*;"
         )
-        self.assertRegex(ref_summary, r"\buint32\s+published_tags\s*=\s*5\s*;")
+        self.assertRegex(
+            ref_summary, r"\boptional\s+uint32\s+published_tags\s*=\s*5\s*;"
+        )
         self.assertIn("durable job record", progress)
         self.assertIn("snapshot-repeated", progress)
         self.assertIn("ACTUAL, never projected/estimated", progress)

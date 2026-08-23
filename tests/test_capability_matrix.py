@@ -463,7 +463,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         self.assertEqual(len(shipped), 151)
         # LandStack adds one shipped method; contract-first additions including
         # CreateSignupInvite and ListSignupInvites remain explicitly planned.
-        self.assertEqual(len(planned), 33)
+        self.assertEqual(len(planned), 34)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

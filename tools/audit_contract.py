@@ -68,7 +68,7 @@ def audit_new_descriptor(decoded: str) -> None:
     # RPCs now inherit SHIPPED; CreateSignupInvite, ListSignupInvites,
     # RegisterGitHubInstallation, and the two remote-link management RPCs
     # remain contract-first until their Weft handlers land).
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 15
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 16
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded

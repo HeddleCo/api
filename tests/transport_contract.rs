@@ -205,7 +205,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 184);
+    assert_eq!(ALL_METHODS.len(), 185);
     for method in [
         "BootstrapOwnerRoot",
         "RotateOwnerKey",
@@ -294,6 +294,31 @@ fn generated_descriptor_carries_github_installation_registration_contract() {
     assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
     assert!(method.client_operation_id_required);
     assert_eq!(method.client_operation_id_field_number, Some(2));
+    assert_eq!(method.maturity, ServiceMaturity::Planned);
+}
+
+#[test]
+fn generated_descriptor_carries_list_installation_repositories_contract() {
+    let method =
+        method_descriptor("/heddle.api.v1alpha1.IdentityService/ListInstallationRepositories")
+            .expect("ListInstallationRepositories descriptor");
+
+    assert_eq!(
+        method.input,
+        "heddle.api.v1alpha1.ListInstallationRepositoriesRequest"
+    );
+    assert_eq!(
+        method.output,
+        "heddle.api.v1alpha1.ListInstallationRepositoriesResponse"
+    );
+    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
+    assert_eq!(
+        method.authorization_access,
+        AuthorizationAccess::AuthenticatedPrincipal
+    );
+    assert_eq!(method.effect, RpcEffect::ReadOnly);
+    assert_eq!(method.retry_behavior, RetryBehavior::Safe);
+    assert!(!method.client_operation_id_required);
     assert_eq!(method.maturity, ServiceMaturity::Planned);
 }
 

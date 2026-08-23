@@ -2,7 +2,9 @@
 
 use heddle_api::heddle::api::v1alpha1::{
     AccessTokenResponse, BeginWebAuthnRegistrationRequest, ClaimSignupInviteResponse, Entitlement,
-    GitHubInstallationRepository, PromoteAgentAccountRequest, RegisterGitHubInstallationRequest,
+    GitHubInstallationRepository, InstallationRepositoryEntry,
+    ListInstallationRepositoriesRequest, ListInstallationRepositoriesResponse,
+    PromoteAgentAccountRequest, RegisterGitHubInstallationRequest,
     RegisterGitHubInstallationResponse, SignupBootstrapMethod, StorageUsage, WhoAmIResponse,
 };
 use prost::Message;
@@ -232,6 +234,49 @@ fn register_github_installation_documents_server_verified_ownership() {
     assert!(IDENTITY_PROTO.contains("GET /user/installations"));
     assert!(IDENTITY_PROTO.contains("The client-supplied installation_id is not ownership proof"));
     assert!(IDENTITY_PROTO.contains("linked GitHub OAuth token"));
+}
+
+#[test]
+fn list_installation_repositories_round_trips_flagged_projection() {
+    let request = ListInstallationRepositoriesRequest {
+        installation_id: 12_345_678,
+    };
+    let decoded_request =
+        ListInstallationRepositoriesRequest::decode(request.encode_to_vec().as_slice())
+            .expect("decode ListInstallationRepositoriesRequest");
+    assert_eq!(decoded_request, request);
+
+    let response = ListInstallationRepositoriesResponse {
+        repositories: vec![
+            InstallationRepositoryEntry {
+                id: 87_654_321,
+                full_name: "HeddleCo/private-repo".to_string(),
+                installation_granted: true,
+            },
+            InstallationRepositoryEntry {
+                id: 99_999_999,
+                full_name: "HeddleCo/ungranted-repo".to_string(),
+                installation_granted: false,
+            },
+        ],
+    };
+    let decoded_response =
+        ListInstallationRepositoriesResponse::decode(response.encode_to_vec().as_slice())
+            .expect("decode ListInstallationRepositoriesResponse");
+    assert_eq!(decoded_response, response);
+    assert!(decoded_response.repositories[0].installation_granted);
+    assert!(!decoded_response.repositories[1].installation_granted);
+}
+
+#[test]
+fn list_installation_repositories_documents_dual_token_semantics() {
+    // The proto must document that BOTH token types are required.
+    assert!(IDENTITY_PROTO.contains("installation token"));
+    assert!(IDENTITY_PROTO.contains("user-to-server OAuth token") || IDENTITY_PROTO.contains("user OAuth token") || IDENTITY_PROTO.contains("user-visible set"));
+    // The proto must document the per-entry flag semantic.
+    assert!(IDENTITY_PROTO.contains("installation_granted"));
+    // The proto must document ownership verification before token fetch.
+    assert!(IDENTITY_PROTO.contains("Weft MUST verify installation ownership") || IDENTITY_PROTO.contains("verify installation ownership"));
 }
 
 #[test]

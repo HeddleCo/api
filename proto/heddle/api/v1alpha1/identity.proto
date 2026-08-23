@@ -733,6 +733,39 @@ message GitHubInstallationRepository {
   string full_name = 2;
 }
 
+// Repository entry in a ListInstallationRepositories response. Carries the
+// same minimal projection as GitHubInstallationRepository plus a flag that
+// distinguishes repos the installation was explicitly granted access to from
+// repos the user can see through their linked OAuth token but that the
+// installation was NOT granted. Ungranted repos render as present-but-disabled
+// with a "grant access" link in the picker; granted repos are selectable.
+message InstallationRepositoryEntry {
+  int64 id = 1;
+  string full_name = 2;
+  // true  → the GitHub App installation was granted access to this repository
+  //         and an installation token can pull it.
+  // false → the repository is visible to the linked user OAuth token (i.e. the
+  //         user has access) but the installation was NOT granted it. Present
+  //         in the response so the caller can surface a "grant access" path
+  //         rather than silently hiding the repository.
+  bool installation_granted = 3;
+}
+
+message ListInstallationRepositoriesRequest {
+  // GitHub App installation to list repositories for. Weft verifies that the
+  // authenticated caller administers this installation before fetching any
+  // tokens — the request is not ownership proof.
+  int64 installation_id = 1;
+}
+
+message ListInstallationRepositoriesResponse {
+  // All repositories visible to the caller for this installation. Entries
+  // with installation_granted = true are importable immediately. Entries with
+  // installation_granted = false are present so the caller can offer a
+  // "grant access" path back to GitHub installation settings.
+  repeated InstallationRepositoryEntry repositories = 1;
+}
+
 message RegisterGitHubInstallationRequest {
   // GitHub App installation the authenticated caller asks Weft to register.
   // The client-supplied installation_id is not ownership proof: Weft verifies
@@ -2126,6 +2159,37 @@ service IdentityService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Lists all repositories visible to the authenticated caller for a given
+  // GitHub App installation. Returns two sets in a single flat list
+  // distinguished by the per-entry `installation_granted` flag:
+  //
+  //   installation_granted = true  → the installation was granted this repo;
+  //     an installation token can pull it; the picker offers it as selectable.
+  //   installation_granted = false → the repo is visible to the caller's
+  //     linked user OAuth token but the installation was NOT granted it; the
+  //     picker renders it as present-but-disabled with a "grant access" link.
+  //
+  // Weft MUST verify installation ownership (same `installed_by = caller`
+  // check as RegisterGitHubInstallation) before fetching either token type.
+  // The granted set comes from the installation token
+  // (GET /installation/repositories via App JWT → installation token);
+  // the user-visible set comes from the stored user-to-server OAuth token
+  // (GET /user/installations/{installation_id}/repositories).
+  rpc ListInstallationRepositories(ListInstallationRepositoriesRequest) returns (ListInstallationRepositoriesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND

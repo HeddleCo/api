@@ -641,6 +641,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey",
       "layers": {
         "client": {

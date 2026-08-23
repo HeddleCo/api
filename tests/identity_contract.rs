@@ -2,10 +2,10 @@
 
 use heddle_api::heddle::api::v1alpha1::{
     AccessTokenResponse, BeginWebAuthnRegistrationRequest, ClaimSignupInviteResponse, Entitlement,
-    GitHubInstallationRepository, InstallationRepositoryEntry,
-    ListInstallationRepositoriesRequest, ListInstallationRepositoriesResponse,
-    PromoteAgentAccountRequest, RegisterGitHubInstallationRequest,
-    RegisterGitHubInstallationResponse, SignupBootstrapMethod, StorageUsage, WhoAmIResponse,
+    GitHubInstallationRepository, InstallationRepositoryEntry, ListInstallationRepositoriesRequest,
+    ListInstallationRepositoriesResponse, PromoteAgentAccountRequest,
+    RegisterGitHubInstallationRequest, RegisterGitHubInstallationResponse, SignupBootstrapMethod,
+    StorageUsage, WhoAmIResponse,
 };
 use prost::Message;
 
@@ -272,11 +272,18 @@ fn list_installation_repositories_round_trips_flagged_projection() {
 fn list_installation_repositories_documents_dual_token_semantics() {
     // The proto must document that BOTH token types are required.
     assert!(IDENTITY_PROTO.contains("installation token"));
-    assert!(IDENTITY_PROTO.contains("user-to-server OAuth token") || IDENTITY_PROTO.contains("user OAuth token") || IDENTITY_PROTO.contains("user-visible set"));
+    assert!(
+        IDENTITY_PROTO.contains("user-to-server OAuth token")
+            || IDENTITY_PROTO.contains("user OAuth token")
+            || IDENTITY_PROTO.contains("user-visible set")
+    );
     // The proto must document the per-entry flag semantic.
     assert!(IDENTITY_PROTO.contains("installation_granted"));
     // The proto must document ownership verification before token fetch.
-    assert!(IDENTITY_PROTO.contains("Weft MUST verify installation ownership") || IDENTITY_PROTO.contains("verify installation ownership"));
+    assert!(
+        IDENTITY_PROTO.contains("Weft MUST verify installation ownership")
+            || IDENTITY_PROTO.contains("verify installation ownership")
+    );
 }
 
 #[test]

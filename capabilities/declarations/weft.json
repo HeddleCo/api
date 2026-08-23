@@ -586,13 +586,13 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit",
+      "rpc": "heddle.api.v1alpha1.IdentityService/MintGitHubAppSetupChallenge",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -619,7 +619,7 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/RecordSubscription",
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
       "layers": {
         "implementation": {
           "status": "planned"
@@ -1081,28 +1081,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace",
-      "layers": {
-        "implementation": {
-          "status": "shipped"
-        },
-        "registration": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository",
-      "layers": {
-        "implementation": {
-          "status": "shipped"
-        },
-        "registration": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateSpool",
       "layers": {
         "implementation": {
@@ -1176,17 +1154,6 @@
         },
         "registration": {
           "status": "planned"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace",
-      "layers": {
-        "implementation": {
-          "status": "shipped"
-        },
-        "registration": {
-          "status": "shipped"
         }
       }
     },

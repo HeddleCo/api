@@ -66,9 +66,10 @@ def audit_new_descriptor(decoded: str) -> None:
     # Three services are planned, and methods on otherwise-shipped services
     # deliberately override their inherited maturity to planned (four handle
     # RPCs now inherit SHIPPED; CreateSignupInvite, ListSignupInvites,
-    # RegisterGitHubInstallation, and the two remote-link management RPCs
+    # RegisterGitHubInstallation, ListInstallationRepositories,
+    # MintGitHubAppSetupChallenge, and the two remote-link management RPCs
     # remain contract-first until their Weft handlers land).
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 15
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 17
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded

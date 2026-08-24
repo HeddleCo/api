@@ -49,7 +49,17 @@ class AdditiveBundleContractTest(unittest.TestCase):
         )
         self.assertEqual(
             fields(IDENTITY, "InstallationRepository"),
-            [("id", 1), ("full_name", 2), ("installation_granted", 3)],
+            [
+                ("id", 1),
+                ("full_name", 2),
+                ("installation_granted", 3),
+                ("visibility", 4),
+                ("description", 5),
+                ("default_branch", 6),
+                ("clone_url", 7),
+                ("stargazers_count", 8),
+                ("size_kb", 9),
+            ],
         )
         self.assertEqual(
             fields(IDENTITY, "MintGitHubAppSetupChallengeRequest"),

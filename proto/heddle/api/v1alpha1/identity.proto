@@ -89,10 +89,8 @@ message RegisterPublicKeyRequest {
   // Raw 32-byte Ed25519 public key the client commits to as the
   // renewal anchor for this device. Distinct from the WebAuthn
   // credential's attested public key (COSE-encoded, lives in
-  // `webauthn_credentials`): this key lives in `device_roots` and
-  // is the one `mint_biscuit_keypair` calls
-  // `Ed25519Signer::verify_with_public_key` against on every
-  // `KeypairProof` renewal. Leave empty for browser-only flows.
+  // `webauthn_credentials`): this key lives in `device_roots`.
+  // Leave empty for browser-only flows.
   //
   // When non-empty, MUST be accompanied by a binding signature
   // (see the three `device_binding_*` fields). Closes
@@ -210,8 +208,7 @@ message RotateCredentialRequest {
   //         u64_be(proof_timestamp_seconds) || 0x00 ||
   //         credential_id || 0x00 || public_key)`.
   // The timestamp is Unix seconds and the signature is 64 raw bytes. The
-  // server rejects proofs whose timestamp is outside ±60s of now (same
-  // window as KeypairProof).
+  // server rejects proofs whose timestamp is outside ±60s of now.
   uint64 proof_timestamp_seconds = 4;
   bytes proof_signature = 5;
 }
@@ -359,23 +356,6 @@ message IssuePresenceTokenResponse {
   google.protobuf.Timestamp expires_at = 2;
 }
 
-// Proof of possession via Ed25519 signature. The server looks up
-// `public_key_id` in `device_roots` first (CLI device flow) and then
-// in `issued_credentials` (service-account credential renewal). The
-// signature is over the canonical bytes
-// `f"{timestamp}\n{public_key_id}\n{requested_scope}"` (UTF-8). The
-// timestamp window is ±60s — replay attempts older than that are
-// rejected without touching the keypair lookup.
-message KeypairProof {
-  // Stable id of the public key. Matches `device_roots.id` or
-  // `issued_credentials.id`.
-  string public_key_id = 1;
-  // Unix-seconds when the signature was produced. Signed input.
-  uint64 timestamp = 2;
-  // Ed25519 signature over the canonical bytes.
-  bytes signature = 3;
-}
-
 // Proof that a user-approved device authorization completed. The
 // CLI presents the device_code returned by
 // `CreateDeviceAuthorization` plus a signature over `device:{code}`
@@ -385,8 +365,7 @@ message KeypairProof {
 message DeviceAuthProof {
   string device_code = 1;
   // Raw Ed25519 public-key bytes. Server stores it on first hand-off
-  // (`device_roots` row) and signs subsequent renewals against it via
-  // `KeypairProof`.
+  // (`device_roots` row) and signs subsequent renewals against it.
   bytes device_public_key = 2;
   // Signature over the bytes `device:{device_code}` using the
   // device's private key. Replaces the old proof field on
@@ -690,6 +669,18 @@ message InstallationRepository {
   int64 id = 1;
   string full_name = 2;
   bool installation_granted = 3;
+  // GitHub repository visibility: "public", "private", or "internal".
+  string visibility = 4;
+  // GitHub repository description; empty when the repo has none.
+  string description = 5;
+  // GitHub repository default branch name (e.g. "main").
+  string default_branch = 6;
+  // GitHub HTTPS clone URL.
+  string clone_url = 7;
+  // GitHub stargazer count at listing time.
+  uint64 stargazers_count = 8;
+  // GitHub repository size in kilobytes at listing time.
+  uint64 size_kb = 9;
 }
 
 // Minimal repository projection returned by GitHub's installation-repository

@@ -1008,6 +1008,9 @@ message CreateAgentAccountRequest {
 }
 
 message CreateAgentAccountResponse {
+  reserved 4;
+  reserved "claim_token";
+
   // Stable account identity. Unchanged when PromoteAgentAccount later claims
   // the handle and fills the independent-root slot.
   string account_id = 1;
@@ -1018,9 +1021,11 @@ message CreateAgentAccountResponse {
   // agent_public_key. Claiming the account neither revokes nor transforms
   // this capability.
   bytes agent_capability = 3;
-  // One-time claim token the agent prints as a claim link. Empty when the
-  // caller mints an Iroh claim link locally instead of a weft-stored token.
-  string claim_token = 4;
+  // Hosted server's web origin (its SERVER_WEB_ORIGIN), so the creating agent
+  // can mint the human claim link `{web_origin}/claim/{node_id}.{secret}`
+  // against the correct origin. Essential for self-hosting where the origin
+  // is not app.heddle.sh.
+  string web_origin = 5;
 }
 
 // Promote-consent half of the agent-account claim ceremony (api#123).

@@ -371,13 +371,15 @@ class SignupContractTest(unittest.TestCase):
                 ("account_id", 1),
                 ("pet_name", 2),
                 ("agent_capability", 3),
-                ("claim_token", 4),
+                ("web_origin", 5),
             ],
         )
         response = body(IDENTITY, "message", "CreateAgentAccountResponse")
         self.assertIn("globally-unique pet name", response)
         self.assertIn("no handle", response)
-        self.assertIn("One-time claim token", response)
+        self.assertIn("SERVER_WEB_ORIGIN", response)
+        self.assertIn("{web_origin}/claim/{node_id}.{secret}", response)
+        self.assertIn("self-hosting", response)
 
         request_type, response_type, contract = rpc("CreateAgentAccount")
         self.assertEqual(request_type, "CreateAgentAccountRequest")

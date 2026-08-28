@@ -4,17 +4,17 @@
     "heddle": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/heddle.json",
-      "sha256": "0c7d9508c18e0b183b5ff0b36e782dd5815611a35e1a986b9119bd3b1dc4d426"
+      "sha256": "84531ad4c71e91e2a8c325f7f1c1ece6048acbfef587166eef1b152fe23d84e5"
     },
     "weft": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/weft.json",
-      "sha256": "02d6c3b11dc6d74167bcd6dcd94d7309b7dbb69a6e32cecd1d4c2f55ff52493a"
+      "sha256": "266b0b078a752de62f58cd13d99ab803d781df5637f0557809f1efc8c491f7a7"
     },
     "tapestry": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/tapestry.json",
-      "sha256": "76928c62a3c0c9d531347f84141e04a930895996aacffbaa0711d60eeeb34bf5"
+      "sha256": "82d8af06c3fba4a6cf729beef428930450053f17947730976ccf9a1df110e351"
     }
   }
 }

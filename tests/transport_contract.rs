@@ -205,7 +205,19 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 181);
+    assert_eq!(ALL_METHODS.len(), 182);
+    let by_thread_ref =
+        method_descriptor("/heddle.api.v1alpha1.CollaborationService/ListByThreadRef")
+            .expect("ListByThreadRef descriptor");
+    assert_eq!(
+        by_thread_ref.input,
+        "heddle.api.v1alpha1.ListByThreadRefRequest"
+    );
+    assert_eq!(
+        by_thread_ref.output,
+        "heddle.api.v1alpha1.ListByThreadRefResponse"
+    );
+    assert_eq!(by_thread_ref.streaming, StreamingShape::Unary);
     for method in [
         "BootstrapOwnerRoot",
         "RotateOwnerKey",

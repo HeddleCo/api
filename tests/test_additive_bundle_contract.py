@@ -32,11 +32,48 @@ def fields(source: str, message: str) -> list[tuple[str, int]]:
 class AdditiveBundleContractTest(unittest.TestCase):
     def test_open_discussion_severity_binds_to_merge_requirement_kind(self) -> None:
         self.assertEqual(
-            fields(COLLABORATION, "OpenDiscussionRequest")[-1],
-            ("severity", 9),
+            fields(COLLABORATION, "OpenDiscussionRequest")[-2:],
+            [("severity", 9), ("kind", 10)],
         )
         requirement_kinds = body(REGISTRY, "enum", "UnmetRequirementKind")
         self.assertIn("UNMET_REQUIREMENT_KIND_OPEN_DISCUSSION = 3", requirement_kinds)
+
+    def test_coordination_discussions_are_first_class_thread_subjects(self) -> None:
+        kinds = body(COLLABORATION, "enum", "DiscussionKind")
+        self.assertIn("DISCUSSION_KIND_UNSPECIFIED = 0", kinds)
+        self.assertIn("DISCUSSION_KIND_CODE_ANCHORED = 1", kinds)
+        self.assertIn("DISCUSSION_KIND_COORDINATION = 2", kinds)
+
+        open_request = body(COLLABORATION, "message", "OpenDiscussionRequest")
+        self.assertIn("optional PathSymbolRef anchor = 3", open_request)
+        self.assertEqual(
+            fields(COLLABORATION, "ListByThreadRefRequest"),
+            [
+                ("repo_path", 1),
+                ("thread_ref", 2),
+                ("status", 3),
+                ("kind", 4),
+                ("page_size", 5),
+                ("page_token", 6),
+            ],
+        )
+        self.assertEqual(
+            fields(COLLABORATION, "ListByThreadRefResponse"),
+            [("discussions", 1), ("next_page_token", 2)],
+        )
+        self.assertEqual(fields(COLLABORATION, "Discussion")[-1], ("kind", 14))
+
+        service = body(COLLABORATION, "service", "CollaborationService")
+        self.assertIn(
+            "rpc ListByThreadRef(ListByThreadRefRequest) "
+            "returns (ListByThreadRefResponse)",
+            service,
+        )
+        rpc = re.search(r"(?ms)rpc ListByThreadRef\(.*?\n  \}", service)
+        self.assertIsNotNone(rpc)
+        self.assertIn("RPC_EFFECT_READ_ONLY", rpc.group(0))
+        self.assertIn("RETRY_BEHAVIOR_SAFE", rpc.group(0))
+        self.assertIn("AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL", rpc.group(0))
 
     def test_github_app_installation_repository_listing_and_setup_mint(self) -> None:
         self.assertEqual(

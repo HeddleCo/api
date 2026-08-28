@@ -245,6 +245,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.CollaborationService/ListByThreadRef",
+      "layers": {
+        "server_adapter": {
+          "status": "planned"
+        },
+        "ui": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.CollaborationService/ListDiscussionsByStates",
       "layers": {
         "server_adapter": {

@@ -457,7 +457,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         actual = build_inventory()
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
-        self.assertEqual(len(shipped), 146)
+        self.assertEqual(len(shipped), 147)
         # Retired methods are absent; contract-first additions including the
         # GitHub App repository list and setup challenge remain explicitly planned.
         self.assertEqual(len(planned), 35)

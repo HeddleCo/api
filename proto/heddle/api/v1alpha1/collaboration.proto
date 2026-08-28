@@ -19,6 +19,18 @@ enum DiscussionStatusFilter {
   DISCUSSION_STATUS_FILTER_ORPHANED = 3;
 }
 
+// The subject a discussion is anchored to. Servers return an explicit kind for
+// newly stored discussions. UNSPECIFIED preserves the pre-kind contract and is
+// interpreted as CODE_ANCHORED when opening or reading a discussion.
+enum DiscussionKind {
+  DISCUSSION_KIND_UNSPECIFIED = 0;
+  // A discussion about a code symbol. This is the existing/default behavior.
+  DISCUSSION_KIND_CODE_ANCHORED = 1;
+  // A thread-only mailbox for capacity, handoff, and meta-chatter. It is
+  // queryable but inert: the discussion never controls or affects work.
+  DISCUSSION_KIND_COORDINATION = 2;
+}
+
 // Whether an open discussion is informational or prevents a merge.
 enum DiscussionSeverity {
   DISCUSSION_SEVERITY_UNSPECIFIED = 0;
@@ -29,16 +41,23 @@ enum DiscussionSeverity {
 message OpenDiscussionRequest {
   RepositoryRef repo_path = 1;
   StateId state_id = 2;
-  PathSymbolRef anchor = 3;
+  // Optional only for a thread-only coordination discussion. CODE_ANCHORED
+  // (including an unset kind) requires this symbol anchor. COORDINATION
+  // requires a non-empty thread_ref and this anchor must be absent.
+  optional PathSymbolRef anchor = 3;
   string body = 4;
   // Optional override; empty uses the configured discussion visibility policy.
   string visibility = 5;
+  // Optional attachment for a code discussion; the sole subject, and required,
+  // for a COORDINATION discussion.
   string thread_ref = 6;
   string client_operation_id = 7;
   // Stable identity paired with `thread_ref`; both are empty when the
   // discussion is not attached to a thread.
   string thread_id = 8;
   DiscussionSeverity severity = 9;
+  // UNSPECIFIED preserves the existing CODE_ANCHORED open behavior.
+  DiscussionKind kind = 10;
 }
 
 message AppendTurnRequest {
@@ -84,9 +103,11 @@ message ResolveDiscussionRequest {
 
 message Discussion {
   string id = 1;
+  // The symbol subject for CODE_ANCHORED; absent for COORDINATION.
   PathSymbolRef anchor = 2;
   StateId opened_against_state = 3;
   google.protobuf.Timestamp opened_at = 4;
+  // The sole subject for a COORDINATION discussion.
   string thread_ref = 5;
   repeated DiscussionTurn turns = 6;
   DiscussionResolution resolution = 7;
@@ -100,6 +121,8 @@ message Discussion {
   // (non-blocking); BLOCKING makes an open discussion an unmet merge
   // requirement; a Reject sets Blocking.
   DiscussionSeverity severity = 13;
+  // UNSPECIFIED on a legacy discussion is interpreted as CODE_ANCHORED.
+  DiscussionKind kind = 14;
 }
 
 message ListDiscussionsByStateRequest {
@@ -118,6 +141,25 @@ message ListDiscussionsBySymbolRequest {
   PathSymbolRef anchor = 2;
   // UNSPECIFIED selects all discussions.
   DiscussionStatusFilter status = 3;
+}
+
+message ListByThreadRefRequest {
+  RepositoryRef repo_path = 1;
+  string thread_ref = 2;
+  // UNSPECIFIED selects all discussions.
+  DiscussionStatusFilter status = 3;
+  // UNSPECIFIED selects all discussion kinds.
+  DiscussionKind kind = 4;
+  // Zero returns all discussions. A positive value returns at most this many discussions.
+  uint32 page_size = 5;
+  // Opaque continuation token returned by ListByThreadRefResponse.
+  string page_token = 6;
+}
+
+message ListByThreadRefResponse {
+  repeated Discussion discussions = 1;
+  // Empty when the last page, or the whole unpaged result, was delivered.
+  string next_page_token = 2;
 }
 
 // Batched discussion-digest read (weft#1397). One call resolves digests and
@@ -244,6 +286,25 @@ service CollaborationService {
     };
   }
   rpc ListBySymbol(ListDiscussionsBySymbolRequest) returns (ListDiscussionsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_COLLABORATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Lists discussions whose first-class subject is the supplied thread_ref.
+  rpc ListByThreadRef(ListByThreadRefRequest) returns (ListByThreadRefResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE

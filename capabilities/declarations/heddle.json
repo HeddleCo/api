@@ -432,17 +432,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
-      "layers": {
-        "client": {
-          "status": "planned"
-        },
-        "cli": {
-          "status": "planned"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
       "layers": {
         "client": {
@@ -553,6 +542,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities",
       "layers": {
         "client": {
@@ -582,6 +582,17 @@
         },
         "cli": {
           "status": "intentionally-unsupported"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
         }
       }
     },
@@ -620,17 +631,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ProvisionAgentRootedAccount",
-      "layers": {
-        "client": {
-          "status": "planned"
-        },
-        "cli": {
-          "status": "planned"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
       "layers": {
         "client": {
           "status": "planned"

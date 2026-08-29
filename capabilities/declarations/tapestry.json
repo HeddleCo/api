@@ -215,7 +215,7 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/GetDiscussion",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
           "status": "planned"
@@ -303,10 +303,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/BeginRecovery",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -336,10 +336,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/BindSignupInviteEmail",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -358,7 +358,7 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimNextDropCode",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
           "status": "planned"
@@ -369,10 +369,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ClaimSignupInvite",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -380,10 +380,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/CompleteRecovery",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -424,21 +424,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateSignupInvite",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
-      "layers": {
-        "server_adapter": {
-          "status": "planned"
-        },
-        "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -446,10 +435,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -534,15 +523,26 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/IssueSignupEmailChallenge",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
       "layers": {
         "server_adapter": {
           "status": "shipped"
@@ -586,6 +586,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
+      "layers": {
+        "server_adapter": {
+          "status": "shipped"
+        },
+        "ui": {
+          "status": "shipped"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit",
       "layers": {
         "server_adapter": {
@@ -600,10 +611,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/MintGitHubAppSetupChallenge",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -611,7 +622,7 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/PromoteAgentAccount",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
           "status": "planned"
@@ -630,24 +641,13 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
-      "layers": {
-        "server_adapter": {
-          "status": "planned"
-        },
-        "ui": {
-          "status": "planned"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.IdentityService/RegisterGitHubInstallation",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -666,7 +666,7 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/RemainingDropCodes",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
           "status": "planned"
@@ -699,10 +699,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ResolveSignupInvite",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -754,10 +754,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken",
       "layers": {
         "server_adapter": {
-          "status": "shipped"
+          "status": "planned"
         },
         "ui": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -765,10 +765,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/SubmitRecoveryProof",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -787,10 +787,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/VetoRecovery",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -864,7 +864,7 @@
       "rpc": "heddle.api.v1alpha1.OperationService/GetRemoteLink",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
           "status": "planned"
@@ -897,10 +897,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "partial"
         },
         "ui": {
-          "status": "planned"
+          "status": "partial"
         }
       }
     },
@@ -1095,10 +1095,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/CreateSpool",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1128,10 +1128,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteSpool",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1337,10 +1337,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility",
       "layers": {
         "server_adapter": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "ui": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -1348,10 +1348,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility",
       "layers": {
         "server_adapter": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "ui": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -1370,10 +1370,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpool",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1777,10 +1777,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/ApproveThread",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1788,10 +1788,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/CheckMergeEligibility",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1887,10 +1887,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadApprovals",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1942,10 +1942,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/RevokeApproval",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },

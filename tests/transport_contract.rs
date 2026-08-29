@@ -205,7 +205,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 182);
+    assert_eq!(ALL_METHODS.len(), 178);
     let by_thread_ref =
         method_descriptor("/heddle.api.v1alpha1.CollaborationService/ListByThreadRef")
             .expect("ListByThreadRef descriptor");
@@ -741,8 +741,7 @@ fn unified_visibility_numbering_is_restrictiveness_order() {
 fn destructive_shipped_methods_match_weft_human_verification_policy() {
     for method in [
         "/heddle.api.v1alpha1.RegistryService/DeleteGrant",
-        "/heddle.api.v1alpha1.RegistryService/DeleteNamespace",
-        "/heddle.api.v1alpha1.RegistryService/DeleteRepository",
+        "/heddle.api.v1alpha1.RegistryService/DeleteSpool",
         "/heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
         "/heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
         "/heddle.api.v1alpha1.RegistryService/UpdateGrant",

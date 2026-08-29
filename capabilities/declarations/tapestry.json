@@ -1125,28 +1125,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteNamespace",
-      "layers": {
-        "server_adapter": {
-          "status": "shipped"
-        },
-        "ui": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/DeleteRepository",
-      "layers": {
-        "server_adapter": {
-          "status": "shipped"
-        },
-        "ui": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteSpool",
       "layers": {
         "server_adapter": {
@@ -1379,28 +1357,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateGrant",
-      "layers": {
-        "server_adapter": {
-          "status": "shipped"
-        },
-        "ui": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateNamespace",
-      "layers": {
-        "server_adapter": {
-          "status": "shipped"
-        },
-        "ui": {
-          "status": "intentionally-unsupported"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.RegistryService/UpdateRepository",
       "layers": {
         "server_adapter": {
           "status": "shipped"

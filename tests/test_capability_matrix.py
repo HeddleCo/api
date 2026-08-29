@@ -137,8 +137,6 @@ REGISTRY_AUTHORIZATION_CONTRACTS = {
     "CreateSpool": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("parent_path",)),
     "DeleteBookmark": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
     "DeleteGrant": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
-    "DeleteNamespace": ("RESOURCE_OWNER", "REQUEST_RESOURCE", ("full_path",)),
-    "DeleteRepository": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
     "DeleteSpool": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
     "DetachChild": ("RESOURCE_WRITER", "REQUEST_RESOURCE", ("parent_path",)),
     "GetCurrentUserSpool": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
@@ -161,8 +159,6 @@ REGISTRY_AUTHORIZATION_CONTRACTS = {
     "SetNamespaceVisibility": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
     "SetSpoolVisibility": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
     "UpdateGrant": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("target",)),
-    "UpdateNamespace": ("RESOURCE_OWNER", "REQUEST_RESOURCE", ("full_path",)),
-    "UpdateRepository": ("RESOURCE_MAINTAINER", "REQUEST_RESOURCE", ("full_path",)),
     "UpdateSpool": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
     "UpdateSpoolSettings": ("RESOURCE_ADMINISTRATOR", "REQUEST_RESOURCE", ("full_path",)),
     "UpsertBookmark": ("CALLER_BOUND", "CALLER_SUBJECT", ()),
@@ -457,7 +453,7 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         actual = build_inventory()
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
-        self.assertEqual(len(shipped), 147)
+        self.assertEqual(len(shipped), 143)
         # Retired methods are absent; contract-first additions including the
         # GitHub App repository list and setup challenge remain explicitly planned.
         self.assertEqual(len(planned), 35)

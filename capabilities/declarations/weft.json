@@ -248,10 +248,10 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/ListByThreadRef",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -432,17 +432,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
-      "layers": {
-        "implementation": {
-          "status": "planned"
-        },
-        "registration": {
-          "status": "planned"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.IdentityService/DeclareRecoveryMethod",
       "layers": {
         "implementation": {
@@ -553,6 +542,17 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities",
       "layers": {
         "implementation": {
@@ -576,6 +576,17 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ListSessions",
+      "layers": {
+        "implementation": {
+          "status": "planned"
+        },
+        "registration": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
       "layers": {
         "implementation": {
           "status": "planned"
@@ -620,17 +631,6 @@
     },
     {
       "rpc": "heddle.api.v1alpha1.IdentityService/ProvisionAgentRootedAccount",
-      "layers": {
-        "implementation": {
-          "status": "planned"
-        },
-        "registration": {
-          "status": "planned"
-        }
-      }
-    },
-    {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
       "layers": {
         "implementation": {
           "status": "planned"

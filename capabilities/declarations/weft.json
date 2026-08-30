@@ -630,17 +630,6 @@
       }
     },
     {
-      "rpc": "heddle.api.v1alpha1.IdentityService/ProvisionAgentRootedAccount",
-      "layers": {
-        "implementation": {
-          "status": "shipped"
-        },
-        "registration": {
-          "status": "shipped"
-        }
-      }
-    },
-    {
       "rpc": "heddle.api.v1alpha1.IdentityService/RegisterGitHubInstallation",
       "layers": {
         "implementation": {

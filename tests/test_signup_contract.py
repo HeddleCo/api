@@ -277,50 +277,6 @@ class SignupContractTest(unittest.TestCase):
         ):
             self.assertIn(failure_shape, public_contract)
 
-    def test_agent_rooted_provisioning_is_invite_and_key_bound(self) -> None:
-        self.assertEqual(
-            fields(IDENTITY, "ProvisionAgentRootedAccountRequest"),
-            [
-                ("invite_code", 1),
-                ("agent_public_key", 2),
-                ("client_operation_id", 3),
-            ],
-        )
-        request = body(
-            IDENTITY, "message", "ProvisionAgentRootedAccountRequest"
-        )
-        self.assertIn("Same high-entropy opaque invite code", request)
-        self.assertIn("MUST contain\n  // exactly 32 bytes", request)
-        self.assertIn("request proof MUST verify against this key", request)
-        self.assertEqual(
-            fields(IDENTITY, "ProvisionAgentRootedAccountResponse"),
-            [("handle", 1), ("account_id", 2), ("agent_capability", 3)],
-        )
-        response = body(
-            IDENTITY, "message", "ProvisionAgentRootedAccountResponse"
-        )
-        self.assertIn("Serialized pre-attenuated capability", response)
-        self.assertIn("requiring an independent root", response)
-
-        request_type, response_type, contract = rpc(
-            "ProvisionAgentRootedAccount"
-        )
-        self.assertEqual(request_type, "ProvisionAgentRootedAccountRequest")
-        self.assertEqual(response_type, "ProvisionAgentRootedAccountResponse")
-        for required in (
-            "maturity: SERVICE_MATURITY_PLANNED",
-            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
-            "effect: RPC_EFFECT_DURABLE_WRITE",
-            "retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
-            "client_operation_id_required: true",
-            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
-            "authorization_scope_source: "
-            "AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE",
-            'path: "invite_code"',
-            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
-        ):
-            self.assertIn(required, contract)
-
     def test_begin_registration_carries_adoption_pre_consent(self) -> None:
         self.assertEqual(
             fields(IDENTITY, "BeginWebAuthnRegistrationRequest"),

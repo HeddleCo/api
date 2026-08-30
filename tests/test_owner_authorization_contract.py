@@ -193,6 +193,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                 ("", "WebAuthnOwnerRootApproval", "human", 2),
                 ("", "DeferredOwnerRootApproval", "deferred_human", 3),
                 ("", "string", "client_operation_id", 4),
+                ("", "OwnerKeyBinding", "owner_key_binding", 5),
             ],
             "BootstrapOwnerRootResponse": [
                 ("", "bytes", "owner_id", 1),

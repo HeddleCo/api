@@ -56,6 +56,7 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
                 ("owner_root_proof_of_possession", 13),
                 ("owner_recovery_policy", 14),
                 ("owner_key_binding", 15),
+                ("claim_deferred_human", 16),
             ],
         )
         self.assertEqual(

@@ -157,6 +157,15 @@ message RegisterPublicKeyRequest {
   // proof is verified after every registration check succeeds; no registry
   // attestation or independent release root participates.
   OwnerKeyBinding owner_key_binding = 15;
+  // Deferred-human claim transition installed atomically with this
+  // registration. Carries the CLAIM_DEFERRED_HUMAN owner-key transition
+  // (origin key + next human authority key + every next guardian) that binds
+  // the previously deferred owner root to the human claiming it. Ignored
+  // before the owner cutover; when present, verified as part of the same
+  // ceremony that accepts the registration. This is the additive install
+  // point that replaces the pruned ProvisionAgentRootedAccount RPC
+  // (api#187 PR-B).
+  SignedOwnerKeyTransition claim_deferred_human = 16;
 }
 
 message BeginWebAuthnAuthenticationRequest {
@@ -968,41 +977,10 @@ message ClaimSignupInviteResponse {
   google.protobuf.Timestamp reservation_expires_at = 6;
 }
 
-// Creates an unclaimed human account by consuming the human's signup invite.
-// The account starts with no independent root; the caller receives only the
-// pre-attenuated, agent-key-bound capability returned below.
-message ProvisionAgentRootedAccountRequest {
-  // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
-  // Possession authorizes provisioning the human account and consumes the
-  // invite on the first successful call.
-  string invite_code = 1;
-  // Raw Ed25519 public key for the creating agent. This field MUST contain
-  // exactly 32 bytes. The server MUST reject every other length, and the
-  // request proof MUST verify against this key.
-  bytes agent_public_key = 2;
-  // Idempotency key scoped to this agent key and RPC. Reuse with a different
-  // invite_code or agent_public_key must fail.
-  string client_operation_id = 3;
-}
-
-message ProvisionAgentRootedAccountResponse {
-  // Server-generated canonical native handle for the new human account.
-  string handle = 1;
-  // Stable account identity. This remains unchanged when ClaimAccount later
-  // replaces the generated handle and fills the independent-root slot.
-  string account_id = 2;
-  // Serialized pre-attenuated capability for the creating agent, bound to
-  // agent_public_key. It carries ordinary human-account authority except for
-  // operations requiring an independent root. Claiming the account neither
-  // revokes nor transforms this capability.
-  bytes agent_capability = 3;
-}
-
 // Invite-gated agent-account create (api#123 / weft#1357). Consumes a shared
 // #1356 invite and mints an agent-rooted human placeholder: no handle yet, a
 // server-generated globally-unique pet name, and a one-time claim token the
-// agent prints. Distinct from ProvisionAgentRootedAccount, which still returns
-// a generated handle (weft#1204). This is the ratified pet-name path.
+// agent prints. This is the ratified pet-name path.
 message CreateAgentAccountRequest {
   // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
   // Possession authorizes creating the placeholder account and consumes the
@@ -2016,30 +1994,6 @@ service IdentityService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_request_targets: {
         path: "account_id"
-        role: AUTHORIZATION_ROLE_CALLER_BOUND
-      }
-      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-    };
-  }
-  // Consumes a human's invite to create an agent-rooted human account. No
-  // established account principal exists yet: authorization comes from the
-  // held invite, while PROOF_OF_POSSESSION binds the call and returned
-  // capability to agent_public_key. The account's independent-root slot stays
-  // empty until a later ClaimAccount ceremony.
-  rpc ProvisionAgentRootedAccount(ProvisionAgentRootedAccountRequest) returns (ProvisionAgentRootedAccountResponse) {
-    option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
-      effect: RPC_EFFECT_DURABLE_WRITE
-      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
-      client_operation_id_required: true
-      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
-      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
-      authorization_request_targets: {
-        path: "invite_code"
         role: AUTHORIZATION_ROLE_CALLER_BOUND
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE

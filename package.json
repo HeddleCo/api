@@ -8,7 +8,8 @@
     "generate": "buf generate && node tools/generate-attachment-authorization.mjs && node tools/generate-ts-exports.mjs",
     "build": "npm run generate && tsc -p packages/typescript/tsconfig.json",
     "typecheck": "tsc -p packages/typescript/tsconfig.json --noEmit",
-    "pack:api": "npm pack --workspace @heddleco/api"
+    "pack:api": "npm pack --workspace @heddleco/api",
+    "treadle-compile": "node packages/typescript/compile-treadle.mjs"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "2.12.0",

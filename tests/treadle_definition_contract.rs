@@ -267,6 +267,59 @@ fn missing_target_environment_or_platform_fails_validation_and_decode() {
     ));
 }
 
+#[derive(Deserialize)]
+struct LockFile {
+    format_version: u32,
+    definition_digest: String,
+}
+
+// linux/amd64 compile of packages/typescript/examples/local-host.mjs
+// (host-exec dummy digest). verify-treadle-conformance.mjs recompiles on
+// linux/x64 and byte-compares this fixture.
+#[test]
+fn compiled_local_host_example_is_canonical_and_matches_lock() {
+    let bytes = include_bytes!("fixtures/treadle-local-host.definition.bin");
+    let lock: LockFile =
+        serde_json::from_str(include_str!("fixtures/treadle-local-host.lock.json"))
+            .expect("valid local-host lock");
+    let decoded =
+        decode_canonical_treadle_definition(bytes).expect("canonical compiled definition");
+    assert_eq!(decoded.format_version, 1);
+    assert_eq!(decoded.name, "local-host");
+    assert_eq!(lock.format_version, 1);
+    assert_eq!(
+        hex::encode(treadle_definition_blake3(&decoded).expect("compiled blake3")),
+        lock.definition_digest
+    );
+    let job_names: Vec<&str> = decoded.jobs.iter().map(|job| job.name.as_str()).collect();
+    assert_eq!(job_names, ["also", "fast"]);
+    let check_names: Vec<Vec<&str>> = decoded
+        .jobs
+        .iter()
+        .map(|job| job.checks.iter().map(|check| check.name.as_str()).collect())
+        .collect();
+    assert_eq!(
+        check_names,
+        [vec!["pwd-check"], vec!["echo-ok", "true-check"]]
+    );
+    for check in decoded.jobs.iter().flat_map(|job| job.checks.iter()) {
+        assert_eq!(check.command, "sh");
+        let environment = check
+            .target_environment
+            .as_ref()
+            .expect("compiled check target_environment");
+        let platform = environment
+            .platform
+            .as_ref()
+            .expect("compiled check platform");
+        assert!(matches!(
+            platform.os.as_str(),
+            "darwin" | "linux" | "windows"
+        ));
+        assert!(matches!(platform.arch.as_str(), "amd64" | "arm64"));
+    }
+}
+
 #[test]
 fn reordered_set_like_fields_canonicalize_to_identical_bytes() {
     let definition = rust_definition();

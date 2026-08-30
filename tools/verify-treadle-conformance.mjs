@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { create, fromBinary } from "@bufbuild/protobuf";
 import {
   TreadleArgvSchema,
@@ -27,8 +30,10 @@ import {
 } from "../packages/typescript/dist/treadle.js";
 import {
   AUTHORING_CHECK_DEFAULTS,
+  HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
   RUST_PACK_TARGET_ENVIRONMENT,
   defineCheck,
+  hostTargetEnvironment,
   definePipeline,
   defineService,
   emitPipeline,
@@ -677,6 +682,92 @@ const clippyWithoutDeny = emitPipeline(definePipeline({
 }));
 assert.deepEqual(clippyWithoutDeny.definition.jobs[0].checks[0].args, ["clippy", "--workspace"]);
 
+assert.deepEqual(hostTargetEnvironment({ platform: "linux", arch: "x64" }), {
+  ociImageDigest: HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+  platform: { os: "linux", arch: "amd64" },
+});
+assert.deepEqual(hostTargetEnvironment({ platform: "darwin", arch: "arm64" }), {
+  ociImageDigest: HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+  platform: { os: "darwin", arch: "arm64" },
+});
+assert.deepEqual(hostTargetEnvironment({ platform: "win32", arch: "x64" }), {
+  ociImageDigest: HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+  platform: { os: "windows", arch: "amd64" },
+});
+assert.throws(() => hostTargetEnvironment({ platform: "freebsd", arch: "x64" }), /unsupported process.platform/);
+assert.throws(() => hostTargetEnvironment({ platform: "linux", arch: "ia32" }), /unsupported process.arch/);
+const liveHost = hostTargetEnvironment();
+assert.equal(liveHost.ociImageDigest, HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST);
+assert.match(liveHost.platform.os, /^(darwin|linux|windows)$/);
+assert.match(liveHost.platform.arch, /^(amd64|arm64)$/);
+assert.notEqual(
+  `${liveHost.platform.os}/${liveHost.platform.arch}`,
+  "must-not-silently-use-a-placeholder",
+);
+
+const compileBin = "packages/typescript/compile-treadle.mjs";
+const localHostExample = "packages/typescript/examples/local-host.mjs";
+const compileOut = mkdtempSync(join(tmpdir(), "treadle-compile-"));
+const compileRun = spawnSync(
+  process.execPath,
+  [compileBin, localHostExample, "--out-dir", compileOut],
+  { encoding: "utf8" },
+);
+assert.equal(compileRun.status, 0, compileRun.stderr);
+const compiledBinPath = join(compileOut, "treadle.definition.bin");
+const compiledLockPath = join(compileOut, "treadle.lock.json");
+assert.match(compileRun.stdout, /treadle\.definition\.bin/);
+assert.match(compileRun.stdout, /treadle\.lock\.json/);
+const compiledBytes = readFileSync(compiledBinPath);
+const compiledLock = JSON.parse(readFileSync(compiledLockPath, "utf8"));
+const compiledDefinition = fromBinary(TreadleDefinitionSchema, compiledBytes);
+assert.deepEqual(
+  compiledBytes,
+  Buffer.from(canonicalTreadleDefinitionBytes(compiledDefinition)),
+);
+assert.equal(
+  Buffer.from(treadleDefinitionBlake3(compiledDefinition)).toString("hex"),
+  compiledLock.definition_digest,
+);
+assert.equal(compiledLock.format_version, 1);
+assert.equal(compiledDefinition.formatVersion, 1);
+assert.equal(compiledDefinition.name, "local-host");
+assert.deepEqual(
+  compiledDefinition.jobs.map((jobMessage) => jobMessage.name),
+  ["also", "fast"],
+);
+assert.deepEqual(
+  compiledDefinition.jobs.map((jobMessage) => jobMessage.checks.map((check) => check.name)),
+  [["pwd-check"], ["echo-ok", "true-check"]],
+);
+for (const check of compiledDefinition.jobs.flatMap((jobMessage) => jobMessage.checks)) {
+  assert.equal(check.command, "sh");
+  assert.ok(check.targetEnvironment);
+  assert.equal(check.targetEnvironment.ociImageDigest, liveHost.ociImageDigest);
+  assert.equal(check.targetEnvironment.platform?.os, liveHost.platform.os);
+  assert.equal(check.targetEnvironment.platform?.arch, liveHost.platform.arch);
+}
+if (process.platform === "linux" && process.arch === "x64") {
+  const fixtureBin = readFileSync("tests/fixtures/treadle-local-host.definition.bin");
+  const fixtureLock = JSON.parse(
+    readFileSync("tests/fixtures/treadle-local-host.lock.json", "utf8"),
+  );
+  assert.deepEqual(compiledBytes, fixtureBin);
+  assert.equal(compiledLock.definition_digest, fixtureLock.definition_digest);
+}
+
+const missingDefaultDir = mkdtempSync(join(tmpdir(), "treadle-missing-default-"));
+const missingDefaultFile = join(missingDefaultDir, "no-default.mjs");
+writeFileSync(missingDefaultFile, "export const notDefault = 1;\n");
+const missingDefaultRun = spawnSync(
+  process.execPath,
+  [compileBin, missingDefaultFile, "--out-dir", join(missingDefaultDir, "out")],
+  { encoding: "utf8" },
+);
+assert.notEqual(missingDefaultRun.status, 0);
+assert.match(missingDefaultRun.stderr, /no default export/);
+rmSync(missingDefaultDir, { recursive: true, force: true });
+
 if (process.argv.includes("--print")) {
   process.stdout.write(`${JSON.stringify({
     format: "heddle-treadle-definition-v1",
@@ -704,6 +795,9 @@ if (process.argv.includes("--print")) {
   );
   process.stdout.write(
     `treadle compact authoring: Fast Lane matched fully-specified bytes ${compactHex.length / 2}; blake3 ${compactFastLane.definitionDigest}; reordered/generic-test identical; defaults did not override specified checks\n`,
+  );
+  process.stdout.write(
+    `treadle compile: ${compiledBytes.length} bytes; lock ${compiledLock.definition_digest}; jobs also/fast; host ${liveHost.platform.os}/${liveHost.platform.arch}\n`,
   );
 }
 

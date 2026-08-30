@@ -14,14 +14,19 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "compile-treadle.mjs"
   ],
+  "bin": {
+    "treadle-compile": "./compile-treadle.mjs"
+  },
   "exports": {
     ".": "./dist/index.js",
     "./shared": "./dist/shared.js",
     "./signing": "./dist/signing.js",
     "./treadle": "./dist/treadle.js",
     "./treadle-authoring": "./dist/treadle-authoring.js",
+    "./treadle-compile": "./compile-treadle.mjs",
     "./identity": "./dist/identity_pb.js",
     "./operation": "./dist/operation_pb.js",
     "./registry": "./dist/registry_pb.js",

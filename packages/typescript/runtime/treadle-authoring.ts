@@ -203,18 +203,95 @@ export interface LanguagePack {
 }
 
 /**
+ * Dummy OCI image digest used by the rust pack and by `hostTargetEnvironment()`.
+ *
+ * Host-exec v0 (`heddle ci run --local`) does not pull this image; it only
+ * admits matching `os`/`arch`. Reuses the v1 conformance fixture pin
+ * (`tests/fixtures/treadle-definition-v1.json` `unit` check: `sha256:` + 64
+ * `1` digits). Override the digest before signing a production definition
+ * against a real image.
+ */
+export const HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST = `sha256:${"1".repeat(64)}`;
+
+/**
  * Rust-pack default `target_environment`.
  *
- * Reuses the linux/amd64 pin already used by the v1 conformance fixture
- * (`tests/fixtures/treadle-definition-v1.json`, the `unit` check:
- * `sha256:` + 64 `1` digits). That is the existing test pin, not a floating
- * `rust:` tag. Override per check or pipeline before signing a production
- * definition against a different image.
+ * linux/amd64 plus {@link HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST}. Golden and
+ * conformance tests keep this pin so compact Fast Lane bytes stay stable.
+ * A pipeline that must run locally has to override with
+ * `defaults.targetEnvironment: hostTargetEnvironment()` — heddle#1616
+ * `admit_host_exec` refuses an os/arch mismatch, and this pin is not the
+ * authoring host.
  */
 export const RUST_PACK_TARGET_ENVIRONMENT: TargetEnvironment = Object.freeze({
-  ociImageDigest: `sha256:${"1".repeat(64)}`,
+  ociImageDigest: HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
   platform: Object.freeze({ os: "linux", arch: "amd64" }),
 });
+
+export interface HostTargetEnvironmentInput {
+  readonly platform?: string;
+  readonly arch?: string;
+  readonly ociImageDigest?: string;
+}
+
+/**
+ * `target_environment` for the current authoring host.
+ *
+ * Maps `process.platform` / `process.arch` onto proto platform strings
+ * (`darwin`/`linux`/`windows`, `amd64`/`arm64`). The image digest stays the
+ * host-exec dummy pin unless overridden. Local-run authors pass this on
+ * pipeline `defaults.targetEnvironment`.
+ */
+export function hostTargetEnvironment(
+  input: HostTargetEnvironmentInput = {},
+): TargetEnvironment {
+  return Object.freeze({
+    ociImageDigest: input.ociImageDigest ?? HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+    platform: Object.freeze({
+      os: mapHostOs(input.platform ?? hostProcessField("platform")),
+      arch: mapHostArch(input.arch ?? hostProcessField("arch")),
+    }),
+  });
+}
+
+function hostProcessField(field: "platform" | "arch"): string {
+  const runtime = globalThis as typeof globalThis & {
+    process?: { platform?: unknown; arch?: unknown };
+  };
+  const value = runtime.process?.[field];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TreadleDefinitionError(`hostTargetEnvironment: process.${field} is unavailable`);
+  }
+  return value;
+}
+
+function mapHostOs(platform: string): "darwin" | "linux" | "windows" {
+  switch (platform) {
+    case "darwin":
+      return "darwin";
+    case "linux":
+      return "linux";
+    case "win32":
+      return "windows";
+    default:
+      throw new TreadleDefinitionError(
+        `hostTargetEnvironment: unsupported process.platform ${JSON.stringify(platform)}; expected darwin, linux, or win32`,
+      );
+  }
+}
+
+function mapHostArch(arch: string): "amd64" | "arm64" {
+  switch (arch) {
+    case "x64":
+      return "amd64";
+    case "arm64":
+      return "arm64";
+    default:
+      throw new TreadleDefinitionError(
+        `hostTargetEnvironment: unsupported process.arch ${JSON.stringify(arch)}; expected x64 or arm64`,
+      );
+  }
+}
 
 /** SDK defaults applied only to fields the author, pipeline, and pack omit. */
 export const AUTHORING_CHECK_DEFAULTS = Object.freeze({

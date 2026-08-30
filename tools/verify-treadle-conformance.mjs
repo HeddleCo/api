@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { create, fromBinary } from "@bufbuild/protobuf";
 import {
   TreadleArgvSchema,
@@ -26,13 +29,20 @@ import {
   treadleDefinitionBlake3,
 } from "../packages/typescript/dist/treadle.js";
 import {
+  AUTHORING_CHECK_DEFAULTS,
+  HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+  RUST_PACK_TARGET_ENVIRONMENT,
   defineCheck,
+  hostTargetEnvironment,
   definePipeline,
   defineService,
   emitPipeline,
   job,
   matrix,
+  rust,
   secretRef,
+  sh,
+  test,
 } from "../packages/typescript/dist/treadle-authoring.js";
 
 const literalEnv = (name, value) =>
@@ -437,6 +447,401 @@ assert.equal(
   canonicalHex,
 );
 
+const defaultsMustNotOverride = emitPipeline(definePipeline({
+  name: "heddle-ci",
+  defaults: {
+    class: "informational",
+    timeoutSeconds: 1,
+    cachePaths: ["nope"],
+    determinismClass: "nondeterministic",
+    targetEnvironment: {
+      ociImageDigest: sha256Digest("9"),
+      platform: { os: "windows", arch: "arm64" },
+    },
+  },
+  jobs: [sdkTestJob(), sdkDocsJob],
+  services: [sdkPostgres()],
+  secretRefs: [sdkRegistryToken, sdkDbPassword],
+}));
+assert.equal(Buffer.from(defaultsMustNotOverride.canonicalBytes).toString("hex"), canonicalHex);
+assert.equal(defaultsMustNotOverride.definitionDigest, blake3Hex);
+
+const rustTarget = RUST_PACK_TARGET_ENVIRONMENT;
+const authoringIsolation = AUTHORING_CHECK_DEFAULTS.isolation;
+const fullySpecifiedFastLaneChecks = (reordered = false) => {
+  const build = defineCheck({
+    name: "build",
+    command: "cargo",
+    args: ["build", "--locked", "--workspace", "--tests"],
+    class: "required",
+    timeoutSeconds: 1800,
+    env: {},
+    workingDirectory: "",
+    serviceDependencies: [],
+    retry: { maxRetries: 0, flakeSignatures: [] },
+    cachePaths: ["target"],
+    isolation: authoringIsolation,
+    triggers: [{ kind: "push" }],
+    supersedeOlderRuns: false,
+    targetEnvironment: rustTarget,
+    determinismClass: "deterministic",
+  });
+  const clippy = defineCheck({
+    name: "clippy",
+    command: "cargo",
+    args: ["clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
+    class: "required",
+    timeoutSeconds: 1800,
+    env: {},
+    workingDirectory: "",
+    serviceDependencies: [],
+    retry: { maxRetries: 0, flakeSignatures: [] },
+    cachePaths: ["target"],
+    isolation: authoringIsolation,
+    triggers: [{ kind: "push" }],
+    supersedeOlderRuns: false,
+    targetEnvironment: rustTarget,
+    determinismClass: "deterministic",
+  });
+  const unit = defineCheck({
+    name: "test",
+    command: "cargo",
+    args: ["test", "--workspace"],
+    class: "required",
+    timeoutSeconds: 1800,
+    env: {},
+    workingDirectory: "",
+    serviceDependencies: [],
+    retry: { maxRetries: 2, flakeSignatures: ["dns error:", "sccache: error"] },
+    cachePaths: ["target"],
+    isolation: authoringIsolation,
+    triggers: [{ kind: "push" }],
+    supersedeOlderRuns: false,
+    targetEnvironment: rustTarget,
+    determinismClass: "deterministic",
+  });
+  const script = defineCheck({
+    name: "no-silent-default-tree-load",
+    command: "sh",
+    args: ["scripts/check-no-silent-default-tree-load.sh"],
+    class: "required",
+    timeoutSeconds: 1800,
+    env: {},
+    workingDirectory: "",
+    serviceDependencies: [],
+    retry: { maxRetries: 0, flakeSignatures: [] },
+    cachePaths: ["target"],
+    isolation: authoringIsolation,
+    triggers: [{ kind: "push" }],
+    supersedeOlderRuns: false,
+    targetEnvironment: rustTarget,
+    determinismClass: "deterministic",
+  });
+  const fmt = defineCheck({
+    name: "fmt",
+    command: "cargo",
+    args: ["fmt", "--check"],
+    class: "advisory",
+    timeoutSeconds: 1800,
+    env: {},
+    workingDirectory: "",
+    serviceDependencies: [],
+    retry: { maxRetries: 0, flakeSignatures: [] },
+    cachePaths: ["target"],
+    isolation: authoringIsolation,
+    triggers: [{ kind: "push" }],
+    supersedeOlderRuns: false,
+    targetEnvironment: rustTarget,
+    determinismClass: "deterministic",
+  });
+  return reordered ? [fmt, script, unit, clippy, build] : [build, clippy, unit, script, fmt];
+};
+
+const compactFastLaneChecks = (reordered = false) => {
+  const checks = [
+    rust.build(["--locked", "--workspace", "--tests"]),
+    rust.clippy(["--locked", "--workspace", "--all-targets"]),
+    rust.test(["--workspace"], { flake: ["dns error:", "sccache: error"] }),
+    sh("no-silent-default-tree-load", ["scripts/check-no-silent-default-tree-load.sh"]),
+    rust.fmt({ class: "advisory" }),
+  ];
+  return reordered ? [...checks].reverse() : checks;
+};
+
+const compactFastLane = emitPipeline(definePipeline({
+  name: "heddle",
+  defaults: { class: "required", cachePaths: ["target"] },
+  jobs: {
+    fast: compactFastLaneChecks(),
+  },
+}));
+const compactFastLaneAgain = emitPipeline(definePipeline({
+  name: "heddle",
+  defaults: { class: "required", cachePaths: ["target"] },
+  jobs: {
+    fast: compactFastLaneChecks(),
+  },
+}));
+const fullySpecifiedFastLane = emitPipeline(definePipeline({
+  name: "heddle",
+  jobs: [job({ name: "fast", checks: fullySpecifiedFastLaneChecks() })],
+  services: [],
+  secretRefs: [],
+}));
+const reorderedCompactFastLane = emitPipeline(definePipeline({
+  name: "heddle",
+  defaults: { class: "required", cachePaths: ["target"] },
+  jobs: {
+    fast: compactFastLaneChecks(true),
+  },
+}));
+const reorderedFullySpecifiedFastLane = emitPipeline(definePipeline({
+  name: "heddle",
+  jobs: [job({ name: "fast", checks: fullySpecifiedFastLaneChecks(true) })],
+}));
+const genericTestPack = emitPipeline(definePipeline({
+  name: "heddle",
+  defaults: { class: "required", cachePaths: ["target"] },
+  jobs: {
+    fast: [
+      rust.build(["--locked", "--workspace", "--tests"]),
+      rust.clippy(["--locked", "--workspace", "--all-targets"]),
+      test(rust, { args: ["--workspace"], flake: ["dns error:", "sccache: error"] }),
+      sh("no-silent-default-tree-load", ["scripts/check-no-silent-default-tree-load.sh"]),
+      rust.fmt({ class: "advisory" }),
+    ],
+  },
+}));
+
+const compactHex = Buffer.from(compactFastLane.canonicalBytes).toString("hex");
+for (const emission of [
+  compactFastLane,
+  compactFastLaneAgain,
+  fullySpecifiedFastLane,
+  reorderedCompactFastLane,
+  reorderedFullySpecifiedFastLane,
+  genericTestPack,
+]) {
+  assert.equal(Buffer.from(emission.canonicalBytes).toString("hex"), compactHex);
+  assert.equal(emission.definitionDigest, compactFastLane.definitionDigest);
+  assert.deepEqual(
+    fromBinary(TreadleDefinitionSchema, emission.canonicalBytes),
+    emission.definition,
+  );
+}
+
+assert.equal(compactFastLane.definition.formatVersion, 1);
+assert.equal(compactFastLane.definition.name, "heddle");
+assert.equal(compactFastLane.definition.jobs.length, 1);
+assert.equal(compactFastLane.definition.jobs[0].name, "fast");
+assert.deepEqual(
+  compactFastLane.definition.jobs[0].checks.map((check) => check.name),
+  ["build", "clippy", "fmt", "no-silent-default-tree-load", "test"],
+);
+
+const byName = Object.fromEntries(
+  compactFastLane.definition.jobs[0].checks.map((check) => [check.name, check]),
+);
+assert.deepEqual(byName.build.args, ["build", "--locked", "--workspace", "--tests"]);
+assert.deepEqual(byName.clippy.args, [
+  "clippy",
+  "--locked",
+  "--workspace",
+  "--all-targets",
+  "--",
+  "-D",
+  "warnings",
+]);
+assert.deepEqual(byName.test.args, ["test", "--workspace"]);
+assert.deepEqual(byName.test.retry.flakeSignatures, ["dns error:", "sccache: error"]);
+assert.equal(byName.test.retry.maxRetries, 2);
+assert.deepEqual(byName["no-silent-default-tree-load"].command, "sh");
+assert.deepEqual(byName["no-silent-default-tree-load"].args, [
+  "scripts/check-no-silent-default-tree-load.sh",
+]);
+assert.deepEqual(byName.fmt.args, ["fmt", "--check"]);
+assert.equal(byName.fmt.class, TreadleCheckClass.ADVISORY);
+for (const check of compactFastLane.definition.jobs[0].checks) {
+  assert.equal(check.command.length > 0, true);
+  assert.ok(check.targetEnvironment);
+  assert.equal(check.targetEnvironment.ociImageDigest, rustTarget.ociImageDigest);
+  assert.equal(check.targetEnvironment.platform?.os, rustTarget.platform.os);
+  assert.equal(check.targetEnvironment.platform?.arch, rustTarget.platform.arch);
+  assert.ok(check.isolation);
+  assert.ok(check.retry);
+  assert.equal(check.timeoutSeconds > 0, true);
+  assert.equal(check.triggers.length > 0, true);
+  assert.deepEqual(check.cachePaths, ["target"]);
+}
+
+const clippyWithoutDeny = emitPipeline(definePipeline({
+  name: "clippy-plain",
+  jobs: {
+    lint: [rust.clippy(["--workspace"], { denyWarnings: false })],
+  },
+}));
+assert.deepEqual(clippyWithoutDeny.definition.jobs[0].checks[0].args, ["clippy", "--workspace"]);
+
+assert.deepEqual(hostTargetEnvironment({ platform: "linux", arch: "x64" }), {
+  ociImageDigest: HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+  platform: { os: "linux", arch: "amd64" },
+});
+assert.deepEqual(hostTargetEnvironment({ platform: "darwin", arch: "arm64" }), {
+  ociImageDigest: HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+  platform: { os: "darwin", arch: "arm64" },
+});
+assert.deepEqual(hostTargetEnvironment({ platform: "win32", arch: "x64" }), {
+  ociImageDigest: HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST,
+  platform: { os: "windows", arch: "amd64" },
+});
+assert.throws(() => hostTargetEnvironment({ platform: "freebsd", arch: "x64" }), /unsupported process.platform/);
+assert.throws(() => hostTargetEnvironment({ platform: "linux", arch: "ia32" }), /unsupported process.arch/);
+const liveHost = hostTargetEnvironment();
+assert.equal(liveHost.ociImageDigest, HOST_EXEC_DUMMY_OCI_IMAGE_DIGEST);
+assert.match(liveHost.platform.os, /^(darwin|linux|windows)$/);
+assert.match(liveHost.platform.arch, /^(amd64|arm64)$/);
+assert.notEqual(
+  `${liveHost.platform.os}/${liveHost.platform.arch}`,
+  "must-not-silently-use-a-placeholder",
+);
+
+const compileBin = "packages/typescript/compile-treadle.mjs";
+const localHostExample = "packages/typescript/examples/local-host.mjs";
+const compileOut = mkdtempSync(join(tmpdir(), "treadle-compile-"));
+const compileRun = spawnSync(
+  process.execPath,
+  [compileBin, localHostExample, "--out-dir", compileOut],
+  { encoding: "utf8" },
+);
+assert.equal(compileRun.status, 0, compileRun.stderr);
+const compiledBinPath = join(compileOut, "treadle.definition.bin");
+const compiledLockPath = join(compileOut, "treadle.lock.json");
+assert.match(compileRun.stdout, /treadle\.definition\.bin/);
+assert.match(compileRun.stdout, /treadle\.lock\.json/);
+const compiledBytes = readFileSync(compiledBinPath);
+const compiledLock = JSON.parse(readFileSync(compiledLockPath, "utf8"));
+const compiledDefinition = fromBinary(TreadleDefinitionSchema, compiledBytes);
+assert.deepEqual(
+  compiledBytes,
+  Buffer.from(canonicalTreadleDefinitionBytes(compiledDefinition)),
+);
+assert.equal(
+  Buffer.from(treadleDefinitionBlake3(compiledDefinition)).toString("hex"),
+  compiledLock.definition_digest,
+);
+assert.equal(compiledLock.format_version, 1);
+assert.equal(compiledDefinition.formatVersion, 1);
+assert.equal(compiledDefinition.name, "local-host");
+assert.deepEqual(
+  compiledDefinition.jobs.map((jobMessage) => jobMessage.name),
+  ["also", "fast"],
+);
+assert.deepEqual(
+  compiledDefinition.jobs.map((jobMessage) => jobMessage.checks.map((check) => check.name)),
+  [["pwd-check"], ["echo-ok", "true-check"]],
+);
+for (const check of compiledDefinition.jobs.flatMap((jobMessage) => jobMessage.checks)) {
+  assert.equal(check.command, "sh");
+  assert.ok(check.targetEnvironment);
+  assert.equal(check.targetEnvironment.ociImageDigest, liveHost.ociImageDigest);
+  assert.equal(check.targetEnvironment.platform?.os, liveHost.platform.os);
+  assert.equal(check.targetEnvironment.platform?.arch, liveHost.platform.arch);
+}
+if (process.platform === "linux" && process.arch === "x64") {
+  const fixtureBin = readFileSync("tests/fixtures/treadle-local-host.definition.bin");
+  const fixtureLock = JSON.parse(
+    readFileSync("tests/fixtures/treadle-local-host.lock.json", "utf8"),
+  );
+  assert.deepEqual(compiledBytes, fixtureBin);
+  assert.equal(compiledLock.definition_digest, fixtureLock.definition_digest);
+}
+
+const rustPackOverriddenByHost = emitPipeline(definePipeline({
+  name: "fast-lane-host",
+  defaults: {
+    targetEnvironment: hostTargetEnvironment({ platform: "darwin", arch: "arm64" }),
+  },
+  jobs: {
+    fast: [rust.fmt(), rust.test([], { name: "test" })],
+  },
+}));
+for (const check of rustPackOverriddenByHost.definition.jobs[0].checks) {
+  assert.equal(check.command, "cargo");
+  assert.ok(check.cachePaths.includes("target"));
+  assert.equal(check.targetEnvironment?.platform?.os, "darwin");
+  assert.equal(check.targetEnvironment?.platform?.arch, "arm64");
+  assert.notEqual(
+    `${check.targetEnvironment?.platform?.os}/${check.targetEnvironment?.platform?.arch}`,
+    `${RUST_PACK_TARGET_ENVIRONMENT.platform.os}/${RUST_PACK_TARGET_ENVIRONMENT.platform.arch}`,
+  );
+}
+
+const fastLaneHostExample = "packages/typescript/examples/fast-lane-host.mjs";
+const fastLaneOut = mkdtempSync(join(tmpdir(), "treadle-fast-lane-host-"));
+const fastLaneRun = spawnSync(
+  process.execPath,
+  [compileBin, fastLaneHostExample, "--out-dir", fastLaneOut],
+  { encoding: "utf8" },
+);
+assert.equal(fastLaneRun.status, 0, fastLaneRun.stderr);
+const fastLaneBytes = readFileSync(join(fastLaneOut, "treadle.definition.bin"));
+const fastLaneLock = JSON.parse(readFileSync(join(fastLaneOut, "treadle.lock.json"), "utf8"));
+const fastLaneDefinition = fromBinary(TreadleDefinitionSchema, fastLaneBytes);
+assert.deepEqual(
+  fastLaneBytes,
+  Buffer.from(canonicalTreadleDefinitionBytes(fastLaneDefinition)),
+);
+assert.equal(
+  Buffer.from(treadleDefinitionBlake3(fastLaneDefinition)).toString("hex"),
+  fastLaneLock.definition_digest,
+);
+assert.equal(fastLaneDefinition.name, "fast-lane-host");
+assert.deepEqual(
+  fastLaneDefinition.jobs.map((jobMessage) => jobMessage.name),
+  ["fast"],
+);
+assert.deepEqual(
+  fastLaneDefinition.jobs[0].checks.map((check) => check.name),
+  ["fmt", "test"],
+);
+for (const check of fastLaneDefinition.jobs[0].checks) {
+  assert.equal(check.command, "cargo");
+  assert.ok(check.cachePaths.includes("target"));
+  assert.ok(check.targetEnvironment);
+  assert.equal(check.targetEnvironment.ociImageDigest, liveHost.ociImageDigest);
+  assert.equal(check.targetEnvironment.platform?.os, liveHost.platform.os);
+  assert.equal(check.targetEnvironment.platform?.arch, liveHost.platform.arch);
+  assert.ok(check.isolation);
+  assert.ok(
+    check.isolation.networkAccess === TreadleNetworkAccess.UNSPECIFIED ||
+      check.isolation.networkAccess === TreadleNetworkAccess.NONE,
+  );
+  assert.equal(check.isolation.profile, "");
+  assert.equal(check.isolation.cpuMillis, 0);
+  assert.equal(check.isolation.memoryBytes, 0n);
+  assert.equal(check.isolation.processLimit, 0);
+}
+if (process.platform === "linux" && process.arch === "x64") {
+  const fixtureBin = readFileSync("tests/fixtures/treadle-fast-lane-host.definition.bin");
+  const fixtureLock = JSON.parse(
+    readFileSync("tests/fixtures/treadle-fast-lane-host.lock.json", "utf8"),
+  );
+  assert.deepEqual(fastLaneBytes, fixtureBin);
+  assert.equal(fastLaneLock.definition_digest, fixtureLock.definition_digest);
+}
+
+const missingDefaultDir = mkdtempSync(join(tmpdir(), "treadle-missing-default-"));
+const missingDefaultFile = join(missingDefaultDir, "no-default.mjs");
+writeFileSync(missingDefaultFile, "export const notDefault = 1;\n");
+const missingDefaultRun = spawnSync(
+  process.execPath,
+  [compileBin, missingDefaultFile, "--out-dir", join(missingDefaultDir, "out")],
+  { encoding: "utf8" },
+);
+assert.notEqual(missingDefaultRun.status, 0);
+assert.match(missingDefaultRun.stderr, /no default export/);
+rmSync(missingDefaultDir, { recursive: true, force: true });
+
 if (process.argv.includes("--print")) {
   process.stdout.write(`${JSON.stringify({
     format: "heddle-treadle-definition-v1",
@@ -461,6 +866,15 @@ if (process.argv.includes("--print")) {
   );
   process.stdout.write(
     "treadle authoring SDK: golden/digest/lock deterministic; reordered authoring matched; 4 matrix checks concrete; round-trip matched\n",
+  );
+  process.stdout.write(
+    `treadle compact authoring: Fast Lane matched fully-specified bytes ${compactHex.length / 2}; blake3 ${compactFastLane.definitionDigest}; reordered/generic-test identical; defaults did not override specified checks\n`,
+  );
+  process.stdout.write(
+    `treadle compile: ${compiledBytes.length} bytes; lock ${compiledLock.definition_digest}; jobs also/fast; host ${liveHost.platform.os}/${liveHost.platform.arch}\n`,
+  );
+  process.stdout.write(
+    `treadle rust-pack host compile: ${fastLaneBytes.length} bytes; lock ${fastLaneLock.definition_digest}; fmt+test; cache_paths target; host ${liveHost.platform.os}/${liveHost.platform.arch}\n`,
   );
 }
 

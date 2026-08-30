@@ -204,10 +204,10 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn",
       "layers": {
         "client": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "cli": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -270,10 +270,10 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion",
       "layers": {
         "client": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "cli": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -281,10 +281,10 @@
       "rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion",
       "layers": {
         "client": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "cli": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -391,10 +391,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateAgentAccount",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -424,10 +424,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/CreateSignupInvite",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -589,10 +589,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ListSignupInvites",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -809,10 +809,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/WhoAmI",
       "layers": {
         "client": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "cli": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -941,7 +941,7 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/BootstrapOwnerRoot",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
           "status": "planned"
@@ -974,10 +974,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/GetCurrentOwnerKeyring",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -1128,10 +1128,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/DeleteSpool",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -1370,10 +1370,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpool",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "intentionally-unsupported"
         }
       }
     },
@@ -1645,7 +1645,7 @@
       "rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents",
       "layers": {
         "client": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "cli": {
           "status": "intentionally-unsupported"
@@ -1744,10 +1744,10 @@
       "rpc": "heddle.api.v1alpha1.StateReviewService/SignState",
       "layers": {
         "client": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "cli": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -1843,10 +1843,10 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/GetThread",
       "layers": {
         "client": {
-          "status": "planned"
+          "status": "shipped"
         },
         "cli": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1909,7 +1909,7 @@
       "rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads",
       "layers": {
         "client": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "cli": {
           "status": "intentionally-unsupported"

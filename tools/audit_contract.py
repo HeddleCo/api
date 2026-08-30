@@ -63,13 +63,20 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
-    # Three services are planned, and methods on otherwise-shipped services
-    # deliberately override their inherited maturity to planned (four handle
-    # RPCs now inherit SHIPPED; CreateSignupInvite, ListSignupInvites,
-    # RegisterGitHubInstallation, ListInstallationRepositories,
-    # MintGitHubAppSetupChallenge, and the two remote-link management RPCs
-    # remain contract-first until their Weft handlers land).
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 17
+    # Three services are planned (AgentService, AgentGatewayService,
+    # OwnerAuthorizationService), and nineteen methods on otherwise-shipped
+    # services deliberately override their inherited maturity to planned
+    # (api#187 maturity spine). CreateSignupInvite, ListSignupInvites, and
+    # ListInstallationRepositories were promoted/cut over to inherited SHIPPED.
+    # StoreProviderToken, ListActors, ListWorktrees, ListDiscussionsByStates,
+    # ListStateAttachments, ListThreadHistories, RecordCheckAck, and
+    # StreamWorkspaceSummary were demoted to planned until their handlers land.
+    # ClaimSignupInvite and CreateAgentAccount stay planned to preserve their
+    # existence-hidden, invite-gated abuse posture (guarded by
+    # tests/test_signup_contract.py); RegisterGitHubInstallation and the two
+    # remote-link management RPCs stay planned pending their Weft handlers
+    # (guarded by tests/transport_contract.rs).
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 22
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded

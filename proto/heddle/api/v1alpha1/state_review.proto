@@ -476,6 +476,7 @@ service StateReviewService {
   // parity — an ack is durable review evidence.
   rpc RecordCheckAck(RecordCheckAckRequest) returns (RecordCheckAckResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE

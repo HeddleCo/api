@@ -1101,6 +1101,7 @@ service RepositoryService {
   // return semantics. Weft-only surface; daemon dual-target is heddle#1333.
   rpc ListStateAttachments(ListStateAttachmentsRequest) returns (ListStateAttachmentsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -1139,6 +1140,7 @@ service RepositoryService {
   // existence-hiding posture as ListStates.
   rpc ListThreadHistories(ListThreadHistoriesRequest) returns (ListThreadHistoriesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY

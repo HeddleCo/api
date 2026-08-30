@@ -467,6 +467,21 @@ message WhoAmIResponse {
   // allowance for its effective plan. This is retained capacity, not the
   // interval-integrated usage used for billing.
   StorageUsage storage_usage = 15;
+  // Owner-root claim status for the caller's subject (api#131). Surfaced for
+  // UX affordances only — servers enforce root-gated operations, never the
+  // client. Absent (default) ⇒ ROOT_STATUS_UNSPECIFIED.
+  RootStatus root_status = 16;
+}
+
+// Owner-root claim status for a subject (api#131).
+enum RootStatus {
+  ROOT_STATUS_UNSPECIFIED = 0;
+  // The subject holds a claimed owner root.
+  ROOT_STATUS_ROOTED = 1;
+  // The subject has no owner root.
+  ROOT_STATUS_ROOTLESS = 2;
+  // The subject is an agent account whose owner root is not yet claimed.
+  ROOT_STATUS_UNCLAIMED_AGENT = 3;
 }
 
 // A single role grant held by the caller on a namespace or repository.
@@ -1634,7 +1649,6 @@ service IdentityService {
   // canonicalized address using the BindSignupInviteEmail rules.
   rpc CreateSignupInvite(CreateSignupInviteRequest) returns (CreateSignupInviteResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1654,7 +1668,6 @@ service IdentityService {
   // is returned. allowance_remaining is reported without spending an invite.
   rpc ListSignupInvites(ListSignupInvitesRequest) returns (ListSignupInvitesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -2034,7 +2047,6 @@ service IdentityService {
   }
   rpc ListInstallationRepositories(ListInstallationRepositoriesRequest) returns (ListInstallationRepositoriesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -2236,6 +2248,7 @@ service IdentityService {
   }
   rpc StoreProviderToken(StoreProviderTokenRequest) returns (StoreProviderTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE

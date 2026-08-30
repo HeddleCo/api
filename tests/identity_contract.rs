@@ -3,7 +3,7 @@
 use heddle_api::heddle::api::v1alpha1::{
     AccessTokenResponse, BeginWebAuthnRegistrationRequest, ClaimSignupInviteResponse, Entitlement,
     GitHubInstallationRepository, PromoteAgentAccountRequest, RegisterGitHubInstallationRequest,
-    RegisterGitHubInstallationResponse, SignupBootstrapMethod, StorageUsage, WhoAmIResponse,
+    RegisterGitHubInstallationResponse, StorageUsage, WhoAmIResponse,
 };
 use prost::Message;
 
@@ -71,6 +71,8 @@ fn begin_registration_round_trips_optional_claim_consent_issuance() {
         nonce: vec![0x33, 0x44],
         authorization_hash: "ab".repeat(32),
         expires_at_millis: 1_750_003_600_000,
+        reservation_id: "invite-reservation-1".to_string(),
+        verified_email_id: "verified-email-1".to_string(),
     };
 
     let decoded = BeginWebAuthnRegistrationRequest::decode(expected.encode_to_vec().as_slice())
@@ -155,28 +157,30 @@ fn promote_agent_account_omits_claim_consent_issuance_for_old_clients() {
 }
 
 #[test]
-fn claim_signup_invite_response_round_trips_mint_inputs() {
+fn claim_signup_invite_response_round_trips_reservation() {
     let expected = ClaimSignupInviteResponse {
-        bootstrap_token: Vec::new(),
         reservation_id: "11111111-2222-3333-4444-555555555555".to_string(),
-        session_id: "signup-bootstrap-session-rev".to_string(),
-        allowed_methods: vec![
-            SignupBootstrapMethod::BeginWebAuthnRegistration as i32,
-            SignupBootstrapMethod::RegisterPublicKey as i32,
-        ],
-        ..Default::default()
+        reservation_expires_at: Some(prost_types::Timestamp {
+            seconds: 1_775_000_000,
+            nanos: 0,
+        }),
     };
 
     let decoded = ClaimSignupInviteResponse::decode(expected.encode_to_vec().as_slice())
         .expect("decode ClaimSignupInviteResponse");
 
     assert_eq!(decoded, expected);
-    assert!(decoded.bootstrap_token.is_empty());
     assert_eq!(
         decoded.reservation_id,
         "11111111-2222-3333-4444-555555555555"
     );
-    assert_eq!(decoded.session_id, "signup-bootstrap-session-rev");
+    assert_eq!(
+        decoded.reservation_expires_at,
+        Some(prost_types::Timestamp {
+            seconds: 1_775_000_000,
+            nanos: 0,
+        })
+    );
 }
 
 #[test]

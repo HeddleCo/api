@@ -776,10 +776,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail",
       "layers": {
         "server_adapter": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "ui": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -842,10 +842,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/GetOperation",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "partial"
         }
       }
     },
@@ -919,10 +919,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/WatchOperations",
       "layers": {
         "server_adapter": {
-          "status": "planned"
+          "status": "shipped"
         },
         "ui": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1172,10 +1172,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
       "layers": {
         "server_adapter": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "ui": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -1271,10 +1271,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/ListSupportAccessGrants",
       "layers": {
         "server_adapter": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "ui": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },
@@ -1326,10 +1326,10 @@
       "rpc": "heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
       "layers": {
         "server_adapter": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         },
         "ui": {
-          "status": "intentionally-unsupported"
+          "status": "shipped"
         }
       }
     },

@@ -4,12 +4,12 @@
     "heddle": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/heddle.json",
-      "sha256": "a239180aeae1bde91d9f48f42df9d23ffdff63ef7951abd1dcc6a28526b2cc04"
+      "sha256": "e626fec424e1dd9e2c2802964805b80fceb4985e1390c8ed9735499bcd98de21"
     },
     "weft": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/weft.json",
-      "sha256": "d4f8e5f99219d1add361b05e73dd821b6ce6a68951ee05f47da2ba0296361541"
+      "sha256": "9d080a992f6d3442f3d691caca3d868770a63c771296c7d84cab6d23aa0ded4f"
     },
     "tapestry": {
       "kind": "consumer-derived-sanitized-declaration",

@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {
@@ -46,7 +46,7 @@
     "./attachment-authorization": "./dist/attachment-authorization.js"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "2.12.0",
+    "@bufbuild/protobuf": "^2.12.0",
     "@noble/hashes": "2.3.0"
   }
 }

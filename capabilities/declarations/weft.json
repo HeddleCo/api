@@ -336,10 +336,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/BindSignupInviteEmail",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -523,10 +523,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/IssueSignupEmailChallenge",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -545,10 +545,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -699,10 +699,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ResolveSignupInvite",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -864,10 +864,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/GetRemoteLink",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -886,10 +886,10 @@
       "rpc": "heddle.api.v1alpha1.OperationService/SetRemoteLink",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -930,10 +930,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/BeginAgentOwnerClaim",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -941,10 +941,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/BootstrapOwnerRoot",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -952,10 +952,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/ChangeOwnerRecoveryPolicy",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -963,10 +963,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/ClaimAgentOwner",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -974,10 +974,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/GetCurrentOwnerKeyring",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -985,10 +985,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/RecoverOwnerKey",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -996,10 +996,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/RotateOwnerKey",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -1007,10 +1007,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/SubmitOwnerAuthorization",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },
@@ -1018,10 +1018,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/TransferResourceOwnership",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },

@@ -36,5 +36,7 @@ protobuf bytes and a deterministic `treadle.lock.json` artifact whose
 loads the file's `export default` (`definePipeline` return), emits, and writes
 `.heddle/treadle.definition.bin` (canonical bytes) and
 `.heddle/treadle.lock.json` (`format_version` + hex digest). `--out-dir`
-defaults to `{cwd}/.heddle`. Missing default export fails closed. The compact
-local-run example is `packages/typescript/examples/local-host.mjs`.
+defaults to `{cwd}/.heddle`. Missing default export fails closed. Compact
+local-run examples: `packages/typescript/examples/local-host.mjs` (`sh`) and
+`packages/typescript/examples/fast-lane-host.mjs` (`rust.fmt` + `rust.test`,
+host platform, rust-pack `cachePaths: ["target"]`).

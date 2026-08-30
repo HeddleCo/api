@@ -756,6 +756,80 @@ if (process.platform === "linux" && process.arch === "x64") {
   assert.equal(compiledLock.definition_digest, fixtureLock.definition_digest);
 }
 
+const rustPackOverriddenByHost = emitPipeline(definePipeline({
+  name: "fast-lane-host",
+  defaults: {
+    targetEnvironment: hostTargetEnvironment({ platform: "darwin", arch: "arm64" }),
+  },
+  jobs: {
+    fast: [rust.fmt(), rust.test([], { name: "test" })],
+  },
+}));
+for (const check of rustPackOverriddenByHost.definition.jobs[0].checks) {
+  assert.equal(check.command, "cargo");
+  assert.ok(check.cachePaths.includes("target"));
+  assert.equal(check.targetEnvironment?.platform?.os, "darwin");
+  assert.equal(check.targetEnvironment?.platform?.arch, "arm64");
+  assert.notEqual(
+    `${check.targetEnvironment?.platform?.os}/${check.targetEnvironment?.platform?.arch}`,
+    `${RUST_PACK_TARGET_ENVIRONMENT.platform.os}/${RUST_PACK_TARGET_ENVIRONMENT.platform.arch}`,
+  );
+}
+
+const fastLaneHostExample = "packages/typescript/examples/fast-lane-host.mjs";
+const fastLaneOut = mkdtempSync(join(tmpdir(), "treadle-fast-lane-host-"));
+const fastLaneRun = spawnSync(
+  process.execPath,
+  [compileBin, fastLaneHostExample, "--out-dir", fastLaneOut],
+  { encoding: "utf8" },
+);
+assert.equal(fastLaneRun.status, 0, fastLaneRun.stderr);
+const fastLaneBytes = readFileSync(join(fastLaneOut, "treadle.definition.bin"));
+const fastLaneLock = JSON.parse(readFileSync(join(fastLaneOut, "treadle.lock.json"), "utf8"));
+const fastLaneDefinition = fromBinary(TreadleDefinitionSchema, fastLaneBytes);
+assert.deepEqual(
+  fastLaneBytes,
+  Buffer.from(canonicalTreadleDefinitionBytes(fastLaneDefinition)),
+);
+assert.equal(
+  Buffer.from(treadleDefinitionBlake3(fastLaneDefinition)).toString("hex"),
+  fastLaneLock.definition_digest,
+);
+assert.equal(fastLaneDefinition.name, "fast-lane-host");
+assert.deepEqual(
+  fastLaneDefinition.jobs.map((jobMessage) => jobMessage.name),
+  ["fast"],
+);
+assert.deepEqual(
+  fastLaneDefinition.jobs[0].checks.map((check) => check.name),
+  ["fmt", "test"],
+);
+for (const check of fastLaneDefinition.jobs[0].checks) {
+  assert.equal(check.command, "cargo");
+  assert.ok(check.cachePaths.includes("target"));
+  assert.ok(check.targetEnvironment);
+  assert.equal(check.targetEnvironment.ociImageDigest, liveHost.ociImageDigest);
+  assert.equal(check.targetEnvironment.platform?.os, liveHost.platform.os);
+  assert.equal(check.targetEnvironment.platform?.arch, liveHost.platform.arch);
+  assert.ok(check.isolation);
+  assert.ok(
+    check.isolation.networkAccess === TreadleNetworkAccess.UNSPECIFIED ||
+      check.isolation.networkAccess === TreadleNetworkAccess.NONE,
+  );
+  assert.equal(check.isolation.profile, "");
+  assert.equal(check.isolation.cpuMillis, 0);
+  assert.equal(check.isolation.memoryBytes, 0n);
+  assert.equal(check.isolation.processLimit, 0);
+}
+if (process.platform === "linux" && process.arch === "x64") {
+  const fixtureBin = readFileSync("tests/fixtures/treadle-fast-lane-host.definition.bin");
+  const fixtureLock = JSON.parse(
+    readFileSync("tests/fixtures/treadle-fast-lane-host.lock.json", "utf8"),
+  );
+  assert.deepEqual(fastLaneBytes, fixtureBin);
+  assert.equal(fastLaneLock.definition_digest, fixtureLock.definition_digest);
+}
+
 const missingDefaultDir = mkdtempSync(join(tmpdir(), "treadle-missing-default-"));
 const missingDefaultFile = join(missingDefaultDir, "no-default.mjs");
 writeFileSync(missingDefaultFile, "export const notDefault = 1;\n");
@@ -798,6 +872,9 @@ if (process.argv.includes("--print")) {
   );
   process.stdout.write(
     `treadle compile: ${compiledBytes.length} bytes; lock ${compiledLock.definition_digest}; jobs also/fast; host ${liveHost.platform.os}/${liveHost.platform.arch}\n`,
+  );
+  process.stdout.write(
+    `treadle rust-pack host compile: ${fastLaneBytes.length} bytes; lock ${fastLaneLock.definition_digest}; fmt+test; cache_paths target; host ${liveHost.platform.os}/${liveHost.platform.arch}\n`,
   );
 }
 

@@ -1429,6 +1429,7 @@ service RegistryService {
   // Global operator view of active agent actors (mirrors ListWorktrees).
   rpc ListActors(ListActorsRequest) returns (ListActorsResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -1443,6 +1444,7 @@ service RegistryService {
   }
   rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY

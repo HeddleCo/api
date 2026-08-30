@@ -395,6 +395,7 @@ service WorkflowService {
   }
   rpc StreamWorkspaceSummary(GetWorkspaceSummaryRequest) returns (stream WorkspaceSummary) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY

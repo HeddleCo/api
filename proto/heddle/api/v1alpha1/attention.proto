@@ -186,6 +186,7 @@ enum FeedItemKind {
   FEED_ITEM_KIND_SECURITY_SURFACE = 3; // V2: stale token, over-scoped grant
   FEED_ITEM_KIND_DRIFT_ALERT = 4; // V2: thread diverged significantly
   FEED_ITEM_KIND_REPO_QUIET = 5; // V2: repo inactive with open threads
+  FEED_ITEM_KIND_IMPORTED_DISCUSSION = 6; // V2: discussion imported from an external source
 }
 
 enum FeedItemResolution {

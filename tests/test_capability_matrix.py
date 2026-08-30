@@ -453,10 +453,13 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         actual = build_inventory()
         shipped = [row for row in actual.values() if row["maturity"] == "SHIPPED"]
         planned = [row for row in actual.values() if row["maturity"] == "PLANNED"]
-        self.assertEqual(len(shipped), 143)
+        self.assertEqual(len(shipped), 138)
         # Retired methods are absent; contract-first additions including the
-        # GitHub App repository list and setup challenge remain explicitly planned.
-        self.assertEqual(len(planned), 35)
+        # GitHub App setup challenge remain explicitly planned. The api#187
+        # maturity spine promoted/cut over three methods to inherited SHIPPED
+        # (CreateSignupInvite, ListSignupInvites, ListInstallationRepositories)
+        # and demoted eight back to PLANNED (net -5 shipped, +5 planned).
+        self.assertEqual(len(planned), 40)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

@@ -29,6 +29,8 @@ enum DiscussionKind {
   // A thread-only mailbox for capacity, handoff, and meta-chatter. It is
   // queryable but inert: the discussion never controls or affects work.
   DISCUSSION_KIND_COORDINATION = 2;
+  // A discussion imported from an external source (e.g. an adopted repository).
+  DISCUSSION_KIND_IMPORTED = 3;
 }
 
 // Whether an open discussion is informational or prevents a merge.
@@ -326,6 +328,7 @@ service CollaborationService {
   // page resolves every thread digest in one read.
   rpc ListDiscussionsByStates(ListDiscussionsByStatesRequest) returns (ListDiscussionsByStatesResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY

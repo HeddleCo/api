@@ -219,6 +219,11 @@ message BootstrapOwnerRootRequest {
     DeferredOwnerRootApproval deferred_human = 3;
   }
   string client_operation_id = 4;
+  // Self-asserted UUID-to-key binding installed atomically with the owner
+  // root. The binding is verified after the bootstrap ceremony's root and
+  // approval checks succeed; no registry attestation or independent release
+  // root participates. Additive: empty preserves prior bootstrap behavior.
+  OwnerKeyBinding owner_key_binding = 5;
 }
 
 // Unsigned acknowledgement only. It is not a credential or offline evidence.

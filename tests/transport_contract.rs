@@ -18,9 +18,8 @@ use heddle_api::heddle::api::v1alpha1::{
     ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse,
     ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
     PromoteAgentAccountRequest, ProviderPlanResponse, ProviderPullCapabilityContext,
-    ProviderReadRequest, ProvisionAgentRootedAccountRequest, PushRequest,
-    RemainingDropCodesRequest, RemoteLink, RemoteLinkAuthMode, RemoteLinkStatus,
-    RemoteSyncDirection, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
+    ProviderReadRequest, PushRequest, RemainingDropCodesRequest, RemoteLink, RemoteLinkAuthMode,
+    RemoteLinkStatus, RemoteSyncDirection, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
     SetRemoteLinkRequest, SigningTier, SpoolSettings, StateId, ThreadOrder, TraceContext,
     Visibility, error_detail, get_context_history_response, list_context_response,
     list_discussions_response, list_refs_response, list_threads_response, set_remote_link_request,
@@ -205,7 +204,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             .authorization_access,
         AuthorizationAccess::Public
     );
-    assert_eq!(ALL_METHODS.len(), 178);
+    assert_eq!(ALL_METHODS.len(), 177);
     let by_thread_ref =
         method_descriptor("/heddle.api.v1alpha1.CollaborationService/ListByThreadRef")
             .expect("ListByThreadRef descriptor");
@@ -520,40 +519,6 @@ fn generated_descriptor_extracts_client_operation_id_without_route_specific_code
     assert_eq!(
         method.client_operation_id(&request).expect("valid request"),
         Some("operation-123")
-    );
-}
-
-#[test]
-fn generated_descriptor_carries_agent_rooted_provisioning_contract() {
-    let method =
-        method_descriptor("/heddle.api.v1alpha1.IdentityService/ProvisionAgentRootedAccount")
-            .expect("agent-rooted provisioning descriptor");
-
-    assert_eq!(
-        method.input,
-        "heddle.api.v1alpha1.ProvisionAgentRootedAccountRequest"
-    );
-    assert_eq!(
-        method.output,
-        "heddle.api.v1alpha1.ProvisionAgentRootedAccountResponse"
-    );
-    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
-    assert_eq!(method.authorization_access, AuthorizationAccess::Public);
-    assert_eq!(method.effect, RpcEffect::DurableWrite);
-    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
-    assert!(method.client_operation_id_required);
-    assert_eq!(method.client_operation_id_field_number, Some(3));
-    assert_eq!(method.maturity, ServiceMaturity::Planned);
-
-    let request = ProvisionAgentRootedAccountRequest {
-        invite_code: "invite-code".to_string(),
-        agent_public_key: vec![7; 32],
-        client_operation_id: "provision-operation-123".to_string(),
-    }
-    .encode_to_vec();
-    assert_eq!(
-        method.client_operation_id(&request).expect("valid request"),
-        Some("provision-operation-123")
     );
 }
 

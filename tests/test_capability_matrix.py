@@ -459,7 +459,8 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         # maturity spine promoted/cut over three methods to inherited SHIPPED
         # (CreateSignupInvite, ListSignupInvites, ListInstallationRepositories)
         # and demoted eight back to PLANNED (net -5 shipped, +5 planned).
-        self.assertEqual(len(planned), 40)
+        # api#187 PR-B then pruned ProvisionAgentRootedAccount (-1 planned).
+        self.assertEqual(len(planned), 39)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

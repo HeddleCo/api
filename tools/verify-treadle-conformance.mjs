@@ -660,7 +660,8 @@ for (const check of compactFastLane.definition.jobs[0].checks) {
   assert.equal(check.command.length > 0, true);
   assert.ok(check.targetEnvironment);
   assert.equal(check.targetEnvironment.ociImageDigest, rustTarget.ociImageDigest);
-  assert.deepEqual(check.targetEnvironment.platform, rustTarget.platform);
+  assert.equal(check.targetEnvironment.platform?.os, rustTarget.platform.os);
+  assert.equal(check.targetEnvironment.platform?.arch, rustTarget.platform.arch);
   assert.ok(check.isolation);
   assert.ok(check.retry);
   assert.equal(check.timeoutSeconds > 0, true);

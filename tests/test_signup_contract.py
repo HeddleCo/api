@@ -133,9 +133,10 @@ class SignupContractTest(unittest.TestCase):
         self.assertEqual(
             fields(IDENTITY, "VerifySignupEmailResponse"),
             [
-                ("bootstrap_token", 1),
                 ("recipient_email", 2),
                 ("bound_handle", 3),
+                ("verified_email_id", 4),
+                ("verified_email_expires_at", 5),
             ],
         )
         verification = body(
@@ -146,8 +147,13 @@ class SignupContractTest(unittest.TestCase):
             "unused, non-revoked invite",
             '"Invite found for <email>"',
             "never copied from a request field",
+            "Single-use verified-email id",
+            "in-body device-binding proof, NOT a",
+            "Absolute expiry of the single-use verified-email id",
         ):
             self.assertIn(required, verification)
+        self.assertIn('reserved 1;', verification)
+        self.assertIn('reserved "bootstrap_token";', verification)
 
         self.assertEqual(
             fields(IDENTITY, "BindSignupInviteEmailRequest"),
@@ -210,33 +216,29 @@ class SignupContractTest(unittest.TestCase):
         self.assertIn("Same high-entropy opaque invite code", request)
         self.assertIn("Possession is the only authorization", request)
 
-        methods = body(IDENTITY, "enum", "SignupBootstrapMethod")
-        self.assertEqual(
-            re.findall(r"SIGNUP_BOOTSTRAP_METHOD_(\w+)\s*=\s*(\d+)", methods),
-            [
-                ("UNSPECIFIED", "0"),
-                ("BEGIN_WEB_AUTHN_REGISTRATION", "1"),
-                ("REGISTER_PUBLIC_KEY", "2"),
-            ],
-        )
+        self.assertNotIn("SignupBootstrapMethod", IDENTITY)
         self.assertEqual(
             fields(IDENTITY, "ClaimSignupInviteResponse"),
             [
-                ("bootstrap_token", 1),
-                ("expires_at", 2),
-                ("allowed_methods", 3),
                 ("reservation_id", 4),
-                ("session_id", 5),
+                ("reservation_expires_at", 6),
             ],
         )
         response = body(IDENTITY, "message", "ClaimSignupInviteResponse")
-        self.assertIn("Opaque short-lived bearer", response)
-        self.assertIn("must carry no other capability", response)
-        self.assertIn("BEGIN_WEB_AUTHN_REGISTRATION and REGISTER_PUBLIC_KEY exactly", response)
-        self.assertIn("The bearer remains the authority", response)
-        self.assertIn("mint input, not", response)
-        self.assertIn("signup_bootstrap_invite", response)
-        self.assertIn("session rev_id", response)
+        for reservation in (
+            "reserved 1;",
+            'reserved "bootstrap_token";',
+            "reserved 2;",
+            'reserved "expires_at";',
+            "reserved 3;",
+            'reserved "allowed_methods";',
+            "reserved 5;",
+            'reserved "session_id";',
+        ):
+            self.assertIn(reservation, response)
+        self.assertIn("Single-use invite-reservation id", response)
+        self.assertIn("in-body device-binding proof, NOT a", response)
+        self.assertIn("Reservation TTL clock the client shows and handles", response)
 
         request_type, response_type, contract = rpc("ClaimSignupInvite")
         self.assertEqual(request_type, "ClaimSignupInviteRequest")
@@ -331,6 +333,8 @@ class SignupContractTest(unittest.TestCase):
                 ("nonce", 6),
                 ("authorization_hash", 7),
                 ("expires_at_millis", 8),
+                ("reservation_id", 9),
+                ("verified_email_id", 10),
             ],
         )
         request = body(IDENTITY, "message", "BeginWebAuthnRegistrationRequest")
@@ -355,6 +359,22 @@ class SignupContractTest(unittest.TestCase):
         )
         self.assertIn("Not decimal text, not protobuf varint", request)
         self.assertIn("Empty hash + 0 is old-client v1", request)
+        self.assertIn("Single-use invite-reservation id", request)
+        self.assertIn("Single-use verified-email id", request)
+        self.assertEqual(request.count("in-body device-binding proof, NOT a"), 2)
+
+    def test_bootstrap_exempt_signup_routes_are_unsigned_and_public(self) -> None:
+        for name in (
+            "ClaimSignupInvite",
+            "BeginWebAuthnRegistration",
+            "RegisterPublicKey",
+            "VerifySignupEmail",
+        ):
+            _, _, contract = rpc(name)
+            self.assertIn("signing_tier: SIGNING_TIER_NONE", contract)
+            self.assertIn(
+                "authorization_access: AUTHORIZATION_ACCESS_PUBLIC", contract
+            )
 
     def test_create_agent_account_is_invite_gated_pet_name_path(self) -> None:
         self.assertEqual(

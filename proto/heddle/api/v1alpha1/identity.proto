@@ -76,6 +76,14 @@ message BeginWebAuthnRegistrationRequest {
   // `authorization_hash` is set, both must travel together with the
   // existing adoption quartet.
   int64 expires_at_millis = 8;
+  // Single-use invite-reservation id the client presents until it is consumed.
+  // Authority is the unspent id plus the in-body device-binding proof, NOT a
+  // bearer.
+  string reservation_id = 9;
+  // Single-use verified-email id the client presents until it is consumed.
+  // Authority is the unspent id plus the in-body device-binding proof, NOT a
+  // bearer.
+  string verified_email_id = 10;
 }
 
 message RegisterPublicKeyRequest {
@@ -757,13 +765,8 @@ message VerifySignupEmailRequest {
 }
 
 message VerifySignupEmailResponse {
-  // Opaque bootstrap-scope Biscuit the client presents on the
-  // subsequent `BeginWebAuthnRegistration` call. Empty on rejection
-  // (the RPC returns a non-OK status in that case; this field is
-  // populated only on success). Carrying the token as raw bytes lets
-  // future fields (expiry, refresh window) extend the response
-  // additively without breaking the wire format.
-  bytes bootstrap_token = 1;
+  reserved 1;
+  reserved "bootstrap_token";
   // Server-canonicalized address from the redeemed challenge metadata. This is
   // populated only after Weft finds an unused, non-revoked invite for the same
   // address, so a caller may truthfully render "Invite found for <email>" only
@@ -772,6 +775,12 @@ message VerifySignupEmailResponse {
   // Server-authoritative handle bound to the redeemed signup challenge. Clients
   // use this to prefill and validate the subsequent registration ceremony.
   string bound_handle = 3;
+  // Single-use verified-email id the client presents until it is consumed.
+  // Authority is the unspent id plus the in-body device-binding proof, NOT a
+  // bearer.
+  string verified_email_id = 4;
+  // Absolute expiry of the single-use verified-email id.
+  google.protobuf.Timestamp verified_email_expires_at = 5;
 }
 
 // Binds an unassigned shareable invite to an address that has already passed
@@ -920,14 +929,6 @@ message RemainingDropCodesResponse {
   uint32 count = 1;
 }
 
-// The complete method allowlist carried by a code-claim signup bearer.
-// UNSPECIFIED is never emitted and must be rejected if received.
-enum SignupBootstrapMethod {
-  SIGNUP_BOOTSTRAP_METHOD_UNSPECIFIED = 0;
-  SIGNUP_BOOTSTRAP_METHOD_BEGIN_WEB_AUTHN_REGISTRATION = 1;
-  SIGNUP_BOOTSTRAP_METHOD_REGISTER_PUBLIC_KEY = 2;
-}
-
 message ClaimSignupInviteRequest {
   // Same high-entropy opaque invite code accepted by ResolveSignupInvite.
   // Possession is the only authorization for this unsigned request. A
@@ -936,26 +937,20 @@ message ClaimSignupInviteRequest {
 }
 
 message ClaimSignupInviteResponse {
-  // Opaque short-lived bearer attenuated to exactly the methods listed in
-  // allowed_methods. It must carry no other capability or account authority.
-  // Empty when weft does not mint; clients mint from reservation_id and
-  // session_id.
-  bytes bootstrap_token = 1;
-  // Absolute expiry enforced by the bearer itself. The server must keep this
-  // lifetime short; clients must not infer validity beyond this timestamp.
-  google.protobuf.Timestamp expires_at = 2;
-  // Exact capability projection for bootstrap_token. A successful response
-  // must contain BEGIN_WEB_AUTHN_REGISTRATION and REGISTER_PUBLIC_KEY exactly
-  // once each, and no other value. The bearer remains the authority.
-  repeated SignupBootstrapMethod allowed_methods = 3;
-  // Signup-invite reservation UUID the client embeds in the invite-bootstrap
-  // biscuit (`signup_bootstrap_invite`). This is a mint input, not
-  // capability: it identifies the reserved invite for client-side minting
-  // after weft leaves bootstrap_token empty.
+  reserved 1;
+  reserved "bootstrap_token";
+  reserved 2;
+  reserved "expires_at";
+  reserved 3;
+  reserved "allowed_methods";
+  reserved 5;
+  reserved "session_id";
+  // Single-use invite-reservation id the client presents until it is consumed.
+  // Authority is the unspent id plus the in-body device-binding proof, NOT a
+  // bearer.
   string reservation_id = 4;
-  // The `signup_bootstrap_invite` session rev_id the client puts in that
-  // biscuit's session fact. This is a mint input, not capability.
-  string session_id = 5;
+  // Reservation TTL clock the client shows and handles.
+  google.protobuf.Timestamp reservation_expires_at = 6;
 }
 
 // Creates an unclaimed human account by consuming the human's signup invite.
@@ -1501,7 +1496,7 @@ service IdentityService {
   rpc BeginWebAuthnRegistration(BeginWebAuthnRegistrationRequest) returns (AuthChallengeResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_TRANSIENT_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: false
@@ -1562,9 +1557,9 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  // Atomically reserves an unassigned shareable invite and mints the narrowly
-  // scoped signup bearer described by ClaimSignupInviteResponse. Holding the
-  // code is the authorization; no bearer or request signature is required.
+  // Atomically reserves an unassigned shareable invite and returns the
+  // single-use reservation described by ClaimSignupInviteResponse. Holding
+  // the code is the authorization; no bearer or request signature is required.
   //
   // Invalid (including malformed or unknown), consumed, reserved, revoked,
   // and email-bound codes all fail identically with CALL_FAILURE_CODE_NOT_FOUND,
@@ -2076,7 +2071,7 @@ service IdentityService {
   rpc RegisterPublicKey(RegisterPublicKeyRequest) returns (AccessTokenResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
@@ -2271,13 +2266,14 @@ service IdentityService {
     };
   }
   // Redeems a mailbox token once, checks the canonical challenge email against
-  // the invite ledger, and only then returns its bootstrap bearer and canonical
-  // recipient_email. Invite and token lifecycle failures are distinguished by
-  // ErrorDetail.context.signup, never by parsing the human message.
+  // the invite ledger, and only then returns its single-use verified-email id
+  // and canonical recipient_email. Invite and token lifecycle failures are
+  // distinguished by ErrorDetail.context.signup, never by parsing the human
+  // message.
   rpc VerifySignupEmail(VerifySignupEmailRequest) returns (VerifySignupEmailResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true

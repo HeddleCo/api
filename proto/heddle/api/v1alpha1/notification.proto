@@ -227,7 +227,7 @@ message UnsubscribeResponse {}
 service NotificationService {
   option (heddle.api.v1alpha1.service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
-    maturity: SERVICE_MATURITY_PLANNED
+    maturity: SERVICE_MATURITY_SHIPPED
   };
 
   rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse) {
@@ -306,8 +306,10 @@ service NotificationService {
   }
 
   // PUBLIC / unauthenticated: the in-body unsubscribe_token is the whole proof.
+  // Deferred pending email delivery; overrides the service's SHIPPED maturity.
   rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE

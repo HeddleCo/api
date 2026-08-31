@@ -62,11 +62,11 @@ def audit_new_descriptor(decoded: str) -> None:
     rpc_count = len(re.findall(r"(?m)^\s*rpc \w+", proto_sources))
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
-    assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
-    # Four services are planned (AgentService, AgentGatewayService,
-    # OwnerAuthorizationService, NotificationService), and eighteen methods on
-    # otherwise-shipped services deliberately override their inherited maturity
-    # to planned (api#187 maturity spine). CreateSignupInvite, ListSignupInvites,
+    assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 13
+    # Three services are planned (AgentService, AgentGatewayService,
+    # OwnerAuthorizationService), and nineteen methods on otherwise-shipped
+    # services deliberately override their inherited maturity to planned
+    # (api#187 maturity spine). CreateSignupInvite, ListSignupInvites,
     # and ListInstallationRepositories were promoted/cut over to inherited SHIPPED.
     # StoreProviderToken, ListActors, ListWorktrees, ListDiscussionsByStates,
     # ListStateAttachments, ListThreadHistories, RecordCheckAck, and
@@ -77,7 +77,10 @@ def audit_new_descriptor(decoded: str) -> None:
     # remote-link management RPCs stay planned pending their Weft handlers
     # (guarded by tests/transport_contract.rs). ProvisionAgentRootedAccount was
     # pruned (api#187 PR-B), dropping one method-level PLANNED override.
-    # NotificationService (0.22.0) adds the fourth planned service-level override.
+    # NotificationService (0.22.0) landed planned at the service level; 0.23.0
+    # promoted the service to SHIPPED and moved the override to Unsubscribe,
+    # which stays planned pending email delivery — the service-level PLANNED
+    # became a SHIPPED (+1 shipped) and a method-level override (net-zero PLANNED).
     assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 22
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded

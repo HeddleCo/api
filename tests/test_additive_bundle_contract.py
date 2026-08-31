@@ -285,7 +285,7 @@ class AdditiveBundleContractTest(unittest.TestCase):
         ):
             self.assertIn(f"NOTIFICATION_KIND_{name} = {number}", notif)
 
-    def test_notification_service_is_planned_recipient_owned_surface(self) -> None:
+    def test_notification_service_is_shipped_recipient_owned_surface(self) -> None:
         self.assertIn("CAPABILITY_AREA_NOTIFICATIONS = 15", CONTRACT)
         self.assertIn(
             "notification_id", dict(fields(NOTIFICATION, "Notification"))
@@ -293,7 +293,16 @@ class AdditiveBundleContractTest(unittest.TestCase):
         # A Notification references a FeedItem rather than copying it.
         self.assertIn("feed_item_id", dict(fields(NOTIFICATION, "Notification")))
         service = body(NOTIFICATION, "service", "NotificationService")
-        self.assertIn("maturity: SERVICE_MATURITY_PLANNED", service)
+        # 0.23.0: the service is SHIPPED (E6 handlers landed). Only Unsubscribe
+        # keeps a method-level PLANNED override pending email delivery.
+        service_contract = re.search(
+            r"(?ms)option \(heddle\.api\.v1alpha1\.service_contract\) = \{.*?\};",
+            service,
+        )
+        self.assertIsNotNone(service_contract)
+        self.assertIn(
+            "maturity: SERVICE_MATURITY_SHIPPED", service_contract.group(0)
+        )
         for rpc_name in (
             "ListNotifications",
             "SubscribeNotifications",
@@ -303,16 +312,20 @@ class AdditiveBundleContractTest(unittest.TestCase):
             "Unsubscribe",
         ):
             self.assertRegex(service, rf"\brpc {rpc_name}\(")
-        # Per-recipient RPCs are scoped to the caller subject, not a repo.
+        # Per-recipient RPCs are scoped to the caller subject, not a repo, and
+        # carry no maturity override — they inherit the service's SHIPPED maturity.
         mark = re.search(r"(?ms)rpc MarkNotificationRead\(.*?\n  \}", service)
         self.assertIsNotNone(mark)
+        self.assertNotIn("maturity:", mark.group(0))
         self.assertIn(
             "AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT", mark.group(0)
         )
         self.assertIn("RPC_EFFECT_DURABLE_WRITE", mark.group(0))
         # Unsubscribe is public/unauthenticated; the in-body token is the proof.
+        # It stays PLANNED (deferred pending email) via a method-level override.
         unsub = re.search(r"(?ms)rpc Unsubscribe\(.*?\n  \}", service)
         self.assertIsNotNone(unsub)
+        self.assertIn("maturity: SERVICE_MATURITY_PLANNED", unsub.group(0))
         self.assertIn("AUTHORIZATION_ACCESS_PUBLIC", unsub.group(0))
         self.assertIn("unsubscribe_token", dict(fields(NOTIFICATION, "UnsubscribeRequest")))
 

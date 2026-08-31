@@ -836,6 +836,19 @@ message SubscribeRepoEventsRequest {
   string thread_id = 5;
 }
 
+// Typed projection of RepoEvent.event_type. `event_type` (a free-form string)
+// stays authoritative on the wire; `kind` is the enum any consumer can switch
+// on. UNSPECIFIED means the producer emitted an event_type this enum does not
+// yet name — read event_type in that case. Additive: new kinds append at the
+// next free number.
+enum RepoEventKind {
+  REPO_EVENT_KIND_UNSPECIFIED = 0;
+  // A discussion turn appended on a thread, carried on the live plane so
+  // clients render new turns without polling. Pairs with state_review.proto
+  // DiscussionTurn.turn_seq / turn_id.
+  REPO_EVENT_KIND_DISCUSSION_TURN = 1;
+}
+
 message RepoEvent {
   int64 event_id = 1;
   string repo_id = 2;
@@ -855,6 +868,9 @@ message RepoEvent {
   RepositoryRef repo_path = 12;
   // Present exactly when this is a thread event; paired with `thread`.
   string thread_id = 13;
+  // Typed projection of event_type; UNSPECIFIED when this producer's event_type
+  // is not yet named by RepoEventKind. Never overrides event_type.
+  RepoEventKind kind = 15;
 }
 
 service RepositoryService {

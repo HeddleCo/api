@@ -198,6 +198,23 @@ message DiscussionTurn {
   // Structured entity mentions spanning ranges of `body`. See
   // DiscussionReference for identity / pin / offset rules.
   repeated DiscussionReference references = 5;
+  // Server-minted turn identity so discussion turns ride the repo_events live
+  // plane (see repository.proto SubscribeRepoEvents / REPO_EVENT_KIND_DISCUSSION_TURN).
+  // turn_seq is a per-discussion monotonic sequence; turn_id is the stable
+  // identity paired with it. Both are zero/empty on a turn not yet minted.
+  uint64 turn_seq = 6;
+  string turn_id = 7;
+  // Provenance for turns imported from an external conversation (a PR review
+  // thread, an issue comment). All empty for a native turn, where author_name /
+  // author_email and posted_at are authoritative. external_author_display is
+  // presentation text (never an auth subject); external_author_id is the source
+  // system's stable author id; source_url deep-links the original; and
+  // original_created_at is the source timestamp (posted_at remains the import
+  // time).
+  string external_author_display = 8;
+  string external_author_id = 9;
+  string source_url = 10;
+  google.protobuf.Timestamp original_created_at = 11;
 }
 
 // Resolution state of a discussion. `Open` means unresolved; the

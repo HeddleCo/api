@@ -131,6 +131,7 @@ enum CapabilityArea {
   CAPABILITY_AREA_PULL_REQUEST_REVIEW = 12;
   CAPABILITY_AREA_SEARCH = 13;
   CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS = 14;
+  CAPABILITY_AREA_NOTIFICATIONS = 15;
 }
 
 // Authorization is declarative contract metadata. Producers still own runtime

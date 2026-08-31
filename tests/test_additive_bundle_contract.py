@@ -9,6 +9,9 @@ IDENTITY = (ROOT / "proto/heddle/api/v1alpha1/identity.proto").read_text()
 REGISTRY = (ROOT / "proto/heddle/api/v1alpha1/registry.proto").read_text()
 REPOSITORY = (ROOT / "proto/heddle/api/v1alpha1/repository.proto").read_text()
 STATE_REVIEW = (ROOT / "proto/heddle/api/v1alpha1/state_review.proto").read_text()
+CONTRACT = (ROOT / "proto/heddle/api/v1alpha1/contract.proto").read_text()
+ATTENTION = (ROOT / "proto/heddle/api/v1alpha1/attention.proto").read_text()
+NOTIFICATION = (ROOT / "proto/heddle/api/v1alpha1/notification.proto").read_text()
 
 
 def body(source: str, kind: str, name: str) -> str:
@@ -217,6 +220,101 @@ class AdditiveBundleContractTest(unittest.TestCase):
         self.assertIn("optional uint32 end_line = 3", entry)
         path_symbol = body(STATE_REVIEW, "message", "PathSymbolRef")
         self.assertNotRegex(path_symbol, r"start_line|end_line")
+
+
+    def test_discussion_turn_gains_streaming_identity_and_import_provenance(
+        self,
+    ) -> None:
+        # E5 server-minted identity (turn_seq/turn_id) and E3 imported-turn
+        # provenance land additively at the next free numbers on DiscussionTurn;
+        # the first five fields are unchanged.
+        self.assertEqual(
+            fields(STATE_REVIEW, "DiscussionTurn"),
+            [
+                ("author_name", 1),
+                ("author_email", 2),
+                ("body", 3),
+                ("posted_at", 4),
+                ("references", 5),
+                ("turn_seq", 6),
+                ("turn_id", 7),
+                ("external_author_display", 8),
+                ("external_author_id", 9),
+                ("source_url", 10),
+                ("original_created_at", 11),
+            ],
+        )
+        turn = body(STATE_REVIEW, "message", "DiscussionTurn")
+        self.assertIn("uint64 turn_seq = 6", turn)
+        self.assertIn("google.protobuf.Timestamp original_created_at = 11", turn)
+
+    def test_discussion_turns_ride_the_repo_events_live_plane(self) -> None:
+        # E5 reuses SubscribeRepoEvents/repo_events. A typed RepoEventKind names
+        # the discussion-turn event; event_type (string) stays authoritative and
+        # RepoEvent.kind is an additive typed projection at the next free number.
+        kinds = body(REPOSITORY, "enum", "RepoEventKind")
+        self.assertIn("REPO_EVENT_KIND_UNSPECIFIED = 0", kinds)
+        self.assertIn("REPO_EVENT_KIND_DISCUSSION_TURN = 1", kinds)
+        self.assertEqual(fields(REPOSITORY, "RepoEvent")[-1], ("kind", 15))
+        self.assertIn("string event_type = 3", body(REPOSITORY, "message", "RepoEvent"))
+
+    def test_notification_kind_mirrors_feed_item_kind_numbers(self) -> None:
+        # E6 NotificationKind values 1..6 mirror FeedItemKind numbers so a feed
+        # item projects onto a notification without remapping; 10..13 are
+        # notification-only kinds.
+        notif = body(NOTIFICATION, "enum", "NotificationKind")
+        feed = body(ATTENTION, "enum", "FeedItemKind")
+        mirrored = {
+            1: "REVIEW_READY",
+            2: "AGENT_COMPLETED",
+            3: "SECURITY_SURFACE",
+            4: "DRIFT_ALERT",
+            6: "IMPORTED_DISCUSSION",
+        }
+        for number, name in mirrored.items():
+            self.assertIn(f"FEED_ITEM_KIND_{name} = {number}", feed)
+            self.assertIn(f"NOTIFICATION_KIND_{name} = {number}", notif)
+        # 5 mirrors the FeedItemKind number while naming the digest form.
+        self.assertIn("FEED_ITEM_KIND_REPO_QUIET = 5", feed)
+        self.assertIn("NOTIFICATION_KIND_REPO_QUIET_DIGEST = 5", notif)
+        for number, name in (
+            (10, "MENTION"),
+            (11, "DISCUSSION_REPLY"),
+            (12, "ACCOUNT_SECURITY"),
+            (13, "STEER_HELD"),
+        ):
+            self.assertIn(f"NOTIFICATION_KIND_{name} = {number}", notif)
+
+    def test_notification_service_is_planned_recipient_owned_surface(self) -> None:
+        self.assertIn("CAPABILITY_AREA_NOTIFICATIONS = 15", CONTRACT)
+        self.assertIn(
+            "notification_id", dict(fields(NOTIFICATION, "Notification"))
+        )
+        # A Notification references a FeedItem rather than copying it.
+        self.assertIn("feed_item_id", dict(fields(NOTIFICATION, "Notification")))
+        service = body(NOTIFICATION, "service", "NotificationService")
+        self.assertIn("maturity: SERVICE_MATURITY_PLANNED", service)
+        for rpc_name in (
+            "ListNotifications",
+            "SubscribeNotifications",
+            "MarkNotificationRead",
+            "GetNotificationPreferences",
+            "SetNotificationPreferences",
+            "Unsubscribe",
+        ):
+            self.assertRegex(service, rf"\brpc {rpc_name}\(")
+        # Per-recipient RPCs are scoped to the caller subject, not a repo.
+        mark = re.search(r"(?ms)rpc MarkNotificationRead\(.*?\n  \}", service)
+        self.assertIsNotNone(mark)
+        self.assertIn(
+            "AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT", mark.group(0)
+        )
+        self.assertIn("RPC_EFFECT_DURABLE_WRITE", mark.group(0))
+        # Unsubscribe is public/unauthenticated; the in-body token is the proof.
+        unsub = re.search(r"(?ms)rpc Unsubscribe\(.*?\n  \}", service)
+        self.assertIsNotNone(unsub)
+        self.assertIn("AUTHORIZATION_ACCESS_PUBLIC", unsub.group(0))
+        self.assertIn("unsubscribe_token", dict(fields(NOTIFICATION, "UnsubscribeRequest")))
 
 
 if __name__ == "__main__":

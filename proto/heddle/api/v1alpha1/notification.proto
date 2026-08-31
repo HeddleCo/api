@@ -1,0 +1,323 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v1alpha1/types.proto";
+
+// ───────────────────────────────────────────────────────────────
+// NotificationService — per-recipient delivery of attention events
+// ───────────────────────────────────────────────────────────────
+//
+// A Notification is the recipient-owned projection of an attention event. It
+// REFERENCES a FeedItem (feed_item_id) rather than copying its body: the feed
+// is the shared per-repo materialization, while a notification is the private,
+// per-recipient decision to surface that event across one or more channels.
+// Notification-only kinds (MENTION, DISCUSSION_REPLY, ACCOUNT_SECURITY,
+// STEER_HELD) have no feed item and leave feed_item_id empty.
+//
+// PLANNED: weft has not built this surface yet. The contract is installed
+// additively so consumers can pin against it; no producer serves it today.
+
+// Kind of notification. Values 1..6 MIRROR attention.proto FeedItemKind's
+// numbers and names so a FeedItem projects onto a Notification without
+// remapping; values 10..13 are notification-only kinds with no FeedItem
+// counterpart. The 7..9 gap is reserved to keep future FeedItemKind additions
+// number-aligned.
+enum NotificationKind {
+  NOTIFICATION_KIND_UNSPECIFIED = 0;
+  NOTIFICATION_KIND_REVIEW_READY = 1; // mirrors FEED_ITEM_KIND_REVIEW_READY
+  NOTIFICATION_KIND_AGENT_COMPLETED = 2; // mirrors FEED_ITEM_KIND_AGENT_COMPLETED
+  NOTIFICATION_KIND_SECURITY_SURFACE = 3; // mirrors FEED_ITEM_KIND_SECURITY_SURFACE
+  NOTIFICATION_KIND_DRIFT_ALERT = 4; // mirrors FEED_ITEM_KIND_DRIFT_ALERT
+  NOTIFICATION_KIND_REPO_QUIET_DIGEST = 5; // mirrors FEED_ITEM_KIND_REPO_QUIET
+  NOTIFICATION_KIND_IMPORTED_DISCUSSION = 6; // mirrors FEED_ITEM_KIND_IMPORTED_DISCUSSION
+  NOTIFICATION_KIND_MENTION = 10; // an @mention resolved to the recipient
+  NOTIFICATION_KIND_DISCUSSION_REPLY = 11; // a reply on a discussion the recipient joined
+  NOTIFICATION_KIND_ACCOUNT_SECURITY = 12; // account/credential security event
+  NOTIFICATION_KIND_STEER_HELD = 13; // an agent steer is held awaiting the recipient
+}
+
+// Delivery channel for a notification. IN_APP is the always-available channel;
+// EMAIL and WEB_PUSH require the recipient to have registered a destination.
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_IN_APP = 1;
+  NOTIFICATION_CHANNEL_EMAIL = 2;
+  NOTIFICATION_CHANNEL_WEB_PUSH = 3;
+}
+
+// How a matching notification is routed to a channel. IMMEDIATE delivers on
+// raise; DIGEST defers into the recipient's digest window; MUTED suppresses
+// the channel for the matched kind/origin entirely.
+enum NotificationRouting {
+  NOTIFICATION_ROUTING_UNSPECIFIED = 0;
+  NOTIFICATION_ROUTING_IMMEDIATE = 1;
+  NOTIFICATION_ROUTING_DIGEST = 2;
+  NOTIFICATION_ROUTING_MUTED = 3;
+}
+
+// Cadence of the recipient's digest roll-up. OFF disables digests (DIGEST-routed
+// notifications then never leave the in-app inbox on a schedule).
+enum DigestCadence {
+  DIGEST_CADENCE_UNSPECIFIED = 0;
+  DIGEST_CADENCE_OFF = 1;
+  DIGEST_CADENCE_HOURLY = 2;
+  DIGEST_CADENCE_DAILY = 3;
+  DIGEST_CADENCE_WEEKLY = 4;
+}
+
+// The human/agent split a ChannelRule keys on, matched against a
+// notification's actor_agent_id: HUMAN matches an empty actor_agent_id, AGENT
+// matches a non-empty one, ANY matches either.
+enum ActorOrigin {
+  ACTOR_ORIGIN_UNSPECIFIED = 0;
+  ACTOR_ORIGIN_ANY = 1;
+  ACTOR_ORIGIN_HUMAN = 2;
+  ACTOR_ORIGIN_AGENT = 3;
+}
+
+// Per-channel delivery outcome for one Notification.
+enum NotificationDeliveryStatus {
+  NOTIFICATION_DELIVERY_STATUS_UNSPECIFIED = 0;
+  NOTIFICATION_DELIVERY_STATUS_PENDING = 1;
+  NOTIFICATION_DELIVERY_STATUS_DELIVERED = 2;
+  NOTIFICATION_DELIVERY_STATUS_FAILED = 3;
+  NOTIFICATION_DELIVERY_STATUS_SUPPRESSED = 4; // routing/preferences suppressed the channel
+}
+
+// --- Core types ---
+
+message Notification {
+  string notification_id = 1;
+  NotificationKind kind = 2;
+  // References attention.proto FeedItem.item_id this notification was raised
+  // from. Empty for notification-only kinds (MENTION, DISCUSSION_REPLY,
+  // ACCOUNT_SECURITY, STEER_HELD) that have no feed item.
+  string feed_item_id = 3;
+  RepositoryRef repo_path = 4;
+  string resource_id = 5; // state_id, session_id, discussion_id, etc.
+  string headline = 6;
+  string detail = 7;
+  string actor_subject = 8; // who/what caused this notification
+  // Deepest delegation label recorded by an agent attenuation block. Empty for
+  // an undelegated root credential; actor_subject remains the root subject.
+  // Empty/non-empty is the ActorOrigin HUMAN/AGENT split.
+  string actor_agent_id = 9;
+  google.protobuf.Timestamp created_at = 10;
+  // Absent until the recipient marks the notification read.
+  google.protobuf.Timestamp read_at = 11;
+  repeated NotificationDelivery deliveries = 12;
+  // Stable idempotency key the producer computes to coalesce duplicate
+  // notifications for the same underlying event.
+  string dedup_key = 13;
+}
+
+message NotificationDelivery {
+  NotificationChannel channel = 1;
+  NotificationDeliveryStatus status = 2;
+  google.protobuf.Timestamp delivered_at = 3;
+  // Producer-facing failure detail; empty unless status is FAILED.
+  string error = 4;
+}
+
+// --- Preference matrix ---
+
+// One cell of the preference matrix: for a (kind, channel, actor_origin) key,
+// route matching notifications per `routing`. A rule with the UNSPECIFIED kind
+// or channel acts as a wildcard default for that axis.
+message ChannelRule {
+  NotificationKind kind = 1;
+  NotificationChannel channel = 2;
+  ActorOrigin actor_origin = 3;
+  NotificationRouting routing = 4;
+}
+
+// A per-spool override layered on top of the account-wide default rules. Rules
+// here take precedence for notifications scoped to `spool`; digest_cadence
+// overrides the account cadence for this spool when set to a non-UNSPECIFIED
+// value.
+message SpoolPreferenceOverride {
+  RepositoryRef spool = 1;
+  repeated ChannelRule rules = 2;
+  DigestCadence digest_cadence = 3;
+}
+
+message NotificationPreferences {
+  // Account-wide default matrix applied when no spool override matches.
+  repeated ChannelRule default_rules = 1;
+  DigestCadence digest_cadence = 2;
+  // IANA timezone name (e.g. "America/New_York") anchoring digest windows.
+  string digest_timezone = 3;
+  repeated SpoolPreferenceOverride spool_overrides = 4;
+}
+
+// --- Requests / responses ---
+
+message ListNotificationsRequest {
+  // Max items to return (server default applies when 0).
+  uint32 page_size = 1;
+  string page_token = 2;
+  bool unread_only = 3;
+  // Optional: only these kinds.
+  repeated NotificationKind kinds = 4;
+  // Optional: only these repos.
+  repeated RepositoryRef repo_paths = 5;
+}
+
+message ListNotificationsResponse {
+  repeated Notification notifications = 1;
+  string next_page_token = 2;
+  uint32 unread_count = 3;
+}
+
+message SubscribeNotificationsRequest {
+  // Resume token: the notification_id of the last received Notification. On
+  // reconnect the server replays notifications after it, then streams live.
+  // Empty streams only new notifications from "now" with no catch-up.
+  string resume_after_id = 1;
+  // Optional: only these kinds.
+  repeated NotificationKind kinds = 2;
+  // Optional: only these repos.
+  repeated RepositoryRef repo_paths = 3;
+}
+
+message MarkNotificationReadRequest {
+  // Notifications to mark read. Ignored when mark_all is true.
+  repeated string notification_ids = 1;
+  // Mark every unread notification for the recipient read.
+  bool mark_all = 2;
+  string client_operation_id = 3;
+}
+
+message MarkNotificationReadResponse {
+  uint32 marked_count = 1;
+  uint32 unread_count = 2;
+}
+
+message GetNotificationPreferencesRequest {}
+
+message GetNotificationPreferencesResponse {
+  NotificationPreferences preferences = 1;
+}
+
+message SetNotificationPreferencesRequest {
+  NotificationPreferences preferences = 1;
+  string client_operation_id = 2;
+}
+
+message SetNotificationPreferencesResponse {
+  NotificationPreferences preferences = 1;
+}
+
+message UnsubscribeRequest {
+  // The whole proof. An opaque, unguessable token minted into an unsubscribe
+  // link identifies the recipient and the scope; no authenticated principal is
+  // required.
+  string unsubscribe_token = 1;
+  // Optional narrowing: unsubscribe only this channel. UNSPECIFIED unsubscribes
+  // every channel the token covers.
+  NotificationChannel channel = 2;
+  string client_operation_id = 3;
+}
+
+message UnsubscribeResponse {}
+
+service NotificationService {
+  option (heddle.api.v1alpha1.service_contract) = {
+    deployment_targets: DEPLOYMENT_TARGET_WEFT
+    maturity: SERVICE_MATURITY_PLANNED
+  };
+
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_NOTIFICATIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+
+  rpc SubscribeNotifications(SubscribeNotificationsRequest) returns (stream Notification) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_NOTIFICATIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+
+  rpc MarkNotificationRead(MarkNotificationReadRequest) returns (MarkNotificationReadResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_NOTIFICATIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+
+  rpc GetNotificationPreferences(GetNotificationPreferencesRequest) returns (GetNotificationPreferencesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_NOTIFICATIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+
+  rpc SetNotificationPreferences(SetNotificationPreferencesRequest) returns (SetNotificationPreferencesResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_NOTIFICATIONS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+
+  // PUBLIC / unauthenticated: the in-body unsubscribe_token is the whole proof.
+  rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_NOTIFICATIONS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+}

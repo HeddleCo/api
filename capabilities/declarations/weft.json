@@ -545,10 +545,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/ListInstallationRepositories",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },

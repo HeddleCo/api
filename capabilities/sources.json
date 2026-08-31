@@ -14,7 +14,7 @@
     "tapestry": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/tapestry.json",
-      "sha256": "94f025a8b722cf32fc85ca7b504862777edfdac10a304647adaf324002b68b23"
+      "sha256": "0cb491314b0162eb172950d9cbc66939976eed4df3dc4a08542264e16c267fef"
     }
   }
 }

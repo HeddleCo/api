@@ -205,7 +205,9 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
         AuthorizationAccess::Public
     );
     // 0.22.0 added the six planned NotificationService methods (177 -> 183).
-    assert_eq!(ALL_METHODS.len(), 183);
+    // api#154 added the planned CollaborationService/SubscribeDiscussionTurns
+    // (E5 live discussions) (183 -> 184).
+    assert_eq!(ALL_METHODS.len(), 184);
     let by_thread_ref =
         method_descriptor("/heddle.api.v1alpha1.CollaborationService/ListByThreadRef")
             .expect("ListByThreadRef descriptor");

@@ -226,6 +226,52 @@ message GetDiscussionRequest {
   StateId state_id = 3;
 }
 
+// Live subscription for discussion turns (E5). Rides the same durable
+// repo_events spine as RepositoryService/SubscribeRepoEvents — a discussion
+// turn surfaces as REPO_EVENT_KIND_DISCUSSION_TURN (repository.proto) — so this
+// RPC reuses that cursor rather than inventing a discussion-specific
+// causal-frontier cursor (heddle#1585). A client replays turns after
+// `after_event_id`, then the stream stays open and delivers new turns live.
+message SubscribeDiscussionTurnsRequest {
+  RepositoryRef repo_path = 1;
+  // Optional thread filter. Empty subscribes to every thread in the repo the
+  // caller can read; non-empty narrows to one thread. Paired with `thread_id`
+  // (its stable identity) exactly as OpenDiscussion / Discussion carry them.
+  string thread_ref = 2;
+  string thread_id = 3;
+  // Optional narrower filter to a single discussion by id. Empty selects all
+  // matching discussions.
+  string discussion_id = 4;
+  // Optional state-ref filter (empty selects all refs); mirrors the ref-scoped
+  // filtering other collaboration reads offer.
+  repeated string refs = 5;
+  // Optional participant filter by author email; empty selects all authors.
+  string participant = 6;
+  // Resume cursor on the repo_events spine — the same `event_id` value carried
+  // by DiscussionTurnEvent and by SubscribeRepoEventsRequest.after_event_id.
+  // The stream replays every matching turn with a larger event_id, then goes
+  // live. Zero replays from the start of retained history.
+  int64 after_event_id = 7;
+}
+
+// One live discussion-turn delivery. Carries the repo_events spine cursor the
+// client resumes on (`event_id`) alongside the turn itself; the turn's
+// `turn_seq` / `turn_id` give per-discussion ordering and stable identity, and
+// author / external_* provenance rides DiscussionTurn (state_review.proto).
+message DiscussionTurnEvent {
+  // The repo_events spine cursor this turn was delivered at. Pass it back as
+  // SubscribeDiscussionTurnsRequest.after_event_id to resume without dupes.
+  int64 event_id = 1;
+  // The discussion this turn belongs to.
+  string discussion_id = 2;
+  // The thread the discussion is anchored to, paired with `thread_id`.
+  string thread_ref = 3;
+  string thread_id = 4;
+  // The appended turn, with server-minted turn_seq / turn_id and full
+  // provenance.
+  DiscussionTurn turn = 5;
+}
+
 service CollaborationService {
   option (heddle.api.v1alpha1.service_contract) = {
     deployment_targets: DEPLOYMENT_TARGET_WEFT
@@ -377,6 +423,30 @@ service CollaborationService {
       authorization_request_targets: {
         path: "repo_path"
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Live, resumable subscription for discussion turns (E5 "live discussions").
+  // Replays turns after the repo_events cursor, then streams new turns as they
+  // land — no polling, no dupes. PLANNED: the wire contract is fixed here; the
+  // weft server handler (which hardens the repo_events emission path) lands as
+  // the next E5 step. Resumable-stream semantics mirror SubscribeRepoEvents.
+  rpc SubscribeDiscussionTurns(SubscribeDiscussionTurnsRequest) returns (stream DiscussionTurnEvent) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      maturity: SERVICE_MATURITY_PLANNED
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_COLLABORATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };

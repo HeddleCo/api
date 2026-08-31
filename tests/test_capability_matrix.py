@@ -466,7 +466,10 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         # MarkNotificationRead, GetNotificationPreferences, SetNotificationPreferences)
         # while Unsubscribe keeps a method-level PLANNED override pending email
         # delivery (net +5 shipped, -5 planned).
-        self.assertEqual(len(planned), 40)
+        # api#154 added CollaborationService/SubscribeDiscussionTurns as a
+        # method-level PLANNED override (E5 live discussions), pending its weft
+        # handler (+1 planned).
+        self.assertEqual(len(planned), 41)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

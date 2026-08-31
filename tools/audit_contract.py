@@ -81,7 +81,10 @@ def audit_new_descriptor(decoded: str) -> None:
     # promoted the service to SHIPPED and moved the override to Unsubscribe,
     # which stays planned pending email delivery — the service-level PLANNED
     # became a SHIPPED (+1 shipped) and a method-level override (net-zero PLANNED).
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 22
+    # api#154 added the planned CollaborationService/SubscribeDiscussionTurns
+    # (E5 live discussions), a method-level PLANNED override on shipped
+    # CollaborationService pending its weft handler (+1 PLANNED).
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 23
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded

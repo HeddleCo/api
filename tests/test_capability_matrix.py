@@ -460,7 +460,10 @@ class CapabilityMatrixAuditTests(unittest.TestCase):
         # (CreateSignupInvite, ListSignupInvites, ListInstallationRepositories)
         # and demoted eight back to PLANNED (net -5 shipped, +5 planned).
         # api#187 PR-B then pruned ProvisionAgentRootedAccount (-1 planned).
-        self.assertEqual(len(planned), 39)
+        # 0.22.0 adds the planned NotificationService — six planned RPCs
+        # (ListNotifications, SubscribeNotifications, MarkNotificationRead,
+        # GetNotificationPreferences, SetNotificationPreferences, Unsubscribe).
+        self.assertEqual(len(planned), 45)
         authorization_fields = (
             "authorization_access",
             "authorization_role",

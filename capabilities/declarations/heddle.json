@@ -806,6 +806,72 @@
       }
     },
     {
+      "rpc": "heddle.api.v1alpha1.NotificationService/GetNotificationPreferences",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.NotificationService/ListNotifications",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.NotificationService/MarkNotificationRead",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.NotificationService/SetNotificationPreferences",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.NotificationService/SubscribeNotifications",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
+      "rpc": "heddle.api.v1alpha1.NotificationService/Unsubscribe",
+      "layers": {
+        "client": {
+          "status": "planned"
+        },
+        "cli": {
+          "status": "planned"
+        }
+      }
+    },
+    {
       "rpc": "heddle.api.v1alpha1.OperationService/BatchGetOperations",
       "layers": {
         "client": {

@@ -63,11 +63,11 @@ def audit_new_descriptor(decoded: str) -> None:
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count
     assert decoded.count(f"[{PACKAGE}.rpc_contract]") == rpc_count
     assert decoded.count("maturity: SERVICE_MATURITY_SHIPPED") == 12
-    # Three services are planned (AgentService, AgentGatewayService,
-    # OwnerAuthorizationService), and eighteen methods on otherwise-shipped
-    # services deliberately override their inherited maturity to planned
-    # (api#187 maturity spine). CreateSignupInvite, ListSignupInvites, and
-    # ListInstallationRepositories were promoted/cut over to inherited SHIPPED.
+    # Four services are planned (AgentService, AgentGatewayService,
+    # OwnerAuthorizationService, NotificationService), and eighteen methods on
+    # otherwise-shipped services deliberately override their inherited maturity
+    # to planned (api#187 maturity spine). CreateSignupInvite, ListSignupInvites,
+    # and ListInstallationRepositories were promoted/cut over to inherited SHIPPED.
     # StoreProviderToken, ListActors, ListWorktrees, ListDiscussionsByStates,
     # ListStateAttachments, ListThreadHistories, RecordCheckAck, and
     # StreamWorkspaceSummary were demoted to planned until their handlers land.
@@ -77,7 +77,8 @@ def audit_new_descriptor(decoded: str) -> None:
     # remote-link management RPCs stay planned pending their Weft handlers
     # (guarded by tests/transport_contract.rs). ProvisionAgentRootedAccount was
     # pruned (api#187 PR-B), dropping one method-level PLANNED override.
-    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 21
+    # NotificationService (0.22.0) adds the fourth planned service-level override.
+    assert decoded.count("maturity: SERVICE_MATURITY_PLANNED") == 22
     assert 'type_name: ".google.protobuf.Any"' not in decoded
     assert "google.protobuf.Struct" not in decoded
     assert "google.protobuf.Value" not in decoded

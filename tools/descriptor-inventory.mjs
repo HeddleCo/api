@@ -26,6 +26,7 @@ const CAPABILITY_LABELS = new Map([
   ["PULL_REQUEST_REVIEW", "pull request review"],
   ["SEARCH", "search"],
   ["ASYNCHRONOUS_OPERATIONS", "asynchronous operations"],
+  ["NOTIFICATIONS", "notifications"],
 ]);
 const RPC_CONTRACT_FIELDS = new Set([
   "signing_identity",

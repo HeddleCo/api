@@ -622,10 +622,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/PromoteAgentAccount",
       "layers": {
         "implementation": {
-          "status": "shipped"
+          "status": "planned"
         },
         "registration": {
-          "status": "shipped"
+          "status": "planned"
         }
       }
     },

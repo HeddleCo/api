@@ -523,10 +523,10 @@
       "rpc": "heddle.api.v1alpha1.IdentityService/IssueSignupEmailChallenge",
       "layers": {
         "server_adapter": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         },
         "ui": {
-          "status": "shipped"
+          "status": "intentionally-unsupported"
         }
       }
     },

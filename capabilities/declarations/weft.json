@@ -809,10 +809,10 @@
       "rpc": "heddle.api.v1alpha1.NotificationService/GetNotificationPreferences",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -820,10 +820,10 @@
       "rpc": "heddle.api.v1alpha1.NotificationService/ListNotifications",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -831,10 +831,10 @@
       "rpc": "heddle.api.v1alpha1.NotificationService/MarkNotificationRead",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -842,10 +842,10 @@
       "rpc": "heddle.api.v1alpha1.NotificationService/SetNotificationPreferences",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -853,10 +853,10 @@
       "rpc": "heddle.api.v1alpha1.NotificationService/SubscribeNotifications",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },

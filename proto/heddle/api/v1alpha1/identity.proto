@@ -8,6 +8,36 @@ import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 
+// Client-minted session signature domains are a closed registry. Every value
+// below is ASCII, versioned, and includes the shown terminal NUL byte. A
+// protocol MUST NOT reuse one domain for another signature purpose.
+//
+//   identity binding:  "heddle-device-binding-v2\0"
+//   PoP delegation:    "heddle-pop-delegation-v1\0"
+//   Tier-1 request:    "heddle-req-sig-v1\0"
+//
+// The PoP-delegation value mirrors the authoritative constant in Weft's
+// strict verified_delegation_chain implementation. The shared Rust and
+// TypeScript API packages export all three values from their signing modules.
+//
+// Two role labels are likewise exact ASCII strings with terminal NUL bytes:
+//
+//   "biscuit_authority_public_key\0"
+//   "device_proof_public_key\0"
+//
+// identity_binding_challenge_v2 is the following byte concatenation in this
+// fixed order (it is not protobuf-encoded, hashed, hex-encoded, or reordered):
+//
+//   "heddle-device-binding-v2\0" ||
+//   "biscuit_authority_public_key\0" || biscuit_authority_public_key[32] ||
+//   "device_proof_public_key\0" || device_proof_public_key[32]
+//
+// A WebAuthn device-binding assertion uses base64url without padding of those
+// exact bytes as clientDataJSON.challenge. Both keys are raw 32-byte Ed25519
+// public keys. Consequently the role labels and fixed-length keys are inside
+// the challenge committed by the assertion, and swapping the key values
+// changes the signed clientDataJSON. No one-key challenge is valid for v2.
+
 // Device-authorization lifecycle from the identity authorization model.
 enum DeviceAuthorizationStatus {
   DEVICE_AUTHORIZATION_STATUS_UNSPECIFIED = 0;
@@ -102,20 +132,23 @@ message RegisterPublicKeyRequest {
   //
   // When non-empty, MUST be accompanied by a binding signature
   // (see the three `device_binding_*` fields). Closes
-  // HeddleCo/weft#131.
-  bytes device_public_key = 5;
+  // HeddleCo/weft#131. Legacy one-key input only: after the GrantEnvelope v2
+  // cutover a server MUST reject this as a substitute for either role-labelled
+  // key below and MUST NOT issue a v1 envelope from it.
+  bytes device_public_key = 5 [deprecated = true];
   string client_operation_id = 6;
   // === Device-key binding proof (HeddleCo/weft#131) ===
-  // Required iff `device_public_key` is non-empty. Together these
+  // Required when the two v2 role-labelled public keys below are present.
+  // The keys and all three proof fields MUST travel together. Together these
   // carry a WebAuthn assertion (`navigator.credentials.get()`
   // produced immediately after `create()` succeeds, signed by the
-  // same authenticator) whose challenge is
-  //   base64url(SHA256("heddle-device-binding-v1" || 0x00 || device_public_key))
+  // same authenticator) whose clientDataJSON.challenge is base64url without
+  // padding of identity_binding_challenge_v2, defined at the top of this file.
   // The server verifies the assertion's signature using the COSE
-  // public key extracted from the attestation, then persists
-  // `device_public_key` as the device root. Binds the two keys
-  // cryptographically: the renewal-path public key is only
-  // accepted if the WebAuthn credential signs it.
+  // public key extracted from the attestation, then persists the
+  // `device_proof_public_key` as the device root. The assertion binds both
+  // session roles to the WebAuthn credential; neither role may be omitted or
+  // inferred from the other after the v2 cutover.
   bytes device_binding_client_data_json = 7;
   bytes device_binding_authenticator_data = 8;
   bytes device_binding_signature = 9;
@@ -135,7 +168,7 @@ message RegisterPublicKeyRequest {
   // `enroll(new_pubkey, scope, expiry, nonce)`. The server enforces the
   // bounded `scope` (read-only vs full), the `expiry` (max 7d on the
   // attestation itself), and one-shot `nonce` (rejects replays). The
-  // resulting enrollment of `device_public_key` is permanent until
+  // resulting enrollment of `device_proof_public_key` is permanent until
   // revoked.
   bytes attesting_pubkey = 10;
   bytes cross_device_attestation = 11;
@@ -146,7 +179,7 @@ message RegisterPublicKeyRequest {
   SignedOwnerRoot owner_root = 12;
   // Fresh proof by owner_root.root.authority_key over
   // SHA-256("heddle-register-owner-root-v1" || challenge_id ||
-  //        accepted root-state hash || device_public_key). This binds root
+  //        accepted root-state hash || device_proof_public_key). This binds root
   // possession to this one registration rather than replaying authority_proof.
   AuthorizationSignature owner_root_proof_of_possession = 13;
   // Guardian M-of-N is the default. If omitted, the signed root's guardian
@@ -166,6 +199,17 @@ message RegisterPublicKeyRequest {
   // point that replaces the pruned ProvisionAgentRootedAccount RPC
   // (api#187 PR-B).
   SignedOwnerKeyTransition claim_deferred_human = 16;
+  // Raw 32-byte Ed25519 public key for the ephemeral Biscuit authority role.
+  // The corresponding private key signs the client-minted Biscuit authority
+  // block. Required together with `device_proof_public_key`; the two public
+  // keys MUST be distinct and MUST NOT be inferred from `device_public_key`.
+  bytes biscuit_authority_public_key = 17;
+  // Raw 32-byte Ed25519 public key for the non-extractable device-proof role.
+  // This is the persisted device root, the GrantEnvelope v2 PoP anchor, and
+  // the key that signs Tier-1 requests until an explicit pop_delegation moves
+  // the effective proof key to a child. Required with
+  // `biscuit_authority_public_key` and committed by the binding assertion.
+  bytes device_proof_public_key = 18;
 }
 
 message BeginWebAuthnAuthenticationRequest {
@@ -181,8 +225,20 @@ message FinishWebAuthnAuthenticationRequest {
   bytes user_handle = 6;
   // Client-side device pubkey the client wants the access token bound
   // to. Server validates this against the user's active device_roots.
-  bytes device_public_key = 7;
+  // Legacy one-key input only: after the GrantEnvelope v2 cutover a server
+  // MUST reject this as a substitute for either role-labelled key below and
+  // MUST NOT issue a v1 envelope from it.
+  bytes device_public_key = 7 [deprecated = true];
   string client_operation_id = 8;
+  // Raw 32-byte Ed25519 public key for the ephemeral Biscuit authority role.
+  // Required together with `device_proof_public_key`; this key verifies the
+  // client-minted authority block and never anchors request PoP.
+  bytes biscuit_authority_public_key = 9;
+  // Raw 32-byte Ed25519 public key for the non-extractable device-proof role.
+  // Required together with `biscuit_authority_public_key`; the server validates
+  // it against the user's active device roots and places it in GrantEnvelope v2
+  // as the initial delegated-PoP and Tier-1 request-signing anchor.
+  bytes device_proof_public_key = 10;
 }
 
 message CreateDeviceAuthorizationRequest {
@@ -303,10 +359,42 @@ message AccessTokenResponse {
   // credential row (device, service-account, agent). Empty for
   // browser sessions.
   string credential_id = 6;
-  // DEPRECATED transport/session GrantEnvelope authenticating the client's
-  // pubkey for Biscuit minting. It is not owner authority; ordinary spool
-  // operations are authorized by the resulting transport Biscuit.
-  bytes grant_envelope = 7 [deprecated = true];
+  // Server-signed GrantEnvelope v2 paired with a client-minted Biscuit. It is
+  // not owner authority; ordinary spool operations are authorized by the
+  // resulting transport Biscuit. The field contains the following byte-exact
+  // wire value:
+  //
+  //   canonical_payload_v2 || signature[64]
+  //
+  // `signature` is raw Ed25519 and covers every byte of
+  // canonical_payload_v2. All integers are big-endian; strings are UTF-8:
+  //
+  //   u8       format_version (MUST equal 0x02; this byte is signed)
+  //   bytes     "biscuit_authority_public_key\0"
+  //   32 bytes  biscuit_authority_public_key
+  //   bytes     "device_proof_public_key\0"
+  //   32 bytes  device_proof_public_key
+  //   u16 + N   subject (N <= 256)
+  //   u16       rights_count (<= 64)
+  //     repeated in encoded order:
+  //       u16 + N kind   (N <= 1024)
+  //       u16 + N path   (N <= 1024)
+  //       u16 + N action (N <= 1024)
+  //   i64       issued_at (Unix seconds)
+  //   i64       expires_at (Unix seconds)
+  //
+  // The discriminator and both exact role labels are inside the server-signed
+  // payload. A parser MUST require 0x02, both labels in this order, both
+  // fixed-length keys, and complete input with no trailing bytes. After cutover
+  // it MUST reject the one-key v1 envelope; field presence MUST NOT select a
+  // version or provide a compatibility fallback.
+  //
+  // The Biscuit minted under `biscuit_authority_public_key` remains the exact
+  // byte prefix of every attenuation. Each ordinary post-authority delegating
+  // block appends one verified pop_delegation transition rooted at
+  // `device_proof_public_key`; an implementation must never rebuild or replace
+  // the original client-minted prefix when attenuating.
+  bytes grant_envelope = 7;
   // Owner-authored purge-only bundle returned without re-signing or
   // reinterpretation. It grants no redact, visibility, or metadata authority.
   OwnerAuthorizationBundle owner_authorization = 8;

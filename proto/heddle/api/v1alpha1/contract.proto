@@ -68,9 +68,9 @@ message CallContext {
   HumanVerification human_verification = 5;
   string client_operation_id = 6;
   TraceContext trace = 7;
-  // Optional signed grant envelope paired with a client-minted Biscuit.
-  // Kept opaque so the public contract does not own Weft's authorization
-  // implementation, while still carrying the complete bearer capability.
+  // Optional signed GrantEnvelope v2 paired with a client-minted Biscuit.
+  // The byte-exact envelope contract is defined by
+  // AccessTokenResponse.grant_envelope in identity.proto.
   bytes bearer_grant_envelope = 8;
 }
 

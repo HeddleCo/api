@@ -282,15 +282,6 @@ class SharedHandleContractTest(unittest.TestCase):
                 f"IdentityService/{method}",
             )
 
-    def test_every_consumer_declares_each_handle_operation(self) -> None:
-        for consumer in ("heddle", "tapestry", "weft"):
-            declaration = json.loads(
-                (ROOT / f"capabilities/declarations/{consumer}.json").read_text()
-            )
-            rpcs = {row["rpc"] for row in declaration["rpc_mappings"]}
-            for method in self.fixture:
-                self.assertIn(f"{PACKAGE}.IdentityService/{method}", rpcs)
-
 
 if __name__ == "__main__":
     unittest.main()

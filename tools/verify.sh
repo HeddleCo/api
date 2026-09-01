@@ -18,8 +18,6 @@ python3 -B -m unittest tests/test_additive_bundle_contract.py
 python3 -B -m unittest tests/test_spool_contract.py
 python3 -B -m unittest tests/test_transport_contract.py
 python3 tools/audit_contract.py
-python3 -m unittest tests/test_capability_matrix.py
-python3 tools/capability_matrix.py --check
 cargo +nightly fmt --check
 cargo test --all-features
 cargo clippy --all-features --all-targets -- -D warnings

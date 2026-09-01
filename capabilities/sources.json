@@ -9,7 +9,7 @@
     "weft": {
       "kind": "consumer-derived-sanitized-declaration",
       "snapshot": "capabilities/declarations/weft.json",
-      "sha256": "2d2161069d945ef735e716bd5c00bf07f6326b8d0aadce5127c0327d7dd3bdb3"
+      "sha256": "569088efa0ae6b162be65748de01d02318c93d7b74df90d3f4fe313d3bf71d0f"
     },
     "tapestry": {
       "kind": "consumer-derived-sanitized-declaration",

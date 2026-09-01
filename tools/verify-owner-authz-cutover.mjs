@@ -121,12 +121,12 @@ if (!registration.ownerRoot || !registration.ownerKeyBinding) {
 const token = roundTrip(
   AccessTokenResponseSchema,
   create(AccessTokenResponseSchema, {
-    grantEnvelope: new TextEncoder().encode("still-live-legacy-envelope"),
+    grantEnvelope: new TextEncoder().encode("grant-envelope-v2-wire"),
     ownerAuthorization: bundle,
   }),
 );
 if (!token.ownerAuthorization || token.grantEnvelope.length === 0) {
-  throw new Error("TypeScript token lost legacy or owner authorization field");
+  throw new Error("TypeScript token lost GrantEnvelope v2 or owner authorization field");
 }
 roundTrip(
   ActiveSessionSchema,

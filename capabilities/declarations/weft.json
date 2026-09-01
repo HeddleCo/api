@@ -996,10 +996,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/BootstrapOwnerRoot",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },
@@ -1029,10 +1029,10 @@
       "rpc": "heddle.api.v1alpha1.OwnerAuthorizationService/GetCurrentOwnerKeyring",
       "layers": {
         "implementation": {
-          "status": "planned"
+          "status": "shipped"
         },
         "registration": {
-          "status": "planned"
+          "status": "shipped"
         }
       }
     },

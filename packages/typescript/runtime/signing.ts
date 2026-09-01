@@ -4,13 +4,15 @@ const encoder = new TextEncoder();
 export const IDENTITY_BINDING_CHALLENGE_V2_DOMAIN = "heddle-device-binding-v2\0";
 /** Exact NUL-terminated domain owned by Weft's strict PoP-delegation verifier. */
 export const POP_DELEGATION_V1_DOMAIN = "heddle-pop-delegation-v1\0";
-/** Exact NUL-terminated domain for Tier-1 request signatures. */
-export const TIER_1_REQUEST_SIGNING_V1_DOMAIN = "heddle-req-sig-v1\0";
+/** Deployed Tier-1 domain; legacy v1 intentionally has no terminal NUL. */
+export const TIER_1_REQUEST_SIGNING_V1_DOMAIN = "heddle-req-sig-v1";
+/** Exact NUL-terminated domain for server-signed GrantEnvelope v2 payloads. */
+export const GRANT_ENVELOPE_V2_DOMAIN = "heddle-grant-envelope-v2\0";
 /** Exact signed/wire role label for the ephemeral Biscuit authority key. */
 export const BISCUIT_AUTHORITY_PUBLIC_KEY_ROLE = "biscuit_authority_public_key\0";
 /** Exact signed/wire role label for the non-extractable device proof key. */
 export const DEVICE_PROOF_PUBLIC_KEY_ROLE = "device_proof_public_key\0";
-/** Signed format discriminator at byte zero of a GrantEnvelope v2 payload. */
+/** Signed format discriminator immediately following the GrantEnvelope domain. */
 export const GRANT_ENVELOPE_V2_FORMAT_VERSION = 2;
 
 export const SIGNING_DOMAIN = TIER_1_REQUEST_SIGNING_V1_DOMAIN;

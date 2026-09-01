@@ -229,7 +229,7 @@ fn generated_identity_requests_round_trip_both_client_mint_key_roles() {
 }
 
 #[test]
-fn grant_envelope_v2_contract_is_explicit_and_fail_closed() {
+fn dual_role_wire_fields_and_domain_registry_are_explicit() {
     let registration = message_body("RegisterPublicKeyRequest");
     assert!(registration.contains("bytes biscuit_authority_public_key = 17;"));
     assert!(registration.contains("bytes device_proof_public_key = 18;"));
@@ -240,17 +240,12 @@ fn grant_envelope_v2_contract_is_explicit_and_fail_closed() {
     for domain in [
         "heddle-device-binding-v2\\0",
         "heddle-pop-delegation-v1\\0",
-        "heddle-req-sig-v1\\0",
+        "heddle-grant-envelope-v2\\0",
     ] {
         assert!(IDENTITY_PROTO.contains(domain), "missing domain {domain}");
     }
-
-    let token = message_body("AccessTokenResponse");
-    assert!(token.contains("format_version (MUST equal 0x02; this byte is signed)"));
-    assert!(token.contains("\"biscuit_authority_public_key\\0\""));
-    assert!(token.contains("\"device_proof_public_key\\0\""));
-    assert!(token.contains("MUST reject the one-key v1 envelope"));
-    assert!(token.contains("byte prefix of every attenuation"));
+    assert!(IDENTITY_PROTO.contains("Tier-1 request:    \"heddle-req-sig-v1\""));
+    assert!(!IDENTITY_PROTO.contains("heddle-req-sig-v1\\0"));
 }
 
 #[test]

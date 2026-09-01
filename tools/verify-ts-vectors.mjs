@@ -15,6 +15,7 @@ import { errorReasonRetryable } from "../packages/typescript/dist/errors.js";
 import {
   BISCUIT_AUTHORITY_PUBLIC_KEY_ROLE,
   DEVICE_PROOF_PUBLIC_KEY_ROLE,
+  GRANT_ENVELOPE_V2_DOMAIN,
   IDENTITY_BINDING_CHALLENGE_V2_DOMAIN,
   POP_DELEGATION_V1_DOMAIN,
   TIER_1_REQUEST_SIGNING_V1_DOMAIN,
@@ -73,11 +74,14 @@ if (
 for (const domain of [
   IDENTITY_BINDING_CHALLENGE_V2_DOMAIN,
   POP_DELEGATION_V1_DOMAIN,
-  TIER_1_REQUEST_SIGNING_V1_DOMAIN,
+  GRANT_ENVELOPE_V2_DOMAIN,
 ]) {
   if (!domain.endsWith("\0")) {
     throw new Error(`client-mint signing domain is not NUL-terminated: ${domain}`);
   }
+}
+if (TIER_1_REQUEST_SIGNING_V1_DOMAIN !== "heddle-req-sig-v1") {
+  throw new Error("deployed Tier-1 request-signing domain changed");
 }
 
 for (const schema of [

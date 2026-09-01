@@ -8,17 +8,21 @@ import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/types.proto";
 
-// Client-minted session signature domains are a closed registry. Every value
-// below is ASCII, versioned, and includes the shown terminal NUL byte. A
-// protocol MUST NOT reuse one domain for another signature purpose.
+// Session signature domains are a closed registry. Every value below is ASCII
+// and versioned. A protocol MUST NOT reuse one domain for another signature
+// purpose.
 //
 //   identity binding:  "heddle-device-binding-v2\0"
 //   PoP delegation:    "heddle-pop-delegation-v1\0"
-//   Tier-1 request:    "heddle-req-sig-v1\0"
+//   GrantEnvelope v2:  "heddle-grant-envelope-v2\0"
+//   Tier-1 request:    "heddle-req-sig-v1"
 //
-// The PoP-delegation value mirrors the authoritative constant in Weft's
-// strict verified_delegation_chain implementation. The shared Rust and
-// TypeScript API packages export all three values from their signing modules.
+// `heddle-req-sig-v1` is the exact deployed value and predates the terminal-NUL
+// convention; it MUST NOT acquire a NUL. Any future request-signing migration
+// requires a new version and a coordinated producer/verifier cutover. The
+// PoP-delegation value mirrors the authoritative constant in Weft's strict
+// verified_delegation_chain implementation. The shared Rust and TypeScript API
+// packages export the registry values from their signing modules.
 //
 // Two role labels are likewise exact ASCII strings with terminal NUL bytes:
 //
@@ -148,7 +152,11 @@ message RegisterPublicKeyRequest {
   // public key extracted from the attestation, then persists the
   // `device_proof_public_key` as the device root. The assertion binds both
   // session roles to the WebAuthn credential; neither role may be omitted or
-  // inferred from the other after the v2 cutover.
+  // inferred from the other after the v2 cutover. The server MUST resolve the
+  // pending `challenge_id` ceremony and verify this assertion against the
+  // credential created by that ceremony, including standard
+  // `clientDataJSON.type` and origin checks; it MUST NOT accept an assertion
+  // from another ceremony.
   bytes device_binding_client_data_json = 7;
   bytes device_binding_authenticator_data = 8;
   bytes device_binding_signature = 9;
@@ -217,6 +225,10 @@ message BeginWebAuthnAuthenticationRequest {
 }
 
 message FinishWebAuthnAuthenticationRequest {
+  // The server MUST resolve this pending ceremony, require `credential_id` to
+  // be the credential selected for it, and verify the assertion challenge,
+  // `clientDataJSON.type == "webauthn.get"`, and expected origin. An assertion
+  // from a different `challenge_id` ceremony MUST be rejected.
   string challenge_id = 1;
   string credential_id = 2;
   bytes client_data_json = 3;
@@ -369,6 +381,7 @@ message AccessTokenResponse {
   // `signature` is raw Ed25519 and covers every byte of
   // canonical_payload_v2. All integers are big-endian; strings are UTF-8:
   //
+  //   bytes     "heddle-grant-envelope-v2\0" (signed domain prefix)
   //   u8       format_version (MUST equal 0x02; this byte is signed)
   //   bytes     "biscuit_authority_public_key\0"
   //   32 bytes  biscuit_authority_public_key
@@ -383,17 +396,21 @@ message AccessTokenResponse {
   //   i64       issued_at (Unix seconds)
   //   i64       expires_at (Unix seconds)
   //
-  // The discriminator and both exact role labels are inside the server-signed
-  // payload. A parser MUST require 0x02, both labels in this order, both
-  // fixed-length keys, and complete input with no trailing bytes. After cutover
-  // it MUST reject the one-key v1 envelope; field presence MUST NOT select a
-  // version or provide a compatibility fallback.
+  // The exact domain, discriminator, and both role labels are inside the
+  // server-signed payload. A parser MUST require the domain, 0x02, both labels
+  // in this order, two distinct fixed-length keys, and complete input with no
+  // trailing bytes. An issuer MUST reject equal role keys. After cutover a
+  // parser MUST reject the one-key v1 envelope; field presence MUST NOT select
+  // a version or provide a compatibility fallback.
   //
   // The Biscuit minted under `biscuit_authority_public_key` remains the exact
   // byte prefix of every attenuation. Each ordinary post-authority delegating
   // block appends one verified pop_delegation transition rooted at
   // `device_proof_public_key`; an implementation must never rebuild or replace
-  // the original client-minted prefix when attenuating.
+  // the original client-minted prefix when attenuating. Tier-1 request signing
+  // is leaf-only: after any accepted pop_delegation, only the effective leaf
+  // proof key may sign; signatures by ancestor proof keys or by the Biscuit
+  // authority key MUST be rejected.
   bytes grant_envelope = 7;
   // Owner-authored purge-only bundle returned without re-signing or
   // reinterpretation. It grants no redact, visibility, or metadata authority.

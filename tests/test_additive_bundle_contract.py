@@ -35,7 +35,7 @@ def fields(source: str, message: str) -> list[tuple[str, int]]:
 class AdditiveBundleContractTest(unittest.TestCase):
     def test_open_discussion_severity_binds_to_merge_requirement_kind(self) -> None:
         self.assertEqual(
-            fields(COLLABORATION, "OpenDiscussionRequest")[-2:],
+            fields(COLLABORATION, "OpenDiscussionRequest")[8:10],
             [("severity", 9), ("kind", 10)],
         )
         requirement_kinds = body(REGISTRY, "enum", "UnmetRequirementKind")

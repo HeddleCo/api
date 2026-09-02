@@ -727,12 +727,16 @@ message SetContextRequest {
   optional StateId target_state_id = 8;
   ContextAnnotationKind kind = 9;
   string client_operation_id = 10;
+  // Optional client-proposed annotation id (the `ann-<UUIDv7>` local id). When
+  // set, the server records it verbatim; empty preserves server-mint.
+  string annotation_id = 11;
 }
 
 message SetContextResponse {
   // Newly-captured physical StateId carrying the annotation.
   StateId state = 1;
   uint32 annotations = 2;
+  string annotation_id = 3;
 }
 
 message ReviseContextRequest {

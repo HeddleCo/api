@@ -2,8 +2,9 @@
 
 use heddle_api::heddle::api::v1alpha1::{
     AccessTokenResponse, BeginWebAuthnRegistrationRequest, ClaimSignupInviteResponse, Entitlement,
-    GitHubInstallationRepository, PromoteAgentAccountRequest, RegisterGitHubInstallationRequest,
-    RegisterGitHubInstallationResponse, StorageUsage, WhoAmIResponse,
+    FinishWebAuthnAuthenticationRequest, GitHubInstallationRepository, PromoteAgentAccountRequest,
+    RegisterGitHubInstallationRequest, RegisterGitHubInstallationResponse,
+    RegisterPublicKeyRequest, StorageUsage, WhoAmIResponse,
 };
 use prost::Message;
 
@@ -199,6 +200,52 @@ fn access_token_response_round_trips_device_id_mint_input() {
     assert_eq!(decoded, expected);
     assert!(decoded.token.is_empty());
     assert_eq!(decoded.device_id, "device-root-id");
+}
+
+#[test]
+fn generated_identity_requests_round_trip_both_client_mint_key_roles() {
+    let authority = vec![0x11; 32];
+    let proof = vec![0x22; 32];
+    let registration = RegisterPublicKeyRequest {
+        biscuit_authority_public_key: authority.clone(),
+        device_proof_public_key: proof.clone(),
+        ..Default::default()
+    };
+    let registration = RegisterPublicKeyRequest::decode(registration.encode_to_vec().as_slice())
+        .expect("decode RegisterPublicKeyRequest");
+    assert_eq!(registration.biscuit_authority_public_key, authority);
+    assert_eq!(registration.device_proof_public_key, proof);
+
+    let authentication = FinishWebAuthnAuthenticationRequest {
+        biscuit_authority_public_key: vec![0x33; 32],
+        device_proof_public_key: vec![0x44; 32],
+        ..Default::default()
+    };
+    let authentication =
+        FinishWebAuthnAuthenticationRequest::decode(authentication.encode_to_vec().as_slice())
+            .expect("decode FinishWebAuthnAuthenticationRequest");
+    assert_eq!(authentication.biscuit_authority_public_key, vec![0x33; 32]);
+    assert_eq!(authentication.device_proof_public_key, vec![0x44; 32]);
+}
+
+#[test]
+fn dual_role_wire_fields_and_domain_registry_are_explicit() {
+    let registration = message_body("RegisterPublicKeyRequest");
+    assert!(registration.contains("bytes biscuit_authority_public_key = 17;"));
+    assert!(registration.contains("bytes device_proof_public_key = 18;"));
+    let authentication = message_body("FinishWebAuthnAuthenticationRequest");
+    assert!(authentication.contains("bytes biscuit_authority_public_key = 9;"));
+    assert!(authentication.contains("bytes device_proof_public_key = 10;"));
+
+    for domain in [
+        "heddle-device-binding-v2\\0",
+        "heddle-pop-delegation-v1\\0",
+        "heddle-grant-envelope-v2\\0",
+    ] {
+        assert!(IDENTITY_PROTO.contains(domain), "missing domain {domain}");
+    }
+    assert!(IDENTITY_PROTO.contains("Tier-1 request:    \"heddle-req-sig-v1\""));
+    assert!(!IDENTITY_PROTO.contains("heddle-req-sig-v1\\0"));
 }
 
 #[test]

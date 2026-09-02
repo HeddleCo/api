@@ -21,6 +21,9 @@ pub const HOSTED_CALL_V1_FIXTURE_JSON: &str = include_str!("../tests/fixtures/ho
 /// Cross-product canonical unary-signing fixture.
 pub const UNARY_SIGNING_V1_FIXTURE_JSON: &str =
     include_str!("../tests/fixtures/unary-signing-v1.json");
+/// Cross-product canonical GrantEnvelope v2 payload and rejection fixtures.
+pub const GRANT_ENVELOPE_V2_FIXTURE_JSON: &str =
+    include_str!("../tests/fixtures/grant-envelope-v2.json");
 /// Cross-product endpoint-descriptor and relay-admission signing fixture.
 pub const TRANSPORT_BOOTSTRAP_V1_FIXTURE_JSON: &str =
     include_str!("../tests/fixtures/transport-bootstrap-v1.json");

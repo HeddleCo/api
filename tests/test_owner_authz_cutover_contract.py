@@ -57,6 +57,8 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
                 ("owner_recovery_policy", 14),
                 ("owner_key_binding", 15),
                 ("claim_deferred_human", 16),
+                ("biscuit_authority_public_key", 17),
+                ("device_proof_public_key", 18),
             ],
         )
         self.assertEqual(
@@ -215,17 +217,18 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
             r"StateAttachmentTransfer\s+state_attachment\s*=\s*9\s*;",
         )
 
-    def test_token_owner_bundle_is_typed_and_legacy_envelope_stays_live(self) -> None:
+    def test_token_owner_bundle_is_typed_and_grant_envelope_v2_stays_live(self) -> None:
         token = block(self.identity, "message", "AccessTokenResponse")
-        self.assertRegex(
-            token, r"bytes\s+grant_envelope\s*=\s*7\s*\[deprecated\s*=\s*true\]"
-        )
+        self.assertRegex(token, r"bytes\s+grant_envelope\s*=\s*7\s*;")
+        self.assertNotRegex(token, r"grant_envelope\s*=\s*7\s*\[deprecated")
         self.assertRegex(
             token,
             r"OwnerAuthorizationBundle\s+owner_authorization\s*=\s*8\s*;",
         )
         self.assertRegex(token, r"string\s+device_id\s*=\s*9\s*;")
-        self.assertIn("It is not owner authority", token)
+        self.assertIn("not owner authority", token)
+        self.assertIn("format_version (MUST equal 0x02; this byte is signed)", token)
+        self.assertIn("MUST reject the one-key v1 envelope", token)
         self.assertIn("purge-only bundle", token)
         self.assertIn("mint input, not capability", token)
         self.assertIn("MintParams.device_id", token)

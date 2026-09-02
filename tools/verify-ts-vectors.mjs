@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { fromBinary, toBinary } from "@bufbuild/protobuf";
 import { HandlePrincipalSchema } from "../packages/typescript/dist/identity_pb.js";
+import {
+  FinishWebAuthnAuthenticationRequestSchema,
+  RegisterPublicKeyRequestSchema,
+} from "../packages/typescript/dist/identity_pb.js";
 import { CallContextSchema } from "../packages/typescript/dist/contract_pb.js";
 import {
   CallFailureCode,
@@ -8,7 +12,16 @@ import {
   ErrorReason,
 } from "../packages/typescript/dist/errors_pb.js";
 import { errorReasonRetryable } from "../packages/typescript/dist/errors.js";
-import { unarySigningBytes } from "../packages/typescript/dist/signing.js";
+import {
+  BISCUIT_AUTHORITY_PUBLIC_KEY_ROLE,
+  DEVICE_PROOF_PUBLIC_KEY_ROLE,
+  GRANT_ENVELOPE_V2_DOMAIN,
+  IDENTITY_BINDING_CHALLENGE_V2_DOMAIN,
+  POP_DELEGATION_V1_DOMAIN,
+  TIER_1_REQUEST_SIGNING_V1_DOMAIN,
+  identityBindingChallengeV2Bytes,
+  unarySigningBytes,
+} from "../packages/typescript/dist/signing.js";
 import {
   FrameError,
   MAX_CALL_CONTEXT,
@@ -33,6 +46,59 @@ const actual = await unarySigningBytes(
 );
 if (Buffer.from(actual).toString("hex") !== vector.canonical_hex) {
   throw new Error("TypeScript unary signing bytes differ from the shared golden vector");
+}
+
+const authorityPublicKey = new Uint8Array(32).fill(0x11);
+const deviceProofPublicKey = new Uint8Array(32).fill(0x22);
+const bindingChallenge = identityBindingChallengeV2Bytes(
+  authorityPublicKey,
+  deviceProofPublicKey,
+);
+const expectedBindingChallenge = Buffer.concat([
+  Buffer.from(IDENTITY_BINDING_CHALLENGE_V2_DOMAIN),
+  Buffer.from(BISCUIT_AUTHORITY_PUBLIC_KEY_ROLE),
+  Buffer.from(authorityPublicKey),
+  Buffer.from(DEVICE_PROOF_PUBLIC_KEY_ROLE),
+  Buffer.from(deviceProofPublicKey),
+]);
+if (!Buffer.from(bindingChallenge).equals(expectedBindingChallenge)) {
+  throw new Error("TypeScript dual-role binding challenge has drifted");
+}
+if (
+  Buffer.from(bindingChallenge).equals(
+    Buffer.from(identityBindingChallengeV2Bytes(deviceProofPublicKey, authorityPublicKey)),
+  )
+) {
+  throw new Error("swapping dual-role keys did not change the binding challenge");
+}
+for (const domain of [
+  IDENTITY_BINDING_CHALLENGE_V2_DOMAIN,
+  POP_DELEGATION_V1_DOMAIN,
+  GRANT_ENVELOPE_V2_DOMAIN,
+]) {
+  if (!domain.endsWith("\0")) {
+    throw new Error(`client-mint signing domain is not NUL-terminated: ${domain}`);
+  }
+}
+if (TIER_1_REQUEST_SIGNING_V1_DOMAIN !== "heddle-req-sig-v1") {
+  throw new Error("deployed Tier-1 request-signing domain changed");
+}
+
+for (const schema of [
+  RegisterPublicKeyRequestSchema,
+  FinishWebAuthnAuthenticationRequestSchema,
+]) {
+  const value = create(schema, {
+    biscuitAuthorityPublicKey: authorityPublicKey,
+    deviceProofPublicKey,
+  });
+  const decoded = fromBinary(schema, toBinary(schema, value));
+  if (
+    !Buffer.from(decoded.biscuitAuthorityPublicKey).equals(authorityPublicKey) ||
+    !Buffer.from(decoded.deviceProofPublicKey).equals(deviceProofPublicKey)
+  ) {
+    throw new Error(`${schema.typeName} lost a dual-role public key`);
+  }
 }
 
 const handleVector = JSON.parse(

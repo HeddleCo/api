@@ -231,7 +231,7 @@ fn generated_round_trips_v2() -> Result<(), String> {
         ..Default::default()
     })?;
     round_trip(AccessTokenResponse {
-        grant_envelope: b"still-live-legacy-envelope".to_vec(),
+        grant_envelope: b"grant-envelope-v2-wire".to_vec(),
         owner_authorization: Some(bundle.clone()),
         ..Default::default()
     })?;

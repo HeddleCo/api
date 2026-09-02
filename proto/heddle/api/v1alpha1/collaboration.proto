@@ -60,6 +60,10 @@ message OpenDiscussionRequest {
   DiscussionSeverity severity = 9;
   // UNSPECIFIED preserves the existing CODE_ANCHORED open behavior.
   DiscussionKind kind = 10;
+  // Optional client-proposed canonical id. When set, must be `disc-<UUIDv7>`;
+  // the server records it verbatim as Discussion.id (client-sovereign identity).
+  // Empty preserves the legacy server-mint behavior.
+  string discussion_id = 11;
 }
 
 message AppendTurnRequest {

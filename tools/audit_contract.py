@@ -113,7 +113,10 @@ def audit_new_descriptor(decoded: str) -> None:
         # StateAttachment.body.raw_object (api#114): opaque attachment bytes for
         # kinds without a public typed body (same role as attachment_object).
         r"raw_object|"
-        r"agent_capability|bearer_capability|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
+        # CallContext.bearer_authority_key_selector (api#217): advisory raw
+        # 32-byte Ed25519 authority public key selecting which registered key to
+        # verify the client-minted biscuit against (weft#1960 leg C).
+        r"agent_capability|bearer_capability|bearer_authority_key_selector|capability_context|canonical_envelope|supported_alpns|encrypted_.*)$"
     )
     unaudited_bytes = sorted(
         name for name in byte_field_pattern.findall(proto_sources) if not allowed_byte_field.fullmatch(name)

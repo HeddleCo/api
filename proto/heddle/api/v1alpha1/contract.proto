@@ -72,6 +72,14 @@ message CallContext {
   // The byte-exact envelope contract is defined by
   // AccessTokenResponse.grant_envelope in identity.proto.
   bytes bearer_grant_envelope = 8;
+  // O(1) authority-key selector for keyed biscuit verification (weft#1960 leg C).
+  // The raw 32-byte Ed25519 biscuit_authority_public_key the client-minted token's
+  // authority block is signed under (AccessTokenResponse.biscuit_authority_public_key,
+  // identity.proto field 17). ADVISORY: it only PICKS which registered authority key
+  // to verify against; the biscuit signature still proves the key, so a wrong or
+  // absent selector is rejected, never trusted. Empty = legacy scan fallback during
+  // cutover.
+  bytes bearer_authority_key_selector = 9;
 }
 
 enum DeploymentTarget {

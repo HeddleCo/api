@@ -308,6 +308,25 @@ message RevokeCredentialResponse {
   bool revoked = 1;
 }
 
+// Revoke a specific device root by its public key. Closes weft#2047 C5: a
+// passkey-enrolled device root (registered via RegisterPublicKey) had no
+// revoke path — RevokeCredential targets `issued_credentials`, not the
+// `device_roots` row that anchors a passkey/one-key enrollment. Revoking the
+// device root removes it from the account's registered roots so tokens it
+// authored (and its Tier-1 request PoP) no longer verify.
+message RevokeDeviceRequest {
+  // Raw Ed25519 device root public key (32 bytes) to revoke. Matches
+  // `device_roots.public_key`.
+  bytes device_public_key = 1;
+  // Optional human-readable reason recorded with the revocation.
+  string reason = 2;
+  string client_operation_id = 3;
+}
+
+message RevokeDeviceResponse {
+  bool revoked = 1;
+}
+
 message CreateServiceAccountRequest {
   string subject = 1;
   string display_name = 2;
@@ -1357,6 +1376,22 @@ message SubmitRecoveryProofRequest {
     PaperCodeRecoveryProof paper_code = 4;
   }
   string client_operation_id = 5;
+  // Proof of possession of the `new_device_public_key` carried by the selected
+  // proof variant (weft#2047 leg 2). Closes the attacker-choosable-new-key
+  // plant: the recovery method (passkey / guardians / paper code) authorizes
+  // *that* recovery, but on its own it does not prove the caller holds the
+  // private half of the key the recovered identity gets bound to, so an
+  // attacker who cleared the recovery gate could bind the account to a key
+  // they do not control. This is a raw 64-byte Ed25519 signature by the NEW
+  // device private key over the 32-byte digest
+  //   SHA256("heddle-recovery-new-device-pop-v1" || 0x00 ||
+  //          recovery_attempt_id (UTF-8) || 0x00 || new_device_public_key).
+  // See heddle_api::signing::recovery_new_device_pop_digest. Binding
+  // `recovery_attempt_id` makes the proof single-use for this attempt. The
+  // server recomputes the digest and verifies the signature against the
+  // accepted variant's `new_device_public_key` before running the completion
+  // cascade; a missing or invalid signature fails the proof.
+  bytes new_device_proof_signature = 6;
 }
 
 // WebAuthn assertion signed by the declared `time_locked_webauthn`
@@ -2250,6 +2285,27 @@ service IdentityService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_request_targets: {
         path: "credential_id"
+        role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+    };
+  }
+  // Revoke a passkey-enrolled device root by its public key (weft#2047 C5).
+  // Modeled on RevokeCredential: the caller must be the owning principal or a
+  // resource administrator of the targeted device root.
+  rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "device_public_key"
         role: AUTHORIZATION_ROLE_CALLER_OR_RESOURCE_ADMINISTRATOR
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE

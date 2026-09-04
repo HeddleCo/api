@@ -20,6 +20,20 @@ pub const TIER_1_REQUEST_SIGNING_V1_DOMAIN: &str = "heddle-req-sig-v1";
 pub const TRANSPORT_BOOTSTRAP_SIGNING_V1_DOMAIN: &str = "heddle-req-sig-v1";
 /// Domain prepended to every server-signed GrantEnvelope v2 canonical payload.
 pub const GRANT_ENVELOPE_V2_DOMAIN: &[u8] = b"heddle-grant-envelope-v2\0";
+/// Domain separator for the one-key passkey↔device-key binding challenge
+/// introduced by weft#2047 (possession-first identity, two-key model retired).
+/// Promoted here from weft-local `weft-authz::webauthn` so weft, heddle, and
+/// tapestry share ONE definition. Unlike the `-v2` NUL-terminated domains, this
+/// value is the bare string with NO terminal NUL: the challenge framing inserts
+/// an explicit `0x00` separator between the domain and the key. This matches
+/// weft's `ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN` byte-for-byte.
+pub const ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN: &str = "heddle-one-key-device-binding-v1";
+/// Domain separator for the recovery new-device-key proof-of-possession
+/// (weft#2047 leg 2). Distinct from the credential-rotation (`heddle-credential-
+/// rotation-v1`) and SA-issuance (`heddle-sa-credential-issue-v1`) PoP domains
+/// so a signature captured against one RPC cannot be replayed against another.
+/// Bare string with explicit `0x00` field separators, matching that PoP family.
+pub const RECOVERY_NEW_DEVICE_POP_V1_DOMAIN: &str = "heddle-recovery-new-device-pop-v1";
 
 /// Exact signed/wire role label for the ephemeral Biscuit authority key.
 pub const BISCUIT_AUTHORITY_PUBLIC_KEY_ROLE: &[u8] = b"biscuit_authority_public_key\0";
@@ -314,6 +328,71 @@ pub fn identity_binding_challenge_v2_bytes(
     .concat()
 }
 
+/// Computes the one-key passkey binding challenge string (weft#2047).
+///
+/// The exact bytes are
+/// `base64url_nopad(SHA256(ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN || 0x00 || device_proof_public_key))`.
+/// The client passes the returned string as the WebAuthn assertion
+/// `clientDataJSON.challenge` when binding the human's passkey to the sole
+/// persistent device key. Mirrors weft's `derive_one_key_device_binding_challenge`
+/// byte-for-byte so server and every client agree on the challenge.
+pub fn one_key_device_binding_challenge(device_proof_public_key: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(device_proof_public_key);
+    base64url_nopad(&hasher.finalize())
+}
+
+/// Returns the 32-byte digest the NEW device key signs to prove possession
+/// during recovery completion (weft#2047 leg 2).
+///
+/// The digest is
+/// `SHA256(RECOVERY_NEW_DEVICE_POP_V1_DOMAIN || 0x00 || recovery_attempt_id (UTF-8) || 0x00 || new_device_public_key)`.
+/// The client signs these 32 bytes with the new device Ed25519 private key and
+/// sends the raw 64-byte signature in
+/// `SubmitRecoveryProofRequest.new_device_proof_signature`. Binding the
+/// `recovery_attempt_id` makes the proof single-use for one attempt; binding
+/// `new_device_public_key` prevents an attacker from planting a key they do not
+/// hold. The server recomputes this digest and verifies the signature against
+/// the `new_device_public_key` carried in the accepted proof variant.
+pub fn recovery_new_device_pop_digest(
+    recovery_attempt_id: &str,
+    new_device_public_key: &[u8],
+) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(RECOVERY_NEW_DEVICE_POP_V1_DOMAIN.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(recovery_attempt_id.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(new_device_public_key);
+    hasher.finalize().into()
+}
+
+/// Encodes bytes as unpadded base64url (RFC 4648 §5, URL/filename-safe alphabet,
+/// no `=` padding). Deliberately dependency-free and matched to the
+/// `URL_SAFE_NO_PAD` engine weft uses, so the one-key challenge string is
+/// byte-for-byte identical across implementations.
+fn base64url_nopad(input: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
+    for chunk in input.chunks(3) {
+        let b0 = u32::from(chunk[0]);
+        let b1 = u32::from(chunk.get(1).copied().unwrap_or(0));
+        let b2 = u32::from(chunk.get(2).copied().unwrap_or(0));
+        let packed = (b0 << 16) | (b1 << 8) | b2;
+        out.push(ALPHABET[((packed >> 18) & 0x3f) as usize] as char);
+        out.push(ALPHABET[((packed >> 12) & 0x3f) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(ALPHABET[((packed >> 6) & 0x3f) as usize] as char);
+        }
+        if chunk.len() > 2 {
+            out.push(ALPHABET[(packed & 0x3f) as usize] as char);
+        }
+    }
+    out
+}
+
 /// Returns the canonical bytes signed for a unary request.
 pub fn unary_bytes(
     signing_identity: &str,
@@ -546,6 +625,64 @@ mod tests {
         assert!(baseline.starts_with(b"heddle-provider-plan-v1\nkind=11:exact-batch"));
         assert_ne!(baseline, different_digest);
         assert_ne!(baseline, different_nonce);
+    }
+
+    #[test]
+    fn base64url_nopad_matches_rfc4648_url_safe_vectors() {
+        // Independently computed with Python `base64.urlsafe_b64encode(..).rstrip(b"=")`.
+        assert_eq!(base64url_nopad(b""), "");
+        assert_eq!(base64url_nopad(&[0xff]), "_w");
+        assert_eq!(base64url_nopad(&[0xff, 0xff]), "__8");
+        assert_eq!(base64url_nopad(&[0xff, 0xff, 0xff]), "____");
+        assert_eq!(base64url_nopad(&[0xfb, 0xef, 0xbe]), "----");
+        assert_eq!(base64url_nopad(&[0x00, 0x01, 0x02, 0x03, 0x04]), "AAECAwQ");
+    }
+
+    #[test]
+    fn one_key_device_binding_challenge_matches_weft_bytes() {
+        // The domain string must equal weft's weft-local constant exactly.
+        assert_eq!(
+            ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN,
+            "heddle-one-key-device-binding-v1"
+        );
+        // Fixed vector, independently computed:
+        //   base64url_nopad(SHA256("heddle-one-key-device-binding-v1" || 0x00 || [0x42; 32]))
+        // Replicates weft `derive_one_key_device_binding_challenge([0x42; 32])`.
+        let device_proof_public_key = [0x42u8; 32];
+        assert_eq!(
+            one_key_device_binding_challenge(&device_proof_public_key),
+            "3RHXb4oa6eEf61uPDjWBZT83WJ7UsOzp16r8Fa_Ho5U"
+        );
+    }
+
+    #[test]
+    fn recovery_new_device_pop_digest_is_domain_separated_and_fixed() {
+        assert_eq!(
+            RECOVERY_NEW_DEVICE_POP_V1_DOMAIN,
+            "heddle-recovery-new-device-pop-v1"
+        );
+        // Fixed vector, independently computed:
+        //   SHA256("heddle-recovery-new-device-pop-v1" || 0x00 ||
+        //          "recovery-attempt-0001" || 0x00 || [0x11; 32])
+        let digest = recovery_new_device_pop_digest("recovery-attempt-0001", &[0x11u8; 32]);
+        assert_eq!(
+            hex::encode(digest),
+            "3dd4241504103a8fbc6bfdfb37f6ac2aa3ff224668c4f50f6b818d1d5727b2a8"
+        );
+        // The attempt id and the key each independently change the digest.
+        assert_ne!(
+            digest,
+            recovery_new_device_pop_digest("recovery-attempt-0002", &[0x11u8; 32])
+        );
+        assert_ne!(
+            digest,
+            recovery_new_device_pop_digest("recovery-attempt-0001", &[0x22u8; 32])
+        );
+        // Domain separation from the credential-rotation PoP family.
+        assert_ne!(
+            RECOVERY_NEW_DEVICE_POP_V1_DOMAIN,
+            "heddle-credential-rotation-v1"
+        );
     }
 
     #[test]

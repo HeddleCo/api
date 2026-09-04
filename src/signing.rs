@@ -8,6 +8,9 @@ use prost::Message;
 /// Domain for the WebAuthn assertion that binds both client-minted session
 /// signing roles. Includes its terminal NUL byte.
 pub const IDENTITY_BINDING_CHALLENGE_V2_DOMAIN: &[u8] = b"heddle-device-binding-v2\0";
+/// Domain for proof that each client-minted session role possesses its private
+/// key. Includes its terminal NUL byte.
+pub const DEVICE_KEY_SELF_POP_V1_DOMAIN: &[u8] = b"heddle-device-key-self-pop-v1\0";
 /// Domain owned authoritatively by Weft's strict `pop_delegation` verifier.
 /// Mirrored here so Rust and TypeScript producers cannot drift.
 pub const POP_DELEGATION_V1_DOMAIN: &[u8] = b"heddle-pop-delegation-v1\0";
@@ -314,6 +317,20 @@ pub fn identity_binding_challenge_v2_bytes(
     .concat()
 }
 
+/// Returns the domain-separated bytes signed by both client-minted session
+/// role keys to prove possession during device registration.
+pub fn device_key_self_pop_v1_bytes(authority: &[u8], proof: &[u8]) -> Vec<u8> {
+    let identity_binding = [
+        IDENTITY_BINDING_CHALLENGE_V2_DOMAIN,
+        BISCUIT_AUTHORITY_PUBLIC_KEY_ROLE,
+        authority,
+        DEVICE_PROOF_PUBLIC_KEY_ROLE,
+        proof,
+    ]
+    .concat();
+    [DEVICE_KEY_SELF_POP_V1_DOMAIN, identity_binding.as_slice()].concat()
+}
+
 /// Returns the canonical bytes signed for a unary request.
 pub fn unary_bytes(
     signing_identity: &str,
@@ -477,8 +494,9 @@ mod tests {
 
     #[test]
     fn client_mint_domains_are_distinct_and_versioned() {
-        let domains: [&[u8]; 3] = [
+        let domains: [&[u8]; 4] = [
             IDENTITY_BINDING_CHALLENGE_V2_DOMAIN,
+            DEVICE_KEY_SELF_POP_V1_DOMAIN,
             POP_DELEGATION_V1_DOMAIN,
             GRANT_ENVELOPE_V2_DOMAIN,
         ];
@@ -490,7 +508,10 @@ mod tests {
         );
         assert_ne!(domains[0], domains[1]);
         assert_ne!(domains[0], domains[2]);
+        assert_ne!(domains[0], domains[3]);
         assert_ne!(domains[1], domains[2]);
+        assert_ne!(domains[1], domains[3]);
+        assert_ne!(domains[2], domains[3]);
         assert_eq!(TIER_1_REQUEST_SIGNING_V1_DOMAIN, "heddle-req-sig-v1");
         assert!(!TIER_1_REQUEST_SIGNING_V1_DOMAIN.as_bytes().contains(&0));
     }
@@ -513,6 +534,19 @@ mod tests {
             challenge,
             identity_binding_challenge_v2_bytes(&proof, &authority)
         );
+    }
+
+    #[test]
+    fn device_key_self_pop_is_distinct_and_role_ordered() {
+        let authority = [0x11; 32];
+        let proof = [0x22; 32];
+        let binding = identity_binding_challenge_v2_bytes(&authority, &proof);
+        let self_pop = device_key_self_pop_v1_bytes(&authority, &proof);
+
+        assert!(self_pop.starts_with(DEVICE_KEY_SELF_POP_V1_DOMAIN));
+        assert_eq!(&self_pop[DEVICE_KEY_SELF_POP_V1_DOMAIN.len()..], binding);
+        assert_ne!(self_pop, binding);
+        assert_ne!(self_pop, device_key_self_pop_v1_bytes(&proof, &authority));
     }
 
     #[test]

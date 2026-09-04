@@ -59,6 +59,8 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
                 ("claim_deferred_human", 16),
                 ("biscuit_authority_public_key", 17),
                 ("device_proof_public_key", 18),
+                ("device_proof_self_pop", 19),
+                ("biscuit_authority_self_pop", 20),
             ],
         )
         self.assertEqual(

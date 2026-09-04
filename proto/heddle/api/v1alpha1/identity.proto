@@ -218,6 +218,14 @@ message RegisterPublicKeyRequest {
   // the effective proof key to a child. Required with
   // `biscuit_authority_public_key` and committed by the binding assertion.
   bytes device_proof_public_key = 18;
+  // 64-byte Ed25519 self-PoP over
+  // device_key_self_pop_v1_bytes(authority, proof), proving possession of the
+  // proof key.
+  bytes device_proof_self_pop = 19;
+  // 64-byte Ed25519 self-PoP over
+  // device_key_self_pop_v1_bytes(authority, proof), proving possession of the
+  // authority key.
+  bytes biscuit_authority_self_pop = 20;
 }
 
 message BeginWebAuthnAuthenticationRequest {
@@ -251,6 +259,14 @@ message FinishWebAuthnAuthenticationRequest {
   // it against the user's active device roots and places it in GrantEnvelope v2
   // as the initial delegated-PoP and Tier-1 request-signing anchor.
   bytes device_proof_public_key = 10;
+  // 64-byte Ed25519 self-PoP over
+  // device_key_self_pop_v1_bytes(authority, proof), proving possession of the
+  // proof key.
+  bytes device_proof_self_pop = 11;
+  // 64-byte Ed25519 self-PoP over
+  // device_key_self_pop_v1_bytes(authority, proof), proving possession of the
+  // authority key.
+  bytes biscuit_authority_self_pop = 12;
 }
 
 message CreateDeviceAuthorizationRequest {

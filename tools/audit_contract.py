@@ -99,7 +99,7 @@ def audit_new_descriptor(decoded: str) -> None:
         r"credential_id|expected_owner_id|issuer_state_hash|owner_id|parent_capability_id|"
         r"governance_state_hash|merge_parent_state_hashes|owner_state_hash|previous_state_hash|"
         r"principal_id|root_spool_uuid|signer_key_id|spool_uuid|state_hash|"
-        r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
+        r".*(?:public_key|pubkey|signature|proof|self_pop|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit.*|bootstrap_token|grant_envelope|nonce)|"
         r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"
         r"grant_batch_digest|final_digest|pack_digest|pack_header|"

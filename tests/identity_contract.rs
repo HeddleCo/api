@@ -206,19 +206,27 @@ fn access_token_response_round_trips_device_id_mint_input() {
 fn generated_identity_requests_round_trip_both_client_mint_key_roles() {
     let authority = vec![0x11; 32];
     let proof = vec![0x22; 32];
+    let authority_self_pop = vec![0x33; 64];
+    let proof_self_pop = vec![0x44; 64];
     let registration = RegisterPublicKeyRequest {
         biscuit_authority_public_key: authority.clone(),
         device_proof_public_key: proof.clone(),
+        biscuit_authority_self_pop: authority_self_pop.clone(),
+        device_proof_self_pop: proof_self_pop.clone(),
         ..Default::default()
     };
     let registration = RegisterPublicKeyRequest::decode(registration.encode_to_vec().as_slice())
         .expect("decode RegisterPublicKeyRequest");
     assert_eq!(registration.biscuit_authority_public_key, authority);
     assert_eq!(registration.device_proof_public_key, proof);
+    assert_eq!(registration.biscuit_authority_self_pop, authority_self_pop);
+    assert_eq!(registration.device_proof_self_pop, proof_self_pop);
 
     let authentication = FinishWebAuthnAuthenticationRequest {
         biscuit_authority_public_key: vec![0x33; 32],
         device_proof_public_key: vec![0x44; 32],
+        biscuit_authority_self_pop: vec![0x55; 64],
+        device_proof_self_pop: vec![0x66; 64],
         ..Default::default()
     };
     let authentication =
@@ -226,6 +234,8 @@ fn generated_identity_requests_round_trip_both_client_mint_key_roles() {
             .expect("decode FinishWebAuthnAuthenticationRequest");
     assert_eq!(authentication.biscuit_authority_public_key, vec![0x33; 32]);
     assert_eq!(authentication.device_proof_public_key, vec![0x44; 32]);
+    assert_eq!(authentication.biscuit_authority_self_pop, vec![0x55; 64]);
+    assert_eq!(authentication.device_proof_self_pop, vec![0x66; 64]);
 }
 
 #[test]
@@ -233,9 +243,13 @@ fn dual_role_wire_fields_and_domain_registry_are_explicit() {
     let registration = message_body("RegisterPublicKeyRequest");
     assert!(registration.contains("bytes biscuit_authority_public_key = 17;"));
     assert!(registration.contains("bytes device_proof_public_key = 18;"));
+    assert!(registration.contains("bytes device_proof_self_pop = 19;"));
+    assert!(registration.contains("bytes biscuit_authority_self_pop = 20;"));
     let authentication = message_body("FinishWebAuthnAuthenticationRequest");
     assert!(authentication.contains("bytes biscuit_authority_public_key = 9;"));
     assert!(authentication.contains("bytes device_proof_public_key = 10;"));
+    assert!(authentication.contains("bytes device_proof_self_pop = 11;"));
+    assert!(authentication.contains("bytes biscuit_authority_self_pop = 12;"));
 
     for domain in [
         "heddle-device-binding-v2\\0",

@@ -8,6 +8,18 @@ export const POP_DELEGATION_V1_DOMAIN = "heddle-pop-delegation-v1\0";
 export const TIER_1_REQUEST_SIGNING_V1_DOMAIN = "heddle-req-sig-v1";
 /** Exact NUL-terminated domain for server-signed GrantEnvelope v2 payloads. */
 export const GRANT_ENVELOPE_V2_DOMAIN = "heddle-grant-envelope-v2\0";
+/**
+ * Domain for the one-key passkey↔device-key binding challenge (weft#2047).
+ * Unlike the `-v2` domains this has NO terminal NUL: the challenge framing
+ * inserts an explicit `0x00` separator. Mirrors the Rust
+ * `ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN` byte-for-byte.
+ */
+export const ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN = "heddle-one-key-device-binding-v1";
+/**
+ * Domain for the recovery new-device-key proof-of-possession (weft#2047 leg 2).
+ * Distinct from the rotation/SA-issuance PoP domains to block cross-RPC replay.
+ */
+export const RECOVERY_NEW_DEVICE_POP_V1_DOMAIN = "heddle-recovery-new-device-pop-v1";
 /** Exact signed/wire role label for the ephemeral Biscuit authority key. */
 export const BISCUIT_AUTHORITY_PUBLIC_KEY_ROLE = "biscuit_authority_public_key\0";
 /** Exact signed/wire role label for the non-extractable device proof key. */
@@ -49,6 +61,62 @@ export function identityBindingChallengeV2Bytes(
     encoder.encode(DEVICE_PROOF_PUBLIC_KEY_ROLE),
     deviceProofPublicKey,
   ]);
+}
+
+/**
+ * Compute the one-key passkey binding challenge string (weft#2047). Returns
+ * `base64urlNoPad(SHA256(ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN || 0x00 || deviceProofPublicKey))`,
+ * used as the WebAuthn assertion `clientDataJSON.challenge`. Mirrors the Rust
+ * `one_key_device_binding_challenge` byte-for-byte.
+ */
+export async function oneKeyDeviceBindingChallenge(
+  deviceProofPublicKey: Uint8Array,
+): Promise<string> {
+  const input = concat([
+    encoder.encode(ONE_KEY_DEVICE_BINDING_CHALLENGE_DOMAIN),
+    new Uint8Array([0]),
+    deviceProofPublicKey,
+  ]);
+  return base64urlNoPad(await digest(input));
+}
+
+/**
+ * Return the 32-byte digest the NEW device key signs to prove possession during
+ * recovery completion (weft#2047 leg 2):
+ * `SHA256(RECOVERY_NEW_DEVICE_POP_V1_DOMAIN || 0x00 || recoveryAttemptId || 0x00 || newDevicePublicKey)`.
+ * Sign these bytes with the new device Ed25519 private key; send the raw
+ * 64-byte signature in `SubmitRecoveryProofRequest.newDeviceProofSignature`.
+ * Mirrors the Rust `recovery_new_device_pop_digest` byte-for-byte.
+ */
+export async function recoveryNewDevicePopDigest(
+  recoveryAttemptId: string,
+  newDevicePublicKey: Uint8Array,
+): Promise<Uint8Array> {
+  const input = concat([
+    encoder.encode(RECOVERY_NEW_DEVICE_POP_V1_DOMAIN),
+    new Uint8Array([0]),
+    encoder.encode(recoveryAttemptId),
+    new Uint8Array([0]),
+    newDevicePublicKey,
+  ]);
+  return digest(input);
+}
+
+/** Encode bytes as unpadded base64url (RFC 4648 §5), matching Rust `base64url_nopad`. */
+function base64urlNoPad(input: Uint8Array): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  let out = "";
+  for (let offset = 0; offset < input.length; offset += 3) {
+    const b0 = input[offset];
+    const b1 = offset + 1 < input.length ? input[offset + 1] : 0;
+    const b2 = offset + 2 < input.length ? input[offset + 2] : 0;
+    const packed = (b0 << 16) | (b1 << 8) | b2;
+    out += alphabet[(packed >> 18) & 0x3f];
+    out += alphabet[(packed >> 12) & 0x3f];
+    if (offset + 1 < input.length) out += alphabet[(packed >> 6) & 0x3f];
+    if (offset + 2 < input.length) out += alphabet[packed & 0x3f];
+  }
+  return out;
 }
 
 export async function unarySigningBytes(

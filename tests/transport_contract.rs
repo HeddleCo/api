@@ -18,15 +18,15 @@ use heddle_api::heddle::api::v1alpha1::{
     ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse,
     ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
     PromoteAgentAccountRequest, ProviderPlanResponse, ProviderPullCapabilityContext,
-    ProviderReadRequest, PushRequest, RemainingDropCodesRequest, RemoteLink, RemoteLinkAuthMode,
-    RemoteLinkStatus, RemoteSyncDirection, RequestProof, RetryBehavior, RpcEffect, ServiceMaturity,
-    SetRemoteLinkRequest, SigningTier, SpoolSettings, StateId, ThreadOrder, TraceContext,
-    Visibility, error_detail, get_context_history_response, list_context_response,
-    list_discussions_response, list_refs_response, list_threads_response, set_remote_link_request,
-    thread_state,
+    ProviderReadRequest, PullReady, PushRequest, RefEntry, RemainingDropCodesRequest, RemoteLink,
+    RemoteLinkAuthMode, RemoteLinkStatus, RemoteSyncDirection, RequestProof, RetryBehavior,
+    RpcEffect, ServiceMaturity, SetRemoteLinkRequest, SigningTier, SpoolSettings, StateId,
+    ThreadOrder, TraceContext, Visibility, error_detail, get_context_history_response,
+    list_context_response, list_discussions_response, list_refs_response, list_threads_response,
+    set_remote_link_request, thread_state,
 };
 use heddle_api::{
-    ALL_METHODS, HOSTED_ALPN_V1, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
+    ALL_METHODS, HOSTED_ALPN_V1, MAX_PAGE_SIZE, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
 };
 use prost::Message;
 use serde::Deserialize;
@@ -206,6 +206,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
     );
     // 0.22.0 added the six planned NotificationService methods (177 -> 183).
     // 0.27.0 added IdentityService.RevokeDevice (183 -> 184, weft#2047 C5).
+    // 0.28.0 adds first-class PullReady.refs / head_thread; method count unchanged.
     assert_eq!(ALL_METHODS.len(), 184);
     let by_thread_ref =
         method_descriptor("/heddle.api.v1alpha1.CollaborationService/ListByThreadRef")
@@ -282,6 +283,32 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
             StreamingShape::Bidirectional
         );
     }
+}
+
+#[test]
+fn pull_ready_carries_one_page_of_list_refs_entries() {
+    let ready = PullReady {
+        refs: vec![RefEntry {
+            name: "main".into(),
+            is_thread: true,
+            revision_address: "heddle:0123".into(),
+            thread_id: "thread-main".into(),
+            ..Default::default()
+        }],
+        head_thread: "main".into(),
+        owner_authorization_protocol_version: 2,
+        ..Default::default()
+    };
+    let decoded = PullReady::decode(ready.encode_to_vec().as_slice()).unwrap();
+    assert_eq!(decoded.refs.len(), 1);
+    assert!(decoded.refs.len() as u32 <= MAX_PAGE_SIZE);
+    assert_eq!(decoded.refs[0].name, "main");
+    assert_eq!(decoded.refs[0].thread_id, "thread-main");
+    assert_eq!(decoded.head_thread, "main");
+    assert_eq!(decoded.owner_authorization_protocol_version, 2);
+    let unset = PullReady::default();
+    assert!(unset.refs.is_empty());
+    assert!(unset.head_thread.is_empty());
 }
 
 #[test]

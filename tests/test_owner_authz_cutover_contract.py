@@ -205,10 +205,12 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
         self.assertIn(("owner_genesis", 10), fields(self.registry, "HostedSpool"))
         ready = fields(self.sync, "PullReady")
         self.assertEqual(
-            ready[-2:],
+            ready[-4:],
             [
                 ("owner_authorization_protocol_version", 9),
                 ("owner_genesis", 10),
+                ("refs", 11),
+                ("head_thread", 12),
             ],
         )
         frame = block(self.sync, "message", "PullServerFrame")

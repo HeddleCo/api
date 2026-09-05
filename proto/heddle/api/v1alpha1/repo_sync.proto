@@ -550,6 +550,12 @@ message PullReady {
   // Verified and TOFU-pinned before any pack or purge sidecar is accepted.
   // The owner root and later transition entries ride in the state tree.
   SignedSpoolOwnerGenesis owner_genesis = 10;
+  // First-class advertised refs for this pull (heddle#1710 / weft#2055).
+  // Same `RefEntry` type as `ListRefs`. One page, capped at MAX_PAGE_SIZE.
+  // Replaces the `heddle-pull-refs-v1` TransferCheckpoint side channel.
+  repeated RefEntry refs = 11;
+  // Advertised HEAD thread. Empty means unset.
+  string head_thread = 12;
 }
 
 message WantObjects {

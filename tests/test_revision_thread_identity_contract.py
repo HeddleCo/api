@@ -125,6 +125,7 @@ class RevisionAndThreadIdentityContractTest(unittest.TestCase):
                 "PushComplete": ("target_thread_id",),
                 "GitCheckpointTransfer": ("thread", "thread_id"),
                 "PullRequest": ("remote_thread", "remote_thread_id"),
+                "PullReady": ("head_thread",),
             },
             "repository.proto": {
                 "SubscribeRepoEventsRequest": ("thread", "thread_id"),
@@ -178,6 +179,21 @@ class RevisionAndThreadIdentityContractTest(unittest.TestCase):
 
         self.assertNotIn("target_thread_pattern_id", registry)
         self.assertNotIn("local_thread_id", message_body(sync, "PullRequest"))
+
+    def test_pull_ready_advertises_one_page_of_list_refs_entries(self) -> None:
+        sync = (PROTO / "repo_sync.proto").read_text()
+        types = (PROTO / "types.proto").read_text()
+        ready = message_body(sync, "PullReady")
+        list_refs = message_body(sync, "ListRefsResponse")
+
+        self.assertRegex(ready, r"repeated\s+RefEntry\s+refs\s*=\s*11\s*;")
+        self.assertRegex(ready, r"string\s+head_thread\s*=\s*12\s*;")
+        self.assertRegex(list_refs, r"RefEntry\s+item\s*=\s*3\s*;")
+        self.assertIn("message RefEntry {", types)
+        self.assertNotRegex(sync, r"(?m)^message (PullRefs|PullRefEntry|HeddlePullRefs)\b")
+        self.assertIn("MAX_PAGE_SIZE", ready)
+        self.assertIn("Empty means unset", ready)
+        self.assertIn("heddle-pull-refs-v1", ready)
 
 
 if __name__ == "__main__":

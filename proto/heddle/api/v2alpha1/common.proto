@@ -1,0 +1,172 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/errors.proto";
+import "heddle/api/v1alpha1/types.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+message SpoolRef {
+  // Stable spool UUID; names, paths and account handles are presentation.
+  string id = 1;
+}
+
+message ThreadId {
+  // Exactly 32 bytes: hash of a versioned immutable creation record.
+  // Canonical genesis encoding is a separate durable-format decision; endpoints
+  // MUST NOT advertise creation until they implement the negotiated format.
+  bytes value = 1;
+}
+
+message ThreadRef {
+  SpoolRef spool = 1;
+  ThreadId id = 2;
+}
+
+message CheckoutRef {
+  SpoolRef spool = 1;
+  EndpointRef device = 2;
+  string id = 3;
+}
+
+message RevisionRef {
+  SpoolRef spool = 1;
+  heddle.api.v1alpha1.StateId state = 2;
+}
+
+message RecordRef {
+  SpoolRef spool = 1;
+  string id = 2;
+}
+
+message EntityRef {
+  oneof entity {
+    SpoolRef spool = 1;
+    ThreadRef thread = 2;
+    CheckoutRef checkout = 3;
+    RevisionRef revision = 4;
+    RecordRef discussion = 5;
+    RecordRef context = 6;
+    RecordRef operation = 7;
+    RecordRef run = 8;
+    RecordRef policy = 9;
+    RecordRef analysis = 10;
+    RecordRef invitation = 11;
+    RecordRef grant = 12;
+  }
+}
+
+message ExpectedVersion {
+  EntityRef resource = 1;
+  // Opaque compare-and-swap version returned with that resource's observation.
+  bytes version = 2;
+}
+
+message Removal {
+  // A deletion or removal from the current filtered window. It is not a claim
+  // that source bytes were purged. Lost authority may instead terminate a view.
+  EntityRef resource = 1;
+}
+
+enum Coverage {
+  COVERAGE_UNSPECIFIED = 0;
+  COVERAGE_NOT_REQUESTED = 1;
+  COVERAGE_PENDING = 2;
+  COVERAGE_PARTIAL = 3;
+  COVERAGE_COMPLETE = 4;
+  COVERAGE_STALE = 5;
+  COVERAGE_UNAVAILABLE = 6;
+  COVERAGE_FAILED = 7;
+}
+
+message SectionStatus {
+  // Contract-defined section name, not a client-supplied query expression.
+  string section = 1;
+  Coverage coverage = 2;
+  RevisionRef computed_for = 3;
+  RecordRef operation = 4;
+  PageInfo page = 5;
+}
+
+enum RequirementKind {
+  REQUIREMENT_KIND_UNSPECIFIED = 0;
+  REQUIREMENT_KIND_CAPABILITY = 1;
+  REQUIREMENT_KIND_HUMAN_SIGNATURE = 2;
+  REQUIREMENT_KIND_REVIEW = 3;
+  REQUIREMENT_KIND_EVIDENCE = 4;
+  REQUIREMENT_KIND_CONFLICT_RESOLUTION = 5;
+  REQUIREMENT_KIND_WRITER_HANDOFF = 6;
+  REQUIREMENT_KIND_INTENT_APPROVAL = 7;
+  REQUIREMENT_KIND_ANALYSIS = 8;
+  REQUIREMENT_KIND_PUBLICATION = 9;
+  REQUIREMENT_KIND_REFRESH = 10;
+}
+
+message Requirement {
+  RequirementKind kind = 1;
+  EntityRef subject = 2;
+  RecordRef policy = 3;
+  bytes policy_version = 4;
+  string explanation = 5;
+  // Canonical typed RPC route; advice never grants authority or executes it.
+  string recovery_method = 6;
+}
+
+message ActionAvailability {
+  string method = 1;
+  EndpointRef endpoint = 2;
+  EntityRef target = 3;
+  bool implemented = 4;
+  bool authorized = 5;
+  repeated Requirement requirements = 6;
+  repeated ExpectedVersion observed_versions = 7;
+}
+
+message Applied {
+  repeated ExpectedVersion resulting_versions = 1;
+}
+
+message Blocked {
+  repeated Requirement requirements = 1;
+}
+
+message MutationReceipt {
+  string client_operation_id = 1;
+  EndpointRef endpoint = 2;
+  oneof outcome {
+    Applied applied = 3;
+    RecordRef pending_operation = 4;
+    Blocked blocked = 5;
+  }
+  // Completion here is at endpoint. Publication has a separate receipt.
+  google.protobuf.Timestamp observed_at = 6;
+}
+
+message MutationResponse {
+  MutationReceipt receipt = 1;
+}
+
+message OperationRecord {
+  RecordRef ref = 1;
+  string client_operation_id = 2;
+  bytes version = 3;
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_QUEUED = 1;
+    STATE_RUNNING = 2;
+    STATE_COMPLETED = 3;
+    STATE_FAILED = 4;
+    STATE_CANCELED = 5;
+    STATE_WAITING_FOR_HUMAN = 6;
+  }
+  State state = 4;
+  uint64 completed_units = 5;
+  optional uint64 total_units = 6;
+  string unit = 7;
+  bool cancellation_supported = 8;
+  bool cancellation_requested = 9;
+  heddle.api.v1alpha1.CallFailure failure = 10;
+  repeated EntityRef results = 11;
+  repeated Requirement requirements = 12;
+}

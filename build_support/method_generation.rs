@@ -23,7 +23,11 @@ struct Method {
     deployments: Vec<String>,
 }
 
-pub fn write(descriptor_path: &Path, output_path: &Path, package: &str) -> Result<(), Box<dyn Error>> {
+pub fn write(
+    descriptor_path: &Path,
+    output_path: &Path,
+    package: &str,
+) -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(descriptor_path)?;
     let pool = DescriptorPool::decode(bytes.as_slice())?;
     let service_contract = extension(&pool, "service_contract")?;

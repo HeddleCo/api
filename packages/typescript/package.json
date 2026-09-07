@@ -44,7 +44,9 @@
     "./presence": "./dist/presence_pb.js",
     "./owner-authorization": "./dist/owner_authorization_pb.js",
     "./owner-governance": "./dist/owner_governance_pb.js",
-    "./attachment-authorization": "./dist/attachment-authorization.js"
+    "./attachment-authorization": "./dist/attachment-authorization.js",
+    "./v2": "./dist/v2alpha1/index.js",
+    "./v2/observation": "./dist/v2alpha1/observation.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.0",

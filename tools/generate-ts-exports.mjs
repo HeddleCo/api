@@ -23,3 +23,15 @@ writeFileSync(
   ["contract_pb", "errors_pb", "types_pb"].map((name) => `export * from "./${name}.js";`).join("\n") +
     '\nexport * from "./errors.js";\nexport * from "./signing.js";\n',
 );
+
+// Preserve every existing package/file entry point while compiling both wire
+// packages from their common root. These aliases are generated, not maintained
+// as a second hand-written list of v1 modules.
+const apiRoot = join(root, "..");
+for (const name of readdirSync(root).filter((name) => name.endsWith(".ts"))) {
+  writeFileSync(join(apiRoot, name), `export * from "./v1alpha1/${name.replace(/\.ts$/, ".js")}";\n`);
+}
+const v2Root = join(apiRoot, "v2alpha1");
+copyFileSync("packages/typescript/runtime/v2-observation.ts", join(v2Root, "observation.ts"));
+const v2Modules = readdirSync(v2Root).filter((name) => name.endsWith(".ts") && name !== "index.ts").sort();
+writeFileSync(join(v2Root, "index.ts"), v2Modules.map((name) => `export * from "./${name.replace(/\.ts$/, ".js")}";`).join("\n") + "\n");

@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+message SourceAnchor {
+  RevisionRef revision = 1;
+  string path = 2;
+  string symbol_id = 3;
+  optional uint32 start_line = 4;
+  optional uint32 end_line = 5;
+}
+
+message CollaborationAnchor {
+  oneof target {
+    ThreadRef thread = 1;
+    SourceAnchor source = 2;
+    SpoolRef spool = 3;
+  }
+}
+
+message DiscussionRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  CollaborationAnchor anchor = 3;
+  string title = 4;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_OPEN = 1;
+    STATUS_RESOLVED = 2;
+    STATUS_ORPHANED = 3;
+  }
+  Status status = 5;
+  bool blocking = 6;
+  uint64 turn_count = 7;
+  RecordRef extracted_context = 8;
+}
+
+message DiscussionTurn {
+  RecordRef ref = 1;
+  RecordRef discussion = 2;
+  string body = 3;
+  string principal_id = 4;
+  string agent_id = 5;
+  repeated EntityRef mentions = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ContextRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  CollaborationAnchor anchor = 3;
+  string content = 4;
+  repeated string tags = 5;
+  string principal_id = 6;
+  string agent_id = 7;
+  RecordRef supersedes = 8;
+  RecordRef extracted_from = 9;
+  Coverage anchor_coverage = 10;
+  bool superseded = 11;
+}
+
+message ObserveCollaborationRequest {
+  SpoolRef spool = 1;
+  repeated CollaborationAnchor anchors = 2;
+  repeated DiscussionRecord.Status statuses = 3;
+  repeated RecordRef discussions = 4;
+  repeated RecordRef contexts = 5;
+  bool include_history = 6;
+  PageRequest page = 7;
+  ObserveOptions observe = 8;
+}
+
+message CollaborationEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    DiscussionRecord discussion = 2;
+    DiscussionTurn turn = 3;
+    ContextRecord context = 4;
+    Removal removal = 5;
+    SectionStatus status = 6;
+  }
+}
+
+message OpenDiscussionRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  CollaborationAnchor anchor = 3;
+  string title = 4;
+  string initial_body = 5;
+  bool blocking = 6;
+}
+
+message AppendDiscussionRequest {
+  string client_operation_id = 1;
+  RecordRef discussion = 2;
+  bytes expected_version = 3;
+  string body = 4;
+  repeated EntityRef mentions = 5;
+}
+
+message ResolveDiscussionRequest {
+  string client_operation_id = 1;
+  RecordRef discussion = 2;
+  bytes expected_version = 3;
+  oneof resolution {
+    ContextRecord extract_context = 4;
+    RevisionRef resolved_by_edit = 5;
+    string dismissal_reason = 6;
+  }
+}
+
+message ReopenDiscussionRequest {
+  string client_operation_id = 1;
+  RecordRef discussion = 2;
+  bytes expected_version = 3;
+  string reason = 4;
+}
+
+message PutContextRequest {
+  string client_operation_id = 1;
+  ContextRecord context = 2;
+  bytes expected_version = 3;
+  // Empty expected version creates; existing records require the observed
+  // version. History is appended, never replaced by editing an old revision.
+}

@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "heddle/api/v1alpha1/agent.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+import "heddle/api/v2alpha1/thread.proto";
+
+message CheckoutOverview {
+  CheckoutRef ref = 1;
+  ThreadRef thread = 2;
+  bytes version = 3;
+  RevisionRef materialized = 4;
+  bool dirty = 5;
+  uint64 changed_paths = 6;
+  repeated Requirement requirements = 7;
+  repeated ActionAvailability actions = 8;
+  RecordRef active_run = 9;
+  // Display only, disclosed solely under device authority.
+  string display_path = 10;
+}
+
+message ObserveCheckoutsRequest {
+  SpoolRef spool = 1;
+  repeated ThreadRef threads = 2;
+  repeated CheckoutRef checkouts = 3;
+  PageRequest page = 4;
+  ObserveOptions observe = 5;
+}
+
+message CheckoutEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    CheckoutOverview checkout = 2;
+    Removal removal = 3;
+    SectionStatus status = 4;
+  }
+}
+
+message MaterializeCheckoutRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  RevisionRef revision = 3;
+  // Omitted for an automatically managed disposable checkout.
+  optional string requested_path = 4;
+}
+
+message CaptureCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef expected_source = 4;
+  string summary = 5;
+  repeated string selected_paths = 6;
+  // One-shot selection follows Heddle capture semantics; no separate index.
+}
+
+message RefreshCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef expected_source = 4;
+  RevisionRef target = 5;
+}
+
+message ResolveCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef expected_source = 4;
+  bytes conflict_set_version = 5;
+  repeated bytes chosen_candidate_ids = 6;
+  // Candidate selection is attributed. A working capture alone never resolves
+  // source conflicts; ambiguous or stale candidate sets fail explicitly.
+}
+
+message RecoverCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef recover_to = 4;
+  // Active writers and working edits are checked by Heddle before materializing.
+}
+
+message CheckoutMutationResponse {
+  MutationReceipt receipt = 1;
+  CheckoutOverview checkout = 2;
+  CaptureSummary capture = 3;
+}
+
+message ObserveRunsRequest {
+  SpoolRef spool = 1;
+  repeated ThreadRef threads = 2;
+  repeated RecordRef runs = 3;
+  bool include_timeline = 4;
+  PageRequest page = 5;
+  ObserveOptions observe = 6;
+}
+
+message RunEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    heddle.api.v1alpha1.AgentRun run = 2;
+    heddle.api.v1alpha1.AgentTimelineEvent timeline = 3;
+    Removal removal = 4;
+    SectionStatus status = 5;
+  }
+}
+
+message ControlRunRequest {
+  string client_operation_id = 1;
+  RecordRef run = 2;
+  bytes expected_version = 3;
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_PAUSE = 1;
+    ACTION_RESUME = 2;
+    ACTION_STOP = 3;
+    ACTION_STEER = 4;
+  }
+  Action action = 4;
+  string instruction = 5;
+}
+
+message DecideRunPermissionRequest {
+  string client_operation_id = 1;
+  RecordRef run = 2;
+  string permission_id = 3;
+  bytes request_digest = 4;
+  bool allow = 5;
+}
+
+message ProposedHumanAction {
+  string method = 1;
+  // Exact deterministic protobuf request. Preserve bytes across older clients;
+  // unknown methods/critical semantics cannot be approved by an unaware client.
+  bytes canonical_request = 2;
+  bytes request_digest = 3;
+  string client_operation_id = 4;
+  repeated EntityRef targets = 5;
+  heddle.api.v1alpha1.RequestProof request_proof = 6;
+  heddle.api.v1alpha1.HumanVerification human_verification = 7;
+}

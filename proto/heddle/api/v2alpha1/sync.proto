@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "heddle/api/v1alpha1/errors.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+import "heddle/api/v2alpha1/thread.proto";
+
+message SyncOpen {
+  ThreadRef thread = 1;
+  enum Direction {
+    DIRECTION_UNSPECIFIED = 0;
+    DIRECTION_PUBLISH = 1;
+    DIRECTION_PULL = 2;
+  }
+  Direction direction = 2;
+  RevisionRef revision = 3;
+  repeated SharedFacet facets = 4;
+  bytes sharing_policy_version = 5;
+  bytes expected_remote_version = 6;
+  bytes resume_cursor = 7;
+}
+
+message ObjectOffer {
+  bytes object_hash = 1;
+  SharedFacet facet = 2;
+  uint64 size = 3;
+}
+
+message ObjectChunk {
+  bytes object_hash = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+}
+
+message SyncCommit {
+  // Commits exactly the agreed inventory and policy. Received bytes alone are
+  // not admission; objects can be quarantined until this check succeeds.
+  bytes inventory_hash = 1;
+}
+
+message SyncClientFrame {
+  // Required in the first (open) frame; later frames must leave this empty.
+  string client_operation_id = 1;
+  oneof body {
+    SyncOpen open = 2;
+    ObjectOffer offer = 3;
+    ObjectChunk chunk = 4;
+    SyncCommit commit = 5;
+  }
+}
+
+message SyncReady {
+  EndpointRef endpoint = 1;
+  ThreadRef thread = 2;
+  RevisionRef current = 3;
+  bytes current_version = 4;
+  uint32 max_chunk_bytes = 5;
+  bytes resume_cursor = 6;
+  // First reply resolves the transfer context without ListThreads/GetRefs calls.
+}
+
+message ObjectNeed {
+  bytes object_hash = 1;
+  uint64 offset = 2;
+}
+
+message PublicationReceipt {
+  string client_operation_id = 1;
+  EndpointRef destination = 2;
+  ThreadRef thread = 3;
+  RevisionRef revision = 4;
+  bytes sharing_policy_version = 5;
+  bytes accepted_inventory_hash = 6;
+  oneof outcome {
+    Applied accepted = 7;
+    heddle.api.v1alpha1.CallFailure rejected = 8;
+  }
+}
+
+message SyncServerFrame {
+  oneof body {
+    SyncReady ready = 1;
+    ObjectNeed need = 2;
+    ObjectOffer offer = 3;
+    ObjectChunk chunk = 4;
+    PublicationReceipt receipt = 5;
+  }
+}

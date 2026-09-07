@@ -1,0 +1,218 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+// Account names and paths resolve to stable resources once. They never become
+// authorization roots or replace the stable IDs in subsequent commands.
+message ResourceSelector {
+  oneof selector {
+    EntityRef resource = 1;
+    string spool_address = 2;
+    ThreadNameSelector thread_name = 3;
+    string principal_handle = 4;
+  }
+}
+message ThreadNameSelector {
+  SpoolRef spool = 1;
+  string name = 2;
+}
+message ResolveResourcesRequest {
+  repeated ResourceSelector selectors = 1;
+  ReadBudget budget = 2;
+}
+message ResourceResolution {
+  uint32 selection_index = 1;
+  EntityRef resource = 2;
+  string principal_id = 3;
+  Coverage coverage = 4;
+}
+message ResolveResourcesResponse {
+  repeated ResourceResolution results = 1;
+}
+
+enum Audience {
+  AUDIENCE_UNSPECIFIED = 0;
+  AUDIENCE_PRIVATE = 1;
+  AUDIENCE_MEMBERS = 2;
+  AUDIENCE_PUBLIC = 3;
+}
+enum ResourceRole {
+  RESOURCE_ROLE_UNSPECIFIED = 0;
+  RESOURCE_ROLE_READER = 1;
+  RESOURCE_ROLE_WRITER = 2;
+  RESOURCE_ROLE_ADMINISTRATOR = 3;
+}
+message SpoolSettings {
+  Audience audience = 1;
+  Audience default_state_audience = 2;
+  string description = 3;
+  bool allow_child_creation = 4;
+  bool require_review_to_land = 5;
+  google.protobuf.Duration abandoned_thread_retention = 6;
+  RecordRef default_review_policy = 7;
+  // Opaque compare-and-swap version belongs to the containing spool record.
+}
+message SpoolMount {
+  RecordRef ref = 1;
+  SpoolRef parent = 2;
+  SpoolRef child = 3;
+  string name = 4;
+  bytes version = 5;
+}
+message MemberRecord {
+  RecordRef ref = 1;
+  string principal_id = 2;
+  ResourceRole role = 3;
+  bytes version = 4;
+}
+message GrantRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string principal_id = 3;
+  ResourceRole role = 4;
+  bool include_descendants = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  // Ordinary grants never imply owner purge authority.
+}
+message InvitationRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string recipient = 3;
+  ResourceRole role = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  bool revoked = 6;
+  bool redeemed = 7;
+  // Redemption secrets are returned only by CreateInvitation, never observations.
+}
+message ApprovalGroupRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string name = 3;
+  string description = 4;
+  repeated string principal_ids = 5;
+}
+message GroupRequirement {
+  RecordRef group = 1;
+  uint32 minimum_approvals = 2;
+}
+message ReviewPolicyRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string name = 3;
+  repeated ThreadRef targets = 4;
+  repeated string target_name_patterns = 5;
+  uint32 required_approvals = 6;
+  ResourceRole minimum_role = 7;
+  repeated string required_paths = 8;
+  bool forbid_author_approval = 9;
+  bool stale_on_revision_change = 10;
+  google.protobuf.Duration approval_ttl = 11;
+  repeated GroupRequirement groups = 12;
+  repeated string required_checks = 13;
+}
+message BookmarkRecord {
+  EntityRef resource = 1;
+  bytes version = 2;
+  string label = 3;
+}
+message SupportAccessRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string support_principal_id = 3;
+  ResourceRole role = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  bool revoked = 6;
+}
+message CreateSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  string name = 3;
+  SpoolSettings settings = 4;
+  SignedRecord owner_genesis = 5;
+}
+message ReviseSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+  string name = 4;
+  SpoolSettings settings = 5;
+}
+message DeleteSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+}
+message SetSpoolMountRequest {
+  string client_operation_id = 1;
+  SpoolMount mount = 2;
+  bytes expected_version = 3;
+}
+message RemoveSpoolMountRequest {
+  string client_operation_id = 1;
+  SpoolMount mount = 2;
+  bytes expected_version = 3;
+}
+message PutGrantRequest {
+  string client_operation_id = 1;
+  GrantRecord grant = 2;
+  bytes expected_version = 3;
+}
+message RevokeGrantRequest {
+  string client_operation_id = 1;
+  RecordRef grant = 2;
+  bytes expected_version = 3;
+}
+message CreateInvitationRequest {
+  string client_operation_id = 1;
+  InvitationRecord invitation = 2;
+}
+message CreateInvitationResponse {
+  MutationReceipt receipt = 1;
+  InvitationRecord invitation = 2;
+  bytes redemption_secret = 3;
+}
+message RedeemInvitationRequest {
+  string client_operation_id = 1;
+  RecordRef invitation = 2;
+  bytes redemption_secret = 3;
+}
+message RevokeInvitationRequest {
+  string client_operation_id = 1;
+  RecordRef invitation = 2;
+  bytes expected_version = 3;
+}
+message PutReviewPolicyRequest {
+  string client_operation_id = 1;
+  ReviewPolicyRecord policy = 2;
+  bytes expected_version = 3;
+}
+message DeleteReviewPolicyRequest {
+  string client_operation_id = 1;
+  RecordRef policy = 2;
+  bytes expected_version = 3;
+}
+message PutApprovalGroupRequest {
+  string client_operation_id = 1;
+  ApprovalGroupRecord group = 2;
+  bytes expected_version = 3;
+}
+message DeleteApprovalGroupRequest {
+  string client_operation_id = 1;
+  RecordRef group = 2;
+  bytes expected_version = 3;
+}
+message SetBookmarkRequest {
+  string client_operation_id = 1;
+  BookmarkRecord bookmark = 2;
+  bool bookmarked = 3;
+  bytes expected_version = 4;
+}
+message SetSupportAccessRequest {
+  string client_operation_id = 1;
+  SupportAccessRecord access = 2;
+  bytes expected_version = 3;
+}

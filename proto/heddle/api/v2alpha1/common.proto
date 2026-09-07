@@ -192,3 +192,16 @@ message OperationRecord {
   repeated EntityRef results = 11;
   repeated Requirement requirements = 12;
 }
+
+// A durable, versioned record. Its format defines canonical bytes, domain,
+// signature algorithm, bounds and verifier. Generic protobuf serialization is
+// never the signing input. Unknown critical formats fail closed.
+message SignedRecord {
+  string format = 1;
+  bytes canonical_record = 2;
+  repeated RecordSignature signatures = 3;
+}
+message RecordSignature {
+  bytes public_key = 1;
+  bytes signature = 2;
+}

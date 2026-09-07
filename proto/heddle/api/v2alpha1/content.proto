@@ -73,7 +73,7 @@ message ContentEvent {
     heddle.api.v1alpha1.TreeEntry tree_entry = 3;
     BlobChunk blob = 4;
     heddle.api.v1alpha1.FileDiff diff = 5;
-    heddle.api.v1alpha1.GetBlameResponse provenance = 6;
+    ProvenanceResult provenance = 6;
     SectionStatus selection_complete = 7;
     heddle.api.v1alpha1.StateSummary state = 8;
     heddle.api.v1alpha1.StateAttachment attachment = 9;
@@ -127,4 +127,12 @@ message SearchEvent {
     SearchHit hit = 2;
     SectionStatus complete = 3;
   }
+}
+
+message ProvenanceResult {
+  string path = 1;
+  RevisionRef revision = 2;
+  Coverage coverage = 3;
+  repeated heddle.api.v1alpha1.BlameLine lines = 4;
+  heddle.api.v1alpha1.BlameSummary summary = 5;
 }

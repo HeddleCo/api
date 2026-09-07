@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package heddle.api.v2alpha1;
 
-import "heddle/api/v1alpha1/agent.proto";
 import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
@@ -102,8 +101,9 @@ message ObserveRunsRequest {
 message RunEvent {
   StreamFrame frame = 1;
   oneof payload {
-    heddle.api.v1alpha1.AgentRun run = 2;
-    heddle.api.v1alpha1.AgentTimelineEvent timeline = 3;
+    RunRecord run = 2;
+    TimelineRecord timeline = 3;
+    RunPolicy policy = 6;
     Removal removal = 4;
     SectionStatus status = 5;
   }
@@ -142,4 +142,56 @@ message ProposedHumanAction {
   repeated EntityRef targets = 5;
   heddle.api.v1alpha1.RequestProof request_proof = 6;
   heddle.api.v1alpha1.HumanVerification human_verification = 7;
+}
+
+message RunRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  ThreadRef thread = 3;
+  CheckoutRef checkout = 4;
+  string principal_id = 5;
+  string agent_id = 6;
+  string harness = 7;
+  string model = 8;
+  OperationRecord.State state = 9;
+  repeated ActionAvailability actions = 10;
+}
+message TimelineRecord {
+  RecordRef ref = 1;
+  RecordRef run = 2;
+  uint64 position = 3;
+  string kind = 4;
+  string summary = 5;
+  RevisionRef captured_revision = 6;
+  repeated RecordRef artifacts = 7;
+  SignedRecord source_operation = 8;
+  // Summary is the authorized projection. Raw artifacts require separate reads.
+}
+message RunPolicy {
+  SpoolRef spool = 1;
+  bytes version = 2;
+  uint64 structured_retention_seconds = 3;
+  uint64 raw_retention_seconds = 4;
+  bool retain_raw = 5;
+  repeated HarnessPreference preferences = 6;
+}
+message HarnessPreference {
+  string harness = 1;
+  string category = 2;
+  bool permitted = 3;
+  SignedRecord principal_authorization = 4;
+}
+message PutRunPolicyRequest {
+  string client_operation_id = 1;
+  RunPolicy policy = 2;
+  bytes expected_version = 3;
+}
+message LandCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef source = 4;
+  ThreadRef target = 5;
+  RevisionRef expected_target = 6;
+  bytes expected_policy_version = 7;
 }

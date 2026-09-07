@@ -44,7 +44,7 @@ host platform, rust-pack `cachePaths: ["target"]`).
 The candidate `@heddleco/api/v2` export provides generated v2 messages/services,
 `createServiceClient`, `describeTools`, and `ObservationState`. Unary methods
 return typed promises; Observe and finite content methods return typed async
-iterables; Push/Pull accept async iterable requests. `/v2/client` and
+iterables; Publish/Fetch accept async iterable requests. `/v2/client` and
 `/v2/observation` are also separate entry points. `/framing` includes bounded,
 pull-based stream decoding alongside the existing unary codec. An application
 transport still supplies Iroh connections, credentials, signing and cancellation.

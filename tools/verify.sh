@@ -17,6 +17,7 @@ python3 -B -m unittest tests/test_signup_contract.py
 python3 -B -m unittest tests/test_additive_bundle_contract.py
 python3 -B -m unittest tests/test_spool_contract.py
 python3 -B -m unittest tests/test_transport_contract.py
+python3 -B -m unittest tests/test_v2_cutover_contract.py
 python3 tools/audit_contract.py
 cargo +nightly fmt --check
 cargo test --all-features

@@ -216,3 +216,22 @@ message ChangeThreadLifecycleRequest {
   ThreadLifecycle lifecycle = 4;
   // READY revalidates requirements. LANDED is rejected here; use LandThread.
 }
+
+message RenameThreadRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  bytes expected_version = 3;
+  string name = 4;
+}
+message StackLanding {
+  ThreadRef thread = 1;
+  RevisionRef source = 2;
+  ThreadRef target = 3;
+  RevisionRef expected_target = 4;
+  bytes expected_policy_version = 5;
+}
+message LandStackRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  repeated StackLanding landings = 3;
+}

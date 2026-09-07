@@ -4,7 +4,7 @@ import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { createServiceClient, describeTools, ContractClientError } from "../packages/typescript/dist/v2alpha1/client.js";
 import { ThreadService, SyncService } from "../packages/typescript/dist/v2alpha1/services_pb.js";
 import { StartThreadRequestSchema, ThreadMutationResponseSchema, ThreadListEventSchema } from "../packages/typescript/dist/v2alpha1/thread_pb.js";
-import { PushServerFrameSchema } from "../packages/typescript/dist/v1alpha1/repo_sync_pb.js";
+import { PublishServerFrameSchema } from "../packages/typescript/dist/v2alpha1/sync_pb.js";
 
 const startPath = "/heddle.api.v2alpha1.ThreadService/StartThread";
 const observePath = "/heddle.api.v2alpha1.ThreadService/ObserveThreads";
@@ -77,21 +77,21 @@ test("bidirectional transfer pulls client frames as the endpoint consumes them",
   const source = async function* () {
     try {
       produced++;
-      yield { clientOperationId: "publish-once", frame: { case: "open", value: {} } };
+      yield { clientOperationId: "publish-once", body: { case: "open", value: {} } };
       produced++;
-      yield { frame: { case: "pack", value: {} } };
+      yield { body: { case: "pack", value: {} } };
     } finally { sourceClosed = true; }
   };
   const transport = {
     async *open(_method, requests) {
       for await (const _ of requests) {
         assert.equal(produced, 1);
-        yield toBinary(PushServerFrameSchema, create(PushServerFrameSchema, { frame: { case: "ready", value: {} } }));
+        yield toBinary(PublishServerFrameSchema, create(PublishServerFrameSchema, { body: { case: "ready", value: {} } }));
       }
     },
   };
-  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v2alpha1.SyncService/Push"]));
-  for await (const _ of client.push(source())) break;
+  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v2alpha1.SyncService/Publish"]));
+  for await (const _ of client.publish(source())) break;
   assert.equal(produced, 1);
   assert.equal(sourceClosed, true);
 });

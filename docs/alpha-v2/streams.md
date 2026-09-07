@@ -1,6 +1,7 @@
 # Candidate v2 streams and client integration
 
-This branch adds `heddle.api.v2alpha1` alongside the unchanged v1 wire package.
+`heddle.api.v2alpha1` is a clean alpha cutover contract. Consumers switch to its
+native routes together; no v2 route forwards a legacy RPC request or response.
 It implements generated types, typed clients, shared framing, and observation
 lifecycle validation. Every v2 service is **PLANNED**: this repository does not
 implement Weft/Heddle handlers, portable root verification, or an Iroh adapter.
@@ -32,7 +33,8 @@ transport bytes; it is not the authority or an application proxy.
 | Identity / Attention / Notification / Operation | Observe server streams | Account state and background changes |
 | Content / Search | Finite server streams | Batched exact-revision selections and bounded results |
 | Mutations | Typed unary request and receipt | Exact targets, versions, operation identity and recovery |
-| Sync | Retained bidirectional Push/Pull | Existing pack, provider and sidecar protocol |
+| Sync | Native bidirectional Publish/Fetch and streamed provider extents | Thread-bound pack, provider and sidecar transfer |
+| Integrations | Observe plus typed connection/import/sync commands | Provider setup, repositories and remote links |
 
 One logical RPC uses one reliable, ordered Iroh stream. Reuse the authenticated
 connection for many RPCs. Send the opening request before awaiting a response;
@@ -142,7 +144,7 @@ do not assume one database transaction or polling task per idle view is cheap.
 Method metadata describes baseline request targets; it is not the entire guard.
 A composed view authorizes each section, record and nested target before emitting
 bytes. Spool membership read does not authorize invitation secrets, grants or
-administration sections. Apply the corresponding retained administration guard
+administration sections. Apply the corresponding administration guard
 and redaction rules; report unavailable only when even that disclosure is allowed.
 Inspect every nested scope, not only the outer spool selector.
 
@@ -195,7 +197,7 @@ at `heddle_api::v2::ALL_METHODS`, and typed markers at `heddle_api::v2::rpc`.
 heap-boxed dispatch is imposed. Dropping a live Messages cancels observation;
 dropping an unfinished Sender aborts its send half. Duplex halves can be driven
 independently. The adapter owns deadlines, authentication, exact-byte signing,
-framing, raw pack phases and cancellation while opening a call.
+framing and cancellation while opening a call.
 
 TypeScript exports `@heddleco/api/v2`, `/v2/client`, `/v2/observation` and the
 existing `/framing`. For example, given an authenticated transport and negotiated
@@ -223,10 +225,9 @@ is_complete/isComplete before treating a finite observation as finished.
 The TypeScript async iterators pull on demand and propagate early return to the
 adapter. decodeMessageStream incrementally consumes arbitrarily split network
 chunks, limits the declared frame before body allocation and closes its source
-iterator on cancellation/error. It supports message/failure frames; raw pack
-phases use decodeStreamFrame and a dedicated bounded transfer adapter. It must
-not buffer a raw pack into a protobuf message. Rust retains its existing matching
-framing codec. Both languages share wire fixtures.
+iterator on cancellation/error. It supports message/failure frames. Native v2 pack transfers use bounded
+PackChunk protobufs and never buffer a whole pack into a message. Both languages
+share framing fixtures; the existing raw-body codec remains a transport primitive.
 
 Tool selection uses protobuf descriptors plus the intersection of the task's
 chosen routes and endpoint implemented methods. It does not publish all RPCs to
@@ -235,25 +236,41 @@ still supply task-specific presentation, permissions and result reduction.
 
 ## Remaining decisions and delivery gates
 
-The [184-method v1 inventory](v1-inventory.json) and [disposition map](v1-disposition.csv)
-cover the review target. The [retained bridges](retained-bridges.csv) enumerate
-104 typed v1 request/response pairs under v2 service routes; these are migration
-bridges, not redesigned ceremonies. There are 140 candidate routes across 17
-services: 36 new and 104 retained. All are PLANNED.
+The [184-method v1 inventory](v1-inventory.json), [review dispositions](v1-disposition.csv)
+and [native cutover map](cutover-map.csv) identify where existing functionality
+lands. The clean contract has 108 native routes across 18 services. All RPC input
+and output messages belong to v2; descriptor checks reject legacy RPC bridges.
+Data-only source values, contract metadata and the typed failure vocabulary reuse
+existing schema definitions where their semantics are unchanged. They provide no
+compatibility route or fallback handler. The v1 package remains in this review
+branch to check existing fixtures; consumer deployment is a coordinated cutover.
 
-Push/Pull deliberately preserve signed openings, exact remote-head preconditions,
-partial fetch, packs/indexes, Git lanes, owner genesis, provider consent/manifests,
-redaction/visibility/attachment sidecars and separate purge authority. Their
-legacy Thread IDs remain legacy IDs. A native v2 transfer opening must bind the
-v2 Thread identity, exact facets/policy and legacy/provider transport context
-before replacing this bridge. PublicationReceipt is a target observation, not a
-claim that the legacy PushComplete proves all v2 policy requirements.
+Publish/Fetch have native v2 openings binding Thread identity, exact revision,
+selected facets, policy version, operation identity and transfer checkpoint.
+Ready resolves the current Thread and advertised refs in the same stream, with
+owner genesis, have/need/missing inventory and explicit closure coverage.
+PackChunk carries an extent plus exactly its declared number of bytes. Negotiated
+frame limits apply before decoding; offsets, extent hashes, final object hashes
+and closure are verified before admission. Native and Git packs/indexes retain
+separate kinds. A transfer checkpoint names only verified durable progress and is
+bound to the opening/plan; changing the plan requires a fresh proof.
+
+Fetch may propose a provider plan. The client approves that exact digest and
+extents before any provider redemption; tickets bind provider, principal, scope,
+plan and extent and are not generic download capabilities. Owner genesis must be
+verified and pinned before admitting source or purge sidecars. Redaction,
+visibility and attachment sidecars retain their own authorship/integrity checks;
+purge additionally requires its owner chain and exact signed operation. A publish
+commit atomically checks expected remote version, still-effective sharing policy
+and the accepted inventory before advancing the remote Thread. PublicationReceipt
+reports that acceptance separately from local capture completion. Partial fetch
+must explicitly list missing material; it cannot imply full closure.
 
 Do not activate StartThread until the versioned immutable genesis encoding/hash
 is agreed, implemented and covered by cross-language vectors. A changed display
 name, intent version or tip does not change identity. The creation nonce permits
-distinct attempts with otherwise identical descriptive inputs. Legacy UUIDs
-cannot be reinterpreted as 32-byte hashes without a migration mapping.
+distinct attempts with otherwise identical descriptive inputs. Existing UUIDs
+are not reinterpreted as 32-byte hashes; clean cutover establishes new identities.
 
 Cross-device writer ownership/handoff remains an open product decision. This
 candidate does not create a global lease or silently permit concurrent offline

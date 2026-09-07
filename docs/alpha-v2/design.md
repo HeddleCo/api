@@ -176,3 +176,9 @@ Before implementing, turn the following into the acceptance matrix:
 - Every advertised method/capability has a real handler and cross-client conformance evidence. Negative cases prove that limits, authorization and call-count checks fail when the protected property is removed.
 
 No runtime tests or performance benchmarks were run for this review. The current call observations are static source evidence, and the performance budgets above are proposed acceptance criteria. Implementation and migration work remain future work.
+
+
+**Accepted cutover decision (2026-09-07):** the user explicitly chose a clean
+alpha cutover with no migration bridges. The native v2 RPC surface and
+streaming lifecycle are specified in [streams.md](streams.md). Earlier inventory
+dispositions describe functionality to preserve, not legacy RPC wrappers to ship.

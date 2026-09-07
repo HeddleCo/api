@@ -54,6 +54,16 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
         for method in service.methods() {
             let path = format!("/{}/{}", service.full_name(), method.name());
             assert!(declared.insert(path.clone()), "duplicate {path}");
+            assert_eq!(
+                method.input().package_name(),
+                "heddle.api.v2alpha1",
+                "{path}: legacy request bridge"
+            );
+            assert_eq!(
+                method.output().package_name(),
+                "heddle.api.v2alpha1",
+                "{path}: legacy response bridge"
+            );
             let options = method.options();
             assert!(
                 options.has_extension(&rpc_contract),
@@ -112,6 +122,7 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
         "CheckoutService",
         "RunService",
         "SyncService",
+        "IntegrationService",
         "WorkspaceService",
         "SearchService",
         "AttentionService",

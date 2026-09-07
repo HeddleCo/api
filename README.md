@@ -15,12 +15,12 @@ partial.
 `heddle.api.v2alpha1` adds composed Thread/workspace/spool observations, typed
 local checkout actions, finite content streams, and shared checkpoint/recovery
 rules. Rust and TypeScript include transport adapters and observation lifecycle
-helpers. Existing v1 imports and routes remain available.
+helpers. V2 uses native RPC requests and responses for a coordinated clean cutover.
 
 All v2 routes are PLANNED until consumer handlers exist. Read the
 [candidate streaming contract and integration gates](docs/alpha-v2/streams.md),
 [complete design](docs/alpha-v2/design.md), and
-[v1 migration inventory](docs/alpha-v2/v1-disposition.csv).
+[v1 review inventory](docs/alpha-v2/v1-disposition.csv).
 
 ## Packages
 

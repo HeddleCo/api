@@ -41,6 +41,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "AttentionEvent.payload",
         "NotificationEvent.payload",
         "OperationEvent.payload",
+        "PublishClientFrame.body",
+        "FetchClientFrame.body",
+        "FetchServerFrame.body",
     ] {
         config.type_attribute(
             format!(".heddle.api.v2alpha1.{oneof}"),

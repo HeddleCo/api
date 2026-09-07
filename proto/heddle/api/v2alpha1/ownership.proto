@@ -1,0 +1,50 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+// Owner records retain their independently versioned canonical formats and
+// purge-only authority. RPC cutover does not create a new trust root.
+message OwnerState {
+  SpoolRef spool = 1;
+  bytes version = 2;
+  SignedRecord genesis = 3;
+  repeated SignedRecord transitions = 4;
+  repeated SignedRecord pending_transitions = 5;
+  SignedRecord recovery_policy = 6;
+}
+message ObserveOwnershipRequest {
+  SpoolRef spool = 1;
+  ObserveOptions observe = 2;
+}
+message OwnershipEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    OwnerState owner = 2;
+    SectionStatus status = 3;
+  }
+}
+message BootstrapOwnershipRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  SignedRecord genesis = 3;
+}
+message SubmitOwnerTransitionRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+  SignedRecord transition = 4;
+}
+message SubmitOwnerCapabilityRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  repeated SignedRecord capability_chain = 3;
+}
+message TransferOwnershipRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+  SignedRecord source_handoff = 4;
+  SignedRecord destination_acceptance = 5;
+}

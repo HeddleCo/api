@@ -2,17 +2,14 @@ syntax = "proto3";
 
 package heddle.api.v2alpha1;
 
-import "heddle/api/v1alpha1/agent.proto";
-import "heddle/api/v1alpha1/attention.proto";
-import "heddle/api/v1alpha1/identity.proto";
-import "heddle/api/v1alpha1/notification.proto";
-import "heddle/api/v1alpha1/registry.proto";
 import "heddle/api/v1alpha1/repository.proto";
-import "heddle/api/v1alpha1/state_review.proto";
+import "heddle/api/v2alpha1/activity.proto";
+import "heddle/api/v2alpha1/administration.proto";
 import "heddle/api/v2alpha1/analysis.proto";
 import "heddle/api/v2alpha1/collaboration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/device.proto";
+import "heddle/api/v2alpha1/identity.proto";
 import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/sync.proto";
 import "heddle/api/v2alpha1/thread.proto";
@@ -46,10 +43,10 @@ message ThreadEvent {
     SectionStatus status = 11;
     Removal removal = 12;
     heddle.api.v1alpha1.FileDiff diff = 13;
-    heddle.api.v1alpha1.ReviewSignature evidence = 14;
+    EvidenceRecord evidence = 14;
     OperationRecord operation = 15;
-    heddle.api.v1alpha1.AgentRun run = 16;
-    heddle.api.v1alpha1.AgentTimelineEvent timeline_event = 17;
+    RunRecord run = 16;
+    TimelineRecord timeline_event = 17;
     PublicationReceipt publication = 18;
     SectionReplacement replace_section = 19;
   }
@@ -60,8 +57,8 @@ message SpoolOverview {
   SpoolRef parent = 2;
   string name = 3;
   bytes version = 4;
-  heddle.api.v1alpha1.Visibility visibility = 5;
-  heddle.api.v1alpha1.SpoolSettings settings = 6;
+  Audience audience = 5;
+  SpoolSettings settings = 6;
   repeated ActionAvailability actions = 7;
   repeated SectionStatus sections = 8;
 }
@@ -77,6 +74,7 @@ enum SpoolSection {
   SPOOL_SECTION_CONTEXT = 7;
   SPOOL_SECTION_OPERATIONS = 8;
   SPOOL_SECTION_CHILDREN = 9;
+  SPOOL_SECTION_SUPPORT_ACCESS = 10;
 }
 
 message ObserveSpoolRequest {
@@ -94,16 +92,18 @@ message SpoolEvent {
   oneof payload {
     SpoolOverview spool = 2;
     ThreadOverview thread = 3;
-    heddle.api.v1alpha1.MemberEntry member = 4;
-    heddle.api.v1alpha1.Invitation invitation = 5;
-    heddle.api.v1alpha1.HostedGrant grant = 6;
-    heddle.api.v1alpha1.ThreadPolicy policy = 7;
-    heddle.api.v1alpha1.ApprovalGroup approval_group = 8;
+    MemberRecord member = 4;
+    InvitationRecord invitation = 5;
+    GrantRecord grant = 6;
+    ReviewPolicyRecord policy = 7;
+    ApprovalGroupRecord approval_group = 8;
     ContextRecord context = 9;
     OperationRecord operation = 10;
     SectionStatus status = 11;
     Removal removal = 12;
     SectionReplacement replace_section = 13;
+    SpoolMount mount = 14;
+    SupportAccessRecord support_access = 15;
   }
 }
 
@@ -114,6 +114,7 @@ message ObserveWorkspaceRequest {
   bool include_attention = 4;
   bool include_operations = 5;
   bool include_devices = 6;
+  bool include_bookmarks = 7;
 }
 
 message WorkspaceEvent {
@@ -121,12 +122,13 @@ message WorkspaceEvent {
   oneof payload {
     SpoolOverview spool = 2;
     ThreadOverview thread = 3;
-    heddle.api.v1alpha1.FeedItem attention = 4;
+    AttentionItem attention = 4;
     OperationRecord operation = 5;
     EndpointRef device = 6;
     SectionStatus status = 7;
     Removal removal = 8;
     SectionReplacement replace_section = 9;
+    BookmarkRecord bookmark = 10;
   }
 }
 
@@ -140,13 +142,14 @@ message ObserveAttentionRequest {
 message AttentionEvent {
   StreamFrame frame = 1;
   oneof payload {
-    heddle.api.v1alpha1.FeedItem item = 2;
+    AttentionItem item = 2;
     Removal removal = 3;
   }
 }
 
 message ObserveNotificationsRequest {
   bool unread_only = 1;
+  bool include_preferences = 4;
   PageRequest page = 2;
   ObserveOptions observe = 3;
 }
@@ -154,7 +157,9 @@ message ObserveNotificationsRequest {
 message NotificationEvent {
   StreamFrame frame = 1;
   oneof payload {
-    heddle.api.v1alpha1.Notification notification = 2;
+    NotificationRecord notification = 2;
+    NotificationPreferences preferences = 4;
+    SectionStatus status = 5;
     Removal removal = 3;
   }
 }
@@ -163,6 +168,8 @@ message ObserveIdentityRequest {
   bool include_devices = 1;
   bool include_sessions = 2;
   bool include_signup_invitations = 3;
+  bool include_delegations = 6;
+  bool include_recovery = 7;
   PageRequest page = 4;
   ObserveOptions observe = 5;
 }
@@ -170,13 +177,16 @@ message ObserveIdentityRequest {
 message IdentityEvent {
   StreamFrame frame = 1;
   oneof payload {
-    heddle.api.v1alpha1.WhoAmIResponse identity = 2;
+    PrincipalRecord identity = 2;
     SectionStatus status = 3;
-    heddle.api.v1alpha1.ActiveSession session = 4;
-    heddle.api.v1alpha1.SignupInviteSummary signup_invitation = 5;
+    SessionRecord session = 4;
+    SignupInvitation signup_invitation = 5;
     DeviceIdentity device = 6;
     Removal removal = 7;
     SectionReplacement replace_section = 8;
+    DelegationRecord delegation = 9;
+    RecoveryAttempt recovery = 10;
+    InvitationQuota invitation_quota = 11;
   }
 }
 

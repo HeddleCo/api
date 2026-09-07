@@ -1,4 +1,5 @@
 //! Shared v2 client behavior. Transport adapters retain key and connection ownership.
+pub mod client;
 use crate::StreamingShape;
 use crate::heddle::api::v1alpha1::{
     AuthorizationAccess, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
@@ -49,6 +50,14 @@ pub enum ObservationAction {
     Complete,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ObservationApplyError<E> {
+    #[error("stream protocol failed: {0}")]
+    Protocol(#[from] StreamProtocolError),
+    #[error("view reducer failed: {0}")]
+    Reducer(E),
+}
+
 /// Cursor and lifecycle tracker; typed consumers own staged view data.
 #[derive(Clone)]
 pub struct ObservationState {
@@ -60,6 +69,28 @@ pub struct ObservationState {
 }
 
 impl ObservationState {
+    /// Advances this tracker only after the view reducer succeeds. At Commit,
+    /// the reducer must atomically apply staged data and persist the supplied
+    /// cursor. A failed reducer leaves the tracker at its previous checkpoint.
+    pub async fn apply<E, F, Fut>(
+        &mut self,
+        frame: &StreamFrame,
+        has_payload: bool,
+        reducer: F,
+    ) -> Result<ObservationAction, ObservationApplyError<E>>
+    where
+        F: FnOnce(ObservationAction, Vec<u8>) -> Fut,
+        Fut: std::future::Future<Output = Result<(), E>>,
+    {
+        let mut next = self.clone();
+        let action = next.accept(frame, has_payload)?;
+        reducer(action, next.cursor.clone())
+            .await
+            .map_err(ObservationApplyError::Reducer)?;
+        *self = next;
+        Ok(action)
+    }
+
     pub fn new(binding_digest: [u8; 32], cursor: Vec<u8>) -> Self {
         Self {
             binding_digest,

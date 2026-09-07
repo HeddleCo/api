@@ -32,6 +32,7 @@ export class ObservationState {
   private sequence = 0n;
   private phase: Phase = "opening";
   private pending = false;
+  private applying = false;
 
   constructor(bindingDigest: Uint8Array, cursor = new Uint8Array()) {
     if (bindingDigest.length !== 32) throw new StreamProtocolError("binding");
@@ -51,6 +52,7 @@ export class ObservationState {
   }
 
   accept(frame: StreamFrame, hasPayload: boolean): ObservationAction {
+    if (this.applying) throw new StreamProtocolError("phase");
     if (this.phase === "reset" || this.phase === "complete") throw new StreamProtocolError("phase");
     if (frame.sequence !== this.sequence + 1n || frame.sequence > 0xffff_ffff_ffff_ffffn) {
       throw new StreamProtocolError("sequence");
@@ -116,5 +118,27 @@ export class ObservationState {
     }
     this.sequence = frame.sequence;
     return action;
+  }
+
+  /** The reducer must atomically apply a committed batch and persist its cursor.
+   * Await each call: concurrent reducers are rejected rather than reordered.
+   */
+  async apply(frame: StreamFrame, hasPayload: boolean,
+    reducer: (action: ObservationAction, cursor: Uint8Array) => void | Promise<void>,
+  ): Promise<ObservationAction> {
+    if (this.applying) throw new StreamProtocolError("phase");
+    const next = this.clone();
+    const action = next.accept(frame, hasPayload);
+    this.applying = true;
+    try {
+      await reducer(action, next.cursor);
+      this.sequence = next.sequence;
+      this.phase = next.phase;
+      this.pending = next.pending;
+      this.committedCursor = next.cursor;
+      return action;
+    } finally {
+      this.applying = false;
+    }
   }
 }

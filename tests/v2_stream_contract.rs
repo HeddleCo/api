@@ -5,6 +5,74 @@ use heddle_api::heddle::api::v2alpha1::{
 };
 use heddle_api::v2::{ObservationState, StreamProtocolError};
 
+#[test]
+fn shared_stream_wire_vectors_match_rust_codec() {
+    use heddle_api::framing::{
+        decode_stream_frame, encode_stream_failure, encode_stream_message, encode_stream_raw_body,
+    };
+    use heddle_api::heddle::api::v1alpha1::CallFailure;
+    let vectors: Vec<serde_json::Value> =
+        serde_json::from_str(include_str!("fixtures/v2-stream-wire.json"))
+            .expect("shared fixtures");
+    assert!(
+        !vectors.is_empty(),
+        "wire parity cannot pass with no vectors"
+    );
+    for vector in vectors {
+        let kind = vector["kind"].as_str().expect("vector kind");
+        let encoded = match kind {
+            "message" => encode_stream_message(
+                &hex::decode(vector["body_hex"].as_str().expect("body")).expect("hex body"),
+            )
+            .expect("message frame"),
+            "failure" => encode_stream_failure(&CallFailure {
+                code: vector["code"].as_i64().expect("code") as i32,
+                message: vector["message"].as_str().expect("message").into(),
+                error: None,
+            })
+            .expect("failure frame"),
+            "raw_body" => encode_stream_raw_body(
+                vector["length"]
+                    .as_str()
+                    .expect("length")
+                    .parse()
+                    .expect("u64 length"),
+            )
+            .expect("raw header"),
+            _ => panic!("unknown fixture kind"),
+        };
+        assert_eq!(
+            hex::encode(&encoded),
+            vector["frame_hex"].as_str().expect("wire bytes")
+        );
+        for cut in 0..encoded.len() {
+            assert!(
+                decode_stream_frame(&encoded[..cut])
+                    .expect("valid prefix")
+                    .is_none()
+            );
+        }
+        assert_eq!(
+            decode_stream_frame(&encoded)
+                .expect("frame")
+                .expect("complete frame")
+                .1,
+            encoded.len()
+        );
+    }
+}
+
+#[test]
+fn oversized_cursor_cannot_replace_a_committed_checkpoint() {
+    let mut state = ObservationState::new([7; 32], b"s0".to_vec());
+    state.accept(&frame(1, open(b"s0")), false).expect("resume");
+    assert_eq!(
+        state.accept(&frame(2, checkpoint(&vec![1; 4097], b"s0", false)), false),
+        Err(StreamProtocolError::Cursor)
+    );
+    assert_eq!(state.cursor(), b"s0");
+}
+
 fn frame(sequence: u64, body: stream_frame::Body) -> StreamFrame {
     StreamFrame {
         sequence,

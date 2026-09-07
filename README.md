@@ -10,11 +10,24 @@ explicitly `PLANNED` for the first release. `OperationService` ships the import
 lifecycle; its batch, list, remote-sync, and cancellation capabilities remain
 partial.
 
+## Candidate alpha v2
+
+`heddle.api.v2alpha1` adds composed Thread/workspace/spool observations, typed
+local checkout actions, finite content streams, and shared checkpoint/recovery
+rules. Rust and TypeScript include transport adapters and observation lifecycle
+helpers. Existing v1 imports and routes remain available.
+
+All v2 routes are PLANNED until consumer handlers exist. Read the
+[candidate streaming contract and integration gates](docs/alpha-v2/streams.md),
+[complete design](docs/alpha-v2/design.md), and
+[v1 migration inventory](docs/alpha-v2/v1-disposition.csv).
+
 ## Packages
 
 - `heddle-api` — transport-neutral Rust messages, deterministic method
   descriptors/router identities, hosted-call framing, and an additive
-  `reflection` feature. It does not generate transport clients or servers.
+  `reflection` feature. V1 remains transport-neutral; candidate v2 adds typed client adapters.
+  Neither package generates application servers.
 - `@heddleco/api` — ESM and TypeScript declarations, published to GitHub
   Packages at `npm.pkg.github.com`.
 

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package heddle.api.v2alpha1;
 
+import "heddle/api/v1alpha1/repo_sync.proto";
 import "heddle/api/v1alpha1/repository.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
@@ -37,7 +38,17 @@ message ContentRead {
     BlobRead blob = 3;
     DiffRead diff = 4;
     ProvenanceRead provenance = 5;
+    StateRead state = 6;
   }
+}
+
+message StateRead {
+  bool include_summary = 1;
+  bool include_attachments = 2;
+  repeated heddle.api.v1alpha1.StateAttachmentKind attachment_kinds = 3;
+  PageRequest page = 4;
+  // Attachments are independently authorized; an empty kind filter does not
+  // confer permission to see private material. Conflicts retain resolved items.
 }
 
 message ReadContentRequest {
@@ -64,6 +75,8 @@ message ContentEvent {
     heddle.api.v1alpha1.FileDiff diff = 5;
     heddle.api.v1alpha1.GetBlameResponse provenance = 6;
     SectionStatus selection_complete = 7;
+    heddle.api.v1alpha1.StateSummary state = 8;
+    heddle.api.v1alpha1.StateAttachment attachment = 9;
   }
   // Each requested selection ends with selection_complete. Missing completion
   // before FIN means interruption, not an empty file or exhausted collection.

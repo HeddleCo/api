@@ -12,9 +12,10 @@ import "heddle/api/v1alpha1/notification.proto";
 import "heddle/api/v1alpha1/operation.proto";
 import "heddle/api/v1alpha1/owner_authorization.proto";
 import "heddle/api/v1alpha1/registry.proto";
+import "heddle/api/v1alpha1/repo_sync.proto";
 import "heddle/api/v1alpha1/state_review.proto";
-import "heddle/api/v1alpha1/workflow.proto";
 import "heddle/api/v1alpha1/types.proto";
+import "heddle/api/v1alpha1/workflow.proto";
 import "heddle/api/v2alpha1/analysis.proto";
 import "heddle/api/v2alpha1/collaboration.proto";
 import "heddle/api/v2alpha1/common.proto";
@@ -22,7 +23,6 @@ import "heddle/api/v2alpha1/content.proto";
 import "heddle/api/v2alpha1/device.proto";
 import "heddle/api/v2alpha1/endpoint.proto";
 import "heddle/api/v2alpha1/stream.proto";
-import "heddle/api/v2alpha1/sync.proto";
 import "heddle/api/v2alpha1/thread.proto";
 import "heddle/api/v2alpha1/views.proto";
 
@@ -31,7 +31,10 @@ import "heddle/api/v2alpha1/views.proto";
 
 service EndpointService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc DescribeEndpoint(DescribeEndpointRequest) returns (DescribeEndpointResponse) {
@@ -51,7 +54,10 @@ service EndpointService {
 
 service WorkspaceService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ObserveWorkspace(ObserveWorkspaceRequest) returns (stream WorkspaceEvent) {
@@ -85,7 +91,10 @@ service SpoolService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
   // Retained typed ceremony/administration bridge; see the migration map.
@@ -1413,7 +1422,10 @@ service IdentityService {
 
 service ThreadService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ObserveThreads(ObserveThreadsRequest) returns (stream ThreadListEvent) {
@@ -1441,9 +1453,18 @@ service ThreadService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "thread.spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
-      authorization_request_targets: {path: "source.spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
-      authorization_request_targets: {path: "base.spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_request_targets: {
+        path: "source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_request_targets: {
+        path: "base.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
   rpc StartThread(StartThreadRequest) returns (ThreadMutationResponse) {
@@ -1459,9 +1480,18 @@ service ThreadService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "parent.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "base.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "parent.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "base.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc ReviseIntent(ReviseIntentRequest) returns (ThreadMutationResponse) {
@@ -1476,7 +1506,10 @@ service ThreadService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "thread.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc SetSharingPolicy(SetThreadSharingRequest) returns (MutationResponse) {
@@ -1491,7 +1524,10 @@ service ThreadService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "policy.thread.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "policy.thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc RecordReview(RecordReviewRequest) returns (MutationResponse) {
@@ -1507,9 +1543,18 @@ service ThreadService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "decision.thread.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "decision.source.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "decision.target.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "decision.thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "decision.source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "decision.target.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc LandThread(LandThreadRequest) returns (ThreadMutationResponse) {
@@ -1525,10 +1570,22 @@ service ThreadService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "thread.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "source.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "target.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "expected_target.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "target.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "expected_target.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc ChangeLifecycle(ChangeThreadLifecycleRequest) returns (ThreadMutationResponse) {
@@ -1543,14 +1600,20 @@ service ThreadService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "thread.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
 }
 
 service CollaborationService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ObserveCollaboration(ObserveCollaborationRequest) returns (stream CollaborationEvent) {
@@ -1564,7 +1627,10 @@ service CollaborationService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
   rpc OpenDiscussion(OpenDiscussionRequest) returns (MutationResponse) {
@@ -1579,7 +1645,10 @@ service CollaborationService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc AppendTurn(AppendDiscussionRequest) returns (MutationResponse) {
@@ -1594,7 +1663,10 @@ service CollaborationService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "discussion.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "discussion.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc ResolveDiscussion(ResolveDiscussionRequest) returns (MutationResponse) {
@@ -1609,7 +1681,10 @@ service CollaborationService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "discussion.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "discussion.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc ReopenDiscussion(ReopenDiscussionRequest) returns (MutationResponse) {
@@ -1624,7 +1699,10 @@ service CollaborationService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "discussion.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "discussion.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc PutContext(PutContextRequest) returns (MutationResponse) {
@@ -1639,14 +1717,20 @@ service CollaborationService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "context.ref.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "context.ref.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
 }
 
 service AnalysisService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ObserveAnalysis(ObserveAnalysisRequest) returns (stream AnalysisEvent) {
@@ -1661,8 +1745,14 @@ service AnalysisService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "source.spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
-      authorization_request_targets: {path: "base.spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_request_targets: {
+        path: "base.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
   rpc StartAnalysis(StartAnalysisRequest) returns (MutationResponse) {
@@ -1678,15 +1768,24 @@ service AnalysisService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "source.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "base.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "base.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
 }
 
 service ContentService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ReadContent(ReadContentRequest) returns (stream ContentEvent) {
@@ -1700,7 +1799,10 @@ service ContentService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "revision.spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "revision.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
   rpc ReadArtifact(ReadArtifactRequest) returns (stream ArtifactEvent) {
@@ -1714,14 +1816,20 @@ service ContentService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "artifact.spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "artifact.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
 }
 
 service SearchService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc Search(SearchRequest) returns (stream SearchEvent) {
@@ -1755,7 +1863,10 @@ service CheckoutService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
   rpc Materialize(MaterializeCheckoutRequest) returns (CheckoutMutationResponse) {
@@ -1771,8 +1882,14 @@ service CheckoutService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "thread.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "revision.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "revision.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc Capture(CaptureCheckoutRequest) returns (CheckoutMutationResponse) {
@@ -1788,8 +1905,14 @@ service CheckoutService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "checkout.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "expected_source.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "checkout.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "expected_source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc Refresh(RefreshCheckoutRequest) returns (CheckoutMutationResponse) {
@@ -1805,9 +1928,18 @@ service CheckoutService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "checkout.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "expected_source.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "target.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "checkout.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "expected_source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "target.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc Resolve(ResolveCheckoutRequest) returns (CheckoutMutationResponse) {
@@ -1823,8 +1955,14 @@ service CheckoutService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "checkout.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "expected_source.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "checkout.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "expected_source.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc Recover(RecoverCheckoutRequest) returns (CheckoutMutationResponse) {
@@ -1840,15 +1978,24 @@ service CheckoutService {
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
-      authorization_request_targets: {path: "checkout.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
-      authorization_request_targets: {path: "recover_to.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "checkout.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "recover_to.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
 }
 
 service RunService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ObserveRuns(ObserveRunsRequest) returns (stream RunEvent) {
@@ -1862,7 +2009,10 @@ service RunService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "spool" role: AUTHORIZATION_ROLE_RESOURCE_READER}
+      authorization_request_targets: {
+        path: "spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
     };
   }
   rpc ControlRun(ControlRunRequest) returns (MutationResponse) {
@@ -1877,7 +2027,10 @@ service RunService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "run.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "run.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   rpc DecidePermission(DecideRunPermissionRequest) returns (MutationResponse) {
@@ -1892,7 +2045,10 @@ service RunService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "run.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "run.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   // Retained typed ceremony/administration bridge; see the migration map.
@@ -1971,7 +2127,10 @@ service RunService {
 
 service AttentionService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ObserveAttention(ObserveAttentionRequest) returns (stream AttentionEvent) {
@@ -2106,7 +2265,10 @@ service NotificationService {
 
 service OperationService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ObserveOperations(ObserveOperationsRequest) returns (stream OperationEvent) {
@@ -2134,7 +2296,10 @@ service OperationService {
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      authorization_request_targets: {path: "operation.spool" role: AUTHORIZATION_ROLE_RESOURCE_WRITER}
+      authorization_request_targets: {
+        path: "operation.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
     };
   }
   // Retained typed ceremony/administration bridge; see the migration map.
@@ -2211,10 +2376,38 @@ service OperationService {
 
 service SyncService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
-  rpc Exchange(stream SyncClientFrame) returns (stream SyncServerFrame) {
+  // Retained pack/sidecar protocol; v2 transfer planning is not yet frozen.
+  rpc Pull(stream heddle.api.v1alpha1.PullClientFrame) returns (stream heddle.api.v1alpha1.PullServerFrame) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_STREAMING_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_TRANSIENT_WRITE
+      retry_behavior: RETRY_BEHAVIOR_RESUMABLE_STREAM
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "open.repository"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_request_targets: {
+        path: "request.repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_multi_target: true
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Retained pack/sidecar protocol; v2 transfer planning is not yet frozen.
+  rpc Push(stream heddle.api.v1alpha1.PushClientFrame) returns (stream heddle.api.v1alpha1.PushServerFrame) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_STREAMING_PROOF_OF_POSSESSION
@@ -2223,8 +2416,17 @@ service SyncService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_SYNCHRONIZATION
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_REPOSITORY
+      authorization_request_targets: {
+        path: "open.repository"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_request_targets: {
+        path: "request.repo_path"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
@@ -2348,7 +2550,10 @@ service OwnerAuthorizationService {
 
 service EvidenceService {
   option (heddle.api.v1alpha1.service_contract) = {
-    deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+    deployment_targets: [
+      DEPLOYMENT_TARGET_WEFT,
+      DEPLOYMENT_TARGET_HEDDLE_DAEMON
+    ]
     maturity: SERVICE_MATURITY_PLANNED
   };
   // Retained typed ceremony/administration bridge; see the migration map.

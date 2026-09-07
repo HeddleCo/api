@@ -88,7 +88,28 @@ pub fn write(
         }
     }
     methods.sort_by(|left, right| left.path.cmp(&right.path));
-    fs::write(output_path, render(&methods))?;
+    let mut generated = render(&methods);
+    if package == "heddle.api.v2alpha1" {
+        generated.push_str(
+            "\n/// Typed operations derived from the protobuf method descriptors.\npub mod rpc {\n",
+        );
+        for (index, method) in methods.iter().enumerate() {
+            let input = format!("crate::{}", method.input.replace('.', "::"));
+            let output = format!("crate::{}", method.output.replace('.', "::"));
+            let marker = match method.streaming {
+                "Unary" => "UnaryRpc",
+                "ServerStreaming" => "ServerStreamingRpc",
+                "ClientStreaming" => "ClientStreamingRpc",
+                _ => "BidirectionalRpc",
+            };
+            generated.push_str(&format!(
+                "pub struct {route};\nimpl super::client::Rpc for {route} {{ type Request = {input}; type Response = {output}; const METHOD: &'static super::MethodDescriptor = &super::ALL_METHODS[{index}]; }}\nimpl super::client::{marker} for {route} {{}}\n",
+                route = method.route,
+            ));
+        }
+        generated.push_str("}\n");
+    }
+    fs::write(output_path, generated)?;
     Ok(())
 }
 

@@ -101,3 +101,5 @@ StateReviewService,GetRepoSignalHealth,EvidenceService
 StateReviewService,RecordCheckAck,EvidenceService
 StateReviewService,RecordVerdict,EvidenceService
 StateReviewService,SignState,EvidenceService
+RepoSyncService,Pull,SyncService
+RepoSyncService,Push,SyncService

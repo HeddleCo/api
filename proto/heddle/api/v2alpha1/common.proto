@@ -32,7 +32,11 @@ message CheckoutRef {
 
 message RevisionRef {
   SpoolRef spool = 1;
-  heddle.api.v1alpha1.StateId state = 2;
+  oneof revision {
+    heddle.api.v1alpha1.StateId state = 2;
+    // Exact lower-case object ID, never a mutable ref or abbreviated hash.
+    string git_commit_oid = 3;
+  }
 }
 
 message RecordRef {
@@ -54,6 +58,17 @@ message EntityRef {
     RecordRef analysis = 10;
     RecordRef invitation = 11;
     RecordRef grant = 12;
+    RecordRef discussion_turn = 13;
+    RecordRef review = 14;
+    RecordRef notification = 15;
+    RecordRef attention_item = 16;
+    RecordRef member = 17;
+    RecordRef approval_group = 18;
+    RecordRef session = 19;
+    RecordRef signup_invitation = 20;
+    EndpointRef device = 21;
+    RecordRef timeline_event = 22;
+    RecordRef artifact = 23;
   }
 }
 
@@ -87,6 +102,13 @@ message SectionStatus {
   RevisionRef computed_for = 3;
   RecordRef operation = 4;
   PageInfo page = 5;
+}
+
+message SectionReplacement {
+  // Stage clearing this section before subsequent records in the same bounded
+  // batch. The clear becomes visible only at checkpoint, like the records.
+  // Use for head-dependent diffs/evidence and collections without stable keys.
+  string section = 1;
 }
 
 enum RequirementKind {

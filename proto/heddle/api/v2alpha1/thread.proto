@@ -216,4 +216,3 @@ message ChangeThreadLifecycleRequest {
   ThreadLifecycle lifecycle = 4;
   // READY revalidates requirements. LANDED is rejected here; use LandThread.
 }
-

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package heddle.api.v2alpha1;
 
+import "heddle/api/v1alpha1/agent.proto";
 import "heddle/api/v1alpha1/attention.proto";
 import "heddle/api/v1alpha1/identity.proto";
 import "heddle/api/v1alpha1/notification.proto";
@@ -13,6 +14,7 @@ import "heddle/api/v2alpha1/collaboration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/device.proto";
 import "heddle/api/v2alpha1/stream.proto";
+import "heddle/api/v2alpha1/sync.proto";
 import "heddle/api/v2alpha1/thread.proto";
 
 message ObserveThreadRequest {
@@ -46,6 +48,10 @@ message ThreadEvent {
     heddle.api.v1alpha1.FileDiff diff = 13;
     heddle.api.v1alpha1.ReviewSignature evidence = 14;
     OperationRecord operation = 15;
+    heddle.api.v1alpha1.AgentRun run = 16;
+    heddle.api.v1alpha1.AgentTimelineEvent timeline_event = 17;
+    PublicationReceipt publication = 18;
+    SectionReplacement replace_section = 19;
   }
 }
 
@@ -97,6 +103,7 @@ message SpoolEvent {
     OperationRecord operation = 10;
     SectionStatus status = 11;
     Removal removal = 12;
+    SectionReplacement replace_section = 13;
   }
 }
 
@@ -119,6 +126,7 @@ message WorkspaceEvent {
     EndpointRef device = 6;
     SectionStatus status = 7;
     Removal removal = 8;
+    SectionReplacement replace_section = 9;
   }
 }
 
@@ -167,6 +175,8 @@ message IdentityEvent {
     heddle.api.v1alpha1.ActiveSession session = 4;
     heddle.api.v1alpha1.SignupInviteSummary signup_invitation = 5;
     DeviceIdentity device = 6;
+    Removal removal = 7;
+    SectionReplacement replace_section = 8;
   }
 }
 

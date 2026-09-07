@@ -32,6 +32,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let descriptor = output.join("heddle_api_descriptor.bin");
 
     let mut config = prost_build::Config::new();
+    // These generated oneofs are bounded, single-message values. Keep them
+    // inline rather than imposing an allocation on each streamed record.
+    // Revisit their layout with measurements in the consuming transport.
+    for oneof in [
+        "ResolveDiscussionRequest.resolution",
+        "ThreadListEvent.payload",
+        "AttentionEvent.payload",
+        "NotificationEvent.payload",
+        "OperationEvent.payload",
+    ] {
+        config.type_attribute(
+            format!(".heddle.api.v2alpha1.{oneof}"),
+            "#[allow(clippy::large_enum_variant)]",
+        );
+    }
     config
         .boxed(".heddle.api.v1alpha1.PushClientFrame.frame.request")
         .boxed(".heddle.api.v1alpha1.BootstrapOwnerRootRequest.approval.deferred_human")

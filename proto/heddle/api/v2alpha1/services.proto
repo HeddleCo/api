@@ -937,6 +937,7 @@ service ThreadService {
   }
   rpc LandThread(LandThreadRequest) returns (ThreadMutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1004,6 +1005,7 @@ service ThreadService {
   }
   rpc LandStack(LandStackRequest) returns (MutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE

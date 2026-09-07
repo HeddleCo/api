@@ -192,3 +192,23 @@ fn observations_are_streamed_and_candidates_are_never_advertised_as_shipped() {
     }
     assert!(observations >= 10, "live coverage must span the product");
 }
+
+#[test]
+fn hosted_landing_and_checkout_landing_have_distinct_endpoint_owners() {
+    use heddle_api::heddle::api::v1alpha1::DeploymentTarget;
+    for (name, expected) in [
+        ("ThreadService/LandThread", DeploymentTarget::Weft),
+        ("ThreadService/LandStack", DeploymentTarget::Weft),
+        (
+            "CheckoutService/LandCheckout",
+            DeploymentTarget::HeddleDaemon,
+        ),
+    ] {
+        let path = format!("/heddle.api.v2alpha1.{name}");
+        let method = ALL_METHODS
+            .iter()
+            .find(|method| method.path == path)
+            .expect("landing route");
+        assert_eq!(method.deployment_targets, &[expected], "{path}");
+    }
+}

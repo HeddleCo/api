@@ -23,7 +23,7 @@ struct Method {
     deployments: Vec<String>,
 }
 
-pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn Error>> {
+pub fn write(descriptor_path: &Path, output_path: &Path, package: &str) -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(descriptor_path)?;
     let pool = DescriptorPool::decode(bytes.as_slice())?;
     let service_contract = extension(&pool, "service_contract")?;
@@ -32,7 +32,7 @@ pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn E
 
     for service in pool
         .services()
-        .filter(|service| service.package_name() == PACKAGE)
+        .filter(|service| service.package_name() == package)
     {
         let service_options = extension_message(service.options(), &service_contract)?;
         let maturity = enum_variant(&service_options, "maturity", "SERVICE_MATURITY_")?;

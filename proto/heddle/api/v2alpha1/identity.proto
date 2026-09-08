@@ -4,6 +4,7 @@ package heddle.api.v2alpha1;
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 // User-root proof is portable. Account association records Weft's acceptance of
@@ -536,6 +537,10 @@ message ProvisionAccountResponse {
   // Authoritative browser origin for the agent's locally generated claim link.
   // The claim secret and its private state remain on the agent's device.
   string claim_web_origin = 4;
+  // Original stored ownership proof on key-bound account reuse. Preserve it
+  // exactly; an absent root permits the client to propose its first bootstrap.
+  // This does not populate the account's independent human-root slot.
+  OwnerState ownership = 5;
 }
 
 // Anonymous continuity has no human account and no independent owner root.

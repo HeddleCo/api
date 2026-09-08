@@ -5,21 +5,9 @@ import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/identity.proto";
 import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
-// Account authority and resource ownership are separate. A root can be
-// established before a spool exists. A spool's genesis/transfer chain refers
-// to that authority without changing the resource identity.
-message OwnerState {
-  PrincipalRef owner = 1;
-  bytes version = 2;
-  OwnerKeyBinding binding = 3;
-  SignedOwnerRoot root = 4;
-  repeated SignedOwnerKeyTransition accepted_transitions = 5;
-  repeated SignedOwnerKeyTransition pending_transitions = 6;
-  // Present only when the caller requested an authorized spool lineage.
-  CloneAuthorizationKeyring resource_keyring = 7;
-}
 message ObserveOwnershipRequest {
   PrincipalRef owner = 1;
   // Optional resource lineage. Reading it also requires access to this spool.

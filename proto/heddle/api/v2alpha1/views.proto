@@ -12,7 +12,7 @@ import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/device.proto";
 import "heddle/api/v2alpha1/identity.proto";
 import "heddle/api/v2alpha1/owner_records.proto";
-import "heddle/api/v2alpha1/ownership.proto";
+import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/sync.proto";
 import "heddle/api/v2alpha1/thread.proto";

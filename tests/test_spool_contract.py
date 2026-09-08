@@ -26,6 +26,16 @@ def fields(name: str) -> list[tuple[str, str, int]]:
 
 
 class SpoolContractTest(unittest.TestCase):
+    def test_flat_spool_promotion_contract(self) -> None:
+        self.assertEqual(fields("PromoteSpoolRequest"), [
+            ("string", "full_path", 1),
+            ("string", "client_operation_id", 2),
+        ])
+        self.assertEqual(fields("PromoteSpoolResponse"), [("HostedSpool", "spool", 1)])
+        self.assertIn("rpc PromoteSpool(PromoteSpoolRequest) returns (PromoteSpoolResponse)", REGISTRY)
+        self.assertIn("NAMESPACE_KIND_SPOOL = 4", REGISTRY)
+        self.assertNotIn("NAMESPACE_KIND_ORG =", REGISTRY)
+
     def test_state_visibility_rename_preserves_wire_tag(self) -> None:
         settings = body("SpoolSettings")
         self.assertIn('reserved "default_state_visibility";', settings)

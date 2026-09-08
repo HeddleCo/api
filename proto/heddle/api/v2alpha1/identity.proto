@@ -107,6 +107,36 @@ message InvitationQuota {
   string distribution_id = 1;
   uint32 remaining = 2;
 }
+// Explicit ceremony selection; omitted or unsupported methods are rejected.
+// Password and OAuth authenticate a server-rooted account. They never confer
+// independent mint authority or downgrade an existing self-rooted account.
+enum CredentialMethod {
+  CREDENTIAL_METHOD_UNSPECIFIED = 0;
+  CREDENTIAL_METHOD_PASSKEY = 1;
+  CREDENTIAL_METHOD_PASSWORD = 2;
+  CREDENTIAL_METHOD_OAUTH = 3;
+}
+enum OAuthProvider {
+  O_AUTH_PROVIDER_UNSPECIFIED = 0;
+  O_AUTH_PROVIDER_GOOGLE = 1;
+  O_AUTH_PROVIDER_APPLE = 2;
+  O_AUTH_PROVIDER_GITHUB = 3;
+  O_AUTH_PROVIDER_GITLAB = 4;
+}
+message PasswordProof {
+  // UTF-8 password bytes: at least 15 characters, at most 1024 bytes on signup.
+  // Secret material:
+  // never retained in observations, receipts, logs or challenge metadata.
+  bytes password_utf8 = 1;
+}
+message OAuthProof {
+  // Provider comes from the original challenge. OIDC tokens bind its nonce;
+  // access tokens are verified against that provider's authenticated user API.
+  oneof proof {
+    string id_token = 1;
+    string access_token = 2;
+  }
+}
 message AuthenticationChallenge {
   RecordRef ref = 1;
   bytes challenge = 2;
@@ -114,6 +144,10 @@ message AuthenticationChallenge {
   google.protobuf.Timestamp expires_at = 4;
   repeated bytes allowed_credential_ids = 5;
   UserVerification user_verification = 6;
+  CredentialMethod method = 7;
+  OAuthProvider oauth_provider = 8;
+  // Separate from ceremony expiry; completion cannot extend this upper bound.
+  google.protobuf.Timestamp credential_expires_at = 9;
 }
 enum UserVerification {
   USER_VERIFICATION_UNSPECIFIED = 0;
@@ -142,11 +176,18 @@ message BeginAuthenticationRequest {
   // proof, device admission and session receipt commit as one ceremony.
   bool enroll_device = 3;
   string device_label = 4;
+  CredentialMethod method = 5;
+  // Required exactly when method is OAUTH. Never a caller-supplied issuer URL.
+  OAuthProvider oauth_provider = 6;
 }
 message CompleteAuthenticationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
-  PasskeyProof passkey = 3;
+  oneof proof {
+    PasskeyProof passkey = 3;
+    PasswordProof password = 6;
+    OAuthProof oauth = 7;
+  }
   // Same key as BeginAuthentication. CallContext.request_proof signs the
   // exact completion request with this key, including the passkey assertion.
   bytes caller_public_key = 4;
@@ -176,6 +217,10 @@ message CredentialResult {
   // Exact retained public association for this credential’s original mint root.
   // A paired leaf inherits it; no owner signature or authority is reminted.
   SignedMintRootAttachment mint_root_attachment = 5;
+  // Verified original human authentication, not inferred from credential kind.
+  // Provisioned agent capabilities have no human authentication method.
+  CredentialMethod method = 6;
+  OAuthProvider oauth_provider = 7;
 }
 enum CredentialKind {
   CREDENTIAL_KIND_UNSPECIFIED = 0;
@@ -222,6 +267,8 @@ message BeginRegistrationRequest {
     RecordRef invitation_reservation = 4;
     RecordRef verified_email = 5;
   }
+  CredentialMethod method = 6;
+  OAuthProvider oauth_provider = 7;
 }
 message RegistrationChallenge {
   RecordRef ref = 1;
@@ -241,6 +288,11 @@ message RegistrationChallenge {
   bytes device_binding_challenge = 10;
   // Exact 32-byte nonce for OwnerKeyBinding; no extra challenge RPC is needed.
   bytes owner_binding_nonce = 11;
+  // Prospective credential lifetime, independent of ten-minute ceremony expiry.
+  // Owner-signed mint-root attachments may use this exact upper bound.
+  google.protobuf.Timestamp credential_expires_at = 12;
+  CredentialMethod method = 13;
+  OAuthProvider oauth_provider = 14;
 }
 message PasskeyRegistration {
   bytes credential_id = 1;
@@ -258,7 +310,11 @@ message OwnerRegistration {
 message CompleteRegistrationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
-  PasskeyRegistration passkey = 3;
+  oneof proof {
+    PasskeyRegistration passkey = 3;
+    PasswordProof password = 10;
+    OAuthProof oauth = 11;
+  }
   bytes caller_public_key = 4;
   PasskeyProof device_binding = 5;
   string device_label = 6;

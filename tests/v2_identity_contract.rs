@@ -230,3 +230,59 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
         assert!(message.get_field_by_name("credential").is_none());
     }
 }
+
+#[test]
+fn credential_ceremonies_have_exclusive_proofs_and_explicit_lifetimes() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
+    for name in [
+        "CompleteAuthenticationRequest",
+        "CompleteRegistrationRequest",
+    ] {
+        let message = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .expect("existing completion entrypoint");
+        let proof = message
+            .oneofs()
+            .find(|o| o.name() == "proof")
+            .expect("one credential proof per ceremony");
+        let names: Vec<_> = proof
+            .fields()
+            .map(|field| field.name().to_owned())
+            .collect();
+        assert_eq!(names, ["passkey", "password", "oauth"]);
+        assert_eq!(
+            message
+                .get_field_by_name("passkey")
+                .expect("passkey proof")
+                .number(),
+            3
+        );
+    }
+    for name in ["AuthenticationChallenge", "RegistrationChallenge"] {
+        let message = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .expect("challenge");
+        assert_ne!(
+            message.get_field_by_name("expires_at"),
+            message.get_field_by_name("credential_expires_at")
+        );
+        assert!(message.get_field_by_name("credential_expires_at").is_some());
+        assert!(message.get_field_by_name("method").is_some());
+        assert!(message.get_field_by_name("oauth_provider").is_some());
+    }
+    let proof = pool
+        .get_message_by_name("heddle.api.v2alpha1.OAuthProof")
+        .expect("provider proof");
+    let fields: Vec<_> = proof
+        .oneofs()
+        .next()
+        .expect("one provider proof")
+        .fields()
+        .map(|field| field.name().to_owned())
+        .collect();
+    assert_eq!(fields, ["id_token", "access_token"]);
+    assert!(
+        proof.get_field_by_name("email").is_none(),
+        "provider identity is verified, never caller asserted"
+    );
+}

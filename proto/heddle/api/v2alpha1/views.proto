@@ -6,6 +6,7 @@ import "heddle/api/v1alpha1/repository.proto";
 import "heddle/api/v2alpha1/activity.proto";
 import "heddle/api/v2alpha1/administration.proto";
 import "heddle/api/v2alpha1/analysis.proto";
+import "heddle/api/v2alpha1/billing.proto";
 import "heddle/api/v2alpha1/collaboration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/device.proto";
@@ -228,6 +229,9 @@ message ObserveIdentityRequest {
   ObserveOptions observe = 6;
   // The shared read budget covers all requested sections together. A session
   // reference/version from this view can be used directly for RevokeSession.
+  bool include_current_credential = 7;
+  bool include_billing = 8;
+  // Optional scalar sections use the same total budget and their own status.
 }
 
 message IdentityEvent {
@@ -243,6 +247,8 @@ message IdentityEvent {
     DelegationRecord delegation = 9;
     RecoveryAttempt recovery = 10;
     InvitationQuota invitation_quota = 11;
+    CurrentCredentialRecord current_credential = 12;
+    BillingRecord billing = 13;
   }
 }
 

@@ -559,3 +559,25 @@ message SignupInvitationResolution {
   uint64 inviter_member_ordinal = 5;
   string bound_email = 6;
 }
+
+// Metadata for the exact credential authenticating this observation. This is
+// not issuance, and neither account tier nor account role upgrades its rights.
+message CurrentCredentialRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  CredentialKind kind = 3;
+  string subject = 4;
+  bytes proof_public_key = 5;
+  RecordRef device = 6;
+  RecordRef delegation = 7;
+  repeated string authentication_methods = 8;
+  string acting_agent_id = 9;
+  string delegated_by_principal_id = 10;
+  string agent_provider = 11;
+  string agent_model = 12;
+  google.protobuf.Timestamp expires_at = 13;
+  bool revoked = 14;
+  repeated ActionAvailability actions = 15;
+  // Revoke the specific device, delegation or session using the corresponding
+  // observed version; this metadata never permits an account-wide revocation.
+}

@@ -210,6 +210,31 @@ discovery must still advertise only implemented ceremonies. In particular, the
 canonical identity model distinguishes shipped passkey/agent flows from target
 password onboarding and per-user server custody.
 
+Passkey registration uses two RPCs. `BeginRegistration` accepts the one device
+public key and either an invitation reservation or verified-email reservation
+for signup. An authenticated independent root can instead enroll another
+device on its account; a claimable agent credential can begin human claim.
+Anonymous signup keeps the anonymous account UUID. The response fixes the
+account UUID, relying party, passkey challenge, device-binding challenge and
+owner-binding nonce together, so preparing the completion needs no additional
+identity lookup or challenge call.
+
+`CompleteRegistration` carries the passkey creation and a follow-up assertion
+by that passkey binding the device key. The enrolling Ed25519 key signs the
+exact completion in `CallContext`, including both passkey proofs and owner
+records; an existing bearer cannot substitute for that proof. New signup
+carries typed `OwnerRegistration` evidence. Claim appends the signed
+`CLAIM_DEFERRED_HUMAN` transition to the existing deferred root. Device
+enrollment does not implicitly replace owner roots or promote rooting tiers.
+Owner records retain their original canonical signature domains; ordinary
+spool access continues to use the Biscuit capability.
+
+Completion must commit challenge consumption, account/device/owner changes,
+session and retry receipt together. Failed proof verification or persistence
+must leave the admitted ceremony retryable. Receipt replay still checks current
+credential authority, and secret owner-bundle enrichment is never cached as
+public retry metadata.
+
 
 Account provisioning and credential issuance are separate operations.
 `ProvisionAccount` creates or recovers the agent's key-bound unclaimed human

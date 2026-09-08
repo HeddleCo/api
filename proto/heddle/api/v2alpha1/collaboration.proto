@@ -76,6 +76,13 @@ message ContextRecord {
   RecordRef extracted_from = 9;
   Coverage anchor_coverage = 10;
   bool superseded = 11;
+  // Context revisions form a causal register. Concurrent current revisions
+  // share ref and version; retain each causal_id instead of choosing a winner.
+  // expected_version uses the aggregate current-frontier version, including
+  // when include_history also returns an earlier revision.
+  bytes causal_id = 12;
+  repeated bytes causal_parents = 13;
+  repeated bytes causal_heads = 14;
 }
 
 // Write input. Actor attribution is carried by the signed canonical operation;

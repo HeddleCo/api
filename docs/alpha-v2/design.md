@@ -277,3 +277,25 @@ for privileged delivery, and still-current admission for completion; neither
 expired proof nor revoked/consumed invitation is revived by a cached receipt.
 Delivery proofs remain outside public deduplication receipts. This replaces the
 former email-bootstrap Biscuit and separate invitation-binding RPC.
+
+### Spool creation and owner rotation
+
+`CreateSpool` names the existing parent by stable reference and supplies a single
+slug plus optional display name. The new UUID comes from the typed,
+owner-signed genesis. No lookup or server-issued creation nonce determines its
+identity. Create and revise return a committed spool overview with their receipt;
+creation also returns the signed owner root and accepted transition history so
+the client can verify the creation key and construct its own local pin.
+
+Creation uses the current owner key. Hosted admission must verify the signed
+root and complete accepted history, bind them to the authenticated account, and
+compare the genesis key with current authority in the same transaction as
+creation. The private key for sequence zero is not an ongoing prerequisite.
+The immutable genesis signature format is unchanged: the original root's signed
+rotation chain proves how the creation key belongs to that owner.
+
+For existing spools, clone and purge verification bind the genesis key to the
+verified history, including keys retired by later rotation. That historical
+relationship does not authorize a retired key to issue capabilities: current
+state, issuer retirement, capability scope and operation signatures are still
+checked independently. An unproven genesis key or incomplete history is denied.

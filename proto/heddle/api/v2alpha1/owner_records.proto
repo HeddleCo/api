@@ -182,8 +182,11 @@ message SpoolOwnerGenesis {
 //   SHA-256(genesis.owner_public_key.public_key || genesis.spool_uuid)
 //
 // A cloner verifies this proof and TOFU-pins spool_uuid -> owner_public_key
-// before accepting the state tree. Later keys are learned only from the
-// owner-signed transition chain rooted here.
+// before accepting the state tree. The owner's signed root and complete
+// accepted rotation history must prove that this key belonged to that owner.
+// New spools use the current key at admission. Later rotation preserves the
+// immutable genesis; historical membership never authorizes a retired key to
+// issue a new capability.
 message SignedSpoolOwnerGenesis {
   SpoolOwnerGenesis genesis = 1;
   AuthorizationSignature owner_signature = 2;

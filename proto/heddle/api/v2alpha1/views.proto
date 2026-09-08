@@ -10,6 +10,8 @@ import "heddle/api/v2alpha1/collaboration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/device.proto";
 import "heddle/api/v2alpha1/identity.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/ownership.proto";
 import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/sync.proto";
 import "heddle/api/v2alpha1/thread.proto";
@@ -61,6 +63,18 @@ message SpoolOverview {
   SpoolSettings settings = 6;
   repeated ActionAvailability actions = 7;
   repeated SectionStatus sections = 8;
+  string slug = 9;
+  SignedSpoolOwnerGenesis owner_genesis = 10;
+}
+
+// Committed overview and independently verifiable owner history seed the
+// caller's view directly. The receipt is not a trust root or a TOFU pin.
+message SpoolMutationResponse {
+  MutationReceipt receipt = 1;
+  SpoolOverview spool = 2;
+  // Creation returns the root and accepted transitions proving its current
+  // signing key. The caller constructs its own local pin after verification.
+  OwnerState ownership = 3;
 }
 
 enum SpoolSection {

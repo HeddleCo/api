@@ -4,6 +4,7 @@ package heddle.api.v2alpha1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 // Account names and paths resolve to stable resources once. They never become
@@ -129,10 +130,17 @@ message SupportAccessRecord {
 }
 message CreateSpoolRequest {
   string client_operation_id = 1;
-  SpoolRef spool = 2;
-  string name = 3;
+  // Existing parent; omit only for an authorized top-level creation.
+  SpoolRef parent = 2;
+  // One address segment. The stable new spool UUID comes only from genesis.
+  string slug = 3;
   SpoolSettings settings = 4;
-  SignedRecord owner_genesis = 5;
+  // Signed by the account's current owner authority. Admission verifies the
+  // account's root and accepted rotation history and compares its current key
+  // atomically with creation. An old key's historical membership is insufficient
+  // to create a new spool. Retry the original signed genesis and operation ID.
+  SignedSpoolOwnerGenesis owner_genesis = 5;
+  optional string display_name = 6;
 }
 message ReviseSpoolRequest {
   string client_operation_id = 1;

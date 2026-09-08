@@ -115,9 +115,16 @@ message PasskeyProof {
 }
 message BeginAuthenticationRequest {
   string account_hint = 1;
-  // Existing device key whose possession CompleteAuthentication must prove.
-  // The challenge records this key; sign-in never enrolls a new attachment.
+  // Device key whose possession CompleteAuthentication must prove.
+  // The challenge records this exact key and the enrollment choice below.
   bytes caller_public_key = 2;
+  // Explicitly attach a fresh browser key after an existing account passkey
+  // verifies this challenge. False requires an already enrolled active key.
+  // Enrollment never replaces the human's root, revives a revoked key, or
+  // reassigns a key owned by another account. The passkey assertion, request
+  // proof, device admission and session receipt commit as one ceremony.
+  bool enroll_device = 3;
+  string device_label = 4;
 }
 message CompleteAuthenticationRequest {
   string client_operation_id = 1;

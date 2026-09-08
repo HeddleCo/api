@@ -4,6 +4,7 @@ package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/administration.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 message SourceAnchor {
@@ -41,8 +42,12 @@ message DiscussionRecord {
   uint64 turn_count = 7;
   RecordRef extracted_context = 8;
   // Exact replication-operation frontier at this record version. Pass these IDs to
-  // AppendDiscussion; concurrent appends remain distinct until observed.
+  // AppendTurn; concurrent appends remain distinct until observed.
   repeated bytes causal_heads = 9;
+  // Public maps to canonical Public; Members maps to Internal. Private maps
+  // to Private{audience_label}; this is an additional restriction on scope ACL.
+  Audience audience = 10;
+  string audience_label = 11;
 }
 
 message DiscussionTurn {
@@ -120,6 +125,10 @@ message OpenDiscussionRequest {
   // Canonical actor-signed Thread operation. The request PoP authorizes this
   // delivery; it cannot substitute for the portable operation signature.
   SignedRecord signed_operation = 7;
+  // Required explicit audience. Private requires a nonempty audience_label;
+  // other audiences require an empty label. Sharing never widens this audience.
+  Audience audience = 8;
+  string audience_label = 9;
 }
 
 message AppendDiscussionRequest {

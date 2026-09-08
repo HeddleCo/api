@@ -123,8 +123,52 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
             .fields()
             .map(|field| field.name().to_owned())
             .collect::<Vec<_>>(),
-        ["client_authority", "issued"]
+        ["client_owned", "issued"]
     );
+    let Kind::Message(registered) = result
+        .get_field_by_name("client_owned")
+        .expect("client-owned registration")
+        .kind()
+    else {
+        panic!("typed registration")
+    };
+    for name in [
+        "ref",
+        "subject",
+        "proof_public_key",
+        "kind",
+        "owner_authorization",
+    ] {
+        assert!(
+            registered.get_field_by_name(name).is_some(),
+            "registration needs {name}"
+        );
+    }
+    assert!(
+        registered.get_field_by_name("biscuit").is_none(),
+        "keyed clients mint their own bearer"
+    );
+    assert!(
+        result.get_field_by_name("session").is_some(),
+        "one session result for every credential ceremony"
+    );
+    assert!(
+        response.get_field_by_name("session").is_none(),
+        "session metadata has one canonical location"
+    );
+    for name in ["ProvisionAccountResponse", "DelegationCredentialResponse"] {
+        let response = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .expect("credential ceremony");
+        assert_eq!(
+            response
+                .get_field_by_name("credential")
+                .expect("credential result")
+                .kind(),
+            Kind::Message(result.clone()),
+            "keyed provisioning cannot require a server-minted bearer"
+        );
+    }
     let Kind::Message(issued) = result
         .get_field_by_name("issued")
         .expect("issued credential")

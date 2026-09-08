@@ -16,7 +16,12 @@ struct Method {
     effect: String,
     retry: String,
     signing: String,
+    signing_identity: String,
     authorization_access: String,
+    authorization_role: String,
+    authorization_scope: String,
+    authorization_existence: String,
+    authorization_targets: Vec<(String, String)>,
     client_operation_id_required: bool,
     client_operation_id_field_number: Option<u32>,
     maturity: String,
@@ -75,11 +80,32 @@ pub fn write(
                 effect: enum_variant(&options, "effect", "RPC_EFFECT_")?,
                 retry: enum_variant(&options, "retry_behavior", "RETRY_BEHAVIOR_")?,
                 signing: enum_variant(&options, "signing_tier", "SIGNING_TIER_")?,
+                signing_identity: enum_variant(
+                    &options,
+                    "signing_identity",
+                    "STABLE_SIGNING_IDENTITY_",
+                )?,
                 authorization_access: enum_variant(
                     &options,
                     "authorization_access",
                     "AUTHORIZATION_ACCESS_",
                 )?,
+                authorization_role: enum_variant(
+                    &options,
+                    "authorization_role",
+                    "AUTHORIZATION_ROLE_",
+                )?,
+                authorization_scope: enum_variant(
+                    &options,
+                    "authorization_scope_source",
+                    "AUTHORIZATION_SCOPE_SOURCE_",
+                )?,
+                authorization_existence: enum_variant(
+                    &options,
+                    "authorization_existence",
+                    "AUTHORIZATION_EXISTENCE_",
+                )?,
+                authorization_targets: authorization_targets(&options)?,
                 client_operation_id_required: bool_value(&options, "client_operation_id_required")?,
                 client_operation_id_field_number,
                 maturity: method_maturity,
@@ -88,7 +114,7 @@ pub fn write(
         }
     }
     methods.sort_by(|left, right| left.path.cmp(&right.path));
-    let mut generated = render(&methods);
+    let mut generated = render(&methods, package == "heddle.api.v2alpha1");
     if package == "heddle.api.v2alpha1" {
         generated.push_str(
             "\n/// Typed operations derived from the protobuf method descriptors.\npub mod rpc {\n",
@@ -111,6 +137,35 @@ pub fn write(
     }
     fs::write(output_path, generated)?;
     Ok(())
+}
+
+fn authorization_targets(
+    options: &DynamicMessage,
+) -> Result<Vec<(String, String)>, Box<dyn Error>> {
+    let value = options
+        .get_field_by_name("authorization_request_targets")
+        .ok_or("missing authorization targets")?;
+    let Value::List(targets) = value.as_ref() else {
+        return Err("authorization targets must be a list".into());
+    };
+    targets
+        .iter()
+        .map(|value| {
+            let Value::Message(target) = value else {
+                return Err("authorization target must be a message".into());
+            };
+            let value = target
+                .get_field_by_name("path")
+                .ok_or("missing target path")?;
+            let Value::String(path) = value.as_ref() else {
+                return Err("target path must be a string".into());
+            };
+            Ok((
+                path.clone(),
+                enum_variant(target, "role", "AUTHORIZATION_ROLE_")?,
+            ))
+        })
+        .collect()
 }
 
 fn bool_value(message: &DynamicMessage, field_name: &str) -> Result<bool, Box<dyn Error>> {
@@ -233,7 +288,7 @@ fn rust_variant(name: &str, prefix: &str) -> Result<String, Box<dyn Error>> {
         .collect())
 }
 
-fn render(methods: &[Method]) -> String {
+fn render(methods: &[Method], complete_policy: bool) -> String {
     let mut output = String::from(
         "/// Generated stable route identity for every declared contract method.\n\
          #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]\n\
@@ -254,7 +309,13 @@ fn render(methods: &[Method]) -> String {
          pub effect: RpcEffect,\n\
          pub retry_behavior: RetryBehavior,\n\
          pub signing_tier: SigningTier,\n\
-         pub authorization_access: AuthorizationAccess,\n\
+         pub authorization_access: AuthorizationAccess,\n",
+    );
+    if complete_policy {
+        output.push_str("pub signing_identity: crate::heddle::api::v1alpha1::StableSigningIdentity,\npub authorization: AuthorizationPolicy,\n");
+    }
+    output.push_str(
+        "\
          pub client_operation_id_required: bool,\n\
          pub client_operation_id_field_number: Option<u32>,\n\
          pub maturity: ServiceMaturity,\n\
@@ -265,6 +326,21 @@ fn render(methods: &[Method]) -> String {
          pub const ALL_METHODS: &[MethodDescriptor] = &[\n",
     );
     for method in methods {
+        let policy = if complete_policy {
+            let targets = method.authorization_targets.iter().map(|(path, role)| format!(
+                "AuthorizationTarget {{ path: {path:?}, role: crate::heddle::api::v1alpha1::AuthorizationRole::{role} }}"
+            )).collect::<Vec<_>>().join(", ");
+            format!(
+                "signing_identity: crate::heddle::api::v1alpha1::StableSigningIdentity::{}, authorization: AuthorizationPolicy {{ role: crate::heddle::api::v1alpha1::AuthorizationRole::{}, scope_source: crate::heddle::api::v1alpha1::AuthorizationScopeSource::{}, existence: crate::heddle::api::v1alpha1::AuthorizationExistence::{}, targets: &[{}] }}, ",
+                method.signing_identity,
+                method.authorization_role,
+                method.authorization_scope,
+                method.authorization_existence,
+                targets
+            )
+        } else {
+            String::new()
+        };
         let deployments = method
             .deployments
             .iter()
@@ -272,7 +348,7 @@ fn render(methods: &[Method]) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         output.push_str(&format!(
-            "MethodDescriptor {{ path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, client_operation_id_field_number: {:?}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
+            "MethodDescriptor {{ {policy}path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, client_operation_id_field_number: {:?}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
             method.path,
             method.input,
             method.output,

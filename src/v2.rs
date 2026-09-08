@@ -2,13 +2,50 @@
 pub mod client;
 use crate::StreamingShape;
 use crate::heddle::api::v1alpha1::{
-    AuthorizationAccess, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
+    AuthorizationAccess, AuthorizationExistence, AuthorizationRole, AuthorizationScopeSource,
+    CallContext, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
 };
 use crate::heddle::api::v2alpha1::{StreamDataKind, StreamFrame, stream_frame};
 
 include!(concat!(env!("OUT_DIR"), "/heddle_api_v2_methods.rs"));
 
+/// Generated resource guard selected by a protobuf request field path.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AuthorizationTarget {
+    pub path: &'static str,
+    pub role: AuthorizationRole,
+}
+
+/// Complete method authorization declaration. Hosts must resolve every
+/// populated target and enforce the role against current authority; metadata
+/// describes that obligation and is never itself a capability.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AuthorizationPolicy {
+    pub role: AuthorizationRole,
+    pub scope_source: AuthorizationScopeSource,
+    pub existence: AuthorizationExistence,
+    pub targets: &'static [AuthorizationTarget],
+}
+
+/// Decoded transport context bound to a v2 route, before body interpretation.
+#[derive(Debug)]
+pub struct RoutedCall<'a> {
+    pub method: &'static MethodDescriptor,
+    pub context: &'a CallContext,
+}
+
+impl<'a> RoutedCall<'a> {
+    pub fn new(path: &str, context: &'a CallContext) -> Option<Self> {
+        method_descriptor(path).map(|method| Self { method, context })
+    }
+}
+
 impl MethodDescriptor {
+    /// Only safe reads can be sent on replayable 0-RTT connections.
+    pub const fn allows_zero_rtt(&self) -> bool {
+        matches!(self.effect, RpcEffect::ReadOnly)
+            && matches!(self.retry_behavior, RetryBehavior::Safe)
+    }
     /// Extract the operation ID for the transport context from the exact request
     /// bytes. Adapters must not maintain a second route/field-number inventory.
     pub fn client_operation_id<'a>(

@@ -47,6 +47,9 @@ enum ResourceRole {
   RESOURCE_ROLE_WRITER = 2;
   RESOURCE_ROLE_ADMINISTRATOR = 3;
 }
+// Fresh bootstrap permits child creation and has no implicit approval mandate.
+// Explicit review policies still apply. A revision supplies the complete record;
+// its settings participate in the observed review policy version.
 message SpoolSettings {
   Audience audience = 1;
   Audience default_state_audience = 2;
@@ -152,6 +155,8 @@ message CreateSpoolRequest {
   }
   optional string display_name = 6;
 }
+// Compare and replace display name and complete settings atomically. The stable
+// UUID, address slug, parent, and immutable owner genesis are unchanged.
 message ReviseSpoolRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;

@@ -227,6 +227,9 @@ message RenameThreadRequest {
   bytes expected_version = 3;
   string name = 4;
 }
+// Each source is the exact revision supplied by the caller. For every distinct
+// target, expected_target is compared once against the initial transaction
+// snapshot. Ordered members then integrate into that target's evolving frontier.
 message StackLanding {
   ThreadRef thread = 1;
   RevisionRef source = 2;
@@ -237,5 +240,8 @@ message StackLanding {
 message LandStackRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
+  // Apply in request order. Source and target Thread sets must be disjoint; a
+  // source never implicitly means the result of an earlier member. All members
+  // and their receipts commit atomically, or none do.
   repeated StackLanding landings = 3;
 }

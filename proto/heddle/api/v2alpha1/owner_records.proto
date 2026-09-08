@@ -304,6 +304,32 @@ message OwnerAuthorizationBundle {
   bytes subject_biscuit = 4;
 }
 
+// Portable authorization for an exact purge, independently of its transport.
+message SidecarAuthorization {
+  OwnerAuthorizationBundle capability = 1;
+  AuthorizationSignature operation_signature = 2;
+}
+
+message PurgeSidecarIdentity {
+  // Exactly 64 lower-case hexadecimal ASCII bytes.
+  string blob_hash = 1;
+}
+
+// Protobuf serialization is never signed. canonical_purge_operation_v2 is:
+// u32_be(format_version), raw 16-byte spool_uuid, blob_hash as a u32-length-
+// prefixed string, raw 32-byte payload_sha256, raw 32-byte leaf_capability_id.
+// The leaf subject signs SHA-256("heddle-purge-operation-v2" || canonical_body).
+// The verifier binds this body to the actual spool, payload and direct PURGE
+// grant. Moving the RPC package does not change this durable signing format.
+message PurgeOperationSigningBody {
+  // Exactly 2.
+  uint32 format_version = 1;
+  bytes spool_uuid = 2;
+  PurgeSidecarIdentity purge_identity = 3;
+  bytes payload_sha256 = 4;
+  bytes leaf_capability_id = 5;
+}
+
 // ── 6. Clone keyring persistence ────────────────────────────────────────────
 
 enum CloneOwnerPinKind {

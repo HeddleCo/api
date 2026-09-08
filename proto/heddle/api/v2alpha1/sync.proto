@@ -3,6 +3,8 @@ package heddle.api.v2alpha1;
 
 import "heddle/api/v1alpha1/errors.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/ownership.proto";
 import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/thread.proto";
 
@@ -85,7 +87,7 @@ message TransferReady {
   ThreadRef thread = 2;
   RevisionRef current = 3;
   bytes current_version = 4;
-  SignedRecord owner_genesis = 5;
+  SignedSpoolOwnerGenesis owner_genesis = 5;
   repeated TransferObject have = 6;
   repeated TransferObject need = 7;
   TransferCheckpoint checkpoint = 8;
@@ -94,6 +96,13 @@ message TransferReady {
   repeated TransferObject missing = 11;
   repeated ThreadOverview advertised_threads = 12;
   PageInfo page = 13;
+  // Exact whole artifacts selected for this download, in transmission order.
+  // Chunk offsets/lengths must stay inside these independently hashed extents.
+  repeated PackExtent packs = 14;
+  // Clone verifies owner history and installs the original Thread genesis
+  // before materializing source. Neither identity is minted by the receiver.
+  OwnerState ownership = 15;
+  SignedRecord thread_genesis = 16;
 }
 message ProviderExtent {
   EndpointRef provider = 1;
@@ -146,6 +155,9 @@ message FetchServerFrame {
     TransferSidecar sidecar = 3;
     ProviderPlan provider_plan = 4;
     FetchComplete complete = 5;
+    // Original signed causal operations for the selected facets. A receiver
+    // admits these to the same replica as live sync; projections are not proofs.
+    SignedRecord operation = 6;
   }
 }
 // Bulk content availability for an already admitted Thread capture. Metadata

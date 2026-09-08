@@ -49,7 +49,8 @@
     "./v2/observation": "./dist/v2alpha1/observation.js",
     "./v2/client": "./dist/v2alpha1/client.js",
     "./v2/owner-certificates": "./dist/v2alpha1/owner-certificates.js",
-    "./v2/collaboration": "./dist/v2alpha1/collaboration.js"
+    "./v2/collaboration": "./dist/v2alpha1/collaboration.js",
+    "./v2/pairing": "./dist/v2alpha1/pairing.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.0",

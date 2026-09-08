@@ -109,3 +109,10 @@ test('independent publishers of the same inner record produce one inner parent a
   assert.equal(outer.parents.length, 2);
   assert.equal(decode(Uint8Array.from(outer.body.canonical)).parents.length, 1);
 });
+
+test('exact state and Git source spans match independent Rust fixtures', async () => {
+  for (const [name, revision] of [['source_state', { kind: 'state', stateId: new Uint8Array(32).fill(5) }], ['source_git', { kind: 'git_commit', oid: 'a'.repeat(40) }]]) {
+    const source = command({ kind: 'open', blocking: true, title: 'Review source', visibility: 'public', body: 'Check these lines', anchor: { kind: 'source', revision, path: 'src/main.rs', symbolId: 'run', startLine: 12, endLine: 18 } });
+    exact(await signDiscussion(source, [], signer), fixtures[name]);
+  }
+});

@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
+import { Audience } from "./administration_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
 
 const FORMAT = "heddle-thread-operation-v1";
@@ -25,7 +26,20 @@ export type PortableCollaborationAnchor =
   | { kind: "source"; revision: { kind: "state"; stateId: Uint8Array } | { kind: "git_commit"; oid: string };
       path: string; symbolId?: string; startLine?: number; endLine?: number };
 export type CollaborationVisibility = "public" | "internal"
-  | { kind: "team_scoped" | "restricted" | "private"; label: string };
+  | { kind: "private"; label: string };
+/** Typed native audiences map losslessly to canonical visibility. Labels are
+ * private-scope identifiers, not a way to broaden the containing spool ACL. */
+export function collaborationVisibility(audience: Audience, label = ""): CollaborationVisibility {
+  if (audience === Audience.PRIVATE) {
+    text(label, 512);
+    if (!label.trim()) throw new Error("Private discussion audience requires a label");
+    return { kind: "private", label };
+  }
+  if (label) throw new Error("Only a private discussion audience may carry a label");
+  if (audience === Audience.PUBLIC) return "public";
+  if (audience === Audience.MEMBERS) return "internal";
+  throw new Error("Discussion audience must be explicit");
+}
 export type DiscussionAction =
   | { kind: "open"; blocking: boolean; title: string; anchor: PortableCollaborationAnchor; visibility: CollaborationVisibility; body: string }
   | { kind: "append"; body: string }
@@ -211,10 +225,13 @@ function actionValue(action: DiscussionAction): MapValue {
   if (action.kind === "open") {
     text(action.title, 256 * 1024);
     let visibility: Value;
-    if (typeof action.visibility === "string") visibility = action.visibility === "public" ? "Public" : "Internal";
-    else { text(action.visibility.label, 512); visibility = action.visibility.kind === "team_scoped"
-      ? { TeamScoped: { team_id: action.visibility.label } }
-      : { [action.visibility.kind === "private" ? "Private" : "Restricted"]: { scope_label: action.visibility.label } }; }
+    if (action.visibility === "public") visibility = "Public";
+    else if (action.visibility === "internal") visibility = "Internal";
+    else if (typeof action.visibility === "object" && action.visibility.kind === "private") {
+      text(action.visibility.label, 512);
+      if (!action.visibility.label.trim()) throw new Error("Private discussion audience requires a label");
+      visibility = { Private: { scope_label: action.visibility.label } };
+    } else throw new Error("Visibility has no native discussion audience representation");
     return { kind: "open", blocking: action.blocking, title: action.title, anchor: anchorValue(action.anchor), visibility, turn: turn(action.body) };
   }
   if (action.kind === "append") return { kind: "append_turn", turn: turn(action.body) };

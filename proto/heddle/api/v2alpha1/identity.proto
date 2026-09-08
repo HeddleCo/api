@@ -150,6 +150,9 @@ message CompleteAuthenticationRequest {
   // Same key as BeginAuthentication. CallContext.request_proof signs the
   // exact completion request with this key, including the passkey assertion.
   bytes caller_public_key = 4;
+  // Required for a newly enrolled independent mint root distinct from the
+  // current owner authority; omitted for existing roots or delegated leaves.
+  SignedMintRootAttachment mint_root_attachment = 5;
 }
 message AuthenticationResponse {
   MutationReceipt receipt = 1;
@@ -170,6 +173,9 @@ message CredentialResult {
   // Original accepted owner proofs where established. An unclaimed agent has
   // no independent human-root bundle; absence does not upgrade its authority.
   OwnerAuthorizationBundle owner_authorization = 4;
+  // Exact retained public association for this credential’s original mint root.
+  // A paired leaf inherits it; no owner signature or authority is reminted.
+  SignedMintRootAttachment mint_root_attachment = 5;
 }
 enum CredentialKind {
   CREDENTIAL_KIND_UNSPECIFIED = 0;
@@ -263,6 +269,8 @@ message CompleteRegistrationRequest {
     OwnerRegistration establish_owner = 7;
     SignedOwnerKeyTransition claim_owner = 8;
   }
+  // Associates a newly enrolled independent mint root with current ownership.
+  SignedMintRootAttachment mint_root_attachment = 9;
 }
 message RegisterRootAttachmentRequest {
   string client_operation_id = 1;

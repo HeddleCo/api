@@ -58,7 +58,9 @@ message ThreadOverview {
   repeated ThreadRelationship relationships = 10;
   repeated ActionAvailability actions = 11;
   repeated SectionStatus sections = 12;
-  uint64 capture_count = 13;
+  // Count only captures visible to this reader. Absent when a bounded window
+  // cannot establish the reader-visible total; never expose an unfiltered count.
+  optional uint64 capture_count = 13;
   uint64 open_discussion_count = 14;
   google.protobuf.Timestamp updated_at = 15;
   RevisionRef integrated_revision = 16;

@@ -382,11 +382,21 @@ message CreateSignupInvitationResponse {
   SignupInvitation invitation = 2;
   bytes redemption_secret = 3;
 }
+// A held shareable invitation code selects the admission directly; no lookup
+// RPC, account bearer or device root is needed before choosing a passkey.
 message RedeemSignupInvitationRequest {
   string client_operation_id = 1;
-  RecordRef invitation = 2;
-  bytes redemption_secret = 3;
-  RootAttachment principal = 4;
+  bytes redemption_secret = 2;
+}
+message SignupReservation {
+  // Opaque, short-lived admission. BeginRegistration accepts this exact ref.
+  // Reservation does not create an account or consume the invite permanently.
+  RecordRef ref = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+message RedeemSignupInvitationResponse {
+  MutationReceipt receipt = 1;
+  SignupReservation reservation = 2;
 }
 message BeginEmailVerificationRequest {
   string client_operation_id = 1;
@@ -472,7 +482,18 @@ message ResolveSignupInvitationRequest {
 }
 message SignupInvitationResolution {
   RecordRef invitation = 1;
-  Coverage availability = 2;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_AVAILABLE = 1;
+    // Includes active reservations: it cannot currently admit another signup.
+    STATUS_IN_USE = 2;
+    STATUS_UNAVAILABLE = 3;
+  }
+  Status status = 2;
   repeated Requirement requirements = 3;
-  // Return only invitation information permitted to the presented capability.
+  // Context authorized by possession of the invitation identifier, sufficient
+  // to populate the invitation page without identity/profile lookups.
+  string inviter_display_handle = 4;
+  uint64 inviter_member_ordinal = 5;
+  string bound_email = 6;
 }

@@ -245,3 +245,16 @@ credential material under that delegation's scope and expiry ceiling.
 `CreateAnonymousSession` retains anonymous identity continuity and rotates its
 separate continuity secret under the existing anti-abuse gate. There is no
 generic principal factory or caller-selected rooting tier.
+
+### Signup admission before device establishment
+
+A held invitation code goes directly to `RedeemSignupInvitation`; its typed,
+expiring reservation is the `BeginRegistration.invitation_reservation` input.
+Reservation does not create an account or permanently consume the invitation.
+Retry requires the same operation and secret, and cannot renew an expired or
+consumed reservation. This public pre-device ceremony has no request-key proof;
+code possession and the shared invitation peer budget are its boundary.
+
+`ResolveSignupInvitation` is an optional invitation-page read. It carries typed
+availability, inviter display context and bound email so rendering that page
+needs no profile lookups. Coverage and invitation validity are separate concepts.

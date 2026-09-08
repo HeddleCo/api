@@ -293,3 +293,15 @@ checkout-targeted actions; scoped section/private artifact denial; gap-free
 snapshot/reconnect; ambiguous operation recovery; separate local/publication
 outcomes; real Iroh cancellation/backpressure and a thousands-of-stream load test.
 The SDK/descriptor tests here do not replace those handler and end-to-end gates.
+
+## First publication
+
+`ReplicationOpen.thread_genesis` can carry the creator-signed immutable creation
+record. A hosted receiver authorizes the spool, verifies the creation signature
+and exact Thread identity, and commits a new replica before emitting Ready.
+An existing replica must have the identical canonical genesis. Reconnecting with
+the same record is idempotent and does not create another Thread. A relaying
+device retains the original creator's signature and uses its own authorized
+request proof for the opening. This avoids a separate hosted create request.
+Acceptance of causal metadata does not assert that source-object closure is
+already available; publication of those bytes has its own durable receipt.

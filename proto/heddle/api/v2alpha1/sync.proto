@@ -173,6 +173,10 @@ message ReplicationOpen {
   ThreadRef thread = 1;
   repeated SharedFacet facets = 2;
   bytes sharing_policy_version = 3;
+  // Original creator-signed genesis for first publication. The receiver must
+  // authorize the destination spool and verify canonical bytes, creator proof,
+  // and exact Thread/spool identity before durably installing it and emitting
+  // Ready. Reconnects may include it again; it cannot replace another genesis.
   SignedRecord thread_genesis = 4;
   ReadBudget budget = 5;
   repeated string record_formats = 6;

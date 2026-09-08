@@ -178,6 +178,10 @@ message ReplicationOpen {
   repeated string record_formats = 6;
   // Fresh session binding; the request PoP covers this exact opening.
   bytes session_nonce = 7;
+  // The opening PoP binds both Iroh identities; replay on another peer or
+  // destination cannot open a stream under the captured credential.
+  EndpointRef source = 8;
+  EndpointRef destination = 9;
 }
 message ReplicationReady {
   EndpointRef endpoint = 1;

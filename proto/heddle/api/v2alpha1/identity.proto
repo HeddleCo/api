@@ -374,29 +374,43 @@ message CredentialInspection {
   bool revoked = 4;
 }
 // Provisional two-key possession, before an approving account is known.
-// SignedRecord format heddle.pairing-initiation.v1; both distinct keys sign
+// SignedRecord format heddle.pairing-initiation.v2; each actual receiver key signs
 // domain || deterministic protobuf bytes. The host and operation prevent reuse.
+// Credential-only receiver. Its subject key is not an Iroh endpoint.
+message BrowserPairingReceiver {}
 message PairingInitiationBinding {
   EndpointRef host = 1;
   string client_operation_id = 2;
-  EndpointRef device = 3;
+  oneof receiver {
+    EndpointRef device = 3;
+    BrowserPairingReceiver browser = 7;
+  }
   bytes subject_public_key = 4;
   int64 not_before_unix_seconds = 5;
   int64 expires_at_unix_seconds = 6;
 }
 message BeginPairingRequest {
   string client_operation_id = 1;
-  EndpointRef device = 2;
+  oneof receiver {
+    EndpointRef device = 2;
+    BrowserPairingReceiver browser = 5;
+  }
   bytes subject_public_key = 3;
   SignedRecord subject_possession = 4;
 }
 message PairingRecord {
   RecordRef ref = 1;
   bytes version = 2;
-  EndpointRef device = 3;
+  oneof receiver {
+    EndpointRef device = 3;
+    BrowserPairingReceiver browser = 10;
+  }
   bytes challenge = 4;
   // Public commitment only. The delegated credential is never observable.
-  RootAttachmentBinding approval_binding = 5;
+  oneof approval {
+    RootAttachmentBinding approval_binding = 5;
+    BrowserPairingApprovalBinding browser_approval = 11;
+  }
   google.protobuf.Timestamp expires_at = 6;
   bool completed = 7;
   bytes subject_public_key = 8;
@@ -424,8 +438,30 @@ message ApprovePairingRequest {
 message CompletePairingRequest {
   string client_operation_id = 1;
   RecordRef pairing = 2;
-  // Signed from ObservePairing.approval_binding before credential release.
-  RootAttachment attachment = 3;
+  // Receiver-specific possession before credential release. Browser completion
+  // does not create an endpoint attachment or an independently trusted mint root.
+  oneof proof {
+    RootAttachment attachment = 3;
+    SignedRecord browser_possession = 4;
+  }
+}
+message BrowserPairingApprovalBinding {
+  uint32 format_version = 1;
+  bytes root_public_key = 2;
+  bytes subject_public_key = 3;
+  string account_id = 4;
+  bytes credential_digest = 5;
+  bytes pairing_challenge = 6;
+  int64 not_before_unix_seconds = 7;
+  int64 expires_at_unix_seconds = 8;
+}
+// SignedRecord format heddle.browser-pairing-completion.v1. The current subject
+// key signs domain || deterministic protobuf bytes plus a fresh exact RPC proof.
+message BrowserPairingCompletionBinding {
+  EndpointRef host = 1;
+  string client_operation_id = 2;
+  RecordRef pairing = 3;
+  BrowserPairingApprovalBinding approval = 4;
 }
 message ObservePairingRequest {
   RecordRef pairing = 1;

@@ -43,3 +43,60 @@ fn approval_observations_contain_commitments_and_completion_requires_device_proo
         "heddle.api.v2alpha1.RootAttachment"
     );
 }
+
+#[test]
+fn browser_pairing_has_exclusive_receiver_and_proof_without_endpoint_claims() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("descriptors");
+    for message in [
+        "BeginPairingRequest",
+        "PairingInitiationBinding",
+        "PairingRecord",
+    ] {
+        let descriptor = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{message}"))
+            .expect("pairing message");
+        let receiver = descriptor
+            .oneofs()
+            .find(|field| field.name() == "receiver")
+            .expect("exclusive receiver");
+        assert_eq!(
+            receiver
+                .fields()
+                .map(|field| field.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["device", "browser"]
+        );
+    }
+    let complete = pool
+        .get_message_by_name("heddle.api.v2alpha1.CompletePairingRequest")
+        .expect("completion");
+    assert_eq!(
+        complete
+            .oneofs()
+            .find(|field| field.name() == "proof")
+            .expect("exclusive proof")
+            .fields()
+            .map(|field| field.name().to_owned())
+            .collect::<Vec<_>>(),
+        ["attachment", "browser_possession"]
+    );
+    let approval = pool
+        .get_message_by_name("heddle.api.v2alpha1.BrowserPairingApprovalBinding")
+        .expect("browser commitment");
+    assert!(approval.get_field_by_name("device").is_none());
+    assert!(approval.get_field_by_name("biscuit").is_none());
+    for name in [
+        "root_public_key",
+        "subject_public_key",
+        "account_id",
+        "credential_digest",
+        "pairing_challenge",
+        "not_before_unix_seconds",
+        "expires_at_unix_seconds",
+    ] {
+        assert!(
+            approval.get_field_by_name(name).is_some(),
+            "missing signed approval field {name}"
+        );
+    }
+}

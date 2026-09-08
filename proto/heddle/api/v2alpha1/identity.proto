@@ -16,6 +16,21 @@ message RootAttachment {
   // Verification binds root, subject, device, scope, validity and possession.
   // An empty attachment is valid only for a directly proved root key.
 }
+// Portable binding of a proved delegated key to its Iroh endpoint. Authority
+// remains the Biscuit's complete attenuation chain, not this locator binding.
+// SignedRecord format heddle.root-attachment.v1 carries these deterministic
+// bytes and one subject-key Ed25519 signature with a format-domain prefix.
+// The shared verifier requires a locally trusted root, verifies the Biscuit's
+// effective proof key and limits, then verifies digest, time and endpoint.
+message RootAttachmentBinding {
+  uint32 format_version = 1;
+  bytes root_public_key = 2;
+  bytes subject_public_key = 3;
+  EndpointRef device = 4;
+  bytes credential_digest = 5;
+  int64 not_before_unix_seconds = 6;
+  int64 expires_at_unix_seconds = 7;
+}
 // Account onboarding state, never a substitute for a verified capability or
 // owner-root binding. Promotions are explicit; a credential's attenuation must
 // survive promotion of its account. AGENT_ROOTED denotes an unclaimed human
@@ -313,6 +328,11 @@ message ApprovePairingRequest {
   RecordRef pairing = 2;
   RootAttachment attachment = 3;
   bytes expected_version = 4;
+  // Browser-created, root-derived Biscuit bound to the pairing's subject key.
+  // The host verifies the same account and descendant authority; it never
+  // substitutes a newly minted independent root. Only the subject's proved
+  // completion receives this secret, never a PairingEvent/identity observation.
+  bytes delegated_biscuit = 5;
 }
 message CompletePairingRequest {
   string client_operation_id = 1;

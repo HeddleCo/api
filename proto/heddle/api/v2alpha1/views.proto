@@ -16,6 +16,14 @@ import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/sync.proto";
 import "heddle/api/v2alpha1/thread.proto";
 
+// Independent section windows share one observation's total read budget.
+// Missing windows select bounded defaults only for requested sections.
+message ThreadPages {
+  PageRequest captures = 1;
+  PageRequest reviews = 2;
+  PageRequest collaboration = 3;
+  PageRequest timeline = 4;
+}
 message ObserveThreadRequest {
   ThreadRef thread = 1;
   repeated ThreadSection sections = 2;
@@ -23,7 +31,7 @@ message ObserveThreadRequest {
   // snapshot and returns the resolved IDs in the overview/review records.
   RevisionRef source = 3;
   RevisionRef base = 4;
-  PageRequest page = 5;
+  ThreadPages pages = 5;
   ObserveOptions observe = 6;
 }
 

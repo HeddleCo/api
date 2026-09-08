@@ -69,6 +69,8 @@ message MemberRecord {
   string principal_id = 2;
   ResourceRole role = 3;
   bytes version = 4;
+  // When present, id must equal principal_id; absent means display unavailable.
+  PublicPrincipalSummary principal = 5;
 }
 message GrantRecord {
   RecordRef ref = 1;

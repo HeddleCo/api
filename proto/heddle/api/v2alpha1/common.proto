@@ -12,6 +12,13 @@ message PrincipalRef {
   string id = 1;
 }
 
+// Public presentation only; never carries credential, account settings or rights.
+message PublicPrincipalSummary {
+  string id = 1;
+  string handle = 2;
+  string display_name = 3;
+}
+
 message SpoolRef {
   // Stable spool UUID; names, paths and account handles are presentation.
   string id = 1;

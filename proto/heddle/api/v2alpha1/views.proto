@@ -149,6 +149,8 @@ message SpoolEvent {
     SectionReplacement replace_section = 13;
     SpoolMount mount = 14;
     SupportAccessRecord support_access = 15;
+    // Paged child summary, separate from the observed root spool.
+    SpoolOverview child = 16;
   }
 }
 

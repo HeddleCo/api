@@ -101,6 +101,19 @@ information; missing completion is interruption. Empty and unavailable differ.
 No live Thread tip is silently substituted for an exact RevisionRef, which can
 name native state or an exact Git commit.
 
+Tree selections return `ContentTreeEntry` with an explicit target. Native file
+and tree hashes, Git object IDs, and child-spool identities plus anchored StateIds
+remain distinct. Following a symlink, Git link, or child spool is a separate
+operation; the containing revision does not grant access to a linked resource.
+File size has presence, so an unknown length differs from a known empty file.
+
+Tree paths are repository-relative, including the selected subtree prefix.
+Depth zero requests one level. Pagination preserves component order (a directory
+and its descendants precede its next sibling), and its token binds revision,
+subtree and depth. A completed page can carry a continuation: only `exhausted`
+means there are no more matching entries. A byte budget should shorten the page
+and return a usable continuation whenever an entry and completion can fit.
+
 ## Views, paging and bounded work
 
 Filters define an endpoint-local window, with deterministic order and stable ID

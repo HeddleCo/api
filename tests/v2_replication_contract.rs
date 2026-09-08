@@ -50,7 +50,7 @@ fn bulk_publication_has_a_thread_bound_upload_and_a_durable_availability_receipt
     assert_eq!(rpc.signing_tier, SigningTier::StreamingProofOfPossession);
     assert!(rpc.client_operation_id_required);
     let open = pool.get_message_by_name("heddle.api.v2alpha1.PublishContentOpen").expect("publication opening");
-    for field in ["thread", "revision", "packs", "sharing_policy_version", "checkpoint"] {
+    for field in ["thread", "revision", "packs", "sharing_policy_version", "checkpoint", "source", "destination"] {
         assert!(open.get_field_by_name(field).is_some(), "opening binds {field}");
     }
     assert!(open.get_field_by_name("expected_tip").is_none(), "content availability must not replace concurrent heads");

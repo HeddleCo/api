@@ -73,6 +73,17 @@ message ContextRecord {
   bool superseded = 11;
 }
 
+// Write input. Actor attribution is carried by the signed canonical operation;
+// coverage and current-view versions are server projections, never client input.
+message ContextDraft {
+  RecordRef ref = 1;
+  CollaborationAnchor anchor = 2;
+  string content = 3;
+  repeated string tags = 4;
+  RecordRef supersedes = 5;
+  RecordRef extracted_from = 6;
+}
+
 message ObserveCollaborationRequest {
   SpoolRef spool = 1;
   repeated CollaborationAnchor anchors = 2;
@@ -126,7 +137,7 @@ message ResolveDiscussionRequest {
   RecordRef discussion = 2;
   bytes expected_version = 3;
   oneof resolution {
-    ContextRecord extract_context = 4;
+    ContextDraft extract_context = 4;
     RevisionRef resolved_by_edit = 5;
     string dismissal_reason = 6;
   }
@@ -143,7 +154,7 @@ message ReopenDiscussionRequest {
 
 message PutContextRequest {
   string client_operation_id = 1;
-  ContextRecord context = 2;
+  ContextDraft context = 2;
   bytes expected_version = 3;
   SignedRecord signed_operation = 4;
   // Empty expected version creates; existing records require the observed

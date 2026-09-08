@@ -1,7 +1,9 @@
 #![cfg(feature = "reflection")]
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v1alpha1::{AuthorizationAccess, SigningTier},
+    heddle::api::v1alpha1::{
+        AuthorizationAccess, AuthorizationRole, AuthorizationScopeSource, SigningTier,
+    },
 };
 use prost_reflect::{DescriptorPool, Kind};
 
@@ -50,6 +52,11 @@ fn invite_redemption_yields_registration_admission_without_a_discovery_call_or_d
     .expect("route");
     assert_eq!(route.authorization_access, AuthorizationAccess::Public);
     assert_eq!(route.signing_tier, SigningTier::None);
+    assert_eq!(route.authorization.role, AuthorizationRole::None);
+    assert_eq!(
+        route.authorization.scope_source,
+        AuthorizationScopeSource::None
+    );
     assert!(route.client_operation_id_required);
 }
 

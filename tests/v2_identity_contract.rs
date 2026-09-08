@@ -6,25 +6,77 @@ use prost_reflect::{DescriptorPool, Kind};
 #[test]
 fn onboarding_distinguishes_human_accounts_delegations_and_anonymous_continuity() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
-    let identity = pool.get_service_by_name("heddle.api.v2alpha1.IdentityService").expect("identity service");
-    let provision = identity.methods().find(|method| method.name() == "ProvisionAccount").expect("agent provisioning creates an unclaimed human account");
-    for name in ["client_operation_id", "invitation_secret", "agent_public_key"] {
-        assert!(provision.input().get_field_by_name(name).is_some(), "provisioning requires {name}");
+    let identity = pool
+        .get_service_by_name("heddle.api.v2alpha1.IdentityService")
+        .expect("identity service");
+    let provision = identity
+        .methods()
+        .find(|method| method.name() == "ProvisionAccount")
+        .expect("agent provisioning creates an unclaimed human account");
+    for name in [
+        "client_operation_id",
+        "invitation_secret",
+        "agent_public_key",
+    ] {
+        assert!(
+            provision.input().get_field_by_name(name).is_some(),
+            "provisioning requires {name}"
+        );
     }
-    assert!(provision.input().get_field_by_name("kind").is_none(), "callers cannot choose a human rooting tier");
+    assert!(
+        provision.input().get_field_by_name("kind").is_none(),
+        "callers cannot choose a human rooting tier"
+    );
     for name in ["principal", "credential", "claim_web_origin"] {
-        assert!(provision.output().get_field_by_name(name).is_some(), "provisioning returns {name}");
+        assert!(
+            provision.output().get_field_by_name(name).is_some(),
+            "provisioning returns {name}"
+        );
     }
-    let anonymous = identity.methods().find(|method| method.name() == "CreateAnonymousSession").expect("anonymous continuity has its own ceremony");
-    assert!(anonymous.input().get_field_by_name("continuity_secret").is_some());
-    assert!(anonymous.output().get_field_by_name("continuity_secret").is_some());
-    assert!(anonymous.output().get_field_by_name("continuity_expires_at").is_some());
-    let issue = identity.methods().find(|method| method.name() == "IssueDelegationCredential").expect("delegated credential issuance is explicit");
+    let anonymous = identity
+        .methods()
+        .find(|method| method.name() == "CreateAnonymousSession")
+        .expect("anonymous continuity has its own ceremony");
+    assert!(
+        anonymous
+            .input()
+            .get_field_by_name("continuity_secret")
+            .is_some()
+    );
+    assert!(
+        anonymous
+            .output()
+            .get_field_by_name("continuity_secret")
+            .is_some()
+    );
+    assert!(
+        anonymous
+            .output()
+            .get_field_by_name("continuity_expires_at")
+            .is_some()
+    );
+    let issue = identity
+        .methods()
+        .find(|method| method.name() == "IssueDelegationCredential")
+        .expect("delegated credential issuance is explicit");
     assert!(issue.input().get_field_by_name("delegation").is_some());
-    assert!(issue.input().get_field_by_name("proof_public_key").is_some());
+    assert!(
+        issue
+            .input()
+            .get_field_by_name("proof_public_key")
+            .is_some()
+    );
     assert!(issue.output().get_field_by_name("credential").is_some());
-    assert!(identity.methods().all(|method| method.name() != "CreatePrincipal"), "remove the conflated principal factory");
-    assert!(pool.get_message_by_name("heddle.api.v2alpha1.CreatePrincipalRequest").is_none());
+    assert!(
+        identity
+            .methods()
+            .all(|method| method.name() != "CreatePrincipal"),
+        "remove the conflated principal factory"
+    );
+    assert!(
+        pool.get_message_by_name("heddle.api.v2alpha1.CreatePrincipalRequest")
+            .is_none()
+    );
 }
 
 #[test]

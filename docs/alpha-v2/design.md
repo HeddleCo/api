@@ -204,3 +204,14 @@ The account/credential types describe the complete intended contract; endpoint
 discovery must still advertise only implemented ceremonies. In particular, the
 canonical identity model distinguishes shipped passkey/agent flows from target
 password onboarding and per-user server custody.
+
+
+Account provisioning and credential issuance are separate operations.
+`ProvisionAccount` creates or recovers the agent's key-bound unclaimed human
+account and returns its attenuated agent credential plus the configured claim
+origin. It cannot create an independent human root. `PutDelegation` manages a
+device/agent/service delegation; `IssueDelegationCredential` explicitly returns
+credential material under that delegation's scope and expiry ceiling.
+`CreateAnonymousSession` retains anonymous identity continuity and rotates its
+separate continuity secret under the existing anti-abuse gate. There is no
+generic principal factory or caller-selected rooting tier.

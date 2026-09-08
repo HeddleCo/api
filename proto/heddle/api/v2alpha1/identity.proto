@@ -37,6 +37,8 @@ message PrincipalRecord {
   repeated ActionAvailability actions = 9;
   EntitlementRecord entitlement = 10;
   RootingTier rooting_tier = 11;
+  // Generated pet name while agent-rooted and unclaimed; handle stays empty.
+  string display_name = 12;
 }
 message EntitlementRecord {
   string plan = 1;
@@ -326,20 +328,68 @@ message CompleteEmailVerificationRequest {
   bytes proof = 3;
 }
 
-message CreatePrincipalRequest {
+// Invite-gated creation of an unclaimed human account. The independent root
+// slot stays empty. The agent proves its own key over this exact request using
+// principal:device-key:<lowercase-hex-agent-public-key>; a human bearer cannot
+// replace that proof. Existing key-bound accounts may be reused without an
+// invitation. Reusing an operation ID with different bytes is rejected.
+message ProvisionAccountRequest {
   string client_operation_id = 1;
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_HUMAN = 1;
-    KIND_AGENT = 2;
-    KIND_SERVICE = 3;
-  }
-  Kind kind = 2;
-  string label = 3;
-  RootAttachment authority = 4;
-  SignedRecord principal_genesis = 5;
-  // An unclaimed agent principal cannot assert a human root it does not own.
+  bytes invitation_secret = 2;
+  bytes agent_public_key = 3;
 }
+message ProvisionAccountResponse {
+  MutationReceipt receipt = 1;
+  PrincipalRecord principal = 2;
+  // Pre-attenuated AGENT credential bound to the proved agent key. Claiming the
+  // account later neither upgrades nor transforms this credential.
+  IssuedCredential credential = 3;
+  // Authoritative browser origin for the agent's locally generated claim link.
+  // The claim secret and its private state remain on the agent's device.
+  string claim_web_origin = 4;
+}
+
+// Anonymous continuity has no human account and no independent owner root.
+// The endpoint retains its existing anti-abuse, expiry and rotation checks.
+message CreateAnonymousSessionRequest {
+  string client_operation_id = 1;
+  bytes continuity_secret = 2;
+  string abuse_challenge_proof = 3;
+}
+message AnonymousSessionResponse {
+  MutationReceipt receipt = 1;
+  string anonymous_id = 2;
+  IssuedCredential credential = 3;
+  // Rotate after successful use; useful only for this ceremony, never as a
+  // normal RPC bearer. Store separately from the short-lived Biscuit.
+  bytes continuity_secret = 4;
+  google.protobuf.Timestamp continuity_expires_at = 5;
+}
+
+// Creating/updating a delegation record and issuing a credential are different
+// effects. The caller must prove the active delegation authority; the new key
+// must prove possession. Scope/expiry cannot exceed the accepted delegation.
+message IssueDelegationCredentialRequest {
+  string client_operation_id = 1;
+  RecordRef delegation = 2;
+  bytes proof_public_key = 3;
+  SignedRecord authority_proof = 4;
+  // Canonical credential scope grammar, checked against the parent's ceiling.
+  string scope = 5;
+  // Omission requests no expiry only where the parent and server policy allow.
+  google.protobuf.Timestamp expires_at = 6;
+  bytes expected_delegation_version = 7;
+  // Proof by proof_public_key over the credential request's canonical unsigned
+  // statement. Both in-body proofs bind delegation, requested scope/expiry,
+  // expected version and operation ID; neither can be replayed for another key.
+  // CallContext independently authenticates and signs the complete request.
+  SignedRecord subject_possession = 8;
+}
+message DelegationCredentialResponse {
+  MutationReceipt receipt = 1;
+  IssuedCredential credential = 2;
+}
+
 message ResolveSignupInvitationRequest {
   bytes redemption_secret = 1;
 }

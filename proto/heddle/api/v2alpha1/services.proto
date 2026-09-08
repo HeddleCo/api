@@ -768,7 +768,7 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc CreatePrincipal(CreatePrincipalRequest) returns (AuthenticationResponse) {
+  rpc ProvisionAccount(ProvisionAccountRequest) returns (ProvisionAccountResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
@@ -777,6 +777,34 @@ service IdentityService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc CreateAnonymousSession(CreateAnonymousSessionRequest) returns (AnonymousSessionResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_NONE
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc IssueDelegationCredential(IssueDelegationCredentialRequest) returns (DelegationCredentialResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE

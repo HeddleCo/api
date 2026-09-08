@@ -60,7 +60,6 @@ message EntitlementRecord {
   string plan = 1;
   uint64 storage_used_bytes = 2;
   uint64 storage_limit_bytes = 3;
-  uint64 credit_balance = 4;
 }
 message SessionRecord {
   RecordRef ref = 1;

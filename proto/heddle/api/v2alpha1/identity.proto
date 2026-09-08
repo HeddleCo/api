@@ -375,7 +375,8 @@ message CredentialInspection {
 }
 // Provisional two-key possession, before an approving account is known.
 // SignedRecord format heddle.pairing-initiation.v2; each actual receiver key signs
-// domain || deterministic protobuf bytes. The host and operation prevent reuse.
+// domain || protobuf bytes in ascending tag order, omitting scalar defaults.
+// Oneof presence is preserved. The host and operation prevent reuse.
 // Credential-only receiver. Its subject key is not an Iroh endpoint.
 message BrowserPairingReceiver {}
 message PairingInitiationBinding {

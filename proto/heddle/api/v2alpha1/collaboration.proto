@@ -40,7 +40,7 @@ message DiscussionRecord {
   bool blocking = 6;
   uint64 turn_count = 7;
   RecordRef extracted_context = 8;
-  // Exact causal frontier observed at this record version. Pass these IDs to
+  // Exact replication-operation frontier at this record version. Pass these IDs to
   // AppendDiscussion; concurrent appends remain distinct until observed.
   repeated bytes causal_heads = 9;
 }
@@ -53,7 +53,7 @@ message DiscussionTurn {
   string agent_id = 5;
   repeated EntityRef mentions = 6;
   google.protobuf.Timestamp created_at = 7;
-  // Immutable causal identity and dependencies, shared across replicas.
+  // Immutable replication-operation identity and dependencies, shared across replicas.
   // These are separate from the addressable record ID and mutable view version.
   bytes causal_id = 8;
   repeated bytes causal_parents = 9;

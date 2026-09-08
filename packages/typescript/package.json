@@ -47,7 +47,8 @@
     "./attachment-authorization": "./dist/attachment-authorization.js",
     "./v2": "./dist/v2alpha1/index.js",
     "./v2/observation": "./dist/v2alpha1/observation.js",
-    "./v2/client": "./dist/v2alpha1/client.js"
+    "./v2/client": "./dist/v2alpha1/client.js",
+    "./v2/collaboration": "./dist/v2alpha1/collaboration.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.0",

@@ -724,8 +724,8 @@ service IdentityService {
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }

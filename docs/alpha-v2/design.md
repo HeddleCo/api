@@ -316,3 +316,13 @@ remain enforced, and accepted changes retain signed actor audit evidence.
 Identity-root changes, resource ownership transfers and purge retain their
 separate authority boundaries. The old owner-governance requirement must not
 survive as a hidden prerequisite for ordinary v2 spool administration.
+
+Agent derivation preserves the delegating human's effective authority unless
+the human supplies a narrower operation, resource, lifetime or delegation
+ceiling. Being an agent, or having additional Biscuit blocks, is not itself a
+reason to refuse an operation. Every descendant retains all ancestor caveats
+and revocation dependencies; delegation never creates rights the human lacks.
+Operations that create grants or credentials must preserve those ceilings in
+the resulting authority. Owner proofs, recovery windows and required co-signers
+still apply to their specific operations, irrespective of whether a human or
+agent submits the request. Key material is not inherited by copying a Biscuit.

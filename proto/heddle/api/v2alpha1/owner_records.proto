@@ -190,6 +190,60 @@ message SpoolOwnerGenesis {
 message SignedSpoolOwnerGenesis {
   SpoolOwnerGenesis genesis = 1;
   AuthorizationSignature owner_signature = 2;
+  // Exactly one of owner_signature or delegated_creation is present.
+  SpoolCreationProof delegated_creation = 3;
+}
+
+// Public association of a credential mint root with one exact owner authority
+// state. This grants no operations: ordinary Biscuit checks remain mandatory.
+// Canonical v1 fields follow tag order using fixed-width/length-prefixed encoding.
+// Domain: "heddle-mint-root-attachment-v1".
+message MintRootAttachment {
+  uint32 format_version = 1;
+  bytes account_uuid = 2;
+  bytes owner_state_hash = 3;
+  uint64 owner_sequence = 4;
+  AuthorizationVerificationKey owner_key = 5;
+  AuthorizationVerificationKey mint_root_key = 6;
+  int64 not_before_unix_seconds = 7;
+  int64 expires_at_unix_seconds = 8;
+  bytes nonce = 9;
+}
+message SignedMintRootAttachment {
+  MintRootAttachment attachment = 1;
+  AuthorizationSignature owner_signature = 2;
+}
+
+// A creator's statement of exact intended creation. created_at is NOT an
+// admission timestamp. Only actual current admission or independently retained
+// accepted evidence establishes whether this creation was permitted then.
+// Canonical v1 fields follow tag order; domain "heddle-spool-creation-v1".
+message SpoolCreationStatement {
+  uint32 format_version = 1;
+  // SHA-256("heddle-spool-owner-genesis-v1" || canonical genesis fields 1,2).
+  bytes genesis_digest = 2;
+  bytes account_uuid = 3;
+  bytes owner_state_hash = 4;
+  uint64 owner_sequence = 5;
+  AuthorizationVerificationKey creator_key = 6;
+  // Empty only for account-root creation.
+  bytes parent_spool_uuid = 7;
+  repeated string parent_path_segments = 8;
+  string name = 9;
+  int64 created_at_unix_seconds = 10;
+}
+message SpoolCreationProof {
+  SpoolCreationStatement statement = 1;
+  AuthorizationSignature creator_signature = 2;
+  // Sealed existing root-derived Biscuit, narrowed to exact CreateSpool method,
+  // parent scope, UUID, genesis digest and creator key. Never an unrestricted
+  // bearer or private attenuation key. A verifier checks all inherited caveats.
+  bytes sealed_biscuit = 3;
+  // Absent when the credential is rooted directly at the owner authority key.
+  SignedMintRootAttachment mint_root_attachment = 4;
+  // Complete witness for the statement's exact owner state. This witness and
+  // creator timestamp alone do not establish that fresh admission occurred.
+  OwnerHistory owner_history = 5;
 }
 
 // ── 3. Rotation and recovery ────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { clone, create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { SignedRecordSchema, type RecordRef, type SignedRecord } from "./common_pb.js";
+import { SignedRecordSchema, RecordRefSchema, type RecordRef, type SignedRecord } from "./common_pb.js";
 import { EndpointKind, type EndpointRef } from "./stream_pb.js";
 import { BeginPairingRequestSchema, CompletePairingRequestSchema, PairingInitiationBindingSchema,
   BrowserPairingCompletionBindingSchema, BrowserPairingApprovalBindingSchema,
@@ -25,7 +25,7 @@ async function verify(record: SignedRecord, format: string, publicKey: Uint8Arra
 }
 async function signed(format: string, canonicalRecord: Uint8Array, signer: PairingSigner) {
   const publicKey = signer.publicKey.slice();
-  const signature = await signer.sign(joined(utf8.encode(format + "\0"), canonicalRecord));
+  const signature = (await signer.sign(joined(utf8.encode(format + "\0"), canonicalRecord))).slice();
   const record = create(SignedRecordSchema, { format, canonicalRecord, signatures: [{ publicKey, signature }] });
   await verify(record, format, publicKey); return record;
 }
@@ -44,7 +44,7 @@ export async function signBrowserPairingInitiation(observedHost: EndpointRef, cl
 export async function signBrowserPairingCompletion(observedHost: EndpointRef, clientOperationId: string, pairing: RecordRef, observedApproval: BrowserPairingApprovalBinding, nowUnixSeconds: bigint, signer: PairingSigner): Promise<CompletePairingRequest> {
   host(observedHost); operation(clientOperationId); reference(pairing); approval(observedApproval);
   if (!equal(observedApproval.subjectPublicKey, signer.publicKey) || nowUnixSeconds < observedApproval.notBeforeUnixSeconds || nowUnixSeconds >= observedApproval.expiresAtUnixSeconds) throw new Error("Browser pairing approval key or lifetime mismatch");
-  const binding = create(BrowserPairingCompletionBindingSchema, { host: observedHost, clientOperationId, pairing, approval: clone(BrowserPairingApprovalBindingSchema, observedApproval) });
+  const binding = create(BrowserPairingCompletionBindingSchema, { host: observedHost, clientOperationId, pairing: clone(RecordRefSchema, pairing), approval: clone(BrowserPairingApprovalBindingSchema, observedApproval) });
   const canonical = toBinary(BrowserPairingCompletionBindingSchema, binding);
   const record = await signed(COMPLETION, canonical, signer);
   return create(CompletePairingRequestSchema, { clientOperationId, pairing: binding.pairing, proof: { case: "browserPossession", value: record } });

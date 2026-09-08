@@ -45,3 +45,13 @@ test('expiry, invalid signatures and mismatched subject keys cannot complete pai
   await assert.rejects(signBrowserPairingInitiation(binding.host, 'start', now, { ...signer, sign: async () => new Uint8Array(64) }), /signature/);
   await assert.rejects(signBrowserPairingCompletion(binding.host, 'finish', completion.pairing, binding.approval, now, { ...signer, publicKey: new Uint8Array(32) }), /key or lifetime/);
 });
+test('async signer cannot change the operation reference or current approval after signing starts', async () => {
+  const ref = structuredClone(completion.pairing);
+  const approval = structuredClone(binding.approval);
+  const finish = await signBrowserPairingCompletion(binding.host, 'browser-complete', ref, approval, now, { ...signer, sign: async data => {
+    ref.id = '00000000-0000-0000-0000-000000000099';
+    approval.accountId = '00000000-0000-0000-0000-000000000098';
+    return signer.sign(data);
+  } });
+  assert.deepEqual(toBinary(CompletePairingRequestSchema, finish), bytes(fixture.completion));
+});

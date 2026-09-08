@@ -316,8 +316,13 @@ checks against a mutable resource. The receiving endpoint derives identity and
 retains the original record; retrying the same genesis cannot mint another Thread.
 Clients use the negotiated native record encoder before asking their key to sign.
 
-Do not activate StartThread until the versioned immutable genesis encoding/hash
-is agreed, implemented and covered by cross-language vectors. A changed display
+The native `heddle-thread-genesis-v1` encoder and verifier live in Heddle's portable
+object-model/crypto crates. Its spool is a canonical non-nil UUID, never a mutable
+namespace/name address. `tests/fixtures/thread-genesis-v1.txt` is shared with the
+Heddle SDK: Rust checks canonical encoding, signature and typed identity;
+TypeScript checks identity, original signature and lossless protobuf relay using
+the same bytes. This does not provide a TypeScript canonical genesis encoder.
+A changed display
 name, intent version or tip does not change identity. The creation nonce permits
 distinct attempts with otherwise identical descriptive inputs. Existing UUIDs
 are not reinterpreted as 32-byte hashes; clean cutover establishes new identities.

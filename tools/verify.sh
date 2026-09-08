@@ -27,4 +27,4 @@ npm run typecheck
 node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs
 node tools/verify-treadle-conformance.mjs
-node --test tests/v2-stream.test.mjs tests/v2-client.test.mjs
+node --test tests/v2-stream.test.mjs tests/v2-client.test.mjs tests/v2-genesis.test.mjs

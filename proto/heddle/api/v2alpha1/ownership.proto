@@ -84,6 +84,8 @@ message PrepareAccountClaimResponse {
   // ceremony. Secret credential material is never an observation payload.
   bytes ceremony_biscuit = 3;
   google.protobuf.Timestamp expires_at = 4;
+  // Device-local label for the unclaimed human account, not a registry lookup.
+  string display_name = 5;
 }
 message SignAccountClaimRequest {
   string client_operation_id = 1;

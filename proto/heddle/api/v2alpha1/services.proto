@@ -449,7 +449,7 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
     };
   }
-  rpc BeginRegistration(BeginRegistrationRequest) returns (AuthenticationChallenge) {
+  rpc BeginRegistration(BeginRegistrationRequest) returns (RegistrationChallenge) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_NONE
       signing_tier: SIGNING_TIER_NONE

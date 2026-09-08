@@ -168,16 +168,68 @@ message IssuedCredential {
   CredentialKind kind = 5;
 }
 message BeginRegistrationRequest {
-  bytes root_public_key = 1;
+  // One Ed25519 device key for Biscuit authority and request possession.
+  // Completion proves this exact key; an existing bearer selects the account
+  // but never substitutes for the enrolling device's signature.
+  bytes caller_public_key = 1;
   string handle = 2;
-  RecordRef signup_invitation = 3;
+  string display_name = 3;
+  // Signup uses one previously admitted reservation. With no admission, an
+  // independently rooted bearer adds a device to its existing account, or a
+  // claimable agent bearer claims its account under a new handle. Anonymous
+  // signup preserves the anonymous account UUID. The challenge records which
+  // ceremony was admitted; completion cannot switch ceremonies or accounts.
+  oneof signup_admission {
+    RecordRef invitation_reservation = 4;
+    RecordRef verified_email = 5;
+  }
+}
+message RegistrationChallenge {
+  RecordRef ref = 1;
+  bytes challenge = 2;
+  string relying_party_id = 3;
+  string relying_party_name = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  // Stable UUID fixed before clients sign owner-root records. WebAuthn user.id
+  // is this string's UTF-8 encoding, including for anonymous promotion/claim.
+  string account_id = 6;
+  string handle = 7;
+  string display_name = 8;
+  UserVerification user_verification = 9;
+  // The passkey creation uses attestation="none". A follow-up assertion by
+  // that passkey proves its binding to caller_public_key using these bytes.
+  // The independent CallContext signature proves possession of the device key.
+  bytes device_binding_challenge = 10;
+  // Exact 32-byte nonce for OwnerKeyBinding; no extra challenge RPC is needed.
+  bytes owner_binding_nonce = 11;
+}
+message PasskeyRegistration {
+  bytes credential_id = 1;
+  bytes client_data_json = 2;
+  bytes attestation_object = 3;
+}
+message OwnerRegistration {
+  SignedOwnerRoot root = 1;
+  AuthorizationSignature proof_of_possession = 2;
+  OwnerKeyBinding binding = 3;
+  // Omission selects the independent guardians in the signed root; it never
+  // selects custodial recovery. Existing warning/consent rules still apply.
+  RegistrationRecoveryPolicy recovery = 4;
 }
 message CompleteRegistrationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
-  PasskeyProof passkey = 3;
-  RootAttachment root = 4;
-  SignedRecord possession_proof = 5;
+  PasskeyRegistration passkey = 3;
+  bytes caller_public_key = 4;
+  PasskeyProof device_binding = 5;
+  string device_label = 6;
+  // New signup establishes an owner root. Claim preserves the original
+  // deferred root and appends CLAIM_DEFERRED_HUMAN. Adding a passkey/device
+  // does not implicitly replace an existing owner root or change rooting tier.
+  oneof owner {
+    OwnerRegistration establish_owner = 7;
+    SignedOwnerKeyTransition claim_owner = 8;
+  }
 }
 message RegisterRootAttachmentRequest {
   string client_operation_id = 1;

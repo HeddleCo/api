@@ -78,6 +78,37 @@ message RecoveryPolicy {
   optional uint64 window_secs = 3;
 }
 
+// Registration defaults to this guardian M-of-N policy. If
+// OwnerRegistration.recovery is absent, the policy in the
+// signed root is treated as this branch and MUST contain a valid threshold and
+// at least one non-WEFT guardian. Absence never selects Weft custody.
+message GuardianRecoveryPolicySelection {
+  RecoveryPolicy policy = 1;
+}
+
+// Versioned evidence that the user saw and accepted the exact 1-of-1 Weft
+// custody warning. warning_sha256 is SHA-256 of the reviewed UTF-8 warning
+// text for warning_version; unknown versions and digests fail closed.
+message WeftCustodyWarningConsent {
+  uint32 warning_version = 1;
+  bytes warning_sha256 = 2;
+  int64 acknowledged_at_unix_seconds = 3;
+}
+
+// The only supported custodial recovery shape is exactly one WEFT guardian
+// with threshold one. It is never inferred from an omitted selection.
+message WeftCustodyRecoveryPolicySelection {
+  RecoveryGuardian guardian = 1;
+  WeftCustodyWarningConsent warning_consent = 2;
+}
+
+message RegistrationRecoveryPolicy {
+  oneof selection {
+    GuardianRecoveryPolicySelection guardians = 1;
+    WeftCustodyRecoveryPolicySelection weft_custody = 2;
+  }
+}
+
 // ── 1. Owner root ───────────────────────────────────────────────────────────
 
 message OwnerRoot {

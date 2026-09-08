@@ -1,7 +1,9 @@
 syntax = "proto3";
 package heddle.api.v2alpha1;
 
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/identity.proto";
 import "heddle/api/v2alpha1/owner_records.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
@@ -64,4 +66,37 @@ message TransferOwnershipRequest {
   ResourceOwnershipTransfer transfer = 4;
   // Both owner signatures bind one complete handoff and exact authority states.
   // Signed transfer_sequence supplies the resource precondition.
+}
+
+// Device-local consent for claiming an agent-rooted human account. Browser
+// possession and the explicit claim authorization are both required. Weft
+// independently verifies the registration; the device never submits it.
+message PrepareAccountClaimRequest {
+  string client_operation_id = 1;
+  bytes browser_public_key = 2;
+  string handle = 3;
+  bytes claim_authorization = 4;
+}
+message PrepareAccountClaimResponse {
+  MutationReceipt receipt = 1;
+  SignedOwnerRoot owner_root = 2;
+  // Short-lived, browser-key-bound attenuation limited to the registration
+  // ceremony. Secret credential material is never an observation payload.
+  bytes ceremony_biscuit = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+message SignAccountClaimRequest {
+  string client_operation_id = 1;
+  bytes claim_authorization = 2;
+  // Exact intended registration with owner unset. Consent verifies its browser
+  // key, account, handle and passkey proofs against the prepared ceremony.
+  CompleteRegistrationRequest registration = 3;
+  // CLAIM_DEFERRED_HUMAN with next-key/guardian possession proofs. The device
+  // checks the exact prior state and sequence, verifies all proofs and adds
+  // only its originating-authority signature; it cannot replace browser data.
+  SignedOwnerKeyTransition proposed_transition = 4;
+}
+message SignAccountClaimResponse {
+  MutationReceipt receipt = 1;
+  SignedOwnerKeyTransition transition = 2;
 }

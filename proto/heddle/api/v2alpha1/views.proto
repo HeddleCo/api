@@ -30,6 +30,12 @@ message ObserveThreadRequest {
 // One typed stream composes a Thread's decision context. Common frame controls
 // have no payload. Every data frame carries exactly one payload; snapshots and
 // delta batches become visible only at their checkpoint.
+// SectionReplacement.section and SectionStatus.section use these exact keys:
+// overview (overview); captures (capture); review (review, diff, evidence);
+// collaboration (discussion, turn, context); analysis (analysis); checkouts
+// (checkout); timeline (timeline_event, run, operation); sharing (sharing,
+// publication). Replacement clears only that section's committed collection.
+// Unknown section semantics require a fresh supported view, never silent loss.
 message ThreadEvent {
   StreamFrame frame = 1;
   oneof payload {

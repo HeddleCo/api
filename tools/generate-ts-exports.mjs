@@ -34,6 +34,7 @@ for (const name of readdirSync(root).filter((name) => name.endsWith(".ts"))) {
 const v2Root = join(apiRoot, "v2alpha1");
 copyFileSync("packages/typescript/runtime/v2-observation.ts", join(v2Root, "observation.ts"));
 copyFileSync("packages/typescript/runtime/v2-client.ts", join(v2Root, "client.ts"));
+copyFileSync("packages/typescript/runtime/v2-owner-certificates.ts", join(v2Root, "owner-certificates.ts"));
 copyFileSync("packages/typescript/runtime/v2-collaboration.ts", join(v2Root, "collaboration.ts"));
 copyFileSync("packages/typescript/runtime/v2-msgpack.ts", join(v2Root, "_collaboration-msgpack.ts"));
 const v2Modules = readdirSync(v2Root).filter((name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_")).sort();

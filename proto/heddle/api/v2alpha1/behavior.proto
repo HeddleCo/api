@@ -130,6 +130,11 @@ message BehaviorBranch {
   BehaviorProvenance provenance = 5;
 }
 
+message BehaviorByteSpan {
+  uint32 start_byte = 1;
+  uint32 end_byte = 2;
+}
+
 message BehaviorBinding {
   string id = 1;
   // The written occurrence remains an expression, even when resolved.
@@ -137,7 +142,9 @@ message BehaviorBinding {
   string name = 3;
   optional string value_id = 4;
   BehaviorSource declaration = 5;
-  BehaviorSource lexical_scope = 6;
+  // Half-open byte span in the declaration's exact revision/path/blob. The
+  // containing block's text is not repeated for every binding occurrence.
+  BehaviorByteSpan lexical_scope = 6;
   BehaviorSupport support = 7;
   repeated BehaviorLimitation limitations = 8;
   BehaviorProvenance provenance = 9;

@@ -71,3 +71,17 @@ fn public_catalog_has_no_account_or_private_collections() {
         ["query", "spools", "observe"]
     );
 }
+
+#[test]
+fn account_device_enrollment_requires_parent_possession_at_initiation() {
+    let begin =
+        heddle_api::v2::method_descriptor("/heddle.api.v2alpha1.IdentityService/BeginRegistration")
+            .expect("registration route");
+    assert_eq!(begin.signing_tier, SigningTier::ProofIfAuthenticated);
+    assert_eq!(begin.authorization_access, AuthorizationAccess::Public);
+    let complete = heddle_api::v2::method_descriptor(
+        "/heddle.api.v2alpha1.IdentityService/CompleteRegistration",
+    )
+    .expect("completion route");
+    assert_eq!(complete.signing_tier, SigningTier::ProofOfPossession);
+}

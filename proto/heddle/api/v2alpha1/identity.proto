@@ -89,6 +89,13 @@ message AuthenticationChallenge {
   string relying_party_id = 3;
   google.protobuf.Timestamp expires_at = 4;
   repeated bytes allowed_credential_ids = 5;
+  UserVerification user_verification = 6;
+}
+enum UserVerification {
+  USER_VERIFICATION_UNSPECIFIED = 0;
+  USER_VERIFICATION_REQUIRED = 1;
+  USER_VERIFICATION_PREFERRED = 2;
+  USER_VERIFICATION_DISCOURAGED = 3;
 }
 message PasskeyProof {
   bytes credential_id = 1;
@@ -96,17 +103,22 @@ message PasskeyProof {
   bytes authenticator_data = 3;
   bytes signature = 4;
   bytes attestation_object = 5;
+  // Raw WebAuthn response.userHandle, bound to the credential's account.
+  bytes user_handle = 6;
 }
 message BeginAuthenticationRequest {
   string account_hint = 1;
+  // Existing device key whose possession CompleteAuthentication must prove.
+  // The challenge records this key; sign-in never enrolls a new attachment.
   bytes caller_public_key = 2;
 }
 message CompleteAuthenticationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
   PasskeyProof passkey = 3;
-  RootAttachment caller = 4;
-  SignedRecord possession_proof = 5;
+  // Same key as BeginAuthentication. CallContext.request_proof signs the
+  // exact completion request with this key, including the passkey assertion.
+  bytes caller_public_key = 4;
 }
 message AuthenticationResponse {
   MutationReceipt receipt = 1;

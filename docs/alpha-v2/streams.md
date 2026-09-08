@@ -314,3 +314,29 @@ receiver validates the complete closure before installing it and emitting a
 `PublicationReceipt`. That receipt means durable content availability; only causal
 replication and explicit integration determine the Thread's heads. Clients can
 run these bulk streams beside the long-lived metadata exchange on one connection.
+
+Publication openings also name the source and destination endpoint keys. Both
+must match the authenticated transport; signing an opening for one receiver does
+not authorize forwarding it to another receiver. Every later client frame retains
+the opening's operation ID. A transport FIN does not substitute for `Finish`.
+
+The native source transfer sends one full pack followed by its index in the
+opening's inventory. Each artifact address is BLAKE3 of its entire byte stream,
+including its native checksum trailer. Chunk extents retain that artifact address
+and carry a contiguous offset, exact byte length, and BLAKE3 of the chunk bytes.
+Full canonical tree anchors keep private historical delta bases out of the pack.
+
+For this native profile, inventory bytes concatenate the length-delimited protobuf
+encoding of each planned `PackExtent` in order. The accepted inventory uses the
+native typed hash `thread-source-inventory-v1`. The plan digest uses
+`thread-source-transfer-v1` over the encoded opening client frame with its
+checkpoint cleared. Native typed hashes are BLAKE3 of the UTF-8 type prefix,
+the content length as a little-endian u64, one zero byte, and the content bytes.
+The transfer ID is the first 16 bytes of the plan digest.
+
+A receiver that commits complete closures returns a zero-byte checkpoint until
+publication commits. Interrupted scratch bytes are not durable progress. Retrying
+the same operation and plan with a fresh request proof replays the committed
+receipt, or restarts an uncommitted upload. The current receiver accepts that zero
+checkpoint and no resume token. Clients drain responses concurrently with uploads;
+their send loop cannot wait until completion to read checkpoint frames.

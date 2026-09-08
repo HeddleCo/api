@@ -137,6 +137,13 @@ WINDOW_CHANGED Reset. Never silently drop an event to keep a consumer current.
 A view has one consistency boundary per endpoint, not a distributed transaction
 across Weft and every device. Browser composition preserves source provenance.
 
+RPC metadata declares `live_stream` independently of retry behavior. Observe
+methods and Thread replication allow quiet intervals between complete messages.
+Finite content reads and source transfers retain operation-progress deadlines,
+including transfers that can resume. Every stream still bounds its initial
+response and incomplete frames. A canceled read preserves both partial framing
+and its original deadline; reconnecting is distinct from restarting that timer.
+
 Endpoints advertise positive default and maximum item/frame/snapshot/batch limits.
 Accepted budgets cannot exceed either the requested nonzero limit or endpoint
 maximum. The shared codec ceiling is 8 MiB per control message; endpoints should

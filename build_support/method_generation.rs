@@ -13,6 +13,7 @@ struct Method {
     output: String,
     route: String,
     streaming: &'static str,
+    live_stream: bool,
     effect: String,
     retry: String,
     signing: String,
@@ -67,6 +68,15 @@ pub fn write(
                 (false, true) => "ServerStreaming",
                 (true, true) => "Bidirectional",
             };
+            let live_stream = bool_value(&options, "live_stream")?;
+            if live_stream && !method.method_descriptor_proto().server_streaming() {
+                return Err(format!(
+                    "{}.{} declares live lifetime without a response stream",
+                    service.full_name(),
+                    method.name()
+                )
+                .into());
+            }
             let client_operation_id_field_number = method
                 .input()
                 .get_field_by_name("client_operation_id")
@@ -77,6 +87,7 @@ pub fn write(
                 output: method.output().full_name().to_string(),
                 route: format!("{}{}", service.name(), method.name()),
                 streaming,
+                live_stream,
                 effect: enum_variant(&options, "effect", "RPC_EFFECT_")?,
                 retry: enum_variant(&options, "retry_behavior", "RETRY_BEHAVIOR_")?,
                 signing: enum_variant(&options, "signing_tier", "SIGNING_TIER_")?,
@@ -306,6 +317,7 @@ fn render(methods: &[Method], complete_policy: bool) -> String {
          pub input: &'static str,\n\
          pub output: &'static str,\n\
          pub streaming: StreamingShape,\n\
+         pub live_stream: bool,\n\
          pub effect: RpcEffect,\n\
          pub retry_behavior: RetryBehavior,\n\
          pub signing_tier: SigningTier,\n\
@@ -348,11 +360,12 @@ fn render(methods: &[Method], complete_policy: bool) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         output.push_str(&format!(
-            "MethodDescriptor {{ {policy}path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, client_operation_id_field_number: {:?}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
+            "MethodDescriptor {{ {policy}path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, live_stream: {}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, client_operation_id_field_number: {:?}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
             method.path,
             method.input,
             method.output,
             method.streaming,
+            method.live_stream,
             method.effect,
             method.retry,
             method.signing,

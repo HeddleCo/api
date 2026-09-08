@@ -236,6 +236,11 @@ message RpcContract {
   repeated DeploymentTarget deployment_targets = 13;
   // Optional per-method maturity override. UNSPECIFIED inherits the service contract.
   ServiceMaturity maturity = 14;
+  // True only for long-lived response streams that may be quiet between
+  // complete messages. Initial response and partial-frame deadlines still
+  // apply. False retains finite-operation progress deadlines. Resumability
+  // alone does not imply liveness: source transfers are finite streams.
+  bool live_stream = 15;
 }
 
 // Machine-readable lifecycle semantics for the canonical Operation state enum.

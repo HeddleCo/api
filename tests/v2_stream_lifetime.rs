@@ -33,6 +33,14 @@ fn live_observations_and_replication_are_distinct_from_finite_resumable_transfer
                 service.name(),
                 method.name()
             );
+            let path = format!("/{}/{}", service.full_name(), method.name());
+            assert_eq!(
+                heddle_api::v2::method_descriptor(&path)
+                    .expect("generated descriptor")
+                    .live_stream,
+                expected,
+                "generated lifetime must match the schema"
+            );
             if expected {
                 live_count += 1;
                 assert!(

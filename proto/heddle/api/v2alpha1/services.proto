@@ -53,6 +53,7 @@ service WorkspaceService {
   };
   rpc ObserveWorkspace(ObserveWorkspaceRequest) returns (stream WorkspaceEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -90,6 +91,7 @@ service SpoolService {
   };
   rpc ObserveSpool(ObserveSpoolRequest) returns (stream SpoolEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -407,6 +409,7 @@ service IdentityService {
   };
   rpc ObserveIdentity(ObserveIdentityRequest) returns (stream IdentityEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -756,6 +759,7 @@ service IdentityService {
   }
   rpc ObservePairing(ObservePairingRequest) returns (stream PairingEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -836,6 +840,7 @@ service ThreadService {
   };
   rpc ObserveThreads(ObserveThreadsRequest) returns (stream ThreadListEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -849,6 +854,7 @@ service ThreadService {
   }
   rpc ObserveThread(ObserveThreadRequest) returns (stream ThreadEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1071,6 +1077,7 @@ service CollaborationService {
   };
   rpc ObserveCollaboration(ObserveCollaborationRequest) returns (stream CollaborationEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1188,6 +1195,7 @@ service AnalysisService {
   };
   rpc ObserveAnalysis(ObserveAnalysisRequest) returns (stream AnalysisEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1307,6 +1315,7 @@ service CheckoutService {
   };
   rpc ObserveCheckouts(ObserveCheckoutsRequest) returns (stream CheckoutEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1473,6 +1482,7 @@ service RunService {
   };
   rpc ObserveRuns(ObserveRunsRequest) returns (stream RunEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1551,6 +1561,7 @@ service AttentionService {
   };
   rpc ObserveAttention(ObserveAttentionRequest) returns (stream AttentionEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1599,6 +1610,7 @@ service NotificationService {
   };
   rpc ObserveNotifications(ObserveNotificationsRequest) returns (stream NotificationEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1664,6 +1676,7 @@ service OperationService {
   };
   rpc ObserveOperations(ObserveOperationsRequest) returns (stream OperationEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -1707,6 +1720,7 @@ service SyncService {
   // independent local operations do not contend on a remote Thread version.
   rpc ReplicateThread(stream ReplicateThreadRequest) returns (stream ReplicateThreadResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_STREAMING_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -1861,6 +1875,7 @@ service OwnerAuthorizationService {
   }
   rpc ObserveOwnership(ObserveOwnershipRequest) returns (stream OwnershipEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_READ_ONLY
@@ -2017,6 +2032,7 @@ service IntegrationService {
   }
   rpc ObserveIntegrations(ObserveIntegrationsRequest) returns (stream IntegrationEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
+      live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY

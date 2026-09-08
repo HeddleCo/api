@@ -394,19 +394,43 @@ message ResolveHandlesRequest {
   repeated string handles = 1;
   ReadBudget budget = 2;
 }
+enum HandleKind {
+  HANDLE_KIND_UNSPECIFIED = 0;
+  HANDLE_KIND_NATIVE = 1;
+  HANDLE_KIND_GITHUB = 2;
+  HANDLE_KIND_GITLAB = 3;
+}
+// Public directory metadata contains no stable subject/account identifiers.
+// ResolveResources supplies those only within an authorized resource scope.
+message PublicHandleRecord {
+  string display_name = 1;
+  string handle = 2;
+  string primary_handle = 3;
+  HandleKind kind = 4;
+  bool verified = 5;
+  string discriminator = 6;
+}
 message HandleResolution {
   string handle = 1;
-  string principal_id = 2;
   enum Status {
     STATUS_UNSPECIFIED = 0;
     STATUS_AVAILABLE = 1;
     STATUS_CLAIMED = 2;
     STATUS_HELD = 3;
     STATUS_UNAVAILABLE = 4;
+    STATUS_RESERVED = 5;
+    STATUS_CONFUSABLE = 6;
   }
   Status status = 3;
   repeated Requirement requirements = 4;
+  PublicHandleRecord public_handle = 5;
+  bool tombstoned = 6;
+  // An active verified-owner hold exists. A caller's own nonblocking hold
+  // yields AVAILABLE plus true; another owner's yields HELD. Never disclose
+  // the holder identity. ClaimHandle rechecks the caller's actual entitlement.
+  bool held_for_verified_owner = 7;
 }
+
 message ResolveHandlesResponse {
   repeated HandleResolution handles = 1;
 }
@@ -414,6 +438,20 @@ message ClaimHandleRequest {
   string client_operation_id = 1;
   string handle = 2;
   SignedRecord entitlement_proof = 3;
+}
+message RequestHeldHandleRequest {
+  string client_operation_id = 1;
+  string handle = 2;
+  // Preserve the existing normalized-name right-of-first-refusal transaction:
+  // an eligible request starts the 30-day window without exposing its owner.
+}
+message RequestHeldHandleResponse {
+  MutationReceipt receipt = 1;
+  google.protobuf.Timestamp right_of_first_refusal_deadline = 2;
+}
+message ClaimHandleResponse {
+  MutationReceipt receipt = 1;
+  PublicHandleRecord public_handle = 2;
 }
 message CreateSignupInvitationRequest {
   string client_operation_id = 1;

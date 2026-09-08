@@ -50,7 +50,7 @@ message ThreadOverview {
   string name = 2;
   bytes version = 3;
   ThreadIntent intent = 4;
-  RevisionRef tip = 5;
+  repeated RevisionRef source_heads = 5;
   RevisionRef base = 6;
   ThreadLifecycle lifecycle = 7;
   ReviewReadiness readiness = 8;
@@ -61,8 +61,10 @@ message ThreadOverview {
   uint64 capture_count = 13;
   uint64 open_discussion_count = 14;
   google.protobuf.Timestamp updated_at = 15;
-  // The source endpoint is in StreamOpen; never overwrite another source's tip
-  // merely because this observation arrived later.
+  RevisionRef integrated_revision = 16;
+  // All non-dominated accepted captures at this endpoint. Concurrent heads are
+  // preserved until explicit source integration; arrival time is not authority.
+  // The source endpoint and coverage remain part of the observation.
 }
 
 message ThreadQuery {

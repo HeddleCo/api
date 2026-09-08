@@ -33,7 +33,7 @@ transport bytes; it is not the authority or an application proxy.
 | Identity / Attention / Notification / Operation | Observe server streams | Account state and background changes |
 | Content / Search | Finite server streams | Batched exact-revision selections and bounded results |
 | Mutations | Typed unary request and receipt | Exact targets, versions, operation identity and recovery |
-| Sync | Native bidirectional Publish/Fetch and streamed provider extents | Thread-bound pack, provider and sidecar transfer |
+| Sync | Live ReplicateThread, bounded Fetch and streamed provider extents | Thread-bound pack, provider and sidecar transfer |
 | Integrations | Observe plus typed connection/import/sync commands | Provider setup, repositories and remote links |
 
 One logical RPC uses one reliable, ordered Iroh stream. Reuse the authenticated
@@ -245,26 +245,36 @@ existing schema definitions where their semantics are unchanged. They provide no
 compatibility route or fallback handler. The v1 package remains in this review
 branch to check existing fixtures; consumer deployment is a coordinated cutover.
 
-Publish/Fetch have native v2 openings binding Thread identity, exact revision,
-selected facets, policy version, operation identity and transfer checkpoint.
-Ready resolves the current Thread and advertised refs in the same stream, with
-owner genesis, have/need/missing inventory and explicit closure coverage.
-PackChunk carries an extent plus exactly its declared number of bytes. Negotiated
-frame limits apply before decoding; offsets, extent hashes, final object hashes
-and closure are verified before admission. Native and Git packs/indexes retain
-separate kinds. A transfer checkpoint names only verified durable progress and is
-bound to the opening/plan; changing the plan requires a fresh proof.
+ReplicateThread is the live durable exchange. Its authenticated opening binds
+Thread identity, selected facets, sharing policy, negotiated record formats and
+byte/item budgets. Both peers send Have, Need, Operations and Receipt frames.
+Causal parents are content-addressed operation IDs. Reconnection exchanges
+frontiers and repairs missing ancestry; duplicate delivery has no new effect.
+The stream remains open after catching up and delivers subsequent operations.
+The finite Publish RPC is removed; there is no migration bridge.
 
-Fetch may propose a provider plan. The client approves that exact digest and
-extents before any provider redemption; tickets bind provider, principal, scope,
-plan and extent and are not generic download capabilities. Owner genesis must be
-verified and pinned before admitting source or purge sidecars. Redaction,
-visibility and attachment sidecars retain their own authorship/integrity checks;
-purge additionally requires its owner chain and exact signed operation. A publish
-commit atomically checks expected remote version, still-effective sharing policy
-and the accepted inventory before advancing the remote Thread. PublicationReceipt
-reports that acceptance separately from local capture completion. Partial fetch
-must explicitly list missing material; it cannot imply full closure.
+A receipt distinguishes accepted, pending and rejected records. Accepted means
+the canonical operation and its validated causal closure are durable. Receiving
+bytes, storing a pending child, and having every source blob are different facts.
+Missing source objects remain explicit. Rejected local work is retained locally.
+An observation cursor and a transfer checkpoint are never causal frontiers.
+Each frame and list obeys negotiated bounds; large frontiers and operation sets
+are sent in bounded pages. Implementations must bound queued work and reconnect
+from durable state after lag, rather than buffering an unbounded history.
+
+Source and discussion histories have independent causal closure. Exporting one
+facet cannot force disclosure of an excluded facet or a private parent Thread.
+Changing policy or losing authority must stop further unauthorized export, even
+on an already-open stream. The receiver independently authorizes admission;
+valid signatures alone do not grant spool membership. A Thread view preserves
+all source heads; source integration adds a capture with the selected parents.
+
+Fetch remains a bounded source/object transfer and may propose a provider plan.
+The client approves the exact digest and extents before redemption. Tickets bind
+provider, principal, scope, plan and extent. Pack chunks are bounded and verified
+before object installation. Source, sidecar and owner-purge authority retain
+their independent checks. Bulk transfer should use separate Iroh streams so
+large source objects do not delay discussion or observation updates.
 
 Do not activate StartThread until the versioned immutable genesis encoding/hash
 is agreed, implemented and covered by cross-language vectors. A changed display
@@ -272,12 +282,10 @@ name, intent version or tip does not change identity. The creation nonce permits
 distinct attempts with otherwise identical descriptive inputs. Existing UUIDs
 are not reinterpreted as 32-byte hashes; clean cutover establishes new identities.
 
-Cross-device writer ownership/handoff remains an open product decision. This
-candidate does not create a global lease or silently permit concurrent offline
-writers. Preserve #1718's local writer behavior and independent hosted landing
-until that policy is decided. Portable user-root attachment, canonical signed
-human actions, private disclosure policy and native v2 transfer proof also need
-versioned formats and real verifiers before their routes are advertised.
+Separate checkouts may write the same Thread, including offline. One checkout
+has one writer. Incoming replication never rewrites its working files. Portable
+user-root attachment, canonical signed human actions and disclosure policy need
+real verifiers before their routes are advertised.
 
 Next consumer work must prove: one useful page read per source without per-row
 fan-out; offline private browser access; hosted landing with devices offline;

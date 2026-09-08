@@ -10,7 +10,7 @@ AgentService.GetAgentPolicy,RunService.ObserveRuns,native_contract,"Align signed
 AgentService.UpdateAgentPolicy,RunService.PutRunPolicy,native_contract,"Align signed delegation, retention/disclosure separation and user-root authority before committing to existing shapes."
 AgentService.ListHarnessPreferences,RunService.ObserveRuns,native_contract,"Align signed delegation, retention/disclosure separation and user-root authority before committing to existing shapes."
 AgentService.DeleteHarnessPreference,RunService.PutRunPolicy,native_contract,"Align signed delegation, retention/disclosure separation and user-root authority before committing to existing shapes."
-AgentGatewayService.Connect,SyncService.Publish;RunService.ObserveRuns;RunService.ControlRun,native_contract,"Keep distinct durable replication, ephemeral activity and delivery lifecycles over shared connections."
+AgentGatewayService.Connect,SyncService.ReplicateThread;RunService.ObserveRuns;RunService.ControlRun,native_contract,"Keep distinct durable replication, ephemeral activity and delivery lifecycles over shared connections."
 AttentionService.GetFeedSnapshot,AttentionService.ObserveAttention,native_contract,Page beyond current cap; attach enough typed target data to render/action cards without hydration fan-out.
 AttentionService.RecordInteraction,AttentionService.RecordInteraction,native_contract,Preserve interaction and resolution semantics separately from underlying discussion/thread records.
 AttentionService.StreamFeed,AttentionService.ObserveAttention,native_contract,Page beyond current cap; attach enough typed target data to render/action cards without hydration fan-out.
@@ -134,8 +134,8 @@ RegistryService.UpdateSpoolSettings,SpoolService.ReviseSpool,native_contract,Typ
 RegistryService.UpsertBookmark,SpoolService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RepoSyncService.ListRefs,ThreadService.ObserveThreads;SyncService.Fetch,native_contract,Advertise refs/HEAD/identities within transfer opening when useful; retain paging for large catalogs.
 RepoSyncService.Pull,SyncService.Fetch,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
-RepoSyncService.Push,SyncService.Publish,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
-RepoSyncService.UpdateRef,SyncService.Publish,native_contract,Stable typed selector and exact old/new revision; no redundant name+ID discovery once identity is known.
+RepoSyncService.Push,SyncService.ReplicateThread,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
+RepoSyncService.UpdateRef,SyncService.ReplicateThread,native_contract,Stable typed selector and exact old/new revision; no redundant name+ID discovery once identity is known.
 RepositoryService.GetBlame,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
 RepositoryService.GetBlob,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
 RepositoryService.GetCompare,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.

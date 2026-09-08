@@ -97,7 +97,8 @@ message OpenDiscussionRequest {
 message AppendDiscussionRequest {
   string client_operation_id = 1;
   RecordRef discussion = 2;
-  bytes expected_version = 3;
+  // Heads the author observed; concurrent appends are retained.
+  repeated bytes causal_parents = 3;
   string body = 4;
   repeated EntityRef mentions = 5;
 }

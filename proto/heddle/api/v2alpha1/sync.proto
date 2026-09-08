@@ -35,17 +35,6 @@ message TransferSelection {
 message TransferProof {
   SignedRecord opening = 1;
 }
-message PublishOpen {
-  ThreadRef thread = 1;
-  RevisionRef source = 2;
-  bytes expected_remote_version = 3;
-  bytes sharing_policy_version = 4;
-  TransferSelection selection = 5;
-  repeated TransferObject inventory = 6;
-  TransferCheckpoint checkpoint = 7;
-  TransferProof proof = 8;
-  SignedRecord thread_genesis = 9;
-}
 message FetchOpen {
   ThreadRef thread = 1;
   RevisionRef revision = 2;
@@ -124,19 +113,6 @@ message ProviderResult {
   bytes plan_digest = 1;
   repeated ObjectAddress verified_extents = 2;
 }
-message TransferCommit {
-  bytes plan_digest = 1;
-  ObjectAddress inventory_digest = 2;
-}
-message PublishClientFrame {
-  string client_operation_id = 1;
-  oneof body {
-    PublishOpen open = 2;
-    PackChunk pack = 3;
-    TransferSidecar sidecar = 4;
-    TransferCommit commit = 5;
-  }
-}
 message PublicationReceipt {
   string client_operation_id = 1;
   EndpointRef destination = 2;
@@ -147,13 +123,6 @@ message PublicationReceipt {
   oneof outcome {
     Applied accepted = 7;
     heddle.api.v1alpha1.CallFailure rejected = 8;
-  }
-}
-message PublishServerFrame {
-  oneof body {
-    TransferReady ready = 1;
-    TransferCheckpoint checkpoint = 2;
-    PublicationReceipt receipt = 3;
   }
 }
 message FetchClientFrame {
@@ -190,5 +159,76 @@ message ProviderExtentEvent {
     PackExtent ready = 1;
     PackChunk chunk = 3;
     TransferCheckpoint complete = 2;
+  }
+}
+
+// A causal frontier is portable within its exact Thread/facet/format. It is
+// never an Observe cursor or a bulk-transfer checkpoint. Heads are paged using
+// the negotiated max_items; repeated Have frames contribute to the same round.
+message CausalFrontier {
+  SharedFacet facet = 1;
+  repeated bytes heads = 2;
+}
+message ReplicationOpen {
+  ThreadRef thread = 1;
+  repeated SharedFacet facets = 2;
+  bytes sharing_policy_version = 3;
+  SignedRecord thread_genesis = 4;
+  ReadBudget budget = 5;
+  repeated string record_formats = 6;
+  // Fresh session binding; the request PoP covers this exact opening.
+  bytes session_nonce = 7;
+}
+message ReplicationReady {
+  EndpointRef endpoint = 1;
+  ThreadRef thread = 2;
+  repeated SharedFacet facets = 3;
+  bytes sharing_policy_version = 4;
+  ReadBudget budget = 5;
+  repeated string record_formats = 6;
+}
+message ReplicationHave {
+  repeated CausalFrontier frontiers = 1;
+}
+message ReplicationNeed {
+  // Content-addressed canonical Thread operation IDs, exactly 32 bytes each.
+  repeated bytes operation_ids = 1;
+}
+message ReplicationOperations {
+  // Each canonical record binds Thread, facet and causal parents. Peers verify
+  // the format, ID, authorization and dependency scope before admitting it.
+  repeated SignedRecord operations = 1;
+}
+message ReplicationRejection {
+  bytes operation_id = 1;
+  heddle.api.v1alpha1.CallFailure failure = 2;
+}
+message ReplicationReceipt {
+  // Accepted means durably stored with accepted causal closure. A record merely
+  // received with missing parents is pending, and must not advance this frontier.
+  repeated bytes accepted_operation_ids = 1;
+  repeated bytes pending_operation_ids = 2;
+  repeated ReplicationRejection rejected = 3;
+  repeated CausalFrontier accepted_frontiers = 4;
+  // Metadata admission is distinct from source/object availability.
+  repeated TransferObject missing_objects = 5;
+  bytes sharing_policy_version = 6;
+}
+message ReplicateThreadRequest {
+  oneof body {
+    ReplicationOpen open = 1;
+    ReplicationHave have = 2;
+    ReplicationNeed need = 3;
+    ReplicationOperations operations = 4;
+    ReplicationReceipt receipt = 5;
+  }
+}
+message ReplicateThreadResponse {
+  oneof body {
+    ReplicationReady ready = 1;
+    ReplicationHave have = 2;
+    ReplicationNeed need = 3;
+    ReplicationOperations operations = 4;
+    ReplicationReceipt receipt = 5;
   }
 }

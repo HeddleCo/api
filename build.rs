@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "AttentionEvent.payload",
         "NotificationEvent.payload",
         "OperationEvent.payload",
-        "PublishClientFrame.body",
+        "ReplicateThreadRequest.body",
         "FetchClientFrame.body",
         "FetchServerFrame.body",
     ] {

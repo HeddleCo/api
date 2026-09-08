@@ -1,6 +1,7 @@
 //! Generated transport-neutral Rust types for the Heddle API.
 
 pub mod framing;
+mod failure;
 pub mod signing;
 mod transport;
 pub mod treadle;

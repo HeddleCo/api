@@ -162,6 +162,10 @@ message PublishContentOpen {
   // merely because they were included in a source pack.
   repeated PackExtent packs = 4;
   TransferCheckpoint checkpoint = 5;
+  // Bound by the opening proof and checked against the authenticated transport.
+  // A proof for one receiver cannot be forwarded to publish at another.
+  EndpointRef source = 6;
+  EndpointRef destination = 7;
 }
 message PublishContentFinish {
   // Names the server's current committed transfer plan, not a caller assertion

@@ -306,3 +306,13 @@ to sign in the same operation. This branch requires an active server-rooted
 account, its configured secret store and current per-user authority; it does not
 create a root, export a private key or use the deployment's signing key. Its
 response has the same portable proof shape, without a second signing RPC.
+
+### Delegated spool administration
+
+Spool settings, sharing, invitations and review policies are ordinary
+administration within the caller's delegated permissions. They do not require a
+second owner signature. Grant ceilings, caveats, expiry and resource versions
+remain enforced, and accepted changes retain signed actor audit evidence.
+Identity-root changes, resource ownership transfers and purge retain their
+separate authority boundaries. The old owner-governance requirement must not
+survive as a hidden prerequisite for ordinary v2 spool administration.

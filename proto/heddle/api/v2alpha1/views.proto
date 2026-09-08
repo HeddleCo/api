@@ -29,7 +29,7 @@ message ObserveThreadRequest {
   ThreadRef thread = 1;
   repeated ThreadSection sections = 2;
   // Optional exact compared revisions; omitting them resolves once in the
-  // snapshot and returns the resolved IDs in the overview/review records.
+  // snapshot and returns the exact pair in the review comparison payload.
   RevisionRef source = 3;
   RevisionRef base = 4;
   ThreadPages pages = 5;
@@ -43,7 +43,7 @@ message ObserveThreadRequest {
 // have no payload. Every data frame carries exactly one payload; snapshots and
 // delta batches become visible only at their checkpoint.
 // SectionReplacement.section and SectionStatus.section use these exact keys:
-// overview (overview); captures (capture); review (review, diff, evidence);
+// overview (overview); captures (capture); review (comparison, review, diff, evidence);
 // collaboration (discussion, turn, context); analysis (analysis); checkouts
 // (checkout); timeline (timeline_event, run, operation); sharing (sharing,
 // publication). Replacement clears only that section's committed collection.
@@ -70,6 +70,7 @@ message ThreadEvent {
     PublicationReceipt publication = 18;
     SectionReplacement replace_section = 19;
     SignedRecord signed_operation = 20;
+    ReviewComparison comparison = 21;
   }
 }
 

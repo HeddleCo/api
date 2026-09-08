@@ -132,6 +132,15 @@ message ThreadSharingPolicy {
   bool ongoing = 4;
 }
 
+// Exact comparison resolved within a review-section snapshot. A client submits
+// these source/base/policy bytes when recording a decision; a Thread's genesis
+// base and an arbitrary source head are not substitutes for this binding.
+message ReviewComparison {
+  RevisionRef source = 1;
+  RevisionRef base = 2;
+  bytes policy_version = 3;
+}
+
 message ReviewDecision {
   RecordRef ref = 1;
   ThreadRef thread = 2;

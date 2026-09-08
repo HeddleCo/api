@@ -43,6 +43,41 @@ impl MessageReader for TestReader {
 }
 
 struct TestWriter;
+
+#[test]
+fn adapter_extracts_operation_identity_from_v2_descriptor() {
+    use heddle_api::v2::client::Rpc;
+    let request = StartThreadRequest {
+        client_operation_id: "start-1".into(),
+        ..Default::default()
+    };
+    assert_eq!(
+        rpc::ThreadServiceStartThread::METHOD
+            .client_operation_id(&request.encode_to_vec())
+            .expect("metadata"),
+        Some("start-1")
+    );
+    assert_eq!(
+        rpc::ThreadServiceObserveThreads::METHOD
+            .client_operation_id(&ObserveThreadsRequest::default().encode_to_vec())
+            .expect("read metadata"),
+        None
+    );
+}
+
+#[test]
+fn blob_source_is_exclusive_and_preserves_an_exact_hash() {
+    use heddle_api::heddle::api::v2alpha1::{BlobRead, blob_read};
+    let request = BlobRead {
+        source: Some(blob_read::Source::ObjectHash(vec![7; 32])),
+        offset: 11,
+        length: 17,
+    };
+    assert_eq!(
+        BlobRead::decode(request.encode_to_vec().as_slice()).expect("blob source"),
+        request
+    );
+}
 impl MessageWriter for TestWriter {
     type Error = io::Error;
     fn send(&mut self, _: Vec<u8>) -> impl Future<Output = Result<(), io::Error>> {
@@ -175,6 +210,28 @@ fn dropping_a_live_observation_cancels_only_its_stream() {
     assert!(!cancelled.load(Ordering::SeqCst));
     drop(events);
     assert!(cancelled.load(Ordering::SeqCst));
+}
+
+#[test]
+fn explicit_cancellation_ends_a_live_observation_without_draining_it() {
+    let transport = TestTransport::default();
+    let cancelled = transport.cancelled.clone();
+    let client = Client::new(
+        transport,
+        ["/heddle.api.v2alpha1.ThreadService/ObserveThreads".into()],
+    );
+    let mut events = completed(
+        client.observe::<rpc::ThreadServiceObserveThreads>(&ObserveThreadsRequest::default()),
+    )
+    .expect("observation");
+    events.cancel();
+    events.cancel();
+    assert!(cancelled.load(Ordering::SeqCst));
+    assert!(
+        completed(events.next())
+            .expect("cancelled stream")
+            .is_none()
+    );
 }
 
 #[test]

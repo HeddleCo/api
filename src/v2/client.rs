@@ -167,6 +167,17 @@ pub struct Messages<R: MessageReader, O> {
     message: PhantomData<O>,
 }
 
+impl<R: MessageReader, O> Messages<R, O> {
+    /// Stop receiving without cancelling any durable server operation. This is
+    /// also safe to call after a typed terminal control such as StreamComplete.
+    pub fn cancel(&mut self) {
+        if !self.done {
+            self.reader.cancel();
+            self.done = true;
+        }
+    }
+}
+
 impl<R: MessageReader, O: Message + Default> Messages<R, O> {
     pub async fn next(&mut self) -> Result<Option<O>, ClientError<R::Error>> {
         if self.done {
@@ -192,9 +203,7 @@ impl<R: MessageReader, O: Message + Default> Messages<R, O> {
 
 impl<R: MessageReader, O> Drop for Messages<R, O> {
     fn drop(&mut self) {
-        if !self.done {
-            self.reader.cancel();
-        }
+        self.cancel();
     }
 }
 

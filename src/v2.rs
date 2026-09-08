@@ -8,6 +8,20 @@ use crate::heddle::api::v2alpha1::{StreamDataKind, StreamFrame, stream_frame};
 
 include!(concat!(env!("OUT_DIR"), "/heddle_api_v2_methods.rs"));
 
+impl MethodDescriptor {
+    /// Extract the operation ID for the transport context from the exact request
+    /// bytes. Adapters must not maintain a second route/field-number inventory.
+    pub fn client_operation_id<'a>(
+        &self,
+        request: &'a [u8],
+    ) -> Result<Option<&'a str>, crate::RequestMetadataError> {
+        self.client_operation_id_field_number
+            .map(|field| crate::transport::protobuf_string_field(request, field))
+            .transpose()
+            .map(Option::flatten)
+    }
+}
+
 /// Upper bound for an opaque observation cursor; independent of payload limits.
 pub const MAX_CURSOR_BYTES: usize = 4096;
 

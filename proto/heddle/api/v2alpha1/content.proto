@@ -14,7 +14,15 @@ message TreeRead {
 }
 
 message BlobRead {
-  string path = 1;
+  oneof source {
+    string path = 1;
+    // Exact native blob content hash, 32 bytes. The endpoint MUST prove the
+    // object is reachable from ReadContentRequest.revision and authorize that
+    // revision before serving it. Possessing a hash confers no authority.
+    // This permits Heddle's lazy object hydration without resolving a path or
+    // downloading a revision pack merely to retrieve one missing blob.
+    bytes object_hash = 4;
+  }
   uint64 offset = 2;
   uint64 length = 3;
 }

@@ -70,3 +70,12 @@ Retain the strong existing contract machinery: deterministic Rust/TypeScript sig
 The user confirmed that Tapestry should combine one Thread across devices and Weft while keeping device checkouts distinct. Local actions explicitly target a checkout. This affects identity, view composition, and mutation routing; it does not imply syncing private state to Weft.
 
 The [candidate surface map](v1-disposition.csv) assigns a proposed disposition and rationale to all 184 methods. It includes account/device lifecycle, collaboration/review, policy/governance, imports and Git remotes, search, background work, and optional confidential persistence so fewer first-page calls do not conceal missing functionality. These are design dispositions, not proof that every candidate removal has no remaining caller. The [v2 proposal](design.md) adds the missing device operations and cross-cutting contracts that an inventory of existing RPCs cannot capture.
+# Heddle client exercise
+
+The Heddle client experiment based on merged Heddle #1718 adds three concrete
+requirements to the candidate contract: exact-revision blob selection by native
+hash as well as path; operation-ID extraction on generated v2 descriptors; and
+explicit cancellation on typed Rust observations. Hash reads must prove
+reachability from the authorized requested revision. The hash itself grants no
+access. These changes support lazy hydration and a single typed Iroh adapter
+without adding name lookups, route catalogs, or v1 RPC forwarding.

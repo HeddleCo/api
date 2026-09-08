@@ -1,7 +1,9 @@
 #![cfg(feature = "reflection")]
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v1alpha1::{AuthorizationAccess, AuthorizationRole, AuthorizationScopeSource, SigningTier},
+    heddle::api::v1alpha1::{
+        AuthorizationAccess, AuthorizationRole, AuthorizationScopeSource, SigningTier,
+    },
 };
 use prost_reflect::DescriptorPool;
 
@@ -19,17 +21,24 @@ fn billing_targets_the_authenticated_account_with_effective_delegated_authority(
         if method.name() == "ObserveBilling" {
             assert_eq!(descriptor.signing_tier, SigningTier::ProofIfAuthenticated);
             assert_eq!(descriptor.authorization_access, AuthorizationAccess::Public);
-            assert_eq!(method.input().get_field_by_name("plans_only").expect("explicit public-only selector").number(), 3);
+            assert_eq!(
+                method
+                    .input()
+                    .get_field_by_name("plans_only")
+                    .expect("explicit public-only selector")
+                    .number(),
+                3
+            );
         } else {
-        assert_eq!(descriptor.signing_tier, SigningTier::ProofOfPossession);
-        assert_eq!(
-            descriptor.authorization.role,
-            AuthorizationRole::CallerBound
-        );
-        assert_eq!(
-            descriptor.authorization.scope_source,
-            AuthorizationScopeSource::CallerSubject
-        );
+            assert_eq!(descriptor.signing_tier, SigningTier::ProofOfPossession);
+            assert_eq!(
+                descriptor.authorization.role,
+                AuthorizationRole::CallerBound
+            );
+            assert_eq!(
+                descriptor.authorization.scope_source,
+                AuthorizationScopeSource::CallerSubject
+            );
         }
         assert!(method.input().get_field_by_name("account_id").is_none());
         assert!(method.input().get_field_by_name("customer_id").is_none());
@@ -177,4 +186,33 @@ fn device_revocation_consumes_the_observed_registry_identity_and_version() {
         request.get_field_by_name("revocation").is_none(),
         "ordinary delegated revocation does not invent an owner ceremony"
     );
+}
+
+#[test]
+fn public_plan_preserves_tiered_pricing_and_unknown_storage() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract");
+    let plan = pool
+        .get_message_by_name("heddle.api.v2alpha1.BillingPlan")
+        .expect("plan");
+    for name in [
+        "storage_bytes",
+        "storage_base_bytes",
+        "storage_per_seat_bytes",
+    ] {
+        let field = plan
+            .get_field_by_name(name)
+            .expect("published storage allowance");
+        assert_eq!(field.kind(), prost_reflect::Kind::Uint64);
+        assert!(field.supports_presence(), "unknown storage is not zero");
+    }
+    let pricing = pool
+        .get_message_by_name("heddle.api.v2alpha1.BillingSeatPricing")
+        .expect("full seat schedule");
+    assert!(
+        pricing
+            .get_field_by_name("tiers")
+            .expect("all tiers")
+            .is_list()
+    );
+    assert!(plan.get_field_by_name("tier").is_some());
 }

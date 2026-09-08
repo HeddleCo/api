@@ -47,6 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ReplicateThreadRequest.body",
         "FetchClientFrame.body",
         "FetchServerFrame.body",
+        "PublishContentServerFrame.body",
     ] {
         config.type_attribute(
             format!(".heddle.api.v2alpha1.{oneof}"),

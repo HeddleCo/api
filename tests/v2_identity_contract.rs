@@ -4,6 +4,49 @@ use heddle_api::FILE_DESCRIPTOR_SET;
 use prost_reflect::{DescriptorPool, Kind};
 
 #[test]
+fn passkey_sign_in_carries_browser_options_and_one_device_proof() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
+    let proof = pool
+        .get_message_by_name("heddle.api.v2alpha1.PasskeyProof")
+        .expect("proof");
+    assert_eq!(
+        proof
+            .get_field_by_name("user_handle")
+            .expect("credential owner binding")
+            .kind(),
+        Kind::Bytes
+    );
+    let complete = pool
+        .get_message_by_name("heddle.api.v2alpha1.CompleteAuthenticationRequest")
+        .expect("completion");
+    assert_eq!(
+        complete
+            .get_field_by_name("caller_public_key")
+            .expect("same device key as challenge")
+            .kind(),
+        Kind::Bytes
+    );
+    assert!(
+        complete.get_field_by_name("caller").is_none(),
+        "sign-in does not enroll an attachment"
+    );
+    assert!(
+        complete.get_field_by_name("possession_proof").is_none(),
+        "CallContext carries the exact request PoP"
+    );
+    let challenge = pool
+        .get_message_by_name("heddle.api.v2alpha1.AuthenticationChallenge")
+        .expect("challenge");
+    assert!(matches!(
+        challenge
+            .get_field_by_name("user_verification")
+            .expect("browser authenticator policy")
+            .kind(),
+        Kind::Enum(_)
+    ));
+}
+
+#[test]
 fn onboarding_distinguishes_human_accounts_delegations_and_anonymous_continuity() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
     let identity = pool

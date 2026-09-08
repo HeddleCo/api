@@ -63,7 +63,8 @@ message BehaviorDependencies {
   // Extraction: exact blob bytes + grammar + symbol/expression versions.
   // Binding: extraction + the complete containing lexical source, including
   // declarations and writes. Comparison: both binding artifacts + comparison
-  // version + exact revision pair/path/selectors. Hashes are domain-separated.
+  // version + exact revision pair/path. Selection caches additionally bind
+  // query paths/symbols. Hashes are domain-separated.
   bytes base_extraction = 1;
   bytes source_extraction = 2;
   bytes base_bindings = 3;

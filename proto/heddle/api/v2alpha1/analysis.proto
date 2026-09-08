@@ -27,7 +27,9 @@ message AnalysisRecord {
   Coverage coverage = 7;
   RecordRef operation = 8;
   bytes version = 9;
-  uint64 finding_count = 10;
+  // Exact total only when known. A bounded/partial projection must not report
+  // the current page's size as the total or use zero to mean unknown.
+  optional uint64 finding_count = 10;
 }
 
 message AnalysisFinding {

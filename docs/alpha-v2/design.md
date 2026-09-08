@@ -258,3 +258,22 @@ code possession and the shared invitation peer budget are its boundary.
 `ResolveSignupInvitation` is an optional invitation-page read. It carries typed
 availability, inviter display context and bound email so rendering that page
 needs no profile lookups. Coverage and invitation validity are separate concepts.
+
+Email signup keeps delivery and mailbox possession separate. The dedicated,
+independently rooted signup-mailer service account calls BeginEmailVerification
+with the email, chosen handle and optional held invitation code. Its existing
+bearer-only credential remains supported. Weft returns a challenge and delivery
+proof to that trusted delivery service; Tapestry sends the proof to the mailbox
+and excludes it from the browser's begin response. Without a code, the ceremony
+uses an invitation already bound to the requested email. No email binding or
+account creation occurs merely because delivery was requested.
+
+CompleteEmailVerification proves the delivered challenge without an account
+credential. It atomically consumes the challenge, binds the selected invitation
+if necessary, creates a short-lived VerifiedEmailReservation and records its
+public receipt. The reservation carries the bound handle and email and feeds
+BeginRegistration directly. Retries require the same request, current authority
+for privileged delivery, and still-current admission for completion; neither
+expired proof nor revoked/consumed invitation is revived by a cached receipt.
+Delivery proofs remain outside public deduplication receipts. This replaces the
+former email-bootstrap Biscuit and separate invitation-binding RPC.

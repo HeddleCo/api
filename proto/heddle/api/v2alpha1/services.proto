@@ -732,29 +732,29 @@ service IdentityService {
   rpc BeginEmailVerification(BeginEmailVerificationRequest) returns (EmailVerificationChallenge) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
-      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc CompleteEmailVerification(CompleteEmailVerificationRequest) returns (MutationResponse) {
+  rpc CompleteEmailVerification(CompleteEmailVerificationRequest) returns (CompleteEmailVerificationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_identity: STABLE_SIGNING_IDENTITY_NONE
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_PUBLIC
-      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
-      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc ObservePairing(ObservePairingRequest) returns (stream PairingEvent) {

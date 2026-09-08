@@ -401,17 +401,37 @@ message RedeemSignupInvitationResponse {
 message BeginEmailVerificationRequest {
   string client_operation_id = 1;
   string email = 2;
-  RecordRef invitation = 3;
+  // Optional held shareable code for binding an invitation after mailbox proof.
+  // Empty selects an existing invitation already bound to this email.
+  bytes invitation_code = 3;
+  string handle = 4;
 }
+// Only the endpoint's authenticated, independently rooted signup-mailer
+// service account may begin delivery. Its bearer is the possession factor.
 message EmailVerificationChallenge {
   MutationReceipt receipt = 1;
   RecordRef challenge = 2;
   google.protobuf.Timestamp expires_at = 3;
+  // Secret for the delivery service to send to the specified mailbox. Never
+  // return this field in a browser's begin-signup response. The durable public
+  // receipt excludes it; an authorized retry may retrieve it while still live.
+  bytes delivery_proof = 4;
 }
 message CompleteEmailVerificationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
   bytes proof = 3;
+}
+message VerifiedEmailReservation {
+  // Use directly as BeginRegistration.verified_email; no bootstrap Biscuit.
+  RecordRef ref = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string handle = 3;
+  string email = 4;
+}
+message CompleteEmailVerificationResponse {
+  MutationReceipt receipt = 1;
+  VerifiedEmailReservation reservation = 2;
 }
 
 // Invite-gated creation of an unclaimed human account. The independent root

@@ -12,6 +12,9 @@ message SourceAnchor {
   string symbol_id = 3;
   optional uint32 start_line = 4;
   optional uint32 end_line = 5;
+  // Owning Thread for replicated source annotations; its spool must equal the
+  // exact revision spool. Source bytes alone do not identify a causal history.
+  ThreadRef thread = 6;
 }
 
 message CollaborationAnchor {
@@ -79,6 +82,9 @@ message ObserveCollaborationRequest {
   bool include_history = 6;
   PageRequest page = 7;
   ObserveOptions observe = 8;
+  // Include original author-signed operations for portable replica ingestion.
+  // UI-only consumers can omit them; projection versions are not causal proofs.
+  bool include_operations = 9;
 }
 
 message CollaborationEvent {
@@ -89,6 +95,7 @@ message CollaborationEvent {
     ContextRecord context = 4;
     Removal removal = 5;
     SectionStatus status = 6;
+    SignedRecord operation = 7;
   }
 }
 

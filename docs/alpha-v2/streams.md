@@ -33,7 +33,7 @@ transport bytes; it is not the authority or an application proxy.
 | Identity / Attention / Notification / Operation | Observe server streams | Account state and background changes |
 | Content / Search | Finite server streams | Batched exact-revision selections and bounded results |
 | Mutations | Typed unary request and receipt | Exact targets, versions, operation identity and recovery |
-| Sync | Live ReplicateThread, bounded Fetch and streamed provider extents | Thread-bound pack, provider and sidecar transfer |
+| Sync | Live ReplicateThread, bounded PublishContent/Fetch and streamed provider extents | Thread-bound pack, provider and sidecar transfer |
 | Integrations | Observe plus typed connection/import/sync commands | Provider setup, repositories and remote links |
 
 One logical RPC uses one reliable, ordered Iroh stream. Reuse the authenticated
@@ -305,3 +305,12 @@ device retains the original creator's signature and uses its own authorized
 request proof for the opening. This avoids a separate hosted create request.
 Acceptance of causal metadata does not assert that source-object closure is
 already available; publication of those bytes has its own durable receipt.
+
+`SyncService.PublishContent` uploads the exact source closure of an already
+admitted capture. Its signed opening fixes the Thread, revision, sharing-policy
+version, pack/index addresses and lengths, and operation ID. Source packs exclude
+unselected context, raw transcripts, secret values, and unrelated history. The
+receiver validates the complete closure before installing it and emitting a
+`PublicationReceipt`. That receipt means durable content availability; only causal
+replication and explicit integration determine the Thread's heads. Clients can
+run these bulk streams beside the long-lived metadata exchange on one connection.

@@ -148,6 +148,46 @@ message FetchServerFrame {
     FetchComplete complete = 5;
   }
 }
+// Bulk content availability for an already admitted Thread capture. Metadata
+// replication owns causal heads; uploading bytes cannot select or replace one.
+// The opening PoP binds the exact Thread/revision, policy, complete pack/index
+// addresses and lengths, operation identity, and any resume checkpoint.
+message PublishContentOpen {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2;
+  bytes sharing_policy_version = 3;
+  // Complete pack/index objects: offset is zero and length is the whole object.
+  // The server validates hashes and the exact authorized source closure before
+  // installation. Extra context, forensic objects, or history are not admitted
+  // merely because they were included in a source pack.
+  repeated PackExtent packs = 4;
+  TransferCheckpoint checkpoint = 5;
+}
+message PublishContentFinish {
+  // Names the server's current committed transfer plan, not a caller assertion
+  // that bytes or closure were accepted. A FIN alone never publishes content.
+  TransferCheckpoint checkpoint = 1;
+}
+message PublishContentClientFrame {
+  // Required and unchanged on every frame; the opening proof covers this value.
+  string client_operation_id = 1;
+  oneof body {
+    PublishContentOpen open = 2;
+    PackChunk pack = 3;
+    TransferSidecar sidecar = 4;
+    PublishContentFinish finish = 5;
+  }
+}
+message PublishContentServerFrame {
+  oneof body {
+    TransferReady ready = 1;
+    TransferCheckpoint checkpoint = 2;
+    // Accepted only after complete authorized closure is durably installed.
+    // Observers may then treat this exact hosted revision as source-available.
+    PublicationReceipt receipt = 3;
+  }
+}
+
 message ReadProviderExtentRequest {
   bytes ticket = 1;
   bytes plan_digest = 2;

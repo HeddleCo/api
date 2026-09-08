@@ -134,7 +134,7 @@ RegistryService.UpdateSpoolSettings,SpoolService.ReviseSpool,native_contract,Typ
 RegistryService.UpsertBookmark,SpoolService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RepoSyncService.ListRefs,ThreadService.ObserveThreads;SyncService.Fetch,native_contract,Advertise refs/HEAD/identities within transfer opening when useful; retain paging for large catalogs.
 RepoSyncService.Pull,SyncService.Fetch,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
-RepoSyncService.Push,SyncService.ReplicateThread,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
+RepoSyncService.Push,SyncService.ReplicateThread;SyncService.PublishContent,native_contract,"Replicate immutable Thread records; upload exact authorized source closure in bounded bulk streams with a separate durable availability receipt."
 RepoSyncService.UpdateRef,SyncService.ReplicateThread,native_contract,Stable typed selector and exact old/new revision; no redundant name+ID discovery once identity is known.
 RepositoryService.GetBlame,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
 RepositoryService.GetBlob,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.

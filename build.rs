@@ -41,6 +41,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "AttentionEvent.payload",
         "NotificationEvent.payload",
         "OperationEvent.payload",
+        "AnalysisEvent.payload",
+        "CompleteRegistrationRequest.owner",
         "OwnershipEvent.payload",
         "ReplicateThreadRequest.body",
         "FetchClientFrame.body",

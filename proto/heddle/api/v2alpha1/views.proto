@@ -165,13 +165,17 @@ message NotificationEvent {
 }
 
 message ObserveIdentityRequest {
-  bool include_devices = 1;
-  bool include_sessions = 2;
-  bool include_signup_invitations = 3;
-  bool include_delegations = 6;
-  bool include_recovery = 7;
-  PageRequest page = 4;
-  ObserveOptions observe = 5;
+  // The principal is always included. Message presence requests a collection;
+  // an empty PageRequest selects its bounded first page. Each collection has
+  // its own SectionStatus.page; no global page token selects a hidden section.
+  PageRequest devices = 1;
+  PageRequest sessions = 2;
+  PageRequest signup_invitations = 3;
+  PageRequest delegations = 4;
+  PageRequest recovery = 5;
+  ObserveOptions observe = 6;
+  // The shared read budget covers all requested sections together. A session
+  // reference/version from this view can be used directly for RevokeSession.
 }
 
 message IdentityEvent {

@@ -129,7 +129,13 @@ section followed by its replacement records within one checkpoint batch. Use it
 for head-dependent diffs/evidence and sections whose legacy records lack stable
 keys. Section names are lower-case enum suffixes, e.g. `review`, `collaboration`,
 `threads`, `invitations`; content status uses the request's selection_id. Identity
-uses `identity`, `devices`, `sessions`, `signup_invitations`. Workspace uses
+uses `identity`, `devices`, `sessions`, `signup_invitations`, `delegations`,
+`recovery`. Its principal is always included; an optional `PageRequest` on each
+collection selects that section and its page. Omission skips the collection,
+while an empty message requests its bounded first page. The accepted read budget
+applies across the entire composed view. Continuations live on the corresponding
+`SectionStatus.page`; a checkpoint's page is only a convenience when exactly one
+collection is implemented and requested. Workspace uses
 `spools`, `threads`, `attention`, `operations`, `devices`.
 
 A window change must produce complete membership updates or an explicit
@@ -181,8 +187,15 @@ commit atomically. Retries may retain public client-owned session metadata;
 owner bundles containing a subject Biscuit must be retrieved separately after
 successful authentication and excluded from that replay body.
 
-Session records include the metadata required to render an active-session
-page within `ObserveIdentity`. Their opaque versions identify persisted
+The session collection contains retained records ordered by issuance time
+descending, with session ID as a stable tie breaker. It includes tracked expired
+and revoked sessions; clients use their timestamps and revocation state to render
+an active-session page. Coverage describes the authorized collection: independent
+account roots can inspect account sessions, while an attenuated credential sees
+only its own session bound to the original minting key. A client-chosen session
+label alone never establishes ownership or the `is_current` marker.
+
+Session records' opaque versions identify persisted
 authorization state and remain usable across serving endpoints and viewers.
 `RevokeSession` requires that exact version and changes only the selected
 session. A delegated credential may end its own session; ending a different

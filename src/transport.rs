@@ -76,12 +76,16 @@ pub(crate) fn protobuf_string_field(
     mut request: &[u8],
     target_field: u32,
 ) -> Result<Option<&str>, RequestMetadataError> {
+    let mut operation_id = None;
     while !request.is_empty() {
         let key = take_varint(&mut request)?;
         let field = u32::try_from(key >> 3).map_err(|_| RequestMetadataError("field overflow"))?;
         let wire = (key & 0x07) as u8;
-        if field == 0 {
-            return Err(RequestMetadataError("field zero"));
+        if field == 0 || field > 0x1fff_ffff {
+            return Err(RequestMetadataError("invalid field number"));
+        }
+        if field == target_field && wire != 2 {
+            return Err(RequestMetadataError("operation id has wrong wire type"));
         }
         match wire {
             0 => {
@@ -95,9 +99,13 @@ pub(crate) fn protobuf_string_field(
                     .map_err(|_| RequestMetadataError("length overflow"))?;
                 let value = take_bytes(&mut request, length)?;
                 if field == target_field {
-                    return std::str::from_utf8(value)
-                        .map(Some)
-                        .map_err(|_| RequestMetadataError("operation id is not UTF-8"));
+                    if operation_id.is_some() {
+                        return Err(RequestMetadataError("duplicate operation id field"));
+                    }
+                    operation_id = Some(
+                        std::str::from_utf8(value)
+                            .map_err(|_| RequestMetadataError("operation id is not UTF-8"))?,
+                    );
                 }
             }
             5 => {
@@ -106,7 +114,7 @@ pub(crate) fn protobuf_string_field(
             _ => return Err(RequestMetadataError("unsupported wire type")),
         }
     }
-    Ok(None)
+    Ok(operation_id)
 }
 
 fn take_varint(input: &mut &[u8]) -> Result<u64, RequestMetadataError> {

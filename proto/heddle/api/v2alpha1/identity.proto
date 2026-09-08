@@ -15,6 +15,16 @@ message RootAttachment {
   // Verification binds root, subject, device, scope, validity and possession.
   // An empty attachment is valid only for a directly proved root key.
 }
+// Account onboarding state, never a substitute for a verified capability or
+// owner-root binding. Promotions are explicit; a credential's attenuation must
+// survive promotion of its account. AGENT_ROOTED denotes an unclaimed human
+// account with an empty independent-root slot, not an account owned by an agent.
+enum RootingTier {
+  ROOTING_TIER_UNSPECIFIED = 0;
+  ROOTING_TIER_SELF_ROOTED = 1;
+  ROOTING_TIER_SERVER_ROOTED = 2;
+  ROOTING_TIER_AGENT_ROOTED = 3;
+}
 message PrincipalRecord {
   string id = 1;
   string handle = 2;
@@ -26,6 +36,7 @@ message PrincipalRecord {
   repeated EntityRef authorized_resources = 8;
   repeated ActionAvailability actions = 9;
   EntitlementRecord entitlement = 10;
+  RootingTier rooting_tier = 11;
 }
 message EntitlementRecord {
   string plan = 1;
@@ -98,6 +109,37 @@ message AuthenticationResponse {
   MutationReceipt receipt = 1;
   PrincipalRecord principal = 2;
   SessionRecord session = 3;
+  CredentialResult credential = 4;
+}
+// Returned only by a successful credential ceremony, never by an observation.
+// Self-rooted users normally retain their client-owned authority; Weft records
+// its account attachment. Server-rooted and agent-rooted flows can return a
+// credential without pretending that the caller holds an independent root.
+message CredentialResult {
+  oneof outcome {
+    RootAttachment client_authority = 1;
+    IssuedCredential issued = 2;
+  }
+}
+message IssuedCredential {
+  RecordRef ref = 1;
+  // Raw serialized Biscuit bytes, not a base64 string. Secret bearer material.
+  // No response ever contains an authority or proof private key.
+  bytes biscuit = 2;
+  // Effective Ed25519 PoP key. Required for agent/device credentials; absence
+  // is permitted only for an explicitly bearer-only credential class.
+  bytes proof_public_key = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_DEVICE = 1;
+    KIND_AGENT = 2;
+    KIND_SERVICE = 3;
+    KIND_ANONYMOUS = 4;
+  }
+  // Credential classification is independent of the account's rooting tier.
+  // An agent credential stays attenuated after the human claims the account.
+  Kind kind = 5;
 }
 message BeginRegistrationRequest {
   bytes root_public_key = 1;

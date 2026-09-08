@@ -182,3 +182,25 @@ No runtime tests or performance benchmarks were run for this review. The current
 alpha cutover with no migration bridges. The native v2 RPC surface and
 streaming lifecycle are specified in [streams.md](streams.md). Earlier inventory
 dispositions describe functionality to preserve, not legacy RPC wrappers to ship.
+
+### Account roots and credential results
+
+Account rooting state belongs to the stable principal UUID, independently of
+spool membership and ownership. `OwnershipService` bootstraps and transitions
+that account root with typed signed records. Rotation, recovery, and recovery
+policy changes retain explicit intent; their signed predecessor hash and
+sequence provide the concurrency condition. A spool is required only for
+resource authorization, lineage, and transfer.
+
+All three onboarding tiers remain supported: self-rooted, server-rooted, and
+agent-rooted. The latter is an unclaimed human account with an empty independent
+root slot; an agent holds a separate attenuated credential. `AuthenticationResponse`
+returns a `CredentialResult`: either the accepted client authority attachment or
+an issued Biscuit with its credential class, PoP key, and expiry. Account views
+never return the bearer. Promoting an account does not upgrade an existing agent
+credential or erase its attenuation. Tier metadata never authorizes an operation.
+
+The account/credential types describe the complete intended contract; endpoint
+discovery must still advertise only implemented ceremonies. In particular, the
+canonical identity model distinguishes shipped passkey/agent flows from target
+password onboarding and per-user server custody.

@@ -1,7 +1,7 @@
 #![cfg(feature = "reflection")]
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v1alpha1::{AuthorizationRole, AuthorizationScopeSource, SigningTier},
+    heddle::api::v1alpha1::{AuthorizationAccess, AuthorizationRole, AuthorizationScopeSource, SigningTier},
 };
 use prost_reflect::DescriptorPool;
 
@@ -16,6 +16,11 @@ fn billing_targets_the_authenticated_account_with_effective_delegated_authority(
     for method in methods {
         let path = format!("/{}/{}", service.full_name(), method.name());
         let descriptor = heddle_api::v2::method_descriptor(&path).expect("native method metadata");
+        if method.name() == "ObserveBilling" {
+            assert_eq!(descriptor.signing_tier, SigningTier::ProofIfAuthenticated);
+            assert_eq!(descriptor.authorization_access, AuthorizationAccess::Public);
+            assert_eq!(method.input().get_field_by_name("plans_only").expect("explicit public-only selector").number(), 3);
+        } else {
         assert_eq!(descriptor.signing_tier, SigningTier::ProofOfPossession);
         assert_eq!(
             descriptor.authorization.role,
@@ -25,6 +30,7 @@ fn billing_targets_the_authenticated_account_with_effective_delegated_authority(
             descriptor.authorization.scope_source,
             AuthorizationScopeSource::CallerSubject
         );
+        }
         assert!(method.input().get_field_by_name("account_id").is_none());
         assert!(method.input().get_field_by_name("customer_id").is_none());
         assert!(

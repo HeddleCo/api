@@ -359,6 +359,14 @@ message CloneOwnerPin {
 // entries. Loading it recomputes every id/hash and verifies the full chain;
 // unknown versions, gaps, duplicate sequences, forks, owner-id mismatch, or
 // capabilities for another spool fail closed.
+// Portable proof of one exact owner-key state, including historical states used
+// by resource transfers. Several states of the same owner may appear.
+message OwnerHistory {
+  SignedOwnerRoot root = 1;
+  repeated SignedOwnerKeyTransition accepted_transitions = 2;
+  bytes state_hash = 3;
+}
+
 message CloneAuthorizationKeyring {
   // Exactly 1.
   uint32 format_version = 1;
@@ -372,6 +380,10 @@ message CloneAuthorizationKeyring {
   SignedSpoolOwnerGenesis owner_genesis = 8;
   // Ordered, gap-free ownership re-anchors accepted after the initial pin.
   repeated ResourceTransferAuditRecord ownership_transfers = 9;
+  // Every transfer party is resolved by (account UUID, exact state hash).
+  // Proofs include original signed records; hosts cannot synthesize authority.
+  // Total encoded keyring and history/transition counts are verifier-bounded.
+  repeated OwnerHistory transfer_owner_histories = 10;
 }
 
 // Canonical source offer for an atomic resource ownership re-anchor.

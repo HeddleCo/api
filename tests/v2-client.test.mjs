@@ -105,3 +105,12 @@ test("agent tool selection requires both task selection and endpoint implementat
   assert.ok(tools[0].contract.retryBehavior > 0);
   assert.deepEqual(describeTools([ThreadService], new Set(), new Set([startPath])), []);
 });
+
+test("agent tools distinguish live subscriptions from finite resumable uploads", () => {
+  const paths = new Set([observePath, "/heddle.api.v2alpha1.SyncService/ReplicateThread", "/heddle.api.v2alpha1.SyncService/PublishContent"]);
+  const tools = describeTools([ThreadService, SyncService], paths, paths);
+  assert.equal(tools.length, 3);
+  for (const tool of tools) {
+    assert.equal(tool.contract.liveStream, !tool.path.endsWith("/PublishContent"), tool.path);
+  }
+});

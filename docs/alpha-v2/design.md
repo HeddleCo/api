@@ -299,3 +299,10 @@ verified history, including keys retired by later rotation. That historical
 relationship does not authorize a retired key to issue capabilities: current
 state, issuer retirement, capability scope and operation signatures are still
 checked independently. An unproven genesis key or incomplete history is denied.
+
+Server-rooted accounts keep their per-user custody path. The creation request
+can instead name a fresh UUIDv7 for the account's existing custodial authority
+to sign in the same operation. This branch requires an active server-rooted
+account, its configured secret store and current per-user authority; it does not
+create a root, export a private key or use the deployment's signing key. Its
+response has the same portable proof shape, without a second signing RPC.

@@ -135,11 +135,19 @@ message CreateSpoolRequest {
   // One address segment. The stable new spool UUID comes only from genesis.
   string slug = 3;
   SpoolSettings settings = 4;
-  // Signed by the account's current owner authority. Admission verifies the
-  // account's root and accepted rotation history and compares its current key
-  // atomically with creation. An old key's historical membership is insufficient
-  // to create a new spool. Retry the original signed genesis and operation ID.
-  SignedSpoolOwnerGenesis owner_genesis = 5;
+  oneof ownership {
+    // Signed by the account's current owner authority. Admission verifies the
+    // account's root and accepted rotation history and compares its current key
+    // atomically with creation. Historical membership alone cannot create a
+    // new spool. Retry the original signed genesis and operation ID.
+    SignedSpoolOwnerGenesis owner_genesis = 5;
+    // Explicit creation through this account's existing server-held authority.
+    // The client supplies a fresh UUIDv7. Only an active server-rooted account
+    // with configured per-user custody can use this branch; it never establishes
+    // a root or falls back to the deployment key. The response contains the same
+    // portable signed genesis and owner history as client-signed creation.
+    SpoolRef custodial_spool = 7;
+  }
   optional string display_name = 6;
 }
 message ReviseSpoolRequest {

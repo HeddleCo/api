@@ -19,8 +19,8 @@ message RootAttachment {
 }
 // Portable binding of a proved delegated key to its Iroh endpoint. Authority
 // remains the Biscuit's complete attenuation chain, not this locator binding.
-// SignedRecord format heddle.root-attachment.v1 carries these deterministic
-// bytes and one subject-key Ed25519 signature with a format-domain prefix.
+// SignedRecord format heddle.root-attachment.v2 carries canonical bytes signed
+// by both endpoint and subject (one signature when the keys are equal).
 // The shared verifier requires a locally trusted root, verifies the Biscuit's
 // effective proof key and limits, then verifies digest, time and endpoint.
 message RootAttachmentBinding {
@@ -31,6 +31,8 @@ message RootAttachmentBinding {
   bytes credential_digest = 5;
   int64 not_before_unix_seconds = 6;
   int64 expires_at_unix_seconds = 7;
+  string account_id = 8;
+  bytes pairing_challenge = 9;
 }
 // Account onboarding state, never a substitute for a verified capability or
 // owner-root binding. Promotions are explicit; a credential's attenuation must
@@ -307,6 +309,17 @@ message CredentialInspection {
   google.protobuf.Timestamp expires_at = 3;
   bool revoked = 4;
 }
+// Provisional two-key possession, before an approving account is known.
+// SignedRecord format heddle.pairing-initiation.v1; both distinct keys sign
+// domain || deterministic protobuf bytes. The host and operation prevent reuse.
+message PairingInitiationBinding {
+  EndpointRef host = 1;
+  string client_operation_id = 2;
+  EndpointRef device = 3;
+  bytes subject_public_key = 4;
+  int64 not_before_unix_seconds = 5;
+  int64 expires_at_unix_seconds = 6;
+}
 message BeginPairingRequest {
   string client_operation_id = 1;
   EndpointRef device = 2;
@@ -318,9 +331,12 @@ message PairingRecord {
   bytes version = 2;
   EndpointRef device = 3;
   bytes challenge = 4;
-  RootAttachment approved_attachment = 5;
+  // Public commitment only. The delegated credential is never observable.
+  RootAttachmentBinding approval_binding = 5;
   google.protobuf.Timestamp expires_at = 6;
   bool completed = 7;
+  bytes subject_public_key = 8;
+  RootAttachment completed_attachment = 9;
 }
 message BeginPairingResponse {
   MutationReceipt receipt = 1;
@@ -329,7 +345,6 @@ message BeginPairingResponse {
 message ApprovePairingRequest {
   string client_operation_id = 1;
   RecordRef pairing = 2;
-  RootAttachment attachment = 3;
   bytes expected_version = 4;
   // Browser-created, root-derived Biscuit bound to the pairing's subject key.
   // The host verifies the same account and descendant authority; it never
@@ -340,7 +355,8 @@ message ApprovePairingRequest {
 message CompletePairingRequest {
   string client_operation_id = 1;
   RecordRef pairing = 2;
-  SignedRecord subject_possession = 3;
+  // Signed from ObservePairing.approval_binding before credential release.
+  RootAttachment attachment = 3;
 }
 message ObservePairingRequest {
   RecordRef pairing = 1;

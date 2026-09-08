@@ -161,6 +161,19 @@ administration sections. Apply the corresponding administration guard
 and redaction rules; report unavailable only when even that disclosure is allowed.
 Inspect every nested scope, not only the outer spool selector.
 
+Hosted passkey sign-in uses `BeginAuthentication` and `CompleteAuthentication`.
+The challenge records the existing caller device key; completion proves that
+key with `CallContext.request_proof` over the exact request and separately
+verifies the passkey assertion against its credential owner and `user_handle`.
+An account hint constrains the credential owner even when no account was found.
+Challenges and credential IDs are raw bytes on the wire; WebAuthn client data
+encodes the challenge as base64url without padding. Sign-in never enrolls an
+attachment or promotes the account's rooting tier. Challenge consumption,
+authenticator-counter advancement, session creation and operation completion
+commit atomically. Retries may retain public client-owned session metadata;
+owner bundles containing a subject Biscuit must be retrieved separately after
+successful authentication and excluded from that replay body.
+
 Owned-device access first verifies the caller and device attach to the same
 user root, then applies attenuation, resource/action scope and private-facet
 rules. Hosted account membership is not a substitute for this check. A browser

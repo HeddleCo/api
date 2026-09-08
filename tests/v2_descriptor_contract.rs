@@ -71,6 +71,31 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
             );
             let extension = options.get_extension(&rpc_contract);
             let contract = option_message(extension.as_ref());
+            let runtime = ALL_METHODS
+                .iter()
+                .find(|entry| entry.path == path)
+                .expect("generated route");
+            for (name, actual) in [
+                ("signing_identity", runtime.signing_identity as i32),
+                ("authorization_role", runtime.authorization.role as i32),
+                (
+                    "authorization_scope_source",
+                    runtime.authorization.scope_source as i32,
+                ),
+                (
+                    "authorization_existence",
+                    runtime.authorization.existence as i32,
+                ),
+            ] {
+                assert_eq!(
+                    contract
+                        .get_field_by_name(name)
+                        .expect("declared policy")
+                        .as_ref(),
+                    &Value::EnumNumber(actual),
+                    "{path}: runtime {name} drifted"
+                );
+            }
             for name in [
                 "effect",
                 "retry_behavior",
@@ -92,7 +117,12 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
             let Value::List(targets) = targets.as_ref() else {
                 panic!("target list");
             };
-            for target in targets {
+            assert_eq!(
+                runtime.authorization.targets.len(),
+                targets.len(),
+                "{path}: target count"
+            );
+            for (target, actual) in targets.iter().zip(runtime.authorization.targets) {
                 let target = option_message(target);
                 let target_path = target.get_field_by_name("path").expect("path");
                 let Value::String(target_path) = target_path.as_ref() else {
@@ -100,6 +130,15 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
                 };
                 assert!(!target_path.is_empty(), "{path}: empty guard path");
                 field_path(method.input(), target_path);
+                assert_eq!(target_path, actual.path, "{path}: target path drifted");
+                assert_eq!(
+                    target
+                        .get_field_by_name("role")
+                        .expect("target role")
+                        .as_ref(),
+                    &Value::EnumNumber(actual.role as i32),
+                    "{path}: target role drifted"
+                );
             }
             let multi = contract
                 .get_field_by_name("authorization_multi_target")

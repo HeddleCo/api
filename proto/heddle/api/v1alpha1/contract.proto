@@ -106,6 +106,12 @@ enum SigningTier {
   SIGNING_TIER_PROOF_OF_POSSESSION = 2;
   SIGNING_TIER_HUMAN_VERIFICATION = 3;
   SIGNING_TIER_STREAMING_PROOF_OF_POSSESSION = 4;
+  // Public reads may omit credentials or carry an anonymous quota token.
+  // A supplied account/device/delegation credential MUST have its verified
+  // leaf proof bound to this exact request. Invalid supplied credentials or
+  // proofs never downgrade to public access. Resource authorization still
+  // restricts unauthenticated/anonymous reads to public content.
+  SIGNING_TIER_PROOF_IF_AUTHENTICATED = 5;
 }
 
 enum RpcEffect {

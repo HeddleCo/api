@@ -269,8 +269,11 @@ message RegisterRootAttachmentRequest {
 }
 message RevokeDeviceRequest {
   string client_operation_id = 1;
-  EndpointRef device = 2;
-  SignedRecord revocation = 3;
+  // Original registry device identity from DeviceIdentity/CurrentCredentialRecord.
+  // Ordinary revocation uses effective delegated account permissions; owner-key
+  // transitions have their separate portable owner-authorization ceremony.
+  RecordRef device = 2;
+  bytes expected_version = 4;
 }
 message PutDelegationRequest {
   string client_operation_id = 1;
@@ -615,6 +618,11 @@ message CurrentCredentialRecord {
   google.protobuf.Timestamp expires_at = 13;
   bool revoked = 14;
   repeated ActionAvailability actions = 15;
+  // Original current session, selected by the verified credential's session
+  // binding and account/mint key, independently of sessions pagination. Absent
+  // for credentials without a persisted session; never synthesized from a
+  // device or credential ID. Its exact ref/version authorizes session revoke.
+  SessionRecord session = 16;
   // Revoke the specific device, delegation or session using the corresponding
   // observed version; this metadata never permits an account-wide revocation.
 }

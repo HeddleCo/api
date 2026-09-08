@@ -101,3 +101,74 @@ fn financial_amounts_and_optional_seats_preserve_absence_and_integer_units() {
     );
     assert!(update.get_field_by_name("expected_version").is_some());
 }
+
+#[test]
+fn current_credential_carries_the_original_session_independently_of_collection_pages() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
+    let credential = pool
+        .get_message_by_name("heddle.api.v2alpha1.CurrentCredentialRecord")
+        .expect("current credential");
+    let session = credential
+        .get_field_by_name("session")
+        .expect("current session");
+    assert!(session.supports_presence());
+    assert_eq!(session.number(), 16);
+    assert_eq!(
+        session.kind(),
+        prost_reflect::Kind::Message(
+            pool.get_message_by_name("heddle.api.v2alpha1.SessionRecord")
+                .expect("original versioned session")
+        )
+    );
+}
+
+#[test]
+fn observed_device_has_original_registry_identity_and_version() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
+    let device = pool
+        .get_message_by_name("heddle.api.v2alpha1.DeviceIdentity")
+        .expect("device observation");
+    assert_eq!(
+        device
+            .get_field_by_name("ref")
+            .expect("registry identity")
+            .number(),
+        6
+    );
+    assert_eq!(
+        device
+            .get_field_by_name("version")
+            .expect("authorization version")
+            .number(),
+        7
+    );
+}
+
+#[test]
+fn device_revocation_consumes_the_observed_registry_identity_and_version() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
+    let request = pool
+        .get_message_by_name("heddle.api.v2alpha1.RevokeDeviceRequest")
+        .expect("device revocation");
+    assert_eq!(
+        request
+            .get_field_by_name("device")
+            .expect("device identity")
+            .kind(),
+        prost_reflect::Kind::Message(
+            pool.get_message_by_name("heddle.api.v2alpha1.RecordRef")
+                .expect("registry ref")
+        )
+    );
+    assert_eq!(
+        request
+            .get_field_by_name("expected_version")
+            .expect("CAS version")
+            .number(),
+        4
+    );
+    assert!(
+        request.get_field_by_name("revocation").is_none(),
+        "ordinary delegated revocation does not invent an owner ceremony"
+    );
+}

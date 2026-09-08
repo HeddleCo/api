@@ -259,6 +259,10 @@ message DeviceIdentity {
   bool revoked = 4;
   // Root attachment verification is independent of Weft account association.
   bytes root_attachment_hash = 5;
+  // Original account-owned registry identity and durable authorization version
+  // for RevokeDevice. Endpoint/key bytes are locators, never substitutes for it.
+  RecordRef ref = 6;
+  bytes version = 7;
 }
 
 message ObserveOperationsRequest {
@@ -284,4 +288,22 @@ message CancelOperationRequest {
   RecordRef operation = 2;
   bytes expected_version = 3;
   // Request acknowledgement is not proof of cancellation or rollback.
+}
+
+// Public resource discovery never includes private grants, devices or account
+// attention. Exact public content still uses the ordinary resource read APIs.
+message ObserveCatalogRequest {
+  // Bounded text search over public spool names, slugs and descriptions.
+  string query = 1;
+  PageRequest spools = 2;
+  ObserveOptions observe = 3;
+}
+message CatalogEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    SpoolOverview spool = 2;
+    SectionStatus status = 3;
+    Removal removal = 4;
+    SectionReplacement replace_section = 5;
+  }
 }

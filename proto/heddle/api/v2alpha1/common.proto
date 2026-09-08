@@ -7,6 +7,11 @@ import "heddle/api/v1alpha1/errors.proto";
 import "heddle/api/v1alpha1/types.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
+message PrincipalRef {
+  // Stable account UUID. Handles and active signing keys can change.
+  string id = 1;
+}
+
 message SpoolRef {
   // Stable spool UUID; names, paths and account handles are presentation.
   string id = 1;

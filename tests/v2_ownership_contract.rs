@@ -44,6 +44,7 @@ fn owner_transitions_keep_distinct_rotation_recovery_and_policy_intent() {
         .get_message_by_name("heddle.api.v2alpha1.SubmitOwnerTransitionRequest")
         .expect("transition request");
     assert!(request.get_field_by_name("spool").is_none());
+    assert!(request.get_field_by_name("expected_version").is_none());
     let action = request
         .oneofs()
         .find(|oneof| oneof.name() == "action")

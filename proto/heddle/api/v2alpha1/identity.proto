@@ -3,6 +3,7 @@ package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 // User-root proof is portable. Account association records Weft's acceptance of
@@ -110,18 +111,36 @@ message CompleteAuthenticationRequest {
 message AuthenticationResponse {
   MutationReceipt receipt = 1;
   PrincipalRecord principal = 2;
-  SessionRecord session = 3;
   CredentialResult credential = 4;
 }
 // Returned only by a successful credential ceremony, never by an observation.
-// Self-rooted users normally retain their client-owned authority; Weft records
-// its account attachment. Server-rooted and agent-rooted flows can return a
-// credential without pretending that the caller holds an independent root.
+// Keyed clients retain their own minting authority. Registration attaches their
+// proved key to an account/session; it does not mint a bearer or confer an
+// independent human root on an agent. Keyless/server-rooted ceremonies can
+// return an issued bearer. Account rooting tier and credential class differ.
 message CredentialResult {
   oneof outcome {
-    RootAttachment client_authority = 1;
+    ClientOwnedCredential client_owned = 1;
     IssuedCredential issued = 2;
   }
+  SessionRecord session = 3;
+  // Original accepted owner proofs where established. An unclaimed agent has
+  // no independent human-root bundle; absence does not upgrade its authority.
+  OwnerAuthorizationBundle owner_authorization = 4;
+}
+enum CredentialKind {
+  CREDENTIAL_KIND_UNSPECIFIED = 0;
+  CREDENTIAL_KIND_DEVICE = 1;
+  CREDENTIAL_KIND_AGENT = 2;
+  CREDENTIAL_KIND_SERVICE = 3;
+  CREDENTIAL_KIND_ANONYMOUS = 4;
+}
+message ClientOwnedCredential {
+  RecordRef ref = 1;
+  // Exact verified credential subject, distinct from the human account UUID.
+  string subject = 2;
+  bytes proof_public_key = 3;
+  CredentialKind kind = 4;
 }
 message IssuedCredential {
   RecordRef ref = 1;
@@ -132,16 +151,9 @@ message IssuedCredential {
   // is permitted only for an explicitly bearer-only credential class.
   bytes proof_public_key = 3;
   google.protobuf.Timestamp expires_at = 4;
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_DEVICE = 1;
-    KIND_AGENT = 2;
-    KIND_SERVICE = 3;
-    KIND_ANONYMOUS = 4;
-  }
   // Credential classification is independent of the account's rooting tier.
   // An agent credential stays attenuated after the human claims the account.
-  Kind kind = 5;
+  CredentialKind kind = 5;
 }
 message BeginRegistrationRequest {
   bytes root_public_key = 1;
@@ -341,9 +353,10 @@ message ProvisionAccountRequest {
 message ProvisionAccountResponse {
   MutationReceipt receipt = 1;
   PrincipalRecord principal = 2;
-  // Pre-attenuated AGENT credential bound to the proved agent key. Claiming the
-  // account later neither upgrades nor transforms this credential.
-  IssuedCredential credential = 3;
+  // Client-owned AGENT registration bound to the proved key, preserving the
+  // server-enforced agent ceiling. Claiming the human account does not upgrade
+  // this credential. A server-minted bearer is not required for keyed agents.
+  CredentialResult credential = 3;
   // Authoritative browser origin for the agent's locally generated claim link.
   // The claim secret and its private state remain on the agent's device.
   string claim_web_origin = 4;
@@ -387,7 +400,7 @@ message IssueDelegationCredentialRequest {
 }
 message DelegationCredentialResponse {
   MutationReceipt receipt = 1;
-  IssuedCredential credential = 2;
+  CredentialResult credential = 2;
 }
 
 message ResolveSignupInvitationRequest {

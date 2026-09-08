@@ -195,8 +195,13 @@ resource authorization, lineage, and transfer.
 All three onboarding tiers remain supported: self-rooted, server-rooted, and
 agent-rooted. The latter is an unclaimed human account with an empty independent
 root slot; an agent holds a separate attenuated credential. `AuthenticationResponse`
-returns a `CredentialResult`: either the accepted client authority attachment or
-an issued Biscuit with its credential class, PoP key, and expiry. Account views
+returns a `CredentialResult`: the accepted client-owned credential registration
+or an issued Biscuit, with one session result. Keyed clients mint their own
+Biscuits; Weft attaches the proved key and enforces its account/credential
+ceiling. Registration returns the credential reference, exact subject, PoP key,
+class, and original owner proofs when established. Anonymous/server-rooted
+issuance returns raw serialized bearer bytes. Those exact bytes also populate
+`CallContext.bearer_capability`; base64 is confined to text storage/configuration. Account views
 never return the bearer. Promoting an account does not upgrade an existing agent
 credential or erase its attenuation. Tier metadata never authorizes an operation.
 

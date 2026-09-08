@@ -132,13 +132,7 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
     else {
         panic!("typed registration")
     };
-    for name in [
-        "ref",
-        "subject",
-        "proof_public_key",
-        "kind",
-        "owner_authorization",
-    ] {
+    for name in ["ref", "subject", "proof_public_key", "kind"] {
         assert!(
             registered.get_field_by_name(name).is_some(),
             "registration needs {name}"
@@ -169,6 +163,10 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
             "keyed provisioning cannot require a server-minted bearer"
         );
     }
+    assert!(
+        result.get_field_by_name("owner_authorization").is_some(),
+        "original owner proofs accompany the credential result"
+    );
     let Kind::Message(issued) = result
         .get_field_by_name("issued")
         .expect("issued credential")

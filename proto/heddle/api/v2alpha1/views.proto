@@ -105,11 +105,23 @@ enum SpoolSection {
   SPOOL_SECTION_SUPPORT_ACCESS = 10;
 }
 
+message SpoolPages {
+  PageRequest threads = 1;
+  PageRequest members = 2;
+  PageRequest invitations = 3;
+  PageRequest grants = 4;
+  PageRequest policies = 5;
+  PageRequest approval_groups = 6;
+  PageRequest context = 7;
+  PageRequest operations = 8;
+  PageRequest children = 9;
+  PageRequest support_access = 10;
+}
 message ObserveSpoolRequest {
   SpoolRef spool = 1;
   repeated SpoolSection sections = 2;
   ThreadQuery threads = 3;
-  PageRequest page = 4;
+  SpoolPages pages = 4;
   ObserveOptions observe = 5;
   // Each requested administration section is independently authorized and
   // paginated. SectionStatus distinguishes not requested from unavailable.
@@ -135,9 +147,17 @@ message SpoolEvent {
   }
 }
 
+message WorkspacePages {
+  PageRequest spools = 1;
+  PageRequest threads = 2;
+  PageRequest attention = 3;
+  PageRequest operations = 4;
+  PageRequest devices = 5;
+  PageRequest bookmarks = 6;
+}
 message ObserveWorkspaceRequest {
   ThreadQuery threads = 1;
-  PageRequest page = 2;
+  WorkspacePages pages = 2;
   ObserveOptions observe = 3;
   bool include_attention = 4;
   bool include_operations = 5;

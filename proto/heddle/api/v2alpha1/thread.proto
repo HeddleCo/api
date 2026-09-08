@@ -62,6 +62,9 @@ message ThreadOverview {
   uint64 open_discussion_count = 14;
   google.protobuf.Timestamp updated_at = 15;
   RevisionRef integrated_revision = 16;
+  // Exact aggregate policy/group version required by review and landing,
+  // including the explicit empty-policy set. Never inferred from no records.
+  bytes review_policy_version = 17;
   // All non-dominated accepted captures at this endpoint. Concurrent heads are
   // preserved until explicit source integration; arrival time is not authority.
   // The source endpoint and coverage remain part of the observation.
@@ -147,6 +150,7 @@ message ReviewDecision {
   string explanation = 8;
   RecordRef revokes = 9;
   google.protobuf.Timestamp expires_at = 10;
+  string agent_id = 11;
 }
 
 message ObserveThreadsRequest {

@@ -88,8 +88,9 @@ message PrepareAccountClaimResponse {
 message SignAccountClaimRequest {
   string client_operation_id = 1;
   bytes claim_authorization = 2;
-  // Exact intended registration with owner unset. Consent verifies its browser
-  // key, account, handle and passkey proofs against the prepared ceremony.
+  // Exact intended registration with owner unset. The device binds its digest
+  // to consent and verifies the prepared browser key. Weft independently
+  // verifies the challenged account, handle and passkey proofs on completion.
   CompleteRegistrationRequest registration = 3;
   // CLAIM_DEFERRED_HUMAN with next-key/guardian possession proofs. The device
   // checks the exact prior state and sequence, verifies all proofs and adds

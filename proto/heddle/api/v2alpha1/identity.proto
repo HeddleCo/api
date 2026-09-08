@@ -266,8 +266,9 @@ message RevokeSessionRequest {
   string client_operation_id = 1;
   // Unscoped session ref from a credential ceremony or identity observation.
   // Ends this session only. Device/delegation revocation is a separate action.
-  // An attenuated credential may end its own session; revoking another session
-  // requires the account's independent-root authority.
+  // A session-only credential may end its own key-bound session. Managing
+  // another session requires the same human account's authority, which may be
+  // delegated to an agent. All operation/resource/lifetime caveats still apply.
   RecordRef session = 2;
   // Required exact SessionRecord.version. A conflict changes no session state.
   bytes expected_version = 3;

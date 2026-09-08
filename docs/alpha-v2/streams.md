@@ -181,6 +181,15 @@ commit atomically. Retries may retain public client-owned session metadata;
 owner bundles containing a subject Biscuit must be retrieved separately after
 successful authentication and excluded from that replay body.
 
+Session records include the metadata required to render an active-session
+page within `ObserveIdentity`. Their opaque versions identify persisted
+authorization state and remain usable across serving endpoints and viewers.
+`RevokeSession` requires that exact version and changes only the selected
+session. A delegated credential may end its own session; ending a different
+session requires the account's independent-root authority. Device-key and
+delegation revocation remain separate operations. Device enrollment can omit
+the handle: the authenticated account UUID selects the existing account.
+
 Owned-device access first verifies the caller and device attach to the same
 user root, then applies attenuation, resource/action scope and private-facet
 rules. Hosted account membership is not a substitute for this check. A browser

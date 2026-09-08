@@ -49,10 +49,17 @@ message EntitlementRecord {
 }
 message SessionRecord {
   RecordRef ref = 1;
+  // Opaque version of durable authorization state, usable directly for revoke.
+  // Serving endpoint and viewer-specific metadata do not affect this version.
   bytes version = 2;
   EndpointRef endpoint = 3;
   google.protobuf.Timestamp expires_at = 4;
   bool revoked = 5;
+  google.protobuf.Timestamp issued_at = 6;
+  google.protobuf.Timestamp last_used_at = 7;
+  string user_agent = 8;
+  string ip_address = 9;
+  bool is_current = 10;
 }
 message DelegationRecord {
   RecordRef ref = 1;
@@ -172,6 +179,8 @@ message BeginRegistrationRequest {
   // Completion proves this exact key; an existing bearer selects the account
   // but never substitutes for the enrolling device's signature.
   bytes caller_public_key = 1;
+  // Required for signup/claim; optional for adding a device. An existing
+  // account is selected by the authenticated UUID, never by a mutable handle.
   string handle = 2;
   string display_name = 3;
   // Signup uses one previously admitted reservation. With no admission, an
@@ -255,7 +264,12 @@ message RevokeDelegationRequest {
 }
 message RevokeSessionRequest {
   string client_operation_id = 1;
+  // Unscoped session ref from a credential ceremony or identity observation.
+  // Ends this session only. Device/delegation revocation is a separate action.
+  // An attenuated credential may end its own session; revoking another session
+  // requires the account's independent-root authority.
   RecordRef session = 2;
+  // Required exact SessionRecord.version. A conflict changes no session state.
   bytes expected_version = 3;
 }
 message IntrospectCredentialRequest {

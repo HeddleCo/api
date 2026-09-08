@@ -166,14 +166,12 @@ message ThreadListEvent {
 message StartThreadRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
-  ThreadRef parent = 3;
-  RevisionRef base = 4;
-  string name = 5;
-  ThreadIntent intent = 6;
-  // Persisted once for retries and replicas. Same descriptive inputs may still
-  // name distinct attempts. The negotiated genesis format defines the hash.
-  bytes creation_nonce = 7;
-  repeated ExpectedVersion expected_versions = 8;
+  // The same original creator-signed record as ReplicationOpen.thread_genesis.
+  // Its negotiated canonical format owns parent, base, name, initial intent,
+  // creator and creation nonce. The endpoint validates its signature, derives
+  // the Thread ID and verifies the spool binding; it never synthesizes a creator.
+  // Retrying the record preserves identity even with a new RPC operation ID.
+  SignedRecord thread_genesis = 3;
 }
 
 message ThreadMutationResponse {

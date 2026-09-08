@@ -104,9 +104,17 @@ impl RpcTransport for TestTransport {
             .push(method.path.into());
         let request = StartThreadRequest::decode(bytes.as_slice()).expect("typed request");
         assert_eq!(request.client_operation_id, "original-op");
+        assert_eq!(
+            request
+                .thread_genesis
+                .as_ref()
+                .expect("signed genesis retained")
+                .canonical_record,
+            [1, 2, 3]
+        );
         ready(Ok(ThreadMutationResponse {
             thread: Some(ThreadOverview {
-                name: request.name,
+                name: "derived from signed genesis".into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -163,12 +171,19 @@ fn typed_mutation_preserves_operation_identity_and_response() {
     let response = completed(
         client.call::<rpc::ThreadServiceStartThread>(&StartThreadRequest {
             client_operation_id: "original-op".into(),
-            name: "intent".into(),
+            thread_genesis: Some(heddle_api::heddle::api::v2alpha1::SignedRecord {
+                format: "heddle-thread-genesis-v1".into(),
+                canonical_record: vec![1, 2, 3],
+                ..Default::default()
+            }),
             ..Default::default()
         }),
     )
     .expect("typed call");
-    assert_eq!(response.thread.expect("resulting thread").name, "intent");
+    assert_eq!(
+        response.thread.expect("resulting thread").name,
+        "derived from signed genesis"
+    );
     assert_eq!(trace.lock().expect("trace mutex").len(), 1);
 }
 

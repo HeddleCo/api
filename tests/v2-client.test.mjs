@@ -18,15 +18,16 @@ test("typed client transmits the original operation ID and returns the resulting
       assert.equal(options.deadline.getTime(), 10000);
       const request = fromBinary(StartThreadRequestSchema, bytes);
       assert.equal(request.clientOperationId, "original-op");
+      assert.deepEqual(request.threadGenesis.canonicalRecord, new Uint8Array([1, 2, 3]));
       return toBinary(ThreadMutationResponseSchema, create(ThreadMutationResponseSchema, {
         receipt: { clientOperationId: request.clientOperationId, outcome: { case: "applied", value: {} } },
-        thread: { name: request.name, version: new Uint8Array([9]) },
+        thread: { name: "derived from signed genesis", version: new Uint8Array([9]) },
       }));
     },
   };
   const client = createServiceClient(ThreadService, transport, new Set([startPath]));
-  const result = await client.startThread({ clientOperationId: "original-op", name: "intent" }, { deadline: new Date(10000) });
-  assert.equal(result.thread.name, "intent");
+  const result = await client.startThread({ clientOperationId: "original-op", threadGenesis: { format: "heddle-thread-genesis-v1", canonicalRecord: new Uint8Array([1, 2, 3]) } }, { deadline: new Date(10000) });
+  assert.equal(result.thread.name, "derived from signed genesis");
   assert.equal(result.receipt.outcome.case, "applied");
   assert.equal(calls, 1);
 });

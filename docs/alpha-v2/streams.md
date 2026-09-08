@@ -309,6 +309,13 @@ before object installation. Source, sidecar and owner-purge authority retain
 their independent checks. Bulk transfer should use separate Iroh streams so
 large source objects do not delay discussion or observation updates.
 
+StartThread accepts the same creator-signed genesis record as ReplicateThread.
+The request carries its authorized spool and operation ID; descriptive inputs
+are encoded once in the canonical record. Creation does not use expected-version
+checks against a mutable resource. The receiving endpoint derives identity and
+retains the original record; retrying the same genesis cannot mint another Thread.
+Clients use the negotiated native record encoder before asking their key to sign.
+
 Do not activate StartThread until the versioned immutable genesis encoding/hash
 is agreed, implemented and covered by cross-language vectors. A changed display
 name, intent version or tip does not change identity. The creation nonce permits

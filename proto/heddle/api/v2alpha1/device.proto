@@ -207,6 +207,18 @@ message RunRecord {
   // Pending exact harness intents. Decisions compare request_digest; observing
   // a prompt never grants permission and timeout/disconnection never implies allow.
   repeated RunPermission pending_permissions = 12;
+  // Explicitly retained artifacts currently readable under this Run's policy.
+  // Raw material remains device-local unless separately published by consent.
+  repeated RunArtifact artifacts = 13;
+}
+message RunArtifact {
+  RecordRef ref = 1;
+  string kind = 2;
+  string media_type = 3;
+  uint64 size = 4;
+  // Integrity only. ReadArtifact authorizes the catalog reference, never a hash.
+  bytes content_hash = 5;
+  google.protobuf.Timestamp retained_until = 6;
 }
 message RunPermission {
   string id = 1;

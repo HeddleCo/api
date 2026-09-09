@@ -51,6 +51,9 @@ message ThreadOverview {
   string name = 2;
   bytes version = 3;
   ThreadIntent intent = 4;
+  // All non-dominated accepted captures at this endpoint. Concurrent heads are
+  // preserved until explicit source integration; arrival time is not authority.
+  // The source endpoint and coverage remain part of the observation.
   repeated RevisionRef source_heads = 5;
   RevisionRef base = 6;
   ThreadLifecycle lifecycle = 7;
@@ -83,9 +86,31 @@ message ThreadOverview {
   repeated ThreadPropertyFrontier metadata_frontiers = 20;
   ThreadAudiencePolicy audience = 21;
   ThreadRetentionPolicy retention = 22;
-  // All non-dominated accepted captures at this endpoint. Concurrent heads are
-  // preserved until explicit source integration; arrival time is not authority.
-  // The source endpoint and coverage remain part of the observation.
+  // Independently admitted effective owner. Missing means unavailable, never
+  // infer ownership from the connected endpoint or current account.
+  ThreadOwnership ownership = 23;
+  // Exact signed source operation IDs, not materialized revision hashes.
+  // An incomplete frontier cannot be used for an ownership claim.
+  SourceOperationFrontier source_frontier = 24;
+}
+
+message ThreadOwnership {
+  oneof owner {
+    bytes local_key = 1;
+    PrincipalRef account = 2;
+    ThreadOwnershipConflict conflict = 3;
+  }
+  // Present only after an explicit admitted local-key to account claim.
+  bytes claim_id = 4;
+}
+message ThreadOwnershipConflict {
+  // At most two distinct admitted claims. Neither candidate wins by time.
+  repeated bytes claim_ids = 1;
+}
+message SourceOperationFrontier {
+  // At most 128 distinct, ordered IDs. Empty and complete means genesis only.
+  repeated bytes operation_ids = 1;
+  bool complete = 2;
 }
 
 enum ThreadProperty {

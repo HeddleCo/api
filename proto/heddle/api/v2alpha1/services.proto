@@ -1715,8 +1715,8 @@ service NotificationService {
   }
   rpc UnsubscribeNotifications(UnsubscribeNotificationsRequest) returns (MutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_identity: STABLE_SIGNING_IDENTITY_NONE
+      signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true

@@ -92,6 +92,9 @@ message SetNotificationPreferencesRequest {
   NotificationPreferences preferences = 2;
   bytes expected_version = 3;
 }
+// Public, single-purpose disabling action. The opaque capability determines
+// the recipient and exact allowed selectors; no account credential is required.
+// Each requested rule must select an authorized channel and DISABLED delivery.
 message UnsubscribeNotificationsRequest {
   string client_operation_id = 1;
   bytes unsubscribe_capability = 2;

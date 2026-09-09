@@ -74,9 +74,39 @@ message ThreadOverview {
   // present false + nonempty version is a retained tombstone. Never substitute
   // this version for Thread.version. The ref binds the authenticated account.
   BookmarkRecord current_bookmark = 18;
+  // Independent causal fields compose across devices. Concurrent candidates
+  // for one field remain explicit until a caller signs a successor observing
+  // every candidate; timestamps never select a winner.
+  repeated ThreadMetadataConflict metadata_conflicts = 19;
+  // Includes empty frontiers for genesis/default fields. Supplies all parent
+  // operation IDs needed to sign an update without another round trip.
+  repeated ThreadPropertyFrontier metadata_frontiers = 20;
   // All non-dominated accepted captures at this endpoint. Concurrent heads are
   // preserved until explicit source integration; arrival time is not authority.
   // The source endpoint and coverage remain part of the observation.
+}
+
+enum ThreadProperty {
+  THREAD_PROPERTY_UNSPECIFIED = 0;
+  THREAD_PROPERTY_NAME = 1;
+  THREAD_PROPERTY_INTENT = 2;
+  THREAD_PROPERTY_LIFECYCLE = 3;
+  THREAD_PROPERTY_SHARING = 4;
+  THREAD_PROPERTY_REVIEW = 5;
+}
+message ThreadPropertyFrontier {
+  ThreadProperty property = 1;
+  // Canonical review UUID for REVIEW; empty for the singleton properties.
+  string record_id = 2;
+  bytes version = 3;
+  repeated bytes operation_ids = 4;
+}
+message ThreadMetadataConflict {
+  ThreadPropertyFrontier frontier = 1;
+  // Exact original caller-signed metadata operations, not projections or
+  // device-synthesized user approval. Each operation binds actor, Spool,
+  // Thread, property, causal parents and value.
+  repeated SignedRecord candidates = 2;
 }
 
 message ThreadQuery {
@@ -124,6 +154,7 @@ enum SharedFacet {
   SHARED_FACET_COLLABORATION = 2;
   SHARED_FACET_EVIDENCE = 3;
   SHARED_FACET_SCRUBBED_TIMELINE = 4;
+  SHARED_FACET_METADATA = 5;
   // Raw forensic and confidential runtime disclosure are separate explicit
   // consent contracts; these values cannot sweep them into ordinary sync.
 }
@@ -206,6 +237,9 @@ message ReviseIntentRequest {
   ThreadRef thread = 2;
   bytes expected_intent_version = 3;
   ThreadIntent proposed_intent = 4;
+  // Original caller-signed native Thread metadata operation. The endpoint
+  // verifies exact request/value/actor/scope/parent binding before admission.
+  SignedRecord operation = 5;
   // Agent attribution cannot set principal_approved; endpoint authority decides.
 }
 
@@ -213,12 +247,14 @@ message SetThreadSharingRequest {
   string client_operation_id = 1;
   ThreadSharingPolicy policy = 2;
   bytes expected_policy_version = 3;
+  SignedRecord operation = 4;
 }
 
 message RecordReviewRequest {
   string client_operation_id = 1;
   ReviewDecision decision = 2;
   repeated ExpectedVersion expected_versions = 3;
+  SignedRecord operation = 4;
 }
 
 message LandThreadRequest {
@@ -236,6 +272,7 @@ message ChangeThreadLifecycleRequest {
   ThreadRef thread = 2;
   bytes expected_version = 3;
   ThreadLifecycle lifecycle = 4;
+  SignedRecord operation = 5;
   // READY revalidates requirements. LANDED is rejected here; use LandThread.
 }
 
@@ -244,6 +281,7 @@ message RenameThreadRequest {
   ThreadRef thread = 2;
   bytes expected_version = 3;
   string name = 4;
+  SignedRecord operation = 5;
 }
 // Each source is the exact revision supplied by the caller. For every distinct
 // target, expected_target is compared once against the initial transaction

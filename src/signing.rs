@@ -512,7 +512,11 @@ fn canonical(kind: &str, fields: &[(&str, Vec<u8>)]) -> Vec<u8> {
     canonical_with_domain(TIER_1_REQUEST_SIGNING_V1_DOMAIN, kind, fields)
 }
 
-fn canonical_with_domain(domain: &str, kind: &str, fields: &[(&str, Vec<u8>)]) -> Vec<u8> {
+pub(crate) fn canonical_with_domain(
+    domain: &str,
+    kind: &str,
+    fields: &[(&str, Vec<u8>)],
+) -> Vec<u8> {
     let mut result = format!("{domain}\nkind={}:{}", kind.len(), kind).into_bytes();
     for (name, value) in fields {
         result.extend_from_slice(format!("\n{name}={}:", value.len()).as_bytes());

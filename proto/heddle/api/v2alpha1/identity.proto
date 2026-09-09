@@ -7,6 +7,19 @@ import "heddle/api/v2alpha1/owner_records.proto";
 import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
+// Original author evidence bound into each signed Thread metadata operation.
+// Supplied history never establishes trust: receivers verify against separately
+// admitted current account authority at first durable admission. Canonical
+// protobuf encoding is mandatory and the entire envelope is bounded to 64 KiB.
+message ThreadControlAuthority {
+  uint32 format = 1; // Must be 1.
+  OwnerHistory owner = 2;
+  bytes mint_root_public_key = 3; // Ed25519, exactly 32 bytes.
+  SignedMintRootAttachment mint_root_attachment = 4;
+  // Sealed Biscuit only: never publish an appendable credential's proof secret.
+  bytes sealed_biscuit = 5;
+}
+
 // User-root proof is portable. Account association records Weft's acceptance of
 // an already user-authorized key; it is not the source of that key's authority.
 message RootAttachment {

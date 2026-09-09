@@ -42,6 +42,27 @@ message SubmitOwnerTransitionRequest {
   // The signed previous_state_hash and sequence are the precondition; there
   // is no second unsigned version that can contradict the signed evidence.
 }
+// Submission durably records a proposal. A later distinct operation completes
+// it after its signed veto window; retrying submission never commits it.
+message OwnerTransitionResponse {
+  MutationReceipt receipt = 1;
+  OwnerTransitionRecord transition = 2;
+}
+message CompleteOwnerTransitionRequest {
+  string client_operation_id = 1;
+  RecordRef transition = 2;
+  bytes expected_version = 3;
+  // heddle.owner-transition-possession.v2 canonical action. Rotation/recovery
+  // prove the proposed key; policy changes prove the current authority key.
+  SignedRecord possession = 4;
+}
+message VetoOwnerTransitionRequest {
+  string client_operation_id = 1;
+  RecordRef transition = 2;
+  bytes expected_version = 3;
+  // heddle.owner-transition-veto.v2, signed by the current owner authority.
+  SignedRecord veto = 4;
+}
 message SubmitOwnerCapabilityRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;

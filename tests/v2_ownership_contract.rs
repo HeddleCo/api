@@ -65,3 +65,38 @@ fn owner_transitions_keep_distinct_rotation_recovery_and_policy_intent() {
         "heddle.api.v2alpha1.ResourceOwnershipTransfer"
     );
 }
+
+#[test]
+fn owner_proposals_have_an_exact_versioned_complete_and_veto_lifecycle() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
+    assert_eq!(
+        field_type(&pool, "OwnerState", "pending_transitions"),
+        "heddle.api.v2alpha1.OwnerTransitionRecord"
+    );
+    assert_eq!(
+        field_type(&pool, "EntityRef", "owner_transition"),
+        "heddle.api.v2alpha1.RecordRef"
+    );
+    let service = pool
+        .get_service_by_name("heddle.api.v2alpha1.OwnerAuthorizationService")
+        .expect("owner service");
+    for name in ["CompleteOwnerTransition", "VetoOwnerTransition"] {
+        let method = service
+            .methods()
+            .find(|method| method.name() == name)
+            .expect("same-service lifecycle");
+        assert!(
+            method
+                .input()
+                .get_field_by_name("expected_version")
+                .is_some()
+        );
+        assert!(
+            method
+                .input()
+                .get_field_by_name("client_operation_id")
+                .is_some()
+        );
+        assert!(method.input().get_field_by_name("transition").is_some());
+    }
+}

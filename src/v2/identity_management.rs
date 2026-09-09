@@ -12,6 +12,8 @@ pub const ROOT_POSSESSION: &str = "heddle.root-registration-possession.v2";
 pub const RECOVERY_TRANSITION: &str = "heddle.owner-recovery-transition.v2";
 pub const RECOVERY_POLICY: &str = "heddle.owner-recovery-policy.v2";
 pub const RECOVERY_POSSESSION: &str = "heddle.owner-recovery-possession.v2";
+pub const OWNER_TRANSITION_POSSESSION: &str = "heddle.owner-transition-possession.v2";
+pub const OWNER_TRANSITION_VETO: &str = "heddle.owner-transition-veto.v2";
 pub const RECOVERY_VETO: &str = "heddle.owner-recovery-veto.v2";
 
 #[derive(Debug, thiserror::Error)]

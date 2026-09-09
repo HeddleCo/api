@@ -220,7 +220,7 @@ function mentionValue(mention: CollaborationMention): MapValue {
   text(mention.id, 1024, true);
   return { kind, spool, device: Array.from(fixed(mention.device, 32)), id: mention.id };
 }
-const RECORD_KINDS = new Set(["discussion", "context", "operation", "run", "policy", "analysis", "invitation", "grant", "discussion_turn", "review", "notification", "attention_item", "member", "approval_group", "session", "signup_invitation", "timeline_event", "artifact", "mount", "support_access", "device_record", "delegation", "recovery"]);
+const RECORD_KINDS = new Set(["discussion", "context", "operation", "run", "policy", "analysis", "invitation", "grant", "discussion_turn", "review", "notification", "attention_item", "member", "approval_group", "session", "signup_invitation", "timeline_event", "artifact", "mount", "support_access", "device_record", "delegation", "recovery", "owner_transition"]);
 function anchorValue(anchor: PortableCollaborationAnchor): MapValue {
   if (anchor.kind === "repository") return { kind: "repository" };
   text(anchor.path, 4096, true, true);

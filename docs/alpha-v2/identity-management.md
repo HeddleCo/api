@@ -36,3 +36,21 @@ veto status and CAS are enforced again in the mutation transaction.
 
 AuthenticationResponse.ownership carries the exact accepted OwnerState so an
 agent or browser can establish offline trust without another hosted lookup.
+
+## Owner transition lifecycle
+
+OwnerAuthorizationService is hosted, except the local account-claim ceremony and
+ObserveOwnership (which can also expose the device's independently verified pin).
+SubmitOwnerTransition durably returns a versioned OwnerTransitionRecord. Retrying
+that operation returns its original receipt; it never commits the proposal.
+CompleteOwnerTransition takes a new operation ID, exact transition reference and
+version, and a SignedRecord in `heddle.owner-transition-possession.v2`. Its canonical
+bytes use `identity_management::recovery_action`; the key is the proposed authority
+for rotation/recovery and the current authority for a policy change. Completion
+returns AuthenticationResponse with the independently verifiable current ownership;
+recovery also returns the newly enrolled client-owned credential result.
+VetoOwnerTransition uses `heddle.owner-transition-veto.v2`, the same canonical action
+including the expected version, and the current owner's signature. These proof
+domains are distinct from Identity recovery proofs and cannot be substituted.
+Pending OwnerState projections expose the same versioned record, original signed
+transition, start and eligibility timestamps, and completion requirements.

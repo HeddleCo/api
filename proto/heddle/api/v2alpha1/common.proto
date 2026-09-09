@@ -98,6 +98,7 @@ message EntityRef {
     RecordRef device_record = 27;
     RecordRef delegation = 28;
     RecordRef recovery = 29;
+    RecordRef owner_transition = 30;
   }
 }
 

@@ -212,6 +212,8 @@ pub fn signing_bytes(format: &str, canonical: &[u8]) -> Result<Vec<u8>, Error> {
             | RECOVERY_POLICY
             | RECOVERY_POSSESSION
             | RECOVERY_VETO
+            | OWNER_TRANSITION_POSSESSION
+            | OWNER_TRANSITION_VETO
     ) || canonical.len() > 128 * 1024
     {
         return Err(Error("unknown format or oversized statement"));

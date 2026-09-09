@@ -67,3 +67,17 @@ fn issuance_proofs_bind_operation_version_scope_and_subject() {
     changed.scope = "admin".into();
     assert_ne!(original, issuance("account", &changed).expect("intent"));
 }
+
+#[test]
+fn owner_lifecycle_proof_domains_are_supported_and_separated() {
+    use heddle_api::v2::identity_management as wire;
+    let complete = wire::signing_bytes(wire::OWNER_TRANSITION_POSSESSION, b"action")
+        .expect("owner completion proof supported");
+    let veto = wire::signing_bytes(wire::OWNER_TRANSITION_VETO, b"action")
+        .expect("owner veto proof supported");
+    assert_ne!(complete, veto);
+    assert_ne!(
+        complete,
+        wire::signing_bytes(wire::RECOVERY_POSSESSION, b"action").expect("recovery domain")
+    );
+}

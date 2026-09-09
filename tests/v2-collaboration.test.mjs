@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
-import { AnnotationTagSchema } from '../packages/typescript/dist/v2alpha1/collaboration_pb.js';
+import { AnnotationTagSchema, SourceTargetReferenceSchema } from '../packages/typescript/dist/v2alpha1/collaboration_pb.js';
 import { Audience } from '../packages/typescript/dist/v2alpha1/administration_pb.js';
 import { SignedRecordSchema } from '../packages/typescript/dist/v2alpha1/common_pb.js';
 import { signDiscussion, signContext, verifyCollaboration, collaborationVisibility, textAnnotationTag } from '../packages/typescript/dist/v2alpha1/collaboration.js';
@@ -132,6 +132,49 @@ test('exact state and Git source spans match independent Rust fixtures', async (
   }
 });
 
+test('explicit source target bindings survive primary anchors and tags and are signed', async () => {
+  const bindings = [
+    { case: 'viewedThread', value: true },
+    { case: 'namedThread', value: { spool: { id: scope.spoolId }, id: { value: new Uint8Array(32).fill(8) } } },
+    { case: 'pinnedRevision', value: { revision: { spool: { id: scope.spoolId }, revision: { case: 'state', value: { value: new Uint8Array(32).fill(5) } } } } },
+  ];
+  for (const binding of bindings) {
+    const target = create(SourceTargetReferenceSchema, { targetId: new Uint8Array(32).fill(6), binding });
+    const anchor = { kind: 'source', revision: { kind: 'state', stateId: new Uint8Array(32).fill(5) }, path: 'src/main.rs', symbolId: 'run', startLine: 12, endLine: 18, target };
+    const record = await signDiscussion(command({ kind: 'open', blocking: true, title: 'Review source', visibility: 'public', body: 'Check these lines', anchor }), [], signer);
+    const outer = decode(record.canonicalRecord), inner = decode(Uint8Array.from(outer.body.canonical));
+    assert.deepEqual(inner.body.anchor.source.target.target, Array(32).fill(6));
+    assert.equal(inner.body.anchor.source.path, 'src/main.rs');
+    await verifyCollaboration(record);
+    const tag = create(AnnotationTagSchema, { tag: { case: 'source', value: { source: {
+      revision: { spool: { id: scope.spoolId }, revision: { case: 'state', value: { value: new Uint8Array(32).fill(5) } } },
+      thread: { spool: { id: scope.spoolId }, id: { value: scope.threadId } }, path: 'src/main.rs', target,
+    } } } });
+    const context = await signContext({ ...contextCommand, tags: [tag] }, [], signer);
+    const contextInner = decode(Uint8Array.from(decode(context.canonicalRecord).body.canonical));
+    assert.deepEqual(contextInner.tags[0].target.source.target, inner.body.anchor.source.target);
+    inner.body.anchor.source.target.target[0] ^= 1;
+    outer.body.canonical = Array.from(encode(inner));
+    const changed = structuredClone(record); changed.canonicalRecord = encode(outer);
+    await assert.rejects(verifyCollaboration(changed), /signature/);
+  }
+});
+
+test('invalid source target binding is rejected before invoking signer', async () => {
+  let signed = 0;
+  const counting = { ...signer, sign: bytes => { signed++; return signer.sign(bytes); } };
+  for (const binding of [undefined, { case: 'viewedThread', value: false },
+    { case: 'namedThread', value: { spool: { id: scope.spoolId } } },
+    { case: 'pinnedRevision', value: { revision: { spool: { id: scope.spoolId } } } },
+    { case: 'pinnedRevision', value: { revision: { spool: { id: scope.spoolId }, revision: { case: 'gitCommitOid', value: 'a'.repeat(40) } },
+      thread: { spool: { id: '00000000-0000-0000-0000-000000000099' }, id: { value: scope.threadId } } } },
+  ]) {
+    const target = create(SourceTargetReferenceSchema, { targetId: new Uint8Array(32).fill(6), ...(binding ? { binding } : {}) });
+    await assert.rejects(signContext({ ...contextCommand, anchor: { kind: 'source', revision: { kind: 'state', stateId: new Uint8Array(32).fill(5) }, path: 'src/main.rs', target } }, [], counting));
+  }
+  assert.equal(signed, 0);
+});
+
 test('native audiences preserve restrictions and reject lossy canonical tiers', async () => {
   assert.equal(collaborationVisibility(Audience.PUBLIC), 'public');
   assert.equal(collaborationVisibility(Audience.MEMBERS), 'internal');
@@ -158,5 +201,5 @@ test('structured annotation tags match independent Rust signatures without numer
   await verifyCollaboration(record);
   const invalid = structuredClone(tags); invalid[2].tag.value.value.value.value = { coefficient: 90n, scale: 2 };
   await assert.rejects(signContext({ ...contextCommand, tags: invalid }, [], signer), /normalized/);
-  await assert.rejects(signContext({ ...contextCommand, tags: [...tags, tags[2]] }, [], signer), /duplicate/);
+  await assert.rejects(signContext({ ...contextCommand, tags: [...tags, structuredClone(tags[2])] }, [], signer), /duplicate/);
 });

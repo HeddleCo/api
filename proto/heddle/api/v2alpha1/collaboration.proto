@@ -16,6 +16,27 @@ message SourceAnchor {
   // Owning Thread for replicated source annotations; its spool must equal the
   // exact revision spool. Source bytes alone do not identify a causal history.
   ThreadRef thread = 6;
+  // Optional shared target identity and explicit tracking policy. Coordinates
+  // above remain original signed evidence. Omitted means exact-location only;
+  // implementations MUST NOT infer tracking from the owning Thread.
+  SourceTargetReference target = 7;
+}
+
+// Shared by primary anchors and annotation references. This is a reference,
+// never a grant to read the target's source or its owning Thread.
+message SourceTargetReference {
+  bytes target_id = 1; // Canonical SourceTargetCore identity, exactly 32 bytes.
+  oneof binding {
+    // Must be true. Inherited references follow the Thread being viewed.
+    bool viewed_thread = 2;
+    ThreadRef named_thread = 3;
+    PinnedSourceTargetRevision pinned_revision = 4;
+  }
+}
+message PinnedSourceTargetRevision {
+  RevisionRef revision = 1;
+  // Optional originating Thread; when present its Spool must match revision.
+  ThreadRef thread = 2;
 }
 
 message CollaborationAnchor {

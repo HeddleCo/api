@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
-import { AnnotationTagSchema, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue } from "./collaboration_pb.js";
+import { AnnotationTagSchema, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference } from "./collaboration_pb.js";
 import type { EntityRef } from "./common_pb.js";
 import { Audience } from "./administration_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
@@ -26,7 +26,7 @@ export type CollaborationMention =
 export type PortableCollaborationAnchor =
   | { kind: "repository" }
   | { kind: "source"; revision: { kind: "state"; stateId: Uint8Array } | { kind: "git_commit"; oid: string };
-      path: string; symbolId?: string; startLine?: number; endLine?: number };
+      path: string; symbolId?: string; startLine?: number; endLine?: number; target?: SourceTargetReference };
 export type CollaborationVisibility = "public" | "internal"
   | { kind: "private"; label: string };
 /** Typed native audiences map losslessly to canonical visibility. Labels are
@@ -221,6 +221,48 @@ function mentionValue(mention: CollaborationMention): MapValue {
   return { kind, spool, device: Array.from(fixed(mention.device, 32)), id: mention.id };
 }
 const RECORD_KINDS = new Set(["discussion", "context", "operation", "run", "policy", "analysis", "invitation", "grant", "discussion_turn", "review", "notification", "attention_item", "member", "approval_group", "session", "signup_invitation", "timeline_event", "artifact", "mount", "support_access", "device_record", "delegation", "recovery", "owner_transition", "billing"]);
+function sourceTargetValue(target: SourceTargetReference): MapValue {
+  const id = Array.from(fixed(target.targetId, 32));
+  const binding = target.binding;
+  if (binding.case === "viewedThread") {
+    if (!binding.value) throw new Error("Viewed Thread binding must be true");
+    return { target: id, binding: { kind: "viewed_thread" } };
+  }
+  if (binding.case === "namedThread") {
+    const thread = binding.value;
+    if (!thread.spool || !thread.id) throw new Error("Named target requires scoped Thread");
+    return { target: id, binding: { kind: "named_thread", scope: {
+      spool: uuid(thread.spool.id), thread: Array.from(fixed(thread.id.value, 32)) } } };
+  }
+  if (binding.case === "pinnedRevision") {
+    const pinned = binding.value, ref = pinned.revision;
+    if (!ref?.spool) throw new Error("Pinned target requires scoped exact revision");
+    const thread = pinned.thread;
+    if (thread && (!thread.id || thread.spool?.id !== ref.spool.id)) throw new Error("Pinned target Thread belongs to another spool");
+    const r = ref.revision;
+    const revision: MapValue = r.case === "state" ? { kind: "state", state_id: Array.from(fixed(r.value.value, 32)) }
+      : r.case === "gitCommitOid" ? { kind: "git_commit", oid: gitOid(r.value) }
+      : (() => { throw new Error("Pinned target requires exact revision"); })();
+    return { target: id, binding: { kind: "pinned_revision", scope: {
+      spool: uuid(ref.spool.id), thread: thread ? Array.from(fixed(thread.id!.value, 32)) : null }, revision } };
+  }
+  throw new Error("Explicit source target binding required");
+}
+function validateSourceTarget(value: Value | undefined) {
+  const target = map(value); keys(target, ["target", "binding"]); byteArray(target.target, 32);
+  const binding = map(target.binding);
+  if (binding.kind === "viewed_thread") { keys(binding, ["kind"]); return; }
+  if (binding.kind !== "named_thread" && binding.kind !== "pinned_revision") throw new Error("Unknown source target binding");
+  keys(binding, ["kind", "scope", ...(binding.kind === "pinned_revision" ? ["revision"] : [])]);
+  const scope = map(binding.scope); keys(scope, ["spool", "thread"]); uuidString(scope.spool);
+  if (binding.kind === "named_thread" || scope.thread !== null) byteArray(scope.thread, 32);
+  if (binding.kind === "pinned_revision") {
+    const revision = map(binding.revision);
+    if (revision.kind === "state") { keys(revision, ["kind", "state_id"]); byteArray(revision.state_id, 32); }
+    else if (revision.kind === "git_commit") { keys(revision, ["kind", "oid"]); gitOid(string(revision.oid)); }
+    else throw new Error("Pinned target requires exact revision");
+  }
+}
 function anchorValue(anchor: PortableCollaborationAnchor): MapValue {
   if (anchor.kind === "repository") return { kind: "repository" };
   text(anchor.path, 4096, true, true);
@@ -230,7 +272,7 @@ function anchorValue(anchor: PortableCollaborationAnchor): MapValue {
     || (anchor.endLine !== undefined && (anchor.startLine === undefined || anchor.endLine < anchor.startLine))) throw new Error("Invalid source span");
   const revision: MapValue = anchor.revision.kind === "state" ? { kind: "state", state_id: Array.from(fixed(anchor.revision.stateId, 32)) }
     : { kind: "git_commit", oid: gitOid(anchor.revision.oid) };
-  return { kind: "source", source: { revision, path: anchor.path, symbol_id: anchor.symbolId ?? "", start_line: anchor.startLine ?? null, end_line: anchor.endLine ?? null } };
+  return { kind: "source", source: { revision, path: anchor.path, symbol_id: anchor.symbolId ?? "", start_line: anchor.startLine ?? null, end_line: anchor.endLine ?? null, ...(anchor.target ? { target: sourceTargetValue(anchor.target) } : {}) } };
 }
 function actionValue(action: DiscussionAction): MapValue {
   const turn = (body: string) => { text(body, 256 * 1024); return { body, content_hash: Array.from(typedHash("collaboration-turn", utf8.encode(body))) }; };
@@ -388,7 +430,8 @@ function validateAnchor(value: Value | undefined) {
   if (anchor.kind === "repository") { keys(anchor, ["kind"]); return; }
   if (anchor.kind !== "source") throw new Error("Unsupported collaboration anchor");
   keys(anchor, ["kind", "source"]);
-  const source = map(anchor.source); keys(source, ["revision", "path", "symbol_id", "start_line", "end_line"]);
+  const source = map(anchor.source); keys(source, ["revision", "path", "symbol_id", "start_line", "end_line", ...(Object.hasOwn(source, "target") ? ["target"] : [])]);
+  if (Object.hasOwn(source, "target")) validateSourceTarget(source.target);
   const revision = map(source.revision);
   let typedRevision: Extract<PortableCollaborationAnchor, { kind: "source" }>["revision"];
   if (revision.kind === "state") { keys(revision, ["kind", "state_id"]); typedRevision = { kind: "state", stateId: byteArray(revision.state_id, 32) }; }
@@ -439,7 +482,7 @@ function annotationSourceValue(reference: AnnotationSourceReference): MapValue {
   const anchor: PortableCollaborationAnchor = { kind: "source", revision: revision.case === "state"
     ? { kind: "state", stateId: revision.value.value } : revision.case === "gitCommitOid"
       ? { kind: "git_commit", oid: revision.value } : (() => { throw new Error("Exact annotation revision required"); })(),
-    path: source.path, symbolId: source.symbolId, startLine: source.startLine, endLine: source.endLine };
+    path: source.path, symbolId: source.symbolId, startLine: source.startLine, endLine: source.endLine, target: source.target };
   annotationPath(source.path);
   if ((source.startLine === undefined) !== (source.endLine === undefined)) throw new Error("Annotation lines require both endpoints");
   return { scope: { spool, thread: thread ? Array.from(fixed(thread.id!.value, 32)) : null }, source: map(anchorValue(anchor).source) };

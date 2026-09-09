@@ -399,7 +399,7 @@ service SpoolService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-  rpc SetBookmark(SetBookmarkRequest) returns (MutationResponse) {
+  rpc SetBookmark(SetBookmarkRequest) returns (BookmarkMutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION

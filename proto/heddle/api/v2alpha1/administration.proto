@@ -121,9 +121,15 @@ message ReviewPolicyRecord {
   repeated string required_checks = 13;
 }
 message BookmarkRecord {
-  EntityRef resource = 1;
+  BookmarkRef ref = 1;
   bytes version = 2;
   string label = 3;
+  // False is a retained tombstone with its own CAS version.
+  bool bookmarked = 4;
+}
+message BookmarkMutationResponse {
+  MutationReceipt receipt = 1;
+  BookmarkRecord bookmark = 2;
 }
 message SupportAccessRecord {
   RecordRef ref = 1;
@@ -230,9 +236,11 @@ message DeleteApprovalGroupRequest {
 }
 message SetBookmarkRequest {
   string client_operation_id = 1;
-  BookmarkRecord bookmark = 2;
+  BookmarkRef bookmark = 2;
   bool bookmarked = 3;
+  // Empty means no bookmark has ever existed; tombstones retain a version.
   bytes expected_version = 4;
+  string label = 5;
 }
 message SetSupportAccessRequest {
   string client_operation_id = 1;

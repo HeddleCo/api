@@ -56,6 +56,16 @@ message RecordRef {
   string id = 2;
 }
 
+// Caller-private preference identity; changing it never changes its target.
+message BookmarkRef {
+  // Must be the authenticated caller's account, including delegated agents.
+  PrincipalRef account = 1;
+  oneof target {
+    SpoolRef spool = 2;
+    ThreadRef thread = 3;
+  }
+}
+
 message EntityRef {
   oneof entity {
     SpoolRef spool = 1;
@@ -81,6 +91,7 @@ message EntityRef {
     EndpointRef device = 21;
     RecordRef timeline_event = 22;
     RecordRef artifact = 23;
+    BookmarkRef bookmark = 24;
   }
 }
 

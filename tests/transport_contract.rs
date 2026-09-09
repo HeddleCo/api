@@ -755,6 +755,7 @@ fn destructive_shipped_methods_match_weft_human_verification_policy() {
 fn call_context_carries_transport_neutral_auth_and_trace_fields() {
     let context = CallContext {
         bearer_capability: b"opaque-biscuit".to_vec(),
+        bearer_authority_proof: b"portable-owner-authority".to_vec(),
         bearer_grant_envelope: b"opaque-grant-envelope".to_vec(),
         request_proof: Some(RequestProof {
             algorithm: "ed25519".to_string(),
@@ -777,6 +778,8 @@ fn call_context_carries_transport_neutral_auth_and_trace_fields() {
         ..Default::default()
     };
 
+    let context = CallContext::decode(context.encode_to_vec().as_slice()).expect("context round trip");
+    assert_eq!(context.bearer_authority_proof, b"portable-owner-authority");
     assert_eq!(context.bearer_capability, b"opaque-biscuit");
     assert_eq!(context.bearer_grant_envelope, b"opaque-grant-envelope");
     assert_eq!(

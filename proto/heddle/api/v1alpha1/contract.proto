@@ -80,6 +80,13 @@ message CallContext {
   // absent selector is rejected, never trusted. Empty = legacy scan fallback during
   // cutover.
   bytes bearer_authority_key_selector = 9;
+  // Optional canonical v2 ThreadControlAuthority for an owned-device call.
+  // At most 64 KiB. The sealed Biscuit MUST exactly equal bearer_capability;
+  // its mint root MUST match any supplied key selector and the verified proof
+  // chain. The receiver verifies accepted owner history and mint attachment
+  // against its independently pinned owner and current revocations. This
+  // evidence cannot establish a new trusted owner or broaden any caveat.
+  bytes bearer_authority_proof = 10;
 }
 
 enum DeploymentTarget {

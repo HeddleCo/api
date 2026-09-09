@@ -49,3 +49,11 @@ Keep the existing matching primitives and ambiguity policy; replace the ownershi
 - Current-path/range query results agree with displayed locations after capture, before pagination, including live removal/addition and source visibility.
 - Old signed tags/proofs remain byte-identical through all captures. Restart/replay reconstructs the same target cores and bindings.
 - Cold resolution and mapping compaction obey budgets; unsupported/partial analysis is visible rather than silently called complete.
+
+## Implementation checkpoint
+
+The portable Heddle model now has separate file/target cores, explicit viewed-Thread/named-Thread/pinned bindings, validated line edit maps, and insertion endpoint affinity. The edit-map reader uses binary search and reports deleted/ambiguous positions. The existing Histogram text diff produces the maps, with explicit source-byte and edit-count limits. No new dependency was introduced for these primitives.
+
+`SourceTargetMap` stores ordinary content-addressed blobs in an immutable 32-way trie. Copying a root shares a fork; replacing a binding copies its route, and no-op updates write zero nodes. Measured regression fixtures replace one binding with 1 read/1 write in a one-entry map and 4 reads/4 writes in a 10,000-entry map. This is bounded path-copying, not a promise of exactly one physical write per changed file. Hash-integrity and no-op-write negative controls fail when their guards are removed.
+
+These are tested primitives, not completed automatic tracking. Remaining integration is source-delta production in native capture and hosted publication, identity interning, shared projection persistence, inherited annotation membership at the fork base, current-source query joins, and target-binding events in composed observations. Until those are connected, the typed tag wire representation and predicates describe original signed source evidence. A successful scalar-query or typed-rendering test does not prove current-source tracking.

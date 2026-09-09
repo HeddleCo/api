@@ -38,6 +38,7 @@ copyFileSync("packages/typescript/runtime/v2-owner-certificates.ts", join(v2Root
 copyFileSync("packages/typescript/runtime/v2-pairing.ts", join(v2Root, "pairing.ts"));
 copyFileSync("packages/typescript/runtime/v2-thread-control.ts", join(v2Root, "thread-control.ts"));
 copyFileSync("packages/typescript/runtime/v2-evidence.ts", join(v2Root, "evidence.ts"));
+copyFileSync("packages/typescript/runtime/v2-initial-source.ts", join(v2Root, "initial-source.ts"));
 copyFileSync("packages/typescript/runtime/v2-collaboration.ts", join(v2Root, "collaboration.ts"));
 copyFileSync("packages/typescript/runtime/v2-msgpack.ts", join(v2Root, "_collaboration-msgpack.ts"));
 const v2Modules = readdirSync(v2Root).filter((name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_")).sort();

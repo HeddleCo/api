@@ -9,11 +9,13 @@ const key = createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506
 const signer = { publicKey: new Uint8Array(createPublicKey(key).export({ format: 'der', type: 'spki' }).subarray(-32)), sign: async bytes => new Uint8Array(sign(null, bytes, key)) };
 const id = n => `00000000-0000-0000-0000-${n.toString(16).padStart(12, '0')}`;
 const author = { actor: { principalId: id(4), agentId: 'test-runner' }, authorityEnvelope: new TextEncoder().encode('independently verified by receiving host'), signer };
-const input = { id: id(1), spoolId: id(2), revision: new Uint8Array(32).fill(3), check: 'unit-tests', outcome: Outcome.PASSED, detail: '42 passed', artifacts: [id(8)], supersedes: [id(9)], completedAtMs: 1234n };
+const input = { id: id(1), spoolId: id(2), threadId: new Uint8Array(32).fill(7), revision: new Uint8Array(32).fill(3), check: 'unit-tests', outcome: Outcome.PASSED, detail: '42 passed', artifacts: [id(8)], supersedes: [id(9)], completedAtMs: 1234n };
 test('all outcomes and original attribution survive signed projection', async () => {
   for (const outcome of [Outcome.PASSED, Outcome.FAILED, Outcome.ERROR, Outcome.SKIPPED]) {
     const result = await signCheckEvidence({ ...input, outcome }, author);
     assert.deepEqual(await projectCheckEvidence(result.evidence), result);
+    assert.deepEqual(result.thread.id.value, input.threadId);
+    assert.equal(result.thread.spool.id, input.spoolId);
     assert.equal(result.summary.outcome, outcome);
     assert.equal(result.summary.author.id, author.actor.principalId);
     assert.equal(result.summary.agentId, 'test-runner');
@@ -49,9 +51,22 @@ test('original signature, domain, canonical author binding and byte limit are ma
   await assert.rejects(signCheckEvidence(input, { ...author, signer: { ...signer, publicKey: new Uint8Array(32).fill(5) } }), /signature/);
 });
 
+test('original Thread scope is signed and cannot be relabeled through an identical revision', async () => {
+  const result = await signCheckEvidence(input, author);
+  const relabeled = structuredClone(result);
+  relabeled.thread.id.value[0] ^= 1;
+  await assert.rejects(prepareCheckAcknowledgement(relabeled, new Uint8Array(32).fill(5), id(6), 2001n, author), /differs from original/);
+  const altered = structuredClone(result.evidence);
+  const raw = decode(altered.canonicalRecord);
+  raw.thread[0] ^= 1;
+  altered.canonicalRecord = encode(raw);
+  await assert.rejects(projectCheckEvidence(altered), /signature/);
+  await assert.rejects(signCheckEvidence({ ...input, threadId: new Uint8Array() }, author), /32 bytes/);
+});
+
 // Generated independently with the Rust object-model and crypto codecs.
 test('browser evidence and progress match Rust canonical bytes and signatures', async () => {
-  const fixture = JSON.parse(readFileSync(new URL('./fixtures/check-evidence-v1-rust.json', import.meta.url), 'utf8'));
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/check-evidence-v2-rust.json', import.meta.url), 'utf8'));
   const result = await signCheckEvidence(input, author);
   const ack = await prepareCheckAcknowledgement(result, new Uint8Array(32).fill(5), id(6), 2001n, author);
   const hex = bytes => Buffer.from(bytes).toString('hex');

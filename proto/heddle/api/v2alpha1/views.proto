@@ -24,6 +24,9 @@ message ThreadPages {
   PageRequest reviews = 2;
   PageRequest collaboration = 3;
   PageRequest timeline = 4;
+  // Current exact-revision checks and acknowledgements for the current policy.
+  // This independent mixed window has its own opaque cursor and evidence status.
+  PageRequest evidence = 5;
 }
 message ObserveThreadRequest {
   ThreadRef thread = 1;
@@ -43,7 +46,7 @@ message ObserveThreadRequest {
 // have no payload. Every data frame carries exactly one payload; snapshots and
 // delta batches become visible only at their checkpoint.
 // SectionReplacement.section and SectionStatus.section use these exact keys:
-// overview (overview); captures (capture); review (comparison, review, diff, evidence);
+// overview (overview); captures (capture); review (comparison, review, diff); evidence (evidence, check_acknowledgement);
 // collaboration (discussion, turn, context); analysis (analysis); checkouts
 // (checkout); timeline (timeline_event, run, operation); sharing (sharing,
 // publication). Replacement clears only that section's committed collection.
@@ -71,6 +74,7 @@ message ThreadEvent {
     SectionReplacement replace_section = 19;
     SignedRecord signed_operation = 20;
     ReviewComparison comparison = 21;
+    CheckAcknowledgementRecord check_acknowledgement = 22;
   }
 }
 

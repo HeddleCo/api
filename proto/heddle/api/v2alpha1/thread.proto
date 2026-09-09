@@ -136,6 +136,7 @@ enum ThreadSection {
   THREAD_SECTION_CHECKOUTS = 6;
   THREAD_SECTION_TIMELINE = 7;
   THREAD_SECTION_SHARING = 8;
+  THREAD_SECTION_EVIDENCE = 9;
 }
 
 message CaptureSummary {

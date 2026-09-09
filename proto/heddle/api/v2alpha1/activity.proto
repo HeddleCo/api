@@ -133,6 +133,19 @@ message EvidenceRecord {
   // projection; if supplied, every field must match the signed original.
   CheckEvidenceSummary summary = 7;
 }
+// Immutable review progress for one accepted check result and exact policy.
+// This does not change its outcome, supersede evidence or grant landing approval.
+message CheckAcknowledgementRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  RecordRef evidence = 3;
+  RevisionRef revision = 4;
+  bytes policy_version = 5;
+  PrincipalRef author = 6;
+  string agent_id = 7;
+  google.protobuf.Timestamp acknowledged_at = 8;
+  SignedRecord acknowledgement = 9;
+}
 message RecordEvidenceRequest {
   string client_operation_id = 1;
   EvidenceRecord evidence = 2;

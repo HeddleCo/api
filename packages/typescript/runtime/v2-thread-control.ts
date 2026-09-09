@@ -188,7 +188,7 @@ function uuid(value: string): Uint8Array {
   return Uint8Array.from(value.replaceAll("-", "").match(/../g)!, byte => Number.parseInt(byte, 16));
 }
 function fixed(value: Uint8Array | undefined, size: number): Uint8Array {
-  if (!(value instanceof Uint8Array) || value.length !== size) throw new Error(`Expected ${size} bytes`);
+  if (!ArrayBuffer.isView(value) || Object.prototype.toString.call(value) !== "[object Uint8Array]" || value.length !== size) throw new Error(`Expected ${size} bytes`);
   return Uint8Array.from(value);
 }
 function compare(left: Uint8Array, right: Uint8Array): number { for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return left[i]! - right[i]!; return 0; }

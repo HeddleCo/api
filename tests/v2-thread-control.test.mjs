@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
@@ -82,4 +83,12 @@ test('a fresh review gets its own empty CAS frontier without inventing singleton
   const signed = await signThreadControl(review.overview, review.command, review.author);
   assert.deepEqual(decode(signed.operation.canonicalRecord).parents, []);
   assert.equal(Buffer.from(signed.expectedVersion).toString('hex'), fixtures[4].empty_property_version);
+});
+
+test('byte views from another browser realm retain the canonical signing identity', async () => {
+  const input = inputs(fixtures[0]);
+  input.author.signer = { ...signer, publicKey: runInNewContext('Uint8Array.from(bytes)', { bytes: Array.from(signer.publicKey) }) };
+  const signed = await signThreadControl(input.overview, input.command, input.author);
+  assert.equal(Buffer.from(signed.operation.signatures[0].signature).toString('hex'), fixtures[0].signature_hex);
+  assert.throws(() => threadPropertyVersion(new Int8Array(32), ThreadProperty.NAME, '', []), /Expected 32 bytes/);
 });

@@ -15,18 +15,29 @@ fn thread_creation_and_replication_preserve_the_same_signed_genesis() {
     let creation = start
         .get_field_by_name("thread_genesis")
         .expect("creation retains the original creator signature");
+    let carrier = pool
+        .get_message_by_name("heddle.api.v2alpha1.ThreadGenesisRecord")
+        .expect("portable original ownership proof carrier");
     assert_eq!(
         creation.kind(),
-        open.get_field_by_name("thread_genesis")
-            .expect("same genesis during later replication")
+        carrier.get_field_by_name("genesis")
+            .expect("same signed genesis in the carrier")
             .kind()
+    );
+    assert_eq!(
+        open.get_field_by_name("thread_genesis").expect("replication proof").kind(),
+        prost_reflect::Kind::Message(carrier.clone()),
+    );
+    assert_eq!(
+        start.get_field_by_name("creator_authority").expect("original creation authority").kind(),
+        carrier.get_field_by_name("creator_authority").expect("original authority survives replication").kind(),
     );
     assert_eq!(
         start
             .fields()
             .map(|field| field.name().to_owned())
             .collect::<Vec<_>>(),
-        ["client_operation_id", "spool", "thread_genesis"],
+        ["client_operation_id", "spool", "thread_genesis", "creator_authority"],
         "signed creation data has one representation; a new immutable identity has no mutable CAS target"
     );
 }

@@ -969,6 +969,42 @@ service ThreadService {
       }
     };
   }
+  rpc SetAudiencePolicy(SetThreadAudienceRequest) returns (MutationResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      authorization_request_targets: {
+        path: "policy.thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+    };
+  }
+  rpc SetRetentionPolicy(SetThreadRetentionRequest) returns (MutationResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_WORKSPACE_MANAGEMENT
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      authorization_request_targets: {
+        path: "policy.thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+    };
+  }
   rpc RecordReview(RecordReviewRequest) returns (MutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

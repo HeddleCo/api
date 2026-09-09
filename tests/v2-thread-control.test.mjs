@@ -4,7 +4,7 @@ import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
-import { ThreadOverviewSchema, ThreadProperty, ThreadLifecycle, SharedFacet, ThreadIntentSchema, ThreadSharingPolicySchema, ReviewDecisionSchema, ReviewDecision_Kind } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
+import { ThreadAudiencePolicySchema, ThreadAudiencePolicy_Kind, ThreadRetentionPolicySchema, MaterialRetention_Mode, ThreadOverviewSchema, ThreadProperty, ThreadLifecycle, SharedFacet, ThreadIntentSchema, ThreadSharingPolicySchema, ReviewDecisionSchema, ReviewDecision_Kind } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
 import { EndpointKind } from '../packages/typescript/dist/v2alpha1/stream_pb.js';
 import { signThreadControl, threadPropertyVersion } from '../packages/typescript/dist/v2alpha1/thread-control.js';
 import { decode } from '../packages/typescript/dist/v2alpha1/_collaboration-msgpack.js';
@@ -91,4 +91,49 @@ test('byte views from another browser realm retain the canonical signing identit
   const signed = await signThreadControl(input.overview, input.command, input.author);
   assert.equal(Buffer.from(signed.operation.signatures[0].signature).toString('hex'), fixtures[0].signature_hex);
   assert.throws(() => threadPropertyVersion(new Int8Array(32), ThreadProperty.NAME, '', []), /Expected 32 bytes/);
+});
+
+
+test('audience and retention sign independent frontiers and never mutate sync destinations', async () => {
+  const input = inputs(fixtures[0]);
+  const policies = [
+    ['audience', ThreadProperty.AUDIENCE, create(ThreadAudiencePolicySchema, { thread: ref, kind: ThreadAudiencePolicy_Kind.OWNER })],
+    ['retention', ThreadProperty.RETENTION, create(ThreadRetentionPolicySchema, { thread: ref,
+      source: { mode: MaterialRetention_Mode.RETAIN }, collaboration: { mode: MaterialRetention_Mode.RETAIN },
+      evidence: { mode: MaterialRetention_Mode.RETAIN }, scrubbedTimeline: { mode: MaterialRetention_Mode.BOUNDED, seconds: 86400n },
+      rawTranscripts: { mode: MaterialRetention_Mode.DISCARD } })],
+  ];
+  const versions = [];
+  for (const [kind, property, value] of policies) {
+    const overview = create(ThreadOverviewSchema, { ref, metadataFrontiers: [{ property,
+      version: threadPropertyVersion(ref.id.value, property, '', []), operationIds: [] }] });
+    const signed = await signThreadControl(overview, { ...input.command, control: { kind, value } }, input.author);
+    const body = decode(Uint8Array.from(decode(signed.operation.canonicalRecord).body.canonical));
+    assert.equal(body.control.kind, kind);
+    assert.equal('destinations' in body.control.value, false);
+    versions.push(signed.expectedVersion);
+  }
+  assert.notDeepEqual(versions[0], versions[1]);
+  assert.notDeepEqual(versions[0], threadPropertyVersion(ref.id.value, ThreadProperty.SHARING, '', []));
+});
+
+test('audience rejects duplicates and retention rejects unbounded raw before signing', async () => {
+  const input = inputs(fixtures[0]);
+  let calls = 0;
+  input.author.signer = { ...signer, sign: async bytes => { calls++; return signer.sign(bytes); } };
+  const value = create(ThreadAudiencePolicySchema, { thread: ref, kind: ThreadAudiencePolicy_Kind.INVITED,
+    invitees: [{ principalId: input.author.actor.principalId }, { principalId: input.author.actor.principalId }] });
+  const overview = create(ThreadOverviewSchema, { ref, metadataFrontiers: [{ property: ThreadProperty.AUDIENCE,
+    version: threadPropertyVersion(ref.id.value, ThreadProperty.AUDIENCE, '', []), operationIds: [] }] });
+  await assert.rejects(signThreadControl(overview, { ...input.command, control: { kind: 'audience', value } }, input.author), /Duplicate/);
+  value.invitees.pop(); value.kind = ThreadAudiencePolicy_Kind.OWNER;
+  await assert.rejects(signThreadControl(overview, { ...input.command, control: { kind: 'audience', value } }, input.author), /Invitees require/);
+  const retentionValue = create(ThreadRetentionPolicySchema, { thread: ref,
+    source: { mode: MaterialRetention_Mode.RETAIN }, collaboration: { mode: MaterialRetention_Mode.RETAIN },
+    evidence: { mode: MaterialRetention_Mode.RETAIN }, scrubbedTimeline: { mode: MaterialRetention_Mode.RETAIN },
+    rawTranscripts: { mode: MaterialRetention_Mode.RETAIN } });
+  overview.metadataFrontiers[0].property = ThreadProperty.RETENTION;
+  overview.metadataFrontiers[0].version = threadPropertyVersion(ref.id.value, ThreadProperty.RETENTION, '', []);
+  await assert.rejects(signThreadControl(overview, { ...input.command, control: { kind: 'retention', value: retentionValue } }, input.author), /raw retention/);
+  assert.equal(calls, 0);
 });

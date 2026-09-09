@@ -2,7 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type RevisionRef, type SignedRecord } from "./common_pb.js";
 import { EndpointKind } from "./stream_pb.js";
-import { SharedFacet, ThreadLifecycle, ThreadProperty, ThreadPropertyFrontierSchema, ReviewDecision_Kind, type ThreadIntent, type ThreadOverview, type ThreadPropertyFrontier, type ThreadSharingPolicy, type ReviewDecision } from "./thread_pb.js";
+import { ThreadAudiencePolicy_Kind, MaterialRetention_Mode, type ThreadAudiencePolicy, type ThreadRetentionPolicy, type MaterialRetention, SharedFacet, ThreadLifecycle, ThreadProperty, ThreadPropertyFrontierSchema, ReviewDecision_Kind, type ThreadIntent, type ThreadOverview, type ThreadPropertyFrontier, type ThreadSharingPolicy, type ReviewDecision } from "./thread_pb.js";
 import type { CollaborationActor, CollaborationSigner } from "./collaboration.js";
 import { encode, equal, type Value } from "./_collaboration-msgpack.js";
 
@@ -16,6 +16,8 @@ export type ThreadControlValue =
   | { kind: "intent"; value: ThreadIntent }
   | { kind: "lifecycle"; value: ThreadLifecycle }
   | { kind: "sharing"; value: ThreadSharingPolicy }
+  | { kind: "audience"; value: ThreadAudiencePolicy }
+  | { kind: "retention"; value: ThreadRetentionPolicy }
   | { kind: "review"; value: ReviewDecision };
 export interface ThreadControlCommand {
   clientOperationId: string;
@@ -89,7 +91,7 @@ export async function signThreadControl(
  * review UUID. Missing an observed existing frontier is never an empty view. */
 export function threadPropertyVersion(thread: Uint8Array, property: ThreadProperty, recordId: string, operationIds: readonly Uint8Array[]): Uint8Array {
   const names: Partial<Record<ThreadProperty, string>> = {
-    [ThreadProperty.NAME]: "name", [ThreadProperty.INTENT]: "intent", [ThreadProperty.LIFECYCLE]: "lifecycle", [ThreadProperty.SHARING]: "sharing",
+    [ThreadProperty.NAME]: "name", [ThreadProperty.INTENT]: "intent", [ThreadProperty.LIFECYCLE]: "lifecycle", [ThreadProperty.SHARING]: "sharing", [ThreadProperty.AUDIENCE]: "audience", [ThreadProperty.RETENTION]: "retention",
   };
   let key: Value;
   if (property === ThreadProperty.REVIEW) key = { review: uuid(recordId) };
@@ -106,6 +108,8 @@ function propertyOf(control: ThreadControlValue): ThreadProperty {
     case "intent": return ThreadProperty.INTENT;
     case "lifecycle": return ThreadProperty.LIFECYCLE;
     case "sharing": return ThreadProperty.SHARING;
+    case "audience": return ThreadProperty.AUDIENCE;
+    case "retention": return ThreadProperty.RETENTION;
     case "review": return ThreadProperty.REVIEW;
   }
 }
@@ -151,6 +155,37 @@ function controlValue(control: ThreadControlValue, spool: string, thread: Uint8A
         return { endpoint: Array.from(endpoint), kind: kind === EndpointKind.DEVICE ? "device" : "weft", spool: uuid(target), facets: facets.map(facet => facetNames[facet]!) };
       }) }; break;
     }
+    case "audience": {
+      const policy = control.value;
+      if (!policy.thread?.id || !equal(policy.thread.id.value, thread) || policy.thread.spool?.id !== spool)
+        throw new Error("Audience policy belongs to another Thread");
+      if (policy.kind === ThreadAudiencePolicy_Kind.OWNER || policy.kind === ThreadAudiencePolicy_Kind.SPOOL) {
+        if (policy.invitees.length) throw new Error("Invitees require the invited audience");
+        value = { kind: policy.kind === ThreadAudiencePolicy_Kind.OWNER ? "owner" : "spool" };
+      } else if (policy.kind === ThreadAudiencePolicy_Kind.INVITED) {
+        if (!policy.invitees.length || policy.invitees.length > 128) throw new Error("Audience requires 1..128 invitees");
+        const invitees = policy.invitees.map(invitee => {
+          if (invitee.agentId) text(invitee.agentId, 256);
+          return { principal_id: uuid(invitee.principalId), agent_id: invitee.agentId || null };
+        }).sort((a, b) => compare(a.principal_id, b.principal_id) ||
+          (a.agent_id === b.agent_id ? 0 : a.agent_id === null ? -1 : b.agent_id === null ? 1 : compare(utf8.encode(a.agent_id), utf8.encode(b.agent_id))));
+        for (let index = 1; index < invitees.length; index++) {
+          if (equal(invitees[index - 1]!.principal_id, invitees[index]!.principal_id) && invitees[index - 1]!.agent_id === invitees[index]!.agent_id)
+            throw new Error("Duplicate Thread audience invitee");
+        }
+        value = { kind: "invited", invitees };
+      } else throw new Error("Explicit Thread audience kind required");
+      break;
+    }
+    case "retention": {
+      const policy = control.value;
+      if (!policy.thread?.id || !equal(policy.thread.id.value, thread) || policy.thread.spool?.id !== spool)
+        throw new Error("Retention policy belongs to another Thread");
+      value = { source: retention(policy.source), collaboration: retention(policy.collaboration),
+        evidence: retention(policy.evidence), scrubbed_timeline: retention(policy.scrubbedTimeline),
+        raw_transcripts: retention(policy.rawTranscripts, true) };
+      break;
+    }
     case "review": {
       const review = control.value;
       const id = review.ref?.id ?? "";
@@ -194,3 +229,15 @@ function fixed(value: Uint8Array | undefined, size: number): Uint8Array {
 function compare(left: Uint8Array, right: Uint8Array): number { for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return left[i]! - right[i]!; return 0; }
 function concat(...parts: Uint8Array[]): Uint8Array { const value = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0)); let offset = 0; for (const part of parts) { value.set(part, offset); offset += part.length; } return value; }
 function typedHash(domain: string, bytes: Uint8Array): Uint8Array { const length = new Uint8Array(8); new DataView(length.buffer).setBigUint64(0, BigInt(bytes.length), true); return blake3(concat(utf8.encode(domain), length, Uint8Array.of(0), bytes)); }
+
+function retention(policy: MaterialRetention | undefined, raw = false): Value {
+  if (!policy) throw new Error("Explicit material retention required");
+  if (policy.mode === MaterialRetention_Mode.BOUNDED) {
+    if (policy.seconds <= 0n || policy.seconds > 9223372036854775n) throw new Error("Invalid bounded retention duration");
+    return { mode: "bounded", seconds: policy.seconds };
+  }
+  if (policy.seconds !== 0n) throw new Error("Only bounded retention carries a duration");
+  if (policy.mode === MaterialRetention_Mode.DISCARD) return { mode: "discard" };
+  if (policy.mode === MaterialRetention_Mode.RETAIN && !raw) return { mode: "retain" };
+  throw new Error("Invalid material retention; raw retention must be explicitly bounded");
+}

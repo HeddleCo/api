@@ -101,6 +101,7 @@ message ImportSourceRequest {
   // never fabricates the caller's creator signature. The hosted executor signs
   // its later import receipt and preserves Git attribution in the Capture.
   SignedRecord thread_genesis = 5;
+  bytes creator_authority = 6;
 }
 message SynchronizeRemoteRequest {
   string client_operation_id = 1;

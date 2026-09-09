@@ -81,6 +81,8 @@ message ThreadOverview {
   // Includes empty frontiers for genesis/default fields. Supplies all parent
   // operation IDs needed to sign an update without another round trip.
   repeated ThreadPropertyFrontier metadata_frontiers = 20;
+  ThreadAudiencePolicy audience = 21;
+  ThreadRetentionPolicy retention = 22;
   // All non-dominated accepted captures at this endpoint. Concurrent heads are
   // preserved until explicit source integration; arrival time is not authority.
   // The source endpoint and coverage remain part of the observation.
@@ -93,6 +95,8 @@ enum ThreadProperty {
   THREAD_PROPERTY_LIFECYCLE = 3;
   THREAD_PROPERTY_SHARING = 4;
   THREAD_PROPERTY_REVIEW = 5;
+  THREAD_PROPERTY_AUDIENCE = 6;
+  THREAD_PROPERTY_RETENTION = 7;
 }
 message ThreadPropertyFrontier {
   ThreadProperty property = 1;
@@ -167,10 +171,57 @@ message SharingDestination {
 }
 
 message ThreadSharingPolicy {
+  // Sync destinations/material only. Uploading does not change audience.
   ThreadRef thread = 1;
   bytes version = 2;
   repeated SharingDestination destinations = 3;
   bool ongoing = 4;
+}
+
+message ThreadInvitee {
+  string principal_id = 1;
+  // Empty includes this principal's otherwise-authorized delegates; nonempty
+  // selects one exact agent attribution. Capability attenuation still applies.
+  string agent_id = 2;
+}
+message ThreadAudiencePolicy {
+  ThreadRef thread = 1;
+  bytes version = 2;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_OWNER = 1;
+    KIND_INVITED = 2;
+    KIND_SPOOL = 3;
+  }
+  // Missing policy defaults to OWNER. The owner is the account verified at
+  // original genesis admission, independent of uploader and Spool ownership.
+  Kind kind = 3;
+  repeated ThreadInvitee invitees = 4;
+  // Concurrent candidates intersect audience until explicitly resolved.
+}
+
+message MaterialRetention {
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    MODE_DISCARD = 1;
+    MODE_BOUNDED = 2;
+    MODE_RETAIN = 3;
+  }
+  Mode mode = 1;
+  // Positive only for BOUNDED; measured from original retention admission.
+  // Re-sync/replay never restarts a material's retention deadline.
+  uint64 seconds = 2;
+}
+message ThreadRetentionPolicy {
+  ThreadRef thread = 1;
+  bytes version = 2;
+  MaterialRetention source = 3;
+  MaterialRetention collaboration = 4;
+  MaterialRetention evidence = 5;
+  MaterialRetention scrubbed_timeline = 6;
+  // Raw retention requires explicit bounded consent. Runtime secrets are not
+  // ordinary Thread material and cannot be enabled by this policy.
+  MaterialRetention raw_transcripts = 7;
 }
 
 // Exact comparison resolved within a review-section snapshot. A client submits
@@ -226,6 +277,9 @@ message StartThreadRequest {
   // the Thread ID and verifies the spool binding; it never synthesizes a creator.
   // Retrying the record preserves identity even with a new RPC operation ID.
   SignedRecord thread_genesis = 3;
+  // Original portable account/key authority, independently verified against the
+  // creator and owner bound by the canonical genesis. Never the courier's proof.
+  bytes creator_authority = 4;
 }
 
 message ThreadMutationResponse {
@@ -247,6 +301,19 @@ message ReviseIntentRequest {
 message SetThreadSharingRequest {
   string client_operation_id = 1;
   ThreadSharingPolicy policy = 2;
+  bytes expected_policy_version = 3;
+  SignedRecord operation = 4;
+}
+
+message SetThreadAudienceRequest {
+  string client_operation_id = 1;
+  ThreadAudiencePolicy policy = 2;
+  bytes expected_policy_version = 3;
+  SignedRecord operation = 4;
+}
+message SetThreadRetentionRequest {
+  string client_operation_id = 1;
+  ThreadRetentionPolicy policy = 2;
   bytes expected_policy_version = 3;
   SignedRecord operation = 4;
 }

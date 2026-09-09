@@ -102,7 +102,7 @@ message TransferReady {
   // Clone verifies owner history and installs the original Thread genesis
   // before materializing source. Neither identity is minted by the receiver.
   OwnerState ownership = 15;
-  SignedRecord thread_genesis = 16;
+  ThreadGenesisRecord thread_genesis = 16;
 }
 message ProviderExtent {
   EndpointRef provider = 1;
@@ -160,7 +160,7 @@ message FetchServerFrame {
     SignedRecord operation = 6;
     // Original creator-signed genesis for a required cross-Thread source
     // dependency. Target access never grants access to this dependency.
-    SignedRecord thread_genesis = 7;
+    ThreadGenesisRecord thread_genesis = 7;
   }
 }
 // Bulk content availability for an already admitted Thread capture. Metadata
@@ -228,6 +228,14 @@ message CausalFrontier {
   SharedFacet facet = 1;
   repeated bytes heads = 2;
 }
+// Carries original ownership proof with the immutable creator-signed identity.
+// The receiver independently verifies it; transport credentials never select
+// the owning account or enroll an otherwise-untrusted account root.
+message ThreadGenesisRecord {
+  SignedRecord genesis = 1;
+  bytes creator_authority = 2;
+}
+
 message ReplicationOpen {
   ThreadRef thread = 1;
   repeated SharedFacet facets = 2;
@@ -236,7 +244,7 @@ message ReplicationOpen {
   // authorize the destination spool and verify canonical bytes, creator proof,
   // and exact Thread/spool identity before durably installing it and emitting
   // Ready. Reconnects may include it again; it cannot replace another genesis.
-  SignedRecord thread_genesis = 4;
+  ThreadGenesisRecord thread_genesis = 4;
   ReadBudget budget = 5;
   repeated string record_formats = 6;
   // Fresh session binding; the request PoP covers this exact opening.

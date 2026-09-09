@@ -103,7 +103,9 @@ message UpdateSubscriptionRequest {
   bytes expected_version = 2;
   optional string plan = 3;
   optional uint32 seats = 4;
-  // At least one update is required. Both update atomically. Changes apply
+  // At least one update is required. One durable operation applies the desired
+  // plan and seats; providers may require separate steps, so intermediate state
+  // is observable. The receipt identifies the operation to observe. Changes apply
   // immediately and their prorated difference is carried to the next invoice;
   // this call never requests an immediate proration charge. The provider
   // calculates amounts. No client may derive an estimated charge from this.

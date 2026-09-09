@@ -251,3 +251,30 @@ fn hosted_landing_and_checkout_landing_have_distinct_endpoint_owners() {
         assert_eq!(method.deployment_targets, &[expected], "{path}");
     }
 }
+
+#[test]
+fn device_deployment_covers_private_work_without_hosted_account_administration() {
+    use heddle_api::heddle::api::v1alpha1::DeploymentTarget::{HeddleDaemon, Weft};
+    for name in [
+        "IdentityService/BeginRegistration", "IdentityService/CompleteAuthentication",
+        "IdentityService/CreateSignupInvitation", "IdentityService/BeginEmailVerification",
+        "SpoolService/PutGrant", "SpoolService/CreateInvitation", "SpoolService/SetSupportAccess",
+        "WorkspaceService/ObserveCatalog", "SyncService/ReadProviderExtent",
+    ] {
+        let path = format!("/heddle.api.v2alpha1.{name}");
+        let method = ALL_METHODS.iter().find(|method| method.path == path).expect("declared hosted boundary");
+        assert_eq!(method.deployment_targets, &[Weft], "{path}");
+    }
+    for name in [
+        "IdentityService/ObserveIdentity", "IdentityService/IntrospectCredential",
+        "SpoolService/ObserveSpool", "SpoolService/CreateSpool", "SpoolService/SetSpoolMount",
+        "ThreadService/ObserveThread", "ThreadService/StartThread",
+        "CollaborationService/PutContext", "ContentService/ReadContent",
+        "ContentService/ReadArtifact", "SyncService/ReplicateThread",
+    ] {
+        let path = format!("/heddle.api.v2alpha1.{name}");
+        let method = ALL_METHODS.iter().find(|method| method.path == path).expect("declared shared boundary");
+        assert!(method.deployment_targets.contains(&Weft), "{path}");
+        assert!(method.deployment_targets.contains(&HeddleDaemon), "{path}");
+    }
+}

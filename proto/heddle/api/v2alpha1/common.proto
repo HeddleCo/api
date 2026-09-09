@@ -102,6 +102,8 @@ message EntityRef {
     RecordRef billing = 31;
     RecordRef evidence = 32;
     RecordRef check_acknowledgement = 33;
+    RecordRef provider_connection = 34;
+    RecordRef remote_link = 35;
   }
 }
 

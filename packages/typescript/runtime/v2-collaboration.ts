@@ -1,6 +1,8 @@
 import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
+import { AnnotationTagSchema, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue } from "./collaboration_pb.js";
+import type { EntityRef } from "./common_pb.js";
 import { Audience } from "./administration_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
 
@@ -63,7 +65,7 @@ export interface ContextCommand extends SharedCommand {
   contextId: string;
   anchor: PortableCollaborationAnchor;
   content: string;
-  tags: string[];
+  tags: AnnotationTag[];
   supersedes?: string;
   extractedFrom?: string;
 }
@@ -96,12 +98,15 @@ export async function signContext(command: ContextCommand, parents: readonly Sig
   const id = uuid(command.contextId);
   if (command.supersedes === command.contextId) throw new Error("Context cannot supersede itself");
   if (command.tags.length > 128) throw new Error("Too many context tags");
-  command.tags.forEach(tag => text(tag, 512));
+  const tags = annotationTagsValue(command.tags);
   text(command.content, 256 * 1024);
-  if (command.extractedFrom) discussionId(command.extractedFrom);
+  if (command.extractedFrom) {
+    discussionId(command.extractedFrom);
+    if (parents.length === 0) throw new Error("Context extraction requires a signed discussion resolution");
+  }
   const frontier = await verifyParents(command.scope, parents, "context", command.contextId);
   const inner = encode({ version: 2, id, parents: frontier.outer, metadata,
-    anchor: anchorValue(command.anchor), content: command.content, tags: command.tags,
+    anchor: anchorValue(command.anchor), content: command.content, tags,
     supersedes: command.supersedes ? uuid(command.supersedes) : null,
     extracted_from: command.extractedFrom ?? null, occurred_at_ms: timestamp(command.occurredAtMs) });
   return signOperation(command.scope.threadId, frontier.outer, "context", inner, signer);
@@ -155,6 +160,13 @@ export async function verifyCollaboration(record: SignedRecord): Promise<Verifie
   const outerParents = hashes(operation.parents);
   if (body.kind === "context" && !equal(encode(outerParents), encode(hashes(inner.parents)))) throw new Error("Context causal frontier differs from Thread operation");
   if (body.kind === "discussion" && (!Array.isArray(inner.parents) || inner.parents.length > 128 || inner.parents.some(id => typeof id !== "string" || !/^co-[0-9a-hjkmnp-tv-z]{52}$/.test(id)))) throw new Error("Invalid discussion causal frontier");
+  if (body.kind === "discussion") {
+    const action = map(inner.body);
+    if (action.kind === "resolve") {
+      const resolution = map(action.resolution);
+      if (resolution.kind === "into_context" && !equal(encode(outerParents), encode(hashes(map(resolution.context).parents)))) throw new Error("Extracted context frontier differs from Thread operation");
+    }
+  }
   return { operationId: typedHash(FORMAT, canonical), threadId: thread, spoolId, kind: body.kind, recordId, canonicalContent: content };
 }
 
@@ -300,27 +312,13 @@ function validateInner(inner: MapValue, kind: "discussion" | "context") {
   timestamp(BigInt(occurred));
   const metadata = map(inner.metadata);
   for (const item of metadata.mentions as Value[]) {
-    const mention = map(item);
-    const kind = string(mention.kind);
-    const fields: Record<string, string[]> = {
-      spool: ["kind", "spool"], thread: ["kind", "spool", "thread"], state: ["kind", "spool", "state"],
-      git_commit: ["kind", "spool", "oid"], checkout: ["kind", "spool", "device", "id"],
-      record: ["kind", "spool", "record_kind", "id"], device: ["kind", "key"],
-    };
-    if (!fields[kind]) throw new Error("Unknown collaboration mention kind");
-    keys(mention, fields[kind]);
-    if (kind !== "device" && !(kind === "record" && mention.spool === null)) uuidString(mention.spool);
-    if (kind === "thread" || kind === "state") byteArray(mention[kind], 32);
-    if (kind === "checkout" || kind === "device") byteArray(mention[kind === "checkout" ? "device" : "key"], 32);
-    if (kind === "checkout" || kind === "record") text(string(mention.id), 1024, true);
-    if (kind === "record" && !RECORD_KINDS.has(string(mention.record_kind))) throw new Error("Unknown collaboration record kind");
-    if (kind === "git_commit") gitOid(string(mention.oid));
+    validateMention(item);
   }
   if (kind === "context") {
     validateAnchor(inner.anchor);
     text(string(inner.content), 256 * 1024);
     if (!Array.isArray(inner.tags) || inner.tags.length > 128) throw new Error("Invalid context tags");
-    inner.tags.forEach(tag => text(string(tag), 512));
+    validateAnnotationTags(inner.tags);
     if (inner.supersedes !== null && uuidString(inner.supersedes) === uuidString(inner.id)) throw new Error("Context cannot supersede itself");
     if (inner.extracted_from !== null) discussionId(string(inner.extracted_from));
     return;
@@ -362,6 +360,18 @@ function validateInner(inner: MapValue, kind: "discussion" | "context") {
       if (resolution.kind === "dismissed") { keys(resolution, ["kind", "reason"]); text(string(resolution.reason), 256 * 1024); }
       else if (resolution.kind === "addressed_by_state") { keys(resolution, ["kind", "state_id"]); byteArray(resolution.state_id, 32); }
       else if (resolution.kind === "annotation") { keys(resolution, ["kind", "annotation_id"]); text(string(resolution.annotation_id), 1024); }
+      else if (resolution.kind === "into_context") {
+        keys(resolution, ["kind", "context"]);
+        const context = map(resolution.context);
+        keys(context, ["version", "id", "parents", "metadata", "anchor", "content", "tags", "supersedes", "extracted_from", "occurred_at_ms"]);
+        if (context.version !== 2) throw new Error("Unsupported extracted context schema");
+        uuidString(context.id); hashes(context.parents);
+        const metadata = map(context.metadata), parentMetadata = map(inner.metadata);
+        keys(metadata, ["scope", "actor", "mentions"]);
+        if (!equal(encode(metadata.scope!), encode(parentMetadata.scope!)) || !equal(encode(metadata.actor!), encode(parentMetadata.actor!)) || context.extracted_from !== inner.discussion_id) throw new Error("Extracted context differs from original discussion scope or actor");
+        if (!Array.isArray(metadata.mentions) || metadata.mentions.length > 128) throw new Error("Invalid context mentions");
+        validateInner(context, "context");
+      }
       else throw new Error("Unsupported collaboration resolution");
       break;
     }
@@ -390,4 +400,152 @@ function validateAnchor(value: Value | undefined) {
     return value;
   };
   anchorValue({ kind: "source", revision: typedRevision, path: string(source.path), symbolId: string(source.symbol_id), startLine: line(source.start_line), endLine: line(source.end_line) });
+}
+
+function validateMention(item: Value) {
+    const mention = map(item);
+    const kind = string(mention.kind);
+    const fields: Record<string, string[]> = {
+      spool: ["kind", "spool"], thread: ["kind", "spool", "thread"], state: ["kind", "spool", "state"],
+      git_commit: ["kind", "spool", "oid"], checkout: ["kind", "spool", "device", "id"],
+      record: ["kind", "spool", "record_kind", "id"], device: ["kind", "key"],
+    };
+    if (!fields[kind]) throw new Error("Unknown collaboration mention kind");
+    keys(mention, fields[kind]);
+    if (kind !== "device" && !(kind === "record" && mention.spool === null)) uuidString(mention.spool);
+    if (kind === "thread" || kind === "state") byteArray(mention[kind], 32);
+    if (kind === "checkout" || kind === "device") byteArray(mention[kind === "checkout" ? "device" : "key"], 32);
+    if (kind === "checkout" || kind === "record") text(string(mention.id), 1024, true);
+    if (kind === "record" && !RECORD_KINDS.has(string(mention.record_kind))) throw new Error("Unknown collaboration record kind");
+    if (kind === "git_commit") gitOid(string(mention.oid));
+}
+
+/** Freeform remains explicit text; strings are never parsed as typed metadata. */
+export function textAnnotationTag(value: string): AnnotationTag {
+  text(value, 512, true);
+  return create(AnnotationTagSchema, { tag: { case: "text", value } });
+}
+function annotationPath(value: string) {
+  text(value, 4096, true);
+  if (/[\\:]/.test(value) || value.split("/").some(part => part === "" || part === "." || part === "..")) throw new Error("Expected canonical relative annotation path");
+}
+function annotationSourceValue(reference: AnnotationSourceReference): MapValue {
+  const source = reference.source;
+  if (!source?.revision?.spool) throw new Error("Annotation source requires scoped revision");
+  const spool = uuid(source.revision.spool.id);
+  const thread = source.thread;
+  if (thread && (thread.spool?.id !== source.revision.spool.id || !thread.id)) throw new Error("Annotation source Thread belongs to another spool");
+  const revision = source.revision.revision;
+  const anchor: PortableCollaborationAnchor = { kind: "source", revision: revision.case === "state"
+    ? { kind: "state", stateId: revision.value.value } : revision.case === "gitCommitOid"
+      ? { kind: "git_commit", oid: revision.value } : (() => { throw new Error("Exact annotation revision required"); })(),
+    path: source.path, symbolId: source.symbolId, startLine: source.startLine, endLine: source.endLine };
+  annotationPath(source.path);
+  if ((source.startLine === undefined) !== (source.endLine === undefined)) throw new Error("Annotation lines require both endpoints");
+  return { scope: { spool, thread: thread ? Array.from(fixed(thread.id!.value, 32)) : null }, source: map(anchorValue(anchor).source) };
+}
+function annotationEntityValue(ref: EntityRef): MapValue {
+  const entity = ref.entity;
+  switch (entity.case) {
+    case "spool": return mentionValue({ kind: "spool", spoolId: entity.value.id });
+    case "thread": {
+      if (!entity.value.spool || !entity.value.id) throw new Error("Thread reference requires scope and ID");
+      return mentionValue({ kind: "thread", spoolId: entity.value.spool.id, id: entity.value.id.value });
+    }
+    case "revision": {
+      const r = entity.value; if (!r.spool) throw new Error("Revision reference requires spool");
+      if (r.revision.case === "state") return mentionValue({ kind: "state", spoolId: r.spool.id, id: r.revision.value.value });
+      if (r.revision.case === "gitCommitOid") return mentionValue({ kind: "git_commit", spoolId: r.spool.id, oid: r.revision.value });
+      throw new Error("Exact entity revision required");
+    }
+    case "device":
+      if (entity.value.kind !== 2) throw new Error("Entity must name a device endpoint");
+      return mentionValue({ kind: "device", key: entity.value.publicKey });
+    case "checkout": {
+      const r = entity.value; if (!r.spool || !r.device || r.device.kind !== 2) throw new Error("Checkout requires spool and device");
+      return mentionValue({ kind: "checkout", spoolId: r.spool.id, device: r.device.publicKey, id: r.id });
+    }
+    case undefined: case "bookmark": throw new Error("Unsupported annotation entity reference");
+    default: {
+      const kind = entity.case.replace(/[A-Z]/g, c => "_" + c.toLowerCase());
+      if (!RECORD_KINDS.has(kind)) throw new Error("Unsupported annotation record reference");
+      return mentionValue({ kind: "record", recordKind: kind, spoolId: entity.value.spool?.id, id: entity.value.id });
+    }
+  }
+}
+function annotationScalarValue(value: AnnotationValue): MapValue {
+  const field = value.value;
+  switch (field.case) {
+    case "text": return { kind: "text", value: field.value };
+    case "boolean": return { kind: "boolean", value: field.value };
+    case "integer": return { kind: "integer", value: field.value };
+    case "decimal": return { kind: "decimal", value: { coefficient: field.value.coefficient, scale: field.value.scale } };
+    default: throw new Error("Annotation property requires a typed value");
+  }
+}
+function annotationTagsValue(tags: readonly AnnotationTag[]): Value[] {
+  const values = tags.map(({ tag }): Value => {
+    switch (tag.case) {
+      case "text": return { kind: "text", text: tag.value };
+      case "symbol": return { kind: "symbol", name: tag.value.name, target: tag.value.target ? annotationSourceValue(tag.value.target) : null };
+      case "source": return { kind: "source", target: annotationSourceValue(tag.value) };
+      case "entity": return { kind: "entity", target: annotationEntityValue(tag.value) };
+      case "property": {
+        if (!tag.value.value) throw new Error("Annotation property requires a value");
+        return { kind: "property", key: tag.value.key, value: annotationScalarValue(tag.value.value) };
+      }
+      default: throw new Error("Annotation tag requires a known variant");
+    }
+  });
+  validateAnnotationTags(values);
+  return values;
+}
+function validateAnnotationSource(value: Value | undefined) {
+  const ref = map(value); keys(ref, ["scope", "source"]);
+  const scope = map(ref.scope); keys(scope, ["spool", "thread"]);
+  uuidString(scope.spool); if (scope.thread !== null) byteArray(scope.thread, 32);
+  validateAnchor({ kind: "source", source: ref.source! });
+  const source = map(ref.source); annotationPath(string(source.path));
+  if ((source.start_line === null) !== (source.end_line === null)) throw new Error("Annotation lines require both endpoints");
+}
+function annotationInteger(value: Value | undefined): bigint {
+  if (typeof value !== "bigint" && (typeof value !== "number" || !Number.isSafeInteger(value))) throw new Error("Annotation integer must be exact");
+  return timestamp(BigInt(value));
+}
+function validateAnnotationTags(values: Value[]) {
+  if (values.length > 128) throw new Error("Too many annotation tags");
+  const propertyKeys = new Set<string>();
+  for (const item of values) {
+    const tag = map(item);
+    switch (tag.kind) {
+      case "text": keys(tag, ["kind", "text"]); text(string(tag.text), 512, true); break;
+      case "symbol":
+        keys(tag, ["kind", "name", "target"]); text(string(tag.name), 512, true);
+        if (tag.target !== null) validateAnnotationSource(tag.target);
+        break;
+      case "source": keys(tag, ["kind", "target"]); validateAnnotationSource(tag.target); break;
+      case "entity": keys(tag, ["kind", "target"]); validateMention(tag.target!); break;
+      case "property": {
+        keys(tag, ["kind", "key", "value"]);
+        const key = string(tag.key);
+        if (!/^[A-Za-z0-9_.\/-]{1,128}$/.test(key) || propertyKeys.has(key)) throw new Error("Invalid or duplicate annotation property key");
+        propertyKeys.add(key);
+        const value = map(tag.value); keys(value, ["kind", "value"]);
+        switch (value.kind) {
+          case "text": text(string(value.value), 512, false, true); break;
+          case "boolean": if (typeof value.value !== "boolean") throw new Error("Expected annotation boolean"); break;
+          case "integer": annotationInteger(value.value); break;
+          case "decimal": {
+            const decimal = map(value.value); keys(decimal, ["coefficient", "scale"]);
+            const coefficient = annotationInteger(decimal.coefficient), scale = decimal.scale;
+            if (typeof scale !== "number" || !Number.isInteger(scale) || scale < 0 || scale > 9 || (scale > 0 && coefficient % 10n === 0n)) throw new Error("Annotation decimal must be normalized with scale at most nine");
+            break;
+          }
+          default: throw new Error("Unknown annotation property value type");
+        }
+        break;
+      }
+      default: throw new Error("Unknown annotation tag type");
+    }
+  }
 }

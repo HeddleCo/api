@@ -64,12 +64,90 @@ message DiscussionTurn {
   repeated bytes causal_parents = 9;
 }
 
+// Structured context metadata. References describe a target; they grant no access
+// to it and never change the annotation's primary anchor or audience.
+message AnnotationDecimal {
+  sint64 coefficient = 1;
+  // Value = coefficient / 10^scale; scale <= 9. Canonical values have no
+  // trailing coefficient zero when scale > 0; zero always has scale 0.
+  uint32 scale = 2;
+}
+message AnnotationValue {
+  oneof value {
+    string text = 1;
+    bool boolean = 2;
+    sint64 integer = 3;
+    AnnotationDecimal decimal = 4;
+  }
+}
+message AnnotationSourceReference {
+  // Exact revision and optional owning Thread, with a nonempty relative path.
+  // Lines are one-based, inclusive, and require both endpoints.
+  SourceAnchor source = 1;
+}
+message AnnotationSymbolTag {
+  // Exact, case-sensitive grouping name; not proof of symbol identity.
+  string name = 1;
+  AnnotationSourceReference target = 2;
+}
+message AnnotationProperty {
+  string key = 1;
+  AnnotationValue value = 2;
+}
+message AnnotationTag {
+  oneof tag {
+    string text = 1;
+    AnnotationSymbolTag symbol = 2;
+    AnnotationSourceReference source = 3;
+    EntityRef entity = 4;
+    AnnotationProperty property = 5;
+  }
+}
+message AnnotationPropertyPredicate {
+  string key = 1;
+  enum Comparison {
+    COMPARISON_UNSPECIFIED = 0;
+    COMPARISON_EQUAL = 1;
+    COMPARISON_LESS = 2;
+    COMPARISON_LESS_OR_EQUAL = 3;
+    COMPARISON_GREATER = 4;
+    COMPARISON_GREATER_OR_EQUAL = 5;
+    COMPARISON_EXISTS = 6;
+  }
+  Comparison comparison = 2;
+  // Absent only for EXISTS. No string/numeric or integer/decimal coercion.
+  // Ordering is supported only for integer and decimal values.
+  AnnotationValue value = 3;
+}
+message AnnotationTagPredicate {
+  oneof predicate {
+    AnnotationTag exact = 1;
+    string symbol_name = 2;
+    // Exact relative path, or component-aware directory prefix. Both include
+    // resolved Symbol targets as well as Source tags, within any revision.
+    string file_path = 3;
+    string file_prefix = 4;
+    // Overlap requires the same spool, revision and path. Optional Thread
+    // narrows further. Coordinates on different revisions never overlap.
+    AnnotationSourceReference lines_overlap = 5;
+    AnnotationPropertyPredicate property = 6;
+  }
+}
+message AnnotationQuery {
+  // At most 64 predicates in total. Each predicate matches one complete tag.
+  // ALL must all match; ANY must match at least one unless empty; NONE must
+  // all fail. Missing properties fail positive predicates, including equality.
+  repeated AnnotationTagPredicate all = 1;
+  repeated AnnotationTagPredicate any = 2;
+  repeated AnnotationTagPredicate none = 3;
+}
+
 message ContextRecord {
   RecordRef ref = 1;
   bytes version = 2;
   CollaborationAnchor anchor = 3;
   string content = 4;
-  repeated string tags = 5;
+  repeated AnnotationTag tags = 5;
   string principal_id = 6;
   string agent_id = 7;
   RecordRef supersedes = 8;
@@ -91,7 +169,7 @@ message ContextDraft {
   RecordRef ref = 1;
   CollaborationAnchor anchor = 2;
   string content = 3;
-  repeated string tags = 4;
+  repeated AnnotationTag tags = 4;
   RecordRef supersedes = 5;
   RecordRef extracted_from = 6;
 }
@@ -108,6 +186,9 @@ message ObserveCollaborationRequest {
   // Include original author-signed operations for portable replica ingestion.
   // UI-only consumers can omit them; projection versions are not causal proofs.
   bool include_operations = 9;
+  // Presence selects context revisions only, including an empty match-all query.
+  // Predicates apply per revision; concurrent heads remain separate results.
+  AnnotationQuery annotations = 10;
 }
 
 message CollaborationEvent {

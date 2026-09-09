@@ -256,6 +256,18 @@ message ThreadGenesisRecord {
   // Optional independently trusted first-admission testimony matched by claim
   // identity. Original acceptance expiry does not invalidate retained admission.
   repeated SignedRecord ownership_claim_admissions = 5;
+  // Exact heddle-original-boundary-acceptance-v1 signatures needed by this
+  // genesis/claim bundle. Fresh acceptance binds the complete streamed-original
+  // manifest and publication intent; verify the accepting authority now. It does
+  // not assert historical validity of expired/revoked original authority or
+  // change original attribution. On relay, require independently pinned,
+  // versioned admission testimony explicitly referencing the acceptance digest;
+  // acceptance alone cannot authorize another destination or a manifest subset.
+  // At most 128 distinct acceptances per transfer, each canonical record <=96KiB,
+  // within the existing metadata/frame budgets (16MiB transfer, 256KiB frame).
+  // Deduplicate identical evidence across wrappers/batches; reject conflicting
+  // or unreferenced evidence. No executor/root trust is enrolled from this field.
+  repeated SignedRecord boundary_acceptances = 6;
 }
 
 message ReplicationOpen {
@@ -296,7 +308,8 @@ message ReplicationOperations {
   // the format, ID, authorization and dependency scope before admitting it.
   repeated SignedRecord operations = 1;
   // Optional original-author admission statements, signed by an independently
-  // enrolled hosted executor (heddle-thread-authority-admission-v1). Each binds
+  // pinned hosted executor. The explicit canonical format defines the admission
+  // basis; adding evidence never reinterprets an older receipt. Each binds
   // one operation ID above, its immutable Spool genesis, Thread, original actor,
   // publisher and authority digest. Reject duplicate or unmatched sidecars.
   // Preserve the original operation signature. A receipt proves first durable
@@ -305,6 +318,14 @@ message ReplicationOperations {
   // retain the exact statement atomically with the original pending bytes and
   // never infer executor trust from an incoming statement or courier identity.
   repeated SignedRecord authority_admissions = 2;
+  // Same acceptance evidence and transfer-wide limits as ThreadGenesisRecord.
+  // Fresh publication verifies the exact complete original manifest, intent and
+  // current accepting capability; retained relay requires a matched explicitly
+  // acceptance-based admission receipt from an independently trusted executor.
+  // Preserve the original author and bytes; this is separate present-tense
+  // acceptance, never a fabricated historical authorization timestamp. Evidence
+  // contributes to the existing batch byte budget; operations remains nonempty.
+  repeated SignedRecord boundary_acceptances = 3;
 }
 message ReplicationRejection {
   bytes operation_id = 1;

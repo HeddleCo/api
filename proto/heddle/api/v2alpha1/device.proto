@@ -204,7 +204,25 @@ message RunRecord {
   // Exact controls consumed by this run's harness. Advertising ControlRun in
   // actions does not imply support for every control variant.
   repeated ControlRunRequest.Action supported_controls = 11;
+  // Pending exact harness intents. Decisions compare request_digest; observing
+  // a prompt never grants permission and timeout/disconnection never implies allow.
+  repeated RunPermission pending_permissions = 12;
 }
+message RunPermission {
+  string id = 1;
+  // Claude v1: BLAKE3(prefix UTF-8 || JSON length as LE u64 || 0x00 || JSON),
+  // prefix = "heddle.claude-permission.v1". JSON uses sorted object keys.
+  bytes request_digest = 2;
+  string harness = 3;
+  string tool_name = 4;
+  // Exact decision-bound intent JSON captured by the device adapter (format,
+  // run_id, permission_id, tool_name, tool_input, cwd); bounded to 64 KiB.
+  // Preserve the original bytes when comparing or approving an intent.
+  bytes canonical_input_json = 5;
+  // Device-clock deadline. Expired prompts cannot be approved after a crash.
+  google.protobuf.Timestamp expires_at = 6;
+}
+
 message TimelineRecord {
   RecordRef ref = 1;
   RecordRef run = 2;

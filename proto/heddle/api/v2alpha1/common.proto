@@ -99,6 +99,7 @@ message EntityRef {
     RecordRef delegation = 28;
     RecordRef recovery = 29;
     RecordRef owner_transition = 30;
+    RecordRef billing = 31;
   }
 }
 

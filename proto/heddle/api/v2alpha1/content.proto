@@ -91,10 +91,19 @@ message ContentRead {
   }
 }
 
+// Immutable source-derived attachments only. Authored context, discussion,
+// review, evidence, and run data are selected through their Thread services.
+enum SourceAttachmentKind {
+  SOURCE_ATTACHMENT_KIND_UNSPECIFIED = 0;
+  SOURCE_ATTACHMENT_KIND_RISK_SIGNALS = 1;
+  SOURCE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 2;
+  SOURCE_ATTACHMENT_KIND_SEMANTIC_INDEX = 3;
+}
+
 message StateRead {
   bool include_summary = 1;
   bool include_attachments = 2;
-  repeated heddle.api.v1alpha1.StateAttachmentKind attachment_kinds = 3;
+  repeated SourceAttachmentKind attachment_kinds = 3;
   PageRequest page = 4;
   // At least one of include_summary/include_attachments must be true. A kind
   // filter or attachment page requires include_attachments. Empty kind filter
@@ -113,7 +122,7 @@ message StateRead {
 // attachment_id or body; absence and withheld private material are indistinguishable.
 // COMPLETE always carries the exact 32-byte native attachment identity and body.
 message StateAttachmentContent {
-  heddle.api.v1alpha1.StateAttachmentKind kind = 1;
+  SourceAttachmentKind kind = 1;
   Coverage coverage = 2;
   bytes attachment_id = 3;
   oneof body {

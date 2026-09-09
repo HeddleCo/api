@@ -120,3 +120,21 @@ fn state_attachment_selections_report_kind_coverage_separately_from_completion()
         "one selection completion remains independent of each attachment's availability"
     );
 }
+
+#[test]
+fn content_attachment_kinds_exclude_thread_authored_records() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
+    for (message, field) in [("StateRead", "attachment_kinds"), ("StateAttachmentContent", "kind")] {
+        let descriptor = pool.get_message_by_name(&format!("heddle.api.v2alpha1.{message}"))
+            .expect("content message").get_field_by_name(field).expect("kind field")
+            .kind().as_enum().expect("source-only enum").clone();
+        assert_eq!(descriptor.full_name(), "heddle.api.v2alpha1.SourceAttachmentKind");
+        let values: Vec<_> = descriptor.values().map(|value| (value.name().to_owned(), value.number())).collect();
+        assert_eq!(values, vec![
+            ("SOURCE_ATTACHMENT_KIND_UNSPECIFIED".into(), 0),
+            ("SOURCE_ATTACHMENT_KIND_RISK_SIGNALS".into(), 1),
+            ("SOURCE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS".into(), 2),
+            ("SOURCE_ATTACHMENT_KIND_SEMANTIC_INDEX".into(), 3),
+        ], "authored records require their original Thread authority");
+    }
+}

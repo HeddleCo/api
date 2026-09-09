@@ -28,7 +28,7 @@ const openCommand = command({ kind: 'open', blocking: true, title: 'Review', anc
 const contextCommand = { scope, actor, occurredAtMs: 100n, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [textAnnotationTag('decision')] };
 
 test('management references retain exact canonical kind in signed context', async () => {
-  for (const recordKind of ['mount', 'support_access', 'device_record', 'delegation', 'recovery', 'owner_transition', 'billing']) {
+  for (const recordKind of ['mount', 'support_access', 'device_record', 'delegation', 'recovery', 'owner_transition', 'billing', 'evidence', 'check_acknowledgement', 'provider_connection', 'remote_link']) {
     const record = await signContext({ ...contextCommand,
       mentions: [{ kind: 'record', recordKind, spoolId: scope.spoolId, id: 'record-1' }],
     }, [], signer);

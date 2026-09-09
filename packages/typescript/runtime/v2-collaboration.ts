@@ -220,7 +220,7 @@ function mentionValue(mention: CollaborationMention): MapValue {
   text(mention.id, 1024, true);
   return { kind, spool, device: Array.from(fixed(mention.device, 32)), id: mention.id };
 }
-const RECORD_KINDS = new Set(["discussion", "context", "operation", "run", "policy", "analysis", "invitation", "grant", "discussion_turn", "review", "notification", "attention_item", "member", "approval_group", "session", "signup_invitation", "timeline_event", "artifact", "mount", "support_access", "device_record", "delegation", "recovery", "owner_transition", "billing"]);
+const RECORD_KINDS = new Set(["discussion", "context", "operation", "run", "policy", "analysis", "invitation", "grant", "discussion_turn", "review", "notification", "attention_item", "member", "approval_group", "session", "signup_invitation", "timeline_event", "artifact", "mount", "support_access", "device_record", "delegation", "recovery", "owner_transition", "billing", "evidence", "check_acknowledgement", "provider_connection", "remote_link"]);
 /** Intern original source evidence once; materialized locations preserve the existing
  * identity. The binding chooses a resolver, never grants access to that scope. */
 export function sourceTargetReference(source: SourceAnchor, binding: SourceTargetReference["binding"]): SourceTargetReference {

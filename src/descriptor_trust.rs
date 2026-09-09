@@ -77,6 +77,23 @@ pub enum EntryReject {
     InvalidKey,
     #[error("malformed signed endpoint descriptor")]
     MalformedDescriptor,
+    #[error("unsupported descriptor set version")]
+    UnsupportedVersion,
+    #[error("unsupported endpoint descriptor version")]
+    UnsupportedDescriptorVersion,
+    #[error("descriptor is not yet valid")]
+    DescriptorNotYetValid,
+    #[error("descriptor has expired")]
+    DescriptorExpired,
+}
+
+/// Errors from [`parse_endpoint_descriptor_set`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum DescriptorSetError {
+    #[error("malformed endpoint descriptor set: {0}")]
+    Malformed(String),
+    #[error("unsupported endpoint descriptor set version {0}")]
+    UnsupportedVersion(u8),
 }
 
 /// Canonical bytes the deployment-descriptor root signs to attest an ephemeral key.
@@ -123,7 +140,7 @@ pub fn verify_ephemeral_attestation(
     entry: &AttestedEndpointDescriptorEntry,
     now_unix_millis: i64,
 ) -> Result<VerifiedEndpoint, EntryReject> {
-    if entry.ephemeral_key_id.is_empty() {
+    if entry.ephemeral_key_id.trim().is_empty() {
         return Err(EntryReject::InvalidKey);
     }
     if entry.not_before_unix_millis >= entry.not_after_unix_millis {
@@ -162,6 +179,9 @@ pub fn verify_ephemeral_attestation(
         return Err(EntryReject::Expired);
     }
 
+    if !is_lowercase_hex(&entry.signed_descriptor) {
+        return Err(EntryReject::MalformedDescriptor);
+    }
     let signed_bytes =
         hex::decode(&entry.signed_descriptor).map_err(|_| EntryReject::MalformedDescriptor)?;
     let signed = SignedEndpointDescriptor::decode(signed_bytes.as_slice())
@@ -187,6 +207,15 @@ pub fn verify_ephemeral_attestation(
     if signed.key_id != entry.ephemeral_key_id {
         return Err(EntryReject::DescriptorKeyMismatch);
     }
+    if descriptor.version != 1 {
+        return Err(EntryReject::UnsupportedDescriptorVersion);
+    }
+    if now_unix_millis < descriptor.issued_at_unix_millis {
+        return Err(EntryReject::DescriptorNotYetValid);
+    }
+    if now_unix_millis >= descriptor.expires_at_unix_millis {
+        return Err(EntryReject::DescriptorExpired);
+    }
 
     Ok(VerifiedEndpoint {
         ephemeral_public_key,
@@ -197,6 +226,18 @@ pub fn verify_ephemeral_attestation(
     })
 }
 
+/// Deserialize an [`EndpointDescriptorSetDocument`] and reject unknown versions.
+pub fn parse_endpoint_descriptor_set(
+    body: &[u8],
+) -> Result<EndpointDescriptorSetDocument, DescriptorSetError> {
+    let set: EndpointDescriptorSetDocument = serde_json::from_slice(body)
+        .map_err(|error| DescriptorSetError::Malformed(error.to_string()))?;
+    if set.version != SET_VERSION {
+        return Err(DescriptorSetError::UnsupportedVersion(set.version));
+    }
+    Ok(set)
+}
+
 /// Verify every entry and drop rejects. Never returns a [`VerifiedEndpoint`]
 /// unless both layers verified and bound.
 pub fn trusted_live_entries(
@@ -204,6 +245,9 @@ pub fn trusted_live_entries(
     root_public_key: &[u8; 32],
     now_unix_millis: i64,
 ) -> (Vec<VerifiedEndpoint>, Vec<EntryReject>) {
+    if set.version != SET_VERSION {
+        return (vec![], vec![EntryReject::UnsupportedVersion]);
+    }
     let mut live = Vec::new();
     let mut rejects = Vec::new();
     for entry in &set.entries {
@@ -213,6 +257,14 @@ pub fn trusted_live_entries(
         }
     }
     (live, rejects)
+}
+
+fn is_lowercase_hex(value: &str) -> bool {
+    !value.is_empty()
+        && value.len().is_multiple_of(2)
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 fn decode_lowercase_hex<const N: usize>(value: &str) -> Option<[u8; N]> {
@@ -662,6 +714,97 @@ mod tests {
         assert_eq!(
             rejects,
             vec![EntryReject::Expired, EntryReject::InvalidSignature]
+        );
+    }
+
+    #[test]
+    fn mismatched_document_version_is_rejected_fail_closed() {
+        let regenerated = regenerate();
+        for version in [0_u8, 2, 255] {
+            let set = EndpointDescriptorSetDocument {
+                version,
+                root_key_id: "root-1".to_string(),
+                entries: vec![regenerated.entry.clone()],
+            };
+            let (live, rejects) = trusted_live_entries(&set, &regenerated.root_public_key, now());
+            assert!(
+                live.is_empty(),
+                "version {version} must not promote entries"
+            );
+            assert_eq!(rejects, vec![EntryReject::UnsupportedVersion]);
+            let body = serde_json::to_vec(&set).expect("serialize set");
+            assert_eq!(
+                parse_endpoint_descriptor_set(&body),
+                Err(DescriptorSetError::UnsupportedVersion(version))
+            );
+        }
+
+        let v1 = EndpointDescriptorSetDocument {
+            version: SET_VERSION,
+            root_key_id: "root-1".to_string(),
+            entries: vec![regenerated.entry.clone()],
+        };
+        let parsed = parse_endpoint_descriptor_set(&serde_json::to_vec(&v1).expect("serialize v1"))
+            .expect("version 1 must parse");
+        assert_eq!(parsed, v1);
+    }
+
+    #[test]
+    fn inner_descriptor_version_and_validity_window_are_enforced() {
+        let regenerated = regenerate();
+        let ephemeral = SigningKey::from_bytes(&EPHEMERAL_SECRET_SEED);
+        let root = regenerated.root_public_key;
+
+        let mut expired = regenerated.entry_descriptor();
+        expired.expires_at_unix_millis = now();
+        let mut expired_entry = regenerated.entry.clone();
+        expired_entry.signed_descriptor =
+            hex::encode(sign_descriptor(&ephemeral, EPHEMERAL_KEY_ID, expired).encode_to_vec());
+        assert_eq!(
+            verify_ephemeral_attestation(&root, &expired_entry, now()),
+            Err(EntryReject::DescriptorExpired)
+        );
+
+        let mut not_yet = regenerated.entry_descriptor();
+        not_yet.issued_at_unix_millis = now() + 1;
+        let mut not_yet_entry = regenerated.entry.clone();
+        not_yet_entry.signed_descriptor =
+            hex::encode(sign_descriptor(&ephemeral, EPHEMERAL_KEY_ID, not_yet).encode_to_vec());
+        assert_eq!(
+            verify_ephemeral_attestation(&root, &not_yet_entry, now()),
+            Err(EntryReject::DescriptorNotYetValid)
+        );
+
+        let mut unsupported = regenerated.entry_descriptor();
+        unsupported.version = 0;
+        let mut unsupported_entry = regenerated.entry.clone();
+        unsupported_entry.signed_descriptor =
+            hex::encode(sign_descriptor(&ephemeral, EPHEMERAL_KEY_ID, unsupported).encode_to_vec());
+        assert_eq!(
+            verify_ephemeral_attestation(&root, &unsupported_entry, now()),
+            Err(EntryReject::UnsupportedDescriptorVersion)
+        );
+    }
+
+    #[test]
+    fn signed_descriptor_hex_must_be_lowercase() {
+        let regenerated = regenerate();
+        let mut entry = regenerated.entry.clone();
+        entry.signed_descriptor = entry.signed_descriptor.to_uppercase();
+        assert_eq!(
+            verify_ephemeral_attestation(&regenerated.root_public_key, &entry, now()),
+            Err(EntryReject::MalformedDescriptor)
+        );
+    }
+
+    #[test]
+    fn whitespace_only_ephemeral_key_id_is_rejected() {
+        let regenerated = regenerate();
+        let mut entry = regenerated.entry.clone();
+        entry.ephemeral_key_id = " \t ".to_string();
+        assert_eq!(
+            verify_ephemeral_attestation(&regenerated.root_public_key, &entry, now()),
+            Err(EntryReject::InvalidKey)
         );
     }
 

@@ -248,6 +248,10 @@ message IssuedCredential {
   // Credential classification is independent of the account's rooting tier.
   // An agent credential stays attenuated after the human claims the account.
   CredentialKind kind = 5;
+  // Exact subject of the issued Biscuit, used to construct request possession
+  // identity. Required: never infer it from the human account UUID or handle;
+  // an agent or anonymous credential can have a different subject.
+  string subject = 6;
 }
 message BeginRegistrationRequest {
   // One Ed25519 device key for Biscuit authority and request possession.

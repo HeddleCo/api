@@ -26,6 +26,19 @@ const command = action => ({ discussionId, clientOperationId: 'operation-1', sco
   occurredAtMs: 100n, author: { name: 'Account' }, action });
 const openCommand = command({ kind: 'open', blocking: true, title: 'Review', anchor: { kind: 'repository' }, visibility: 'public', body: 'First turn' });
 const contextCommand = { scope, actor, occurredAtMs: 100n, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [textAnnotationTag('decision')] };
+
+test('management references retain exact canonical kind in signed context', async () => {
+  for (const recordKind of ['mount', 'support_access', 'device_record', 'delegation', 'recovery']) {
+    const record = await signContext({ ...contextCommand,
+      mentions: [{ kind: 'record', recordKind, spoolId: scope.spoolId, id: 'record-1' }],
+    }, [], signer);
+    await verifyCollaboration(record);
+    const outer = decode(record.canonicalRecord);
+    const inner = decode(Uint8Array.from(outer.body.canonical));
+    assert.equal(inner.metadata.mentions[0].record_kind, recordKind);
+    assert.equal(inner.metadata.mentions[0].id, 'record-1');
+  }
+});
 function exact(actual, fixture) {
   assert.deepEqual(actual.canonicalRecord, new Uint8Array(fixture.record.canonicalRecord));
   assert.deepEqual(actual.signatures[0].signature, new Uint8Array(fixture.record.signatures[0].signature));

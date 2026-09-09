@@ -97,6 +97,25 @@ message UnsubscribeNotificationsRequest {
   bytes unsubscribe_capability = 2;
   repeated NotificationRule rules = 3;
 }
+// Derived presentation of canonical signed evidence. The receiving endpoint
+// verifies original authority independently; a reported pass is not itself
+// cryptographic proof that an external process ran correctly.
+message CheckEvidenceSummary {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_PASSED = 1;
+    OUTCOME_FAILED = 2;
+    OUTCOME_ERROR = 3;
+    OUTCOME_SKIPPED = 4;
+  }
+  Outcome outcome = 1;
+  string detail = 2;
+  PrincipalRef author = 3;
+  string agent_id = 4;
+  repeated RecordRef artifacts = 5;
+  repeated RecordRef supersedes = 6;
+  google.protobuf.Timestamp completed_at = 7;
+}
 message EvidenceRecord {
   RecordRef ref = 1;
   bytes version = 2;
@@ -110,6 +129,9 @@ message EvidenceRecord {
   // neither grants Spool access nor satisfies the current review policy.
   SignedRecord evidence = 5;
   Coverage coverage = 6;
+  // Always derived from evidence when observed. A command may omit this
+  // projection; if supplied, every field must match the signed original.
+  CheckEvidenceSummary summary = 7;
 }
 message RecordEvidenceRequest {
   string client_operation_id = 1;

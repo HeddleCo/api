@@ -79,62 +79,17 @@ fn content_tree_entries_preserve_typed_native_and_foreign_targets() {
 }
 
 #[test]
-fn state_attachment_selections_report_kind_coverage_separately_from_completion() {
+fn raw_state_reads_cannot_disclose_authored_sidecars() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
-    let event = pool
-        .get_message_by_name("heddle.api.v2alpha1.ContentEvent")
+    let event = pool.get_message_by_name("heddle.api.v2alpha1.ContentEvent")
         .expect("content event");
-    let attachment = event
-        .get_field_by_name("attachment")
-        .expect("attachment selection")
-        .kind()
-        .as_message()
-        .expect("typed attachment")
-        .clone();
-    assert_eq!(
-        attachment.full_name(),
-        "heddle.api.v2alpha1.StateAttachmentContent"
-    );
-    assert_eq!(
-        attachment
-            .get_field_by_name("coverage")
-            .expect("per-kind coverage")
-            .kind()
-            .as_enum()
-            .expect("coverage enum")
-            .full_name(),
-        "heddle.api.v2alpha1.Coverage"
-    );
-    assert!(attachment.get_field_by_name("kind").is_some());
-    assert!(attachment.get_field_by_name("attachment_id").is_some());
-    let bodies: Vec<_> = attachment
-        .oneofs()
-        .find(|oneof| oneof.name() == "body")
-        .expect("optional disclosed body")
-        .fields()
-        .map(|field| field.name().to_owned())
-        .collect();
-    assert_eq!(bodies, ["structured_conflicts", "raw_object"]);
-    assert!(
-        event.get_field_by_name("selection_complete").is_some(),
-        "one selection completion remains independent of each attachment's availability"
-    );
-}
-
-#[test]
-fn content_attachment_kinds_exclude_thread_authored_records() {
-    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
-    for (message, field) in [("StateRead", "attachment_kinds"), ("StateAttachmentContent", "kind")] {
-        let descriptor = pool.get_message_by_name(&format!("heddle.api.v2alpha1.{message}"))
-            .expect("content message").get_field_by_name(field).expect("kind field")
-            .kind().as_enum().expect("source-only enum").clone();
-        assert_eq!(descriptor.full_name(), "heddle.api.v2alpha1.SourceAttachmentKind");
-        let values: Vec<_> = descriptor.values().map(|value| (value.name().to_owned(), value.number())).collect();
-        assert_eq!(values, vec![
-            ("SOURCE_ATTACHMENT_KIND_UNSPECIFIED".into(), 0),
-            ("SOURCE_ATTACHMENT_KIND_RISK_SIGNALS".into(), 1),
-            ("SOURCE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS".into(), 2),
-            ("SOURCE_ATTACHMENT_KIND_SEMANTIC_INDEX".into(), 3),
-        ], "authored records require their original Thread authority");
-    }
+    assert!(event.get_field_by_name("attachment").is_none(),
+        "authored sidecars require their originating Thread authority");
+    assert!(event.get_field_by_name("state").is_some());
+    assert!(event.get_field_by_name("selection_complete").is_some());
+    let state = pool.get_message_by_name("heddle.api.v2alpha1.StateRead")
+        .expect("state selection");
+    assert_eq!(state.fields().count(), 0, "State selection always returns its summary");
+    assert!(pool.get_message_by_name("heddle.api.v2alpha1.StateAttachmentContent").is_none());
+    assert!(pool.get_enum_by_name("heddle.api.v2alpha1.SourceAttachmentKind").is_none());
 }

@@ -77,7 +77,10 @@ message CompleteProviderConnectionRequest {
 message StoreProviderCredentialRequest {
   string client_operation_id = 1;
   string provider = 2;
-  bytes sealed_credential = 3;
+  // Provider bearer input travels only over the authenticated encrypted RPC
+  // transport. Weft validates it with the named provider and encrypts it using
+  // server credential custody before storage. Never project or log this value.
+  string access_token = 3;
 }
 message RevokeProviderConnectionRequest {
   string client_operation_id = 1;

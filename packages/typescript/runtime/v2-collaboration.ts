@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
-import { AnnotationTagSchema, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference } from "./collaboration_pb.js";
+import { AnnotationSourceReferenceSchema, SourceTargetReferenceSchema, AnnotationTagSchema, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference, type SourceAnchor } from "./collaboration_pb.js";
 import type { EntityRef } from "./common_pb.js";
 import { Audience } from "./administration_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
@@ -221,6 +221,24 @@ function mentionValue(mention: CollaborationMention): MapValue {
   return { kind, spool, device: Array.from(fixed(mention.device, 32)), id: mention.id };
 }
 const RECORD_KINDS = new Set(["discussion", "context", "operation", "run", "policy", "analysis", "invitation", "grant", "discussion_turn", "review", "notification", "attention_item", "member", "approval_group", "session", "signup_invitation", "timeline_event", "artifact", "mount", "support_access", "device_record", "delegation", "recovery", "owner_transition", "billing"]);
+/** Intern original source evidence once; materialized locations preserve the existing
+ * identity. The binding chooses a resolver, never grants access to that scope. */
+export function sourceTargetReference(source: SourceAnchor, binding: SourceTargetReference["binding"]): SourceTargetReference {
+  const evidence = annotationSourceValue(create(AnnotationSourceReferenceSchema, { source }));
+  const anchor = map(evidence.source);
+  if (source.symbolId && !source.symbolId.trim()) throw new Error("Invalid source symbol address");
+  let targetId = source.target?.targetId;
+  if (!targetId) {
+    const file = typedHash("heddle-source-file-v1", encode({ scope: evidence.scope, revision: anchor.revision, path: anchor.path }));
+    const selector: MapValue = source.symbolId ? { kind: "symbol", address: source.symbolId }
+      : source.startLine !== undefined ? { kind: "lines", range: { start: source.startLine - 1, end: source.endLine!, start_affinity: "after", end_affinity: "before" } }
+      : { kind: "file" };
+    targetId = typedHash("heddle-source-target-v1", encode({ file: Array.from(file), revision: anchor.revision, selector }));
+  }
+  const target = create(SourceTargetReferenceSchema, { targetId: Uint8Array.from(targetId), binding });
+  sourceTargetValue(target);
+  return target;
+}
 function sourceTargetValue(target: SourceTargetReference): MapValue {
   const id = Array.from(fixed(target.targetId, 32));
   const binding = target.binding;

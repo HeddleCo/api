@@ -234,6 +234,9 @@ message CausalFrontier {
 message ThreadGenesisRecord {
   SignedRecord genesis = 1;
   bytes creator_authority = 2;
+  // Original account authority admitted by an independently pinned hosted executor.
+  // Does not authorize current disclosure or enroll the original account locally.
+  SignedRecord admission = 3;
 }
 
 message ReplicationOpen {

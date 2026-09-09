@@ -102,6 +102,11 @@ message ImportSourceRequest {
   // its later import receipt and preserves Git attribution in the Capture.
   SignedRecord thread_genesis = 5;
   bytes creator_authority = 6;
+  // Optional canonical synthetic empty State, at most 4096 bytes, whose identity
+  // exactly matches thread_genesis.base. Enables a fresh Spool import in one
+  // call without requiring a pre-existing hosted base. Nonempty source closures
+  // use SyncService publication instead. The creator signature binds this base.
+  bytes initial_base_state = 7;
 }
 message SynchronizeRemoteRequest {
   string client_operation_id = 1;

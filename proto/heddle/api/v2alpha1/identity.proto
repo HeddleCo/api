@@ -770,6 +770,12 @@ message CurrentCredentialRecord {
   // for credentials without a persisted session; never synthesized from a
   // device or credential ID. Its exact ref/version authorizes session revoke.
   SessionRecord session = 16;
+  // Canonical ThreadControlAuthority for this exact original credential. Sealed
+  // once during identity observation, reusable for local authoring until its
+  // original limits expire; delivery never refreshes or expands this proof.
+  // Absent when portable owner association is unavailable. Receivers separately
+  // validate current authority at first admission. Contains no private key.
+  bytes thread_control_authority = 17;
   // Revoke the specific device, delegation or session using the corresponding
   // observed version; this metadata never permits an account-wide revocation.
 }

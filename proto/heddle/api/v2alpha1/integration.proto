@@ -97,6 +97,10 @@ message ImportSourceRequest {
   SpoolRef destination = 2;
   ProviderRepository source = 3;
   bytes expected_destination_version = 4;
+  // Original creator-signed canonical Thread genesis, as in StartThread. Import
+  // never fabricates the caller's creator signature. The hosted executor signs
+  // its later import receipt and preserves Git attribution in the Capture.
+  SignedRecord thread_genesis = 5;
 }
 message SynchronizeRemoteRequest {
   string client_operation_id = 1;

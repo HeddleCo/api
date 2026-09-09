@@ -158,6 +158,9 @@ message FetchServerFrame {
     // Original signed causal operations for the selected facets. A receiver
     // admits these to the same replica as live sync; projections are not proofs.
     SignedRecord operation = 6;
+    // Original creator-signed genesis for a required cross-Thread source
+    // dependency. Target access never grants access to this dependency.
+    SignedRecord thread_genesis = 7;
   }
 }
 // Bulk content availability for an already admitted Thread capture. Metadata

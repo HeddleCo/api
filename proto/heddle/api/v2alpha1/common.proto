@@ -206,6 +206,9 @@ message OperationRecord {
     STATE_FAILED = 4;
     STATE_CANCELED = 5;
     STATE_WAITING_FOR_HUMAN = 6;
+    // Execution has acknowledged a pause. A queued pause request alone does
+    // not establish this state, and resume preserves the same operation/run.
+    STATE_PAUSED = 7;
   }
   State state = 4;
   uint64 completed_units = 5;

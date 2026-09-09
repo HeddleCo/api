@@ -189,6 +189,9 @@ message RunRecord {
   string model = 8;
   OperationRecord.State state = 9;
   repeated ActionAvailability actions = 10;
+  // Exact controls consumed by this run's harness. Advertising ControlRun in
+  // actions does not imply support for every control variant.
+  repeated ControlRunRequest.Action supported_controls = 11;
 }
 message TimelineRecord {
   RecordRef ref = 1;

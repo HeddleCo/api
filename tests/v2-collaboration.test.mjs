@@ -142,6 +142,8 @@ test('explicit source target bindings survive primary anchors and tags and are s
     const target = create(SourceTargetReferenceSchema, { targetId: new Uint8Array(32).fill(6), binding });
     const anchor = { kind: 'source', revision: { kind: 'state', stateId: new Uint8Array(32).fill(5) }, path: 'src/main.rs', symbolId: 'run', startLine: 12, endLine: 18, target };
     const record = await signDiscussion(command({ kind: 'open', blocking: true, title: 'Review source', visibility: 'public', body: 'Check these lines', anchor }), [], signer);
+    const fixtureName = { viewedThread: 'viewed', namedThread: 'named', pinnedRevision: 'pinned' }[binding.case];
+    exact(record, fixtures['target_' + fixtureName]);
     const outer = decode(record.canonicalRecord), inner = decode(Uint8Array.from(outer.body.canonical));
     assert.deepEqual(inner.body.anchor.source.target.target, Array(32).fill(6));
     assert.equal(inner.body.anchor.source.path, 'src/main.rs');
@@ -151,6 +153,7 @@ test('explicit source target bindings survive primary anchors and tags and are s
       thread: { spool: { id: scope.spoolId }, id: { value: scope.threadId } }, path: 'src/main.rs', target,
     } } } });
     const context = await signContext({ ...contextCommand, tags: [tag] }, [], signer);
+    exact(context, fixtures['tag_' + fixtureName]);
     const contextInner = decode(Uint8Array.from(decode(context.canonicalRecord).body.canonical));
     assert.deepEqual(contextInner.tags[0].target.source.target, inner.body.anchor.source.target);
     inner.body.anchor.source.target.target[0] ^= 1;

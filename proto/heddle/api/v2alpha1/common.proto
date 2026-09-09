@@ -92,6 +92,8 @@ message EntityRef {
     RecordRef timeline_event = 22;
     RecordRef artifact = 23;
     BookmarkRef bookmark = 24;
+    RecordRef mount = 25;
+    RecordRef support_access = 26;
   }
 }
 

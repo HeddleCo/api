@@ -199,6 +199,9 @@ message AuthenticationResponse {
   MutationReceipt receipt = 1;
   PrincipalRecord principal = 2;
   CredentialResult credential = 4;
+  // Exact accepted root, original binding and current signed transition history.
+  // Available immediately after authentication, including while Weft is offline.
+  OwnerState ownership = 5;
 }
 // Returned only by a successful credential ceremony, never by an observation.
 // Keyed clients retain their own minting authority. Registration attaches their

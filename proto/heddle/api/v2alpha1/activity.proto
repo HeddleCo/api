@@ -102,6 +102,12 @@ message EvidenceRecord {
   bytes version = 2;
   RevisionRef revision = 3;
   string check = 4;
+  // heddle-check-evidence-v1: canonical named MessagePack CheckEvidence,
+  // Ed25519 over UTF8(format) || 0x00 || canonical_record. Exactly one original
+  // publisher signature. The payload binds this ID, Spool, native revision,
+  // check, terminal outcome, original actor/authority, completion time and any
+  // independently authorized artifact references. Signature validity alone
+  // neither grants Spool access nor satisfies the current review policy.
   SignedRecord evidence = 5;
   Coverage coverage = 6;
 }
@@ -125,4 +131,8 @@ message AcknowledgeCheckRequest {
   RecordRef evidence = 2;
   RevisionRef revision = 3;
   bytes policy_version = 4;
+  // heddle-check-acknowledgement-v1. Same canonical/signature rules as evidence;
+  // binds the accepted evidence digest, revision, policy, original actor and
+  // this client_operation_id. Acknowledging never changes the recorded outcome.
+  SignedRecord acknowledgement = 5;
 }

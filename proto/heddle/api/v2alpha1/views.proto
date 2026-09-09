@@ -85,6 +85,11 @@ message SpoolOverview {
   repeated SectionStatus sections = 8;
   string slug = 9;
   SignedSpoolOwnerGenesis owner_genesis = 10;
+  // Caller-private preference composed by an exact Spool page. Missing means
+  // unavailable, unrequested, or anonymous (including ordinary list rows).
+  // Present false + empty version proves absence; false + nonempty version is
+  // a retained tombstone. This never changes the Spool resource version.
+  BookmarkRecord current_bookmark = 11;
 }
 
 // Committed overview and independently verifiable owner history seed the

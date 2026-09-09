@@ -4,6 +4,7 @@ package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/administration.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 enum ThreadLifecycle {
@@ -67,6 +68,12 @@ message ThreadOverview {
   // Exact aggregate policy/group version required by review and landing,
   // including the explicit empty-policy set. Never inferred from no records.
   bytes review_policy_version = 17;
+  // Caller-private preference composed by an exact Thread page. Missing means
+  // unavailable, unrequested, or anonymous (including ordinary list rows).
+  // Present false + empty version proves no bookmark exists at this snapshot;
+  // present false + nonempty version is a retained tombstone. Never substitute
+  // this version for Thread.version. The ref binds the authenticated account.
+  BookmarkRecord current_bookmark = 18;
   // All non-dominated accepted captures at this endpoint. Concurrent heads are
   // preserved until explicit source integration; arrival time is not authority.
   // The source endpoint and coverage remain part of the observation.

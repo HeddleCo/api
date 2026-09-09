@@ -40,8 +40,8 @@ fn bookmark_versions_have_a_caller_private_identity_and_return_tombstones() {
         reference.full_name()
     );
     let method = pool
-        .get_service_by_name("heddle.api.v2alpha1.SpoolService")
-        .expect("spools")
+        .get_service_by_name("heddle.api.v2alpha1.WorkspaceService")
+        .expect("workspace")
         .methods()
         .find(|m| m.name() == "SetBookmark")
         .expect("mutation");
@@ -66,4 +66,33 @@ fn bookmark_versions_have_a_caller_private_identity_and_return_tombstones() {
         record.get_field_by_name("resource").is_none(),
         "target identity must not masquerade as bookmark identity"
     );
+}
+
+#[test]
+fn exact_resource_pages_can_distinguish_unavailable_absent_and_tombstoned_bookmarks() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled contract");
+    for name in ["ThreadOverview", "SpoolOverview"] {
+        let overview = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .expect("overview");
+        let bookmark = overview
+            .get_field_by_name("current_bookmark")
+            .expect("composed private preference");
+        assert!(
+            bookmark.supports_presence(),
+            "unknown must not become a false absent bookmark"
+        );
+        assert_eq!(
+            bookmark
+                .kind()
+                .as_message()
+                .expect("bookmark record")
+                .full_name(),
+            "heddle.api.v2alpha1.BookmarkRecord"
+        );
+        assert!(
+            overview.get_field_by_name("version").is_some(),
+            "resource CAS remains independent"
+        );
+    }
 }

@@ -105,7 +105,7 @@ RegistryService.AttachChild,SpoolService.SetSpoolMount,native_contract,"Use cano
 RegistryService.CreateGrant,SpoolService.PutGrant,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RegistryService.CreateInvitation,SpoolService.CreateInvitation,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RegistryService.CreateSpool,SpoolService.CreateSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
-RegistryService.DeleteBookmark,SpoolService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.DeleteBookmark,WorkspaceService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RegistryService.DeleteGrant,SpoolService.RevokeGrant,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RegistryService.DeleteSpool,SpoolService.DeleteSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RegistryService.DetachChild,SpoolService.RemoveSpoolMount,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
@@ -131,7 +131,7 @@ RegistryService.SetSpoolVisibility,SpoolService.ReviseSpool,native_contract,"Use
 RegistryService.UpdateGrant,SpoolService.PutGrant,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RegistryService.UpdateSpool,SpoolService.ReviseSpool,native_contract,Typed update masks and preconditions; preserve per-field authority rather than one broad settings permission.
 RegistryService.UpdateSpoolSettings,SpoolService.ReviseSpool,native_contract,Typed update masks and preconditions; preserve per-field authority rather than one broad settings permission.
-RegistryService.UpsertBookmark,SpoolService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.UpsertBookmark,WorkspaceService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RepoSyncService.ListRefs,ThreadService.ObserveThreads;SyncService.Fetch,native_contract,Advertise refs/HEAD/identities within transfer opening when useful; retain paging for large catalogs.
 RepoSyncService.Pull,SyncService.Fetch,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
 RepoSyncService.Push,SyncService.ReplicateThread;SyncService.PublishContent,native_contract,"Replicate immutable Thread records; upload exact authorized source closure in bounded bulk streams with a separate durable availability receipt."

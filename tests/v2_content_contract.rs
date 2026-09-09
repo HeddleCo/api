@@ -108,3 +108,15 @@ fn source_transfers_share_original_operation_and_authority_receipt_batches() {
     assert!(batch.get_field_by_name("operations").expect("original signatures").is_list());
     assert!(batch.get_field_by_name("authority_admissions").expect("retained testimony").is_list());
 }
+
+#[test]
+fn source_genesis_transfers_preserve_claim_conflicts_and_matched_admission() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
+    let wrapper = pool.get_message_by_name("heddle.api.v2alpha1.ThreadGenesisRecord").expect("original wrapper");
+    for (name, number) in [("ownership_claims", 4), ("ownership_claim_admissions", 5)] {
+        let field = wrapper.get_field_by_name(name).expect("claim provenance survives transfer");
+        assert_eq!(field.number(), number);
+        assert!(field.is_list(), "preserve conflicts rather than choosing an owner");
+        assert_eq!(field.kind().as_message().expect("signed claim or admission").full_name(), "heddle.api.v2alpha1.SignedRecord");
+    }
+}

@@ -85,3 +85,23 @@ message StartAnalysisRequest {
   EndpointRef execution_endpoint = 5;
   bytes expected_disclosure_policy_version = 6;
 }
+
+// Immutable derived analysis output. Stored under an opaque Thread-scoped
+// artifact identity; this is never an authorization wrapper for source bytes.
+// Readers decode one canonical message, not concatenated stream frames. The
+// producer rejects outputs larger than its advertised artifact byte budget.
+message AnalysisArtifact {
+  // Version 1. Unknown versions must be rejected before interpreting payloads.
+  uint32 schema_version = 1;
+  RevisionRef source = 2;
+  RevisionRef base = 3;
+  repeated AnalysisRecord analyses = 4;
+  repeated AnalysisFinding findings = 5;
+  repeated heddle.api.v1alpha1.FileDiff diffs = 6;
+  repeated heddle.api.v1alpha1.SemanticHotSpot hot_spots = 7;
+  repeated BehaviorChange behavior_changes = 8;
+  repeated BehaviorAnalysisCoverage behavior_coverage = 9;
+  // Each analysis names its implementation/version and reports actual coverage.
+  // Raw transcripts, runtime secrets, and original private attachments are not
+  // analysis output and cannot be placed into this derived-artifact envelope.
+}

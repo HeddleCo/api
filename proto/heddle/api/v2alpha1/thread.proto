@@ -282,6 +282,23 @@ message StartThreadRequest {
   bytes creator_authority = 4;
 }
 
+// The owner and accepting account publisher co-sign one exact canonical claim.
+// Upload and device enrollment never invoke this transition implicitly.
+message ClaimThreadOwnershipRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  // heddle-thread-ownership-claim-v1; one acceptor signature requests local
+  // co-signing, or two signatures ordered local-owner, acceptor import full proof.
+  SignedRecord claim = 3;
+}
+message ClaimThreadOwnershipResponse {
+  MutationReceipt receipt = 1;
+  ThreadRef thread = 2;
+  PrincipalRef owner = 3;
+  bytes claim_id = 4;
+  SignedRecord claim = 5;
+}
+
 message ThreadMutationResponse {
   MutationReceipt receipt = 1;
   ThreadOverview thread = 2;

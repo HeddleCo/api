@@ -250,6 +250,12 @@ message ThreadGenesisRecord {
   // Original account authority admitted by an independently pinned hosted executor.
   // Does not authorize current disclosure or enroll the original account locally.
   SignedRecord admission = 3;
+  // At most two exact co-signed claims. Conflicting claims fail closed; a
+  // transport must never select a winner or rewrite the immutable genesis.
+  repeated SignedRecord ownership_claims = 4;
+  // Optional independently trusted first-admission testimony matched by claim
+  // identity. Original acceptance expiry does not invalidate retained admission.
+  repeated SignedRecord ownership_claim_admissions = 5;
 }
 
 message ReplicationOpen {

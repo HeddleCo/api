@@ -2,6 +2,7 @@ syntax = "proto3";
 package heddle.api.v2alpha1;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
@@ -42,6 +43,8 @@ message RemoteLinkRecord {
   // Exact native source destination. A remote never selects a Thread from a
   // mutable latest-import pointer; divergence preserves this Thread unchanged.
   ThreadRef target = 11;
+  // Optional explicit recurring-policy deadline, independent of bearer age.
+  google.protobuf.Timestamp expires_at = 12;
 }
 message ObserveIntegrationsRequest {
   repeated SpoolRef spools = 1;
@@ -58,6 +61,7 @@ message IntegrationEvent {
     RemoteLinkRecord remote = 4;
     SectionStatus status = 5;
     Removal removal = 6;
+    SectionReplacement replace_section = 7;
   }
 }
 message BeginProviderConnectionRequest {

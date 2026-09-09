@@ -96,8 +96,33 @@ message StateRead {
   bool include_attachments = 2;
   repeated heddle.api.v1alpha1.StateAttachmentKind attachment_kinds = 3;
   PageRequest page = 4;
-  // Attachments are independently authorized; an empty kind filter does not
-  // confer permission to see private material. Conflicts retain resolved items.
+  // At least one of include_summary/include_attachments must be true. A kind
+  // filter or attachment page requires include_attachments. Empty kind filter
+  // requests all known kinds in enum order; each requested kind receives one
+  // StateAttachmentContent, including unavailable kinds. Page size counts kinds.
+  // Page tokens bind the exact revision, kind set, and authorized attachment-head
+  // snapshot; changed heads require restarting the selection. The summary, when
+  // requested, is emitted on each page and does not consume a kind's page slot.
+  // Attachments are independently authorized. Selection completion is PARTIAL
+  // when any kind on the page is unavailable; it never upgrades unavailable
+  // attachment data to COMPLETE. Conflicts retain resolved items.
+}
+
+// One requested attachment kind at the selected immutable revision. A kind
+// without available publication evidence is reported as UNAVAILABLE without an
+// attachment_id or body; absence and withheld private material are indistinguishable.
+// COMPLETE always carries the exact 32-byte native attachment identity and body.
+message StateAttachmentContent {
+  heddle.api.v1alpha1.StateAttachmentKind kind = 1;
+  Coverage coverage = 2;
+  bytes attachment_id = 3;
+  oneof body {
+    // Includes both open and resolved conflict records.
+    heddle.api.v1alpha1.StructuredConflicts structured_conflicts = 4;
+    // Native encoded StateAttachment record for other kinds. Whole-record
+    // authorization precedes disclosure; private closure pointers are not public.
+    bytes raw_object = 5;
+  }
 }
 
 message ReadContentRequest {
@@ -125,7 +150,7 @@ message ContentEvent {
     ProvenanceResult provenance = 6;
     SectionStatus selection_complete = 7;
     heddle.api.v1alpha1.StateSummary state = 8;
-    heddle.api.v1alpha1.StateAttachment attachment = 9;
+    StateAttachmentContent attachment = 9;
   }
   // Each requested selection ends with selection_complete. Missing completion
   // before FIN means interruption, not an empty file or exhausted collection.

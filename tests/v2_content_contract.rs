@@ -77,3 +77,46 @@ fn content_tree_entries_preserve_typed_native_and_foreign_targets() {
         "source mode survives the read"
     );
 }
+
+#[test]
+fn state_attachment_selections_report_kind_coverage_separately_from_completion() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
+    let event = pool
+        .get_message_by_name("heddle.api.v2alpha1.ContentEvent")
+        .expect("content event");
+    let attachment = event
+        .get_field_by_name("attachment")
+        .expect("attachment selection")
+        .kind()
+        .as_message()
+        .expect("typed attachment")
+        .clone();
+    assert_eq!(
+        attachment.full_name(),
+        "heddle.api.v2alpha1.StateAttachmentContent"
+    );
+    assert_eq!(
+        attachment
+            .get_field_by_name("coverage")
+            .expect("per-kind coverage")
+            .kind()
+            .as_enum()
+            .expect("coverage enum")
+            .full_name(),
+        "heddle.api.v2alpha1.Coverage"
+    );
+    assert!(attachment.get_field_by_name("kind").is_some());
+    assert!(attachment.get_field_by_name("attachment_id").is_some());
+    let bodies: Vec<_> = attachment
+        .oneofs()
+        .find(|oneof| oneof.name() == "body")
+        .expect("optional disclosed body")
+        .fields()
+        .map(|field| field.name().to_owned())
+        .collect();
+    assert_eq!(bodies, ["structured_conflicts", "raw_object"]);
+    assert!(
+        event.get_field_by_name("selection_complete").is_some(),
+        "one selection completion remains independent of each attachment's availability"
+    );
+}

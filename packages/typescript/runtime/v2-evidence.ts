@@ -5,12 +5,14 @@ import { EvidenceRecordSchema, AcknowledgeCheckRequestSchema, CheckEvidenceSumma
 import type { ThreadControlAuthor } from "./thread-control.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
 
-const EVIDENCE = "heddle-check-evidence-v1", ACK = "heddle-check-acknowledgement-v1";
+const EVIDENCE = "heddle-check-evidence-v2", ACK = "heddle-check-acknowledgement-v1";
 const utf8 = new TextEncoder();
 type MapValue = { [key: string]: Value };
 export interface CheckResult {
   id: string;
   spoolId: string;
+  /** Original audience scope; matching source in another Thread is no grant. */
+  threadId: Uint8Array;
   revision: Uint8Array;
   check: string;
   outcome: CheckEvidenceSummary_Outcome;
@@ -37,7 +39,7 @@ export async function projectCheckEvidence(record: SignedRecord): Promise<Eviden
   const raw = map(decode(record.canonicalRecord)), author = map(raw.author), actor = map(author.actor);
   const outcomes: Record<string, CheckEvidenceSummary_Outcome> = { passed: CheckEvidenceSummary_Outcome.PASSED, failed: CheckEvidenceSummary_Outcome.FAILED, error: CheckEvidenceSummary_Outcome.ERROR, skipped: CheckEvidenceSummary_Outcome.SKIPPED };
   const input: CheckResult = {
-    id: uuidString(raw.id), spoolId: uuidString(raw.spool), revision: byteArray(raw.revision, 32),
+    id: uuidString(raw.id), spoolId: uuidString(raw.spool), threadId: byteArray(raw.thread, 32), revision: byteArray(raw.revision, 32),
     check: string(raw.check), outcome: outcomes[string(raw.outcome)] ?? CheckEvidenceSummary_Outcome.UNSPECIFIED,
     detail: string(raw.detail), artifacts: list(raw.artifacts).map(uuidString), supersedes: list(raw.supersedes).map(uuidString), completedAtMs: integer(raw.completed_at_ms),
   };
@@ -49,7 +51,7 @@ export async function projectCheckEvidence(record: SignedRecord): Promise<Eviden
   if (!equal(encode(evidenceValue(input, canonicalAuthor)), record.canonicalRecord)) throw new Error("Noncanonical signed evidence");
   await verify(record, publisher);
   const spool = { id: input.spoolId }, ref = (id: string) => ({ spool, id });
-  return create(EvidenceRecordSchema, { ref: ref(input.id), version: signedCheckVersion(record),
+  return create(EvidenceRecordSchema, { ref: ref(input.id), thread: { spool, id: { value: input.threadId } }, version: signedCheckVersion(record),
     revision: { spool, revision: { case: "state", value: { value: input.revision } } }, check: input.check, evidence: record, coverage: Coverage.COMPLETE,
     summary: { outcome: input.outcome, detail: input.detail, author: { id: uuidString(actor.principal_id) }, agentId: actor.agent_id === null ? "" : string(actor.agent_id),
       artifacts: input.artifacts.map(ref), supersedes: input.supersedes.map(ref), completedAt: { seconds: input.completedAtMs / 1000n, nanos: Number(input.completedAtMs % 1000n) * 1_000_000 } } });
@@ -81,7 +83,7 @@ function evidenceValue(input: CheckResult, author: MapValue): MapValue {
   text(input.check, 512); text(input.detail, 32768, true);
   const artifacts = ids(input.artifacts, 64), supersedes = ids(input.supersedes, 32);
   if (input.supersedes.includes(input.id)) throw new Error("Check cannot supersede itself");
-  return { version: 1, id: uuid(input.id), spool: uuid(input.spoolId), revision: Array.from(fixed(input.revision, 32)), check: input.check, outcome, detail: input.detail,
+  return { version: 2, id: uuid(input.id), spool: uuid(input.spoolId), thread: Array.from(fixed(input.threadId, 32)), revision: Array.from(fixed(input.revision, 32)), check: input.check, outcome, detail: input.detail,
     artifacts, supersedes, author, completed_at_ms: timestamp(input.completedAtMs) };
 }
 function authorValue(author: ThreadControlAuthor): MapValue {

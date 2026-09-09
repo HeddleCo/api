@@ -124,9 +124,9 @@ message EvidenceRecord {
   bytes version = 2;
   RevisionRef revision = 3;
   string check = 4;
-  // heddle-check-evidence-v1: canonical named MessagePack CheckEvidence,
+  // heddle-check-evidence-v2: canonical named MessagePack CheckEvidence,
   // Ed25519 over UTF8(format) || 0x00 || canonical_record. Exactly one original
-  // publisher signature. The payload binds this ID, Spool, native revision,
+  // publisher signature. The payload binds this ID, Spool, original Thread, native revision,
   // check, terminal outcome, original actor/authority, completion time and any
   // independently authorized artifact references. Signature validity alone
   // neither grants Spool access nor satisfies the current review policy.
@@ -135,6 +135,8 @@ message EvidenceRecord {
   // Always derived from evidence when observed. A command may omit this
   // projection; if supplied, every field must match the signed original.
   CheckEvidenceSummary summary = 7;
+  // Required original audience scope, independently of matching source revisions.
+  ThreadRef thread = 8;
 }
 // Immutable review progress for one accepted check result and exact policy.
 // This does not change its outcome, supersede evidence or grant landing approval.

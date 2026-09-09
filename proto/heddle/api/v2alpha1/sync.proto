@@ -157,7 +157,9 @@ message FetchServerFrame {
     FetchComplete complete = 5;
     // Original signed causal operations for the selected facets. A receiver
     // admits these to the same replica as live sync; projections are not proofs.
-    SignedRecord operation = 6;
+    // Bounded originals and matched retained authority receipts use exactly
+    // the live-replication batch shape; a receipt is not current disclosure permission.
+    ReplicationOperations operations = 6;
     // Original creator-signed genesis for a required cross-Thread source
     // dependency. Target access never grants access to this dependency.
     ThreadGenesisRecord thread_genesis = 7;
@@ -199,7 +201,9 @@ message PublishContentClientFrame {
     // within the transfer budget; receiving a record does not admit its source.
     // Finish verifies original authority, each Thread audience and complete
     // causal/source closure before atomically publishing source availability.
-    SignedRecord operation = 6;
+    // Bounded originals and matched retained authority receipts use exactly
+    // the live-replication batch shape; a receipt is not current disclosure permission.
+    ReplicationOperations operations = 6;
     // Original genesis and independently verifiable creator/admission proof for
     // the selected Thread or a required source dependency. A courier cannot
     // replace the creator, enroll an account or implicitly claim local ownership.

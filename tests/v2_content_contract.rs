@@ -93,3 +93,18 @@ fn raw_state_reads_cannot_disclose_authored_sidecars() {
     assert!(pool.get_message_by_name("heddle.api.v2alpha1.StateAttachmentContent").is_none());
     assert!(pool.get_enum_by_name("heddle.api.v2alpha1.SourceAttachmentKind").is_none());
 }
+
+#[test]
+fn source_transfers_share_original_operation_and_authority_receipt_batches() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
+    for name in ["FetchServerFrame", "PublishContentClientFrame"] {
+        let frame = pool.get_message_by_name(&format!("heddle.api.v2alpha1.{name}")).expect("source frame");
+        let batch = frame.get_field_by_name("operations").expect("original operation batch");
+        assert_eq!(batch.number(), 6);
+        assert_eq!(batch.kind().as_message().expect("batch message").full_name(), "heddle.api.v2alpha1.ReplicationOperations");
+        assert!(frame.get_field_by_name("operation").is_none(), "no separate unreceipted source framing");
+    }
+    let batch = pool.get_message_by_name("heddle.api.v2alpha1.ReplicationOperations").expect("shared batch");
+    assert!(batch.get_field_by_name("operations").expect("original signatures").is_list());
+    assert!(batch.get_field_by_name("authority_admissions").expect("retained testimony").is_list());
+}

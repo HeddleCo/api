@@ -39,6 +39,9 @@ message RemoteLinkRecord {
   bool enabled = 8;
   repeated ThreadRef diverged_threads = 9;
   RecordRef latest_operation = 10;
+  // Exact native source destination. A remote never selects a Thread from a
+  // mutable latest-import pointer; divergence preserves this Thread unchanged.
+  ThreadRef target = 11;
 }
 message ObserveIntegrationsRequest {
   repeated SpoolRef spools = 1;

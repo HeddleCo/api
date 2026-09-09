@@ -185,6 +185,18 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
         registered.get_field_by_name("biscuit").is_none(),
         "keyed clients mint their own bearer"
     );
+    let Kind::Message(issued) = result
+        .get_field_by_name("issued")
+        .expect("issued credential")
+        .kind()
+    else {
+        panic!("typed issued credential")
+    };
+    assert_eq!(
+        issued.get_field_by_name("subject").map(|field| field.kind()),
+        Some(Kind::String),
+        "issued credentials must identify their exact proof subject without conflating it with the human account UUID"
+    );
     assert!(
         result.get_field_by_name("session").is_some(),
         "one session result for every credential ceremony"

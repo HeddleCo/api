@@ -94,6 +94,10 @@ message EntityRef {
     BookmarkRef bookmark = 24;
     RecordRef mount = 25;
     RecordRef support_access = 26;
+    // Registry identity is distinct from the device's transport locator.
+    RecordRef device_record = 27;
+    RecordRef delegation = 28;
+    RecordRef recovery = 29;
   }
 }
 

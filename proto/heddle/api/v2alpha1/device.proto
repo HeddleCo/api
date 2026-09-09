@@ -21,6 +21,18 @@ message CheckoutOverview {
   RecordRef active_run = 9;
   // Display only, disclosed solely under device authority.
   string display_path = 10;
+  SourceConflictSet conflicts = 11;
+}
+
+// A bounded set of immutable source alternatives observed at one checkout
+// version. Candidate IDs are opaque and only meaningful within this version.
+message SourceConflictSet {
+  bytes version = 1;
+  repeated SourceConflictCandidate candidates = 2;
+}
+message SourceConflictCandidate {
+  bytes id = 1;
+  RevisionRef revision = 2;
 }
 
 message ObserveCheckoutsRequest {

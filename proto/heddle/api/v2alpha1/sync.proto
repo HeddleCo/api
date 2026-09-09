@@ -195,6 +195,15 @@ message PublishContentClientFrame {
     PackChunk pack = 3;
     TransferSidecar sidecar = 4;
     PublishContentFinish finish = 5;
+    // Original signed source causal dependencies, symmetric with Fetch. Stage
+    // within the transfer budget; receiving a record does not admit its source.
+    // Finish verifies original authority, each Thread audience and complete
+    // causal/source closure before atomically publishing source availability.
+    SignedRecord operation = 6;
+    // Original genesis and independently verifiable creator/admission proof for
+    // the selected Thread or a required source dependency. A courier cannot
+    // replace the creator, enroll an account or implicitly claim local ownership.
+    ThreadGenesisRecord thread_genesis = 7;
   }
 }
 message PublishContentServerFrame {

@@ -610,6 +610,23 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  // Renews the caller's own short-TTL ephemeral (declined-enrollment) session,
+  // optionally rotating its PoP key. Proven by the existing ephemeral bearer
+  // plus a request PoP; self-revoke uses RevokeSession, which already exists.
+  rpc RenewEphemeralSession(RenewEphemeralSessionRequest) returns (RenewEphemeralSessionResponse) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   rpc IntrospectCredential(IntrospectCredentialRequest) returns (CredentialInspection) {
     option (heddle.api.v1alpha1.rpc_contract) = {
       deployment_targets: [

@@ -211,6 +211,12 @@ message CompleteAuthenticationRequest {
   // browser?"), so the server enrolls the device (writes the device root) only
   // on explicit post-consent enroll. The decline path signs in without enrolling.
   bool enroll_device = 8;
+  // When enroll_device == false, this 32-byte browser-derived ephemeral public
+  // key is what Weft delegates the short-TTL ephemeral session Biscuit to
+  // (PoP-bound to this key). The decline path holds no device root, so the
+  // ephemeral session is renewable and self-revocable against this key only.
+  // Ignored when enroll_device == true (an enrolled device roots its own key).
+  bytes ephemeral_public_key = 9;
 }
 message AuthenticationResponse {
   MutationReceipt receipt = 1;
@@ -387,6 +393,25 @@ message RevokeSessionRequest {
   RecordRef session = 2;
   // Required exact SessionRecord.version. A conflict changes no session state.
   bytes expected_version = 3;
+}
+// Renews a short-TTL ephemeral (declined-enrollment) session in place. The
+// renewal is proven by the caller's existing ephemeral bearer plus a request
+// PoP signed by the ephemeral key (CallContext.request_proof), so the body
+// carries no session ref: the renewed session is exactly the caller's own.
+message RenewEphemeralSessionRequest {
+  string client_operation_id = 1;
+  // Optional key rotation. When set, this 32-byte key becomes the ephemeral
+  // session's new PoP subject and the renewed Biscuit is delegated to it; the
+  // current request is still signed by the existing ephemeral key. Omitted to
+  // renew the expiry without rotating the key.
+  bytes new_ephemeral_public_key = 2;
+}
+message RenewEphemeralSessionResponse {
+  MutationReceipt receipt = 1;
+  // Renewed ephemeral session: Weft-delegated Biscuit, its PoP public key and
+  // the new expiry. Mirrors the issued-credential token shape returned by the
+  // authentication-completion path; no new token format is introduced here.
+  IssuedCredential credential = 2;
 }
 message IntrospectCredentialRequest {
   bytes biscuit = 1;

@@ -119,7 +119,10 @@ service SpoolService {
   };
   rpc ObserveSpool(ObserveSpoolRequest) returns (stream SpoolEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_IF_AUTHENTICATED
@@ -138,7 +141,10 @@ service SpoolService {
   }
   rpc CreateSpool(CreateSpoolRequest) returns (SpoolMutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -157,7 +163,10 @@ service SpoolService {
   }
   rpc ReviseSpool(ReviseSpoolRequest) returns (SpoolMutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -176,7 +185,10 @@ service SpoolService {
   }
   rpc DeleteSpool(DeleteSpoolRequest) returns (MutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -339,7 +351,10 @@ service SpoolService {
   }
   rpc SetSpoolMount(SetSpoolMountRequest) returns (MutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -363,7 +378,10 @@ service SpoolService {
   }
   rpc RemoveSpoolMount(RemoveSpoolMountRequest) returns (MutationResponse) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
       effect: RPC_EFFECT_DURABLE_WRITE
@@ -417,7 +435,6 @@ service SpoolService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
-
 }
 
 service IdentityService {
@@ -427,7 +444,10 @@ service IdentityService {
   };
   rpc ObserveIdentity(ObserveIdentityRequest) returns (stream IdentityEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
@@ -570,7 +590,10 @@ service IdentityService {
   }
   rpc IntrospectCredential(IntrospectCredentialRequest) returns (CredentialInspection) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_NONE
       effect: RPC_EFFECT_READ_ONLY
@@ -2048,7 +2071,10 @@ service OwnerAuthorizationService {
   }
   rpc ObserveOwnership(ObserveOwnershipRequest) returns (stream OwnershipEvent) {
     option (heddle.api.v1alpha1.rpc_contract) = {
-      deployment_targets: [DEPLOYMENT_TARGET_WEFT, DEPLOYMENT_TARGET_HEDDLE_DAEMON]
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
       live_stream: true
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION

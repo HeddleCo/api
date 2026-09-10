@@ -3,8 +3,8 @@ syntax = "proto3";
 package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
-import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/administration.proto";
+import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 enum ThreadLifecycle {

@@ -48,6 +48,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "FetchClientFrame.body",
         "FetchServerFrame.body",
         "PublishContentServerFrame.body",
+        "CreateSpoolRequest.ownership",
+        "CollaborationAnchor.target",
+        "CheckoutEvent.payload",
+        "PairingEvent.payload",
+        "ThreadEvent.payload",
+        "IdentityEvent.payload",
+        "CatalogEvent.payload",
     ] {
         config.type_attribute(
             format!(".heddle.api.v2alpha1.{oneof}"),

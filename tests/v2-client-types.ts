@@ -5,7 +5,7 @@ import type { ThreadListEvent, ThreadMutationResponse } from "../packages/typesc
 declare const transport: RpcTransport;
 const client = createServiceClient(ThreadService, transport, new Set<string>());
 const observation: AsyncIterable<ThreadListEvent> = client.observeThreads({ query: { spools: [{ id: "spool" }] } });
-const mutation: Promise<ThreadMutationResponse> = client.startThread({ clientOperationId: "op", name: "thread" });
+const mutation: Promise<ThreadMutationResponse> = client.startThread({ clientOperationId: "op", threadGenesis: { format: "heddle-thread-genesis-v1", canonicalRecord: new Uint8Array() } });
 // @ts-expect-error Unknown agent plumbing is not an accepted product operation.
 client.startThread({ manualHeartbeat: true });
 // @ts-expect-error Observations are streams, not unary promises.

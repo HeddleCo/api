@@ -3,6 +3,8 @@ package heddle.api.v2alpha1;
 
 import "heddle/api/v1alpha1/errors.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/thread.proto";
 
@@ -34,17 +36,6 @@ message TransferSelection {
 }
 message TransferProof {
   SignedRecord opening = 1;
-}
-message PublishOpen {
-  ThreadRef thread = 1;
-  RevisionRef source = 2;
-  bytes expected_remote_version = 3;
-  bytes sharing_policy_version = 4;
-  TransferSelection selection = 5;
-  repeated TransferObject inventory = 6;
-  TransferCheckpoint checkpoint = 7;
-  TransferProof proof = 8;
-  SignedRecord thread_genesis = 9;
 }
 message FetchOpen {
   ThreadRef thread = 1;
@@ -96,7 +87,7 @@ message TransferReady {
   ThreadRef thread = 2;
   RevisionRef current = 3;
   bytes current_version = 4;
-  SignedRecord owner_genesis = 5;
+  SignedSpoolOwnerGenesis owner_genesis = 5;
   repeated TransferObject have = 6;
   repeated TransferObject need = 7;
   TransferCheckpoint checkpoint = 8;
@@ -105,6 +96,13 @@ message TransferReady {
   repeated TransferObject missing = 11;
   repeated ThreadOverview advertised_threads = 12;
   PageInfo page = 13;
+  // Exact whole artifacts selected for this download, in transmission order.
+  // Chunk offsets/lengths must stay inside these independently hashed extents.
+  repeated PackExtent packs = 14;
+  // Clone verifies owner history and installs the original Thread genesis
+  // before materializing source. Neither identity is minted by the receiver.
+  OwnerState ownership = 15;
+  ThreadGenesisRecord thread_genesis = 16;
 }
 message ProviderExtent {
   EndpointRef provider = 1;
@@ -124,19 +122,6 @@ message ProviderResult {
   bytes plan_digest = 1;
   repeated ObjectAddress verified_extents = 2;
 }
-message TransferCommit {
-  bytes plan_digest = 1;
-  ObjectAddress inventory_digest = 2;
-}
-message PublishClientFrame {
-  string client_operation_id = 1;
-  oneof body {
-    PublishOpen open = 2;
-    PackChunk pack = 3;
-    TransferSidecar sidecar = 4;
-    TransferCommit commit = 5;
-  }
-}
 message PublicationReceipt {
   string client_operation_id = 1;
   EndpointRef destination = 2;
@@ -147,13 +132,6 @@ message PublicationReceipt {
   oneof outcome {
     Applied accepted = 7;
     heddle.api.v1alpha1.CallFailure rejected = 8;
-  }
-}
-message PublishServerFrame {
-  oneof body {
-    TransferReady ready = 1;
-    TransferCheckpoint checkpoint = 2;
-    PublicationReceipt receipt = 3;
   }
 }
 message FetchClientFrame {
@@ -177,8 +155,71 @@ message FetchServerFrame {
     TransferSidecar sidecar = 3;
     ProviderPlan provider_plan = 4;
     FetchComplete complete = 5;
+    // Original signed causal operations for the selected facets. A receiver
+    // admits these to the same replica as live sync; projections are not proofs.
+    // Bounded originals and matched retained authority receipts use exactly
+    // the live-replication batch shape; a receipt is not current disclosure permission.
+    ReplicationOperations operations = 6;
+    // Original creator-signed genesis for a required cross-Thread source
+    // dependency. Target access never grants access to this dependency.
+    ThreadGenesisRecord thread_genesis = 7;
   }
 }
+// Bulk content availability for an already admitted Thread capture. Metadata
+// replication owns causal heads; uploading bytes cannot select or replace one.
+// The opening PoP binds the exact Thread/revision, policy, complete pack/index
+// addresses and lengths, operation identity, and any resume checkpoint.
+message PublishContentOpen {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2;
+  bytes sharing_policy_version = 3;
+  // Complete pack/index objects: offset is zero and length is the whole object.
+  // The server validates hashes and the exact authorized source closure before
+  // installation. Extra context, forensic objects, or history are not admitted
+  // merely because they were included in a source pack.
+  repeated PackExtent packs = 4;
+  TransferCheckpoint checkpoint = 5;
+  // Bound by the opening proof and checked against the authenticated transport.
+  // A proof for one receiver cannot be forwarded to publish at another.
+  EndpointRef source = 6;
+  EndpointRef destination = 7;
+}
+message PublishContentFinish {
+  // Names the server's current committed transfer plan, not a caller assertion
+  // that bytes or closure were accepted. A FIN alone never publishes content.
+  TransferCheckpoint checkpoint = 1;
+}
+message PublishContentClientFrame {
+  // Required and unchanged on every frame; the opening proof covers this value.
+  string client_operation_id = 1;
+  oneof body {
+    PublishContentOpen open = 2;
+    PackChunk pack = 3;
+    TransferSidecar sidecar = 4;
+    PublishContentFinish finish = 5;
+    // Original signed source causal dependencies, symmetric with Fetch. Stage
+    // within the transfer budget; receiving a record does not admit its source.
+    // Finish verifies original authority, each Thread audience and complete
+    // causal/source closure before atomically publishing source availability.
+    // Bounded originals and matched retained authority receipts use exactly
+    // the live-replication batch shape; a receipt is not current disclosure permission.
+    ReplicationOperations operations = 6;
+    // Original genesis and independently verifiable creator/admission proof for
+    // the selected Thread or a required source dependency. A courier cannot
+    // replace the creator, enroll an account or implicitly claim local ownership.
+    ThreadGenesisRecord thread_genesis = 7;
+  }
+}
+message PublishContentServerFrame {
+  oneof body {
+    TransferReady ready = 1;
+    TransferCheckpoint checkpoint = 2;
+    // Accepted only after complete authorized closure is durably installed.
+    // Observers may then treat this exact hosted revision as source-available.
+    PublicationReceipt receipt = 3;
+  }
+}
+
 message ReadProviderExtentRequest {
   bytes ticket = 1;
   bytes plan_digest = 2;
@@ -190,5 +231,132 @@ message ProviderExtentEvent {
     PackExtent ready = 1;
     PackChunk chunk = 3;
     TransferCheckpoint complete = 2;
+  }
+}
+
+// A causal frontier is portable within its exact Thread/facet/format. It is
+// never an Observe cursor or a bulk-transfer checkpoint. Heads are paged using
+// the negotiated max_items; repeated Have frames contribute to the same round.
+message CausalFrontier {
+  SharedFacet facet = 1;
+  repeated bytes heads = 2;
+}
+// Carries original ownership proof with the immutable creator-signed identity.
+// The receiver independently verifies it; transport credentials never select
+// the owning account or enroll an otherwise-untrusted account root.
+message ThreadGenesisRecord {
+  SignedRecord genesis = 1;
+  bytes creator_authority = 2;
+  // Original account authority admitted by an independently pinned hosted executor.
+  // Does not authorize current disclosure or enroll the original account locally.
+  SignedRecord admission = 3;
+  // At most two exact co-signed claims. Conflicting claims fail closed; a
+  // transport must never select a winner or rewrite the immutable genesis.
+  repeated SignedRecord ownership_claims = 4;
+  // Optional independently trusted first-admission testimony matched by claim
+  // identity. Original acceptance expiry does not invalidate retained admission.
+  repeated SignedRecord ownership_claim_admissions = 5;
+  // Exact heddle-original-boundary-acceptance-v1 signatures needed by this
+  // genesis/claim bundle. Fresh acceptance binds the complete streamed-original
+  // manifest and publication intent; verify the accepting authority now. It does
+  // not assert historical validity of expired/revoked original authority or
+  // change original attribution. On relay, require independently pinned,
+  // versioned admission testimony explicitly referencing the acceptance digest;
+  // acceptance alone cannot authorize another destination or a manifest subset.
+  // At most 128 distinct acceptances per transfer, each canonical record <=96KiB,
+  // within the existing metadata/frame budgets (16MiB transfer, 256KiB frame).
+  // Deduplicate identical evidence across wrappers/batches; reject conflicting
+  // or unreferenced evidence. No executor/root trust is enrolled from this field.
+  repeated SignedRecord boundary_acceptances = 6;
+}
+
+message ReplicationOpen {
+  ThreadRef thread = 1;
+  repeated SharedFacet facets = 2;
+  bytes sharing_policy_version = 3;
+  // Original creator-signed genesis for first publication. The receiver must
+  // authorize the destination spool and verify canonical bytes, creator proof,
+  // and exact Thread/spool identity before durably installing it and emitting
+  // Ready. Reconnects may include it again; it cannot replace another genesis.
+  ThreadGenesisRecord thread_genesis = 4;
+  ReadBudget budget = 5;
+  repeated string record_formats = 6;
+  // Fresh session binding; the request PoP covers this exact opening.
+  bytes session_nonce = 7;
+  // The opening PoP binds both Iroh identities; replay on another peer or
+  // destination cannot open a stream under the captured credential.
+  EndpointRef source = 8;
+  EndpointRef destination = 9;
+}
+message ReplicationReady {
+  EndpointRef endpoint = 1;
+  ThreadRef thread = 2;
+  repeated SharedFacet facets = 3;
+  bytes sharing_policy_version = 4;
+  ReadBudget budget = 5;
+  repeated string record_formats = 6;
+}
+message ReplicationHave {
+  repeated CausalFrontier frontiers = 1;
+}
+message ReplicationNeed {
+  // Content-addressed canonical Thread operation IDs, exactly 32 bytes each.
+  repeated bytes operation_ids = 1;
+}
+message ReplicationOperations {
+  // Each canonical record binds Thread, facet and causal parents. Peers verify
+  // the format, ID, authorization and dependency scope before admitting it.
+  repeated SignedRecord operations = 1;
+  // Optional original-author admission statements, signed by an independently
+  // pinned hosted executor. The explicit canonical format defines the admission
+  // basis; adding evidence never reinterprets an older receipt. Each binds
+  // one operation ID above, its immutable Spool genesis, Thread, original actor,
+  // publisher and authority digest. Reject duplicate or unmatched sidecars.
+  // Preserve the original operation signature. A receipt proves first durable
+  // authority admission, including pending causal work; it is not causal
+  // acceptance, current permission, approval or landing eligibility. Receivers
+  // retain the exact statement atomically with the original pending bytes and
+  // never infer executor trust from an incoming statement or courier identity.
+  repeated SignedRecord authority_admissions = 2;
+  // Same acceptance evidence and transfer-wide limits as ThreadGenesisRecord.
+  // Fresh publication verifies the exact complete original manifest, intent and
+  // current accepting capability; retained relay requires a matched explicitly
+  // acceptance-based admission receipt from an independently trusted executor.
+  // Preserve the original author and bytes; this is separate present-tense
+  // acceptance, never a fabricated historical authorization timestamp. Evidence
+  // contributes to the existing batch byte budget; operations remains nonempty.
+  repeated SignedRecord boundary_acceptances = 3;
+}
+message ReplicationRejection {
+  bytes operation_id = 1;
+  heddle.api.v1alpha1.CallFailure failure = 2;
+}
+message ReplicationReceipt {
+  // Accepted means durably stored with accepted causal closure. A record merely
+  // received with missing parents is pending, and must not advance this frontier.
+  repeated bytes accepted_operation_ids = 1;
+  repeated bytes pending_operation_ids = 2;
+  repeated ReplicationRejection rejected = 3;
+  repeated CausalFrontier accepted_frontiers = 4;
+  // Metadata admission is distinct from source/object availability.
+  repeated TransferObject missing_objects = 5;
+  bytes sharing_policy_version = 6;
+}
+message ReplicateThreadRequest {
+  oneof body {
+    ReplicationOpen open = 1;
+    ReplicationHave have = 2;
+    ReplicationNeed need = 3;
+    ReplicationOperations operations = 4;
+    ReplicationReceipt receipt = 5;
+  }
+}
+message ReplicateThreadResponse {
+  oneof body {
+    ReplicationReady ready = 1;
+    ReplicationHave have = 2;
+    ReplicationNeed need = 3;
+    ReplicationOperations operations = 4;
+    ReplicationReceipt receipt = 5;
   }
 }

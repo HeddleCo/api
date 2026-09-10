@@ -3,6 +3,7 @@ syntax = "proto3";
 package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/administration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
@@ -12,6 +13,30 @@ message SourceAnchor {
   string symbol_id = 3;
   optional uint32 start_line = 4;
   optional uint32 end_line = 5;
+  // Owning Thread for replicated source annotations; its spool must equal the
+  // exact revision spool. Source bytes alone do not identify a causal history.
+  ThreadRef thread = 6;
+  // Optional shared target identity and explicit tracking policy. Coordinates
+  // above remain original signed evidence. Omitted means exact-location only;
+  // implementations MUST NOT infer tracking from the owning Thread.
+  SourceTargetReference target = 7;
+}
+
+// Shared by primary anchors and annotation references. This is a reference,
+// never a grant to read the target's source or its owning Thread.
+message SourceTargetReference {
+  bytes target_id = 1; // Canonical SourceTargetCore identity, exactly 32 bytes.
+  oneof binding {
+    // Must be true. Inherited references follow the Thread being viewed.
+    bool viewed_thread = 2;
+    ThreadRef named_thread = 3;
+    PinnedSourceTargetRevision pinned_revision = 4;
+  }
+}
+message PinnedSourceTargetRevision {
+  RevisionRef revision = 1;
+  // Optional originating Thread; when present its Spool must match revision.
+  ThreadRef thread = 2;
 }
 
 message CollaborationAnchor {
@@ -37,6 +62,13 @@ message DiscussionRecord {
   bool blocking = 6;
   uint64 turn_count = 7;
   RecordRef extracted_context = 8;
+  // Exact replication-operation frontier at this record version. Pass these IDs to
+  // AppendTurn; concurrent appends remain distinct until observed.
+  repeated bytes causal_heads = 9;
+  // Public maps to canonical Public; Members maps to Internal. Private maps
+  // to Private{audience_label}; this is an additional restriction on scope ACL.
+  Audience audience = 10;
+  string audience_label = 11;
 }
 
 message DiscussionTurn {
@@ -47,6 +79,88 @@ message DiscussionTurn {
   string agent_id = 5;
   repeated EntityRef mentions = 6;
   google.protobuf.Timestamp created_at = 7;
+  // Immutable replication-operation identity and dependencies, shared across replicas.
+  // These are separate from the addressable record ID and mutable view version.
+  bytes causal_id = 8;
+  repeated bytes causal_parents = 9;
+}
+
+// Structured context metadata. References describe a target; they grant no access
+// to it and never change the annotation's primary anchor or audience.
+message AnnotationDecimal {
+  sint64 coefficient = 1;
+  // Value = coefficient / 10^scale; scale <= 9. Canonical values have no
+  // trailing coefficient zero when scale > 0; zero always has scale 0.
+  uint32 scale = 2;
+}
+message AnnotationValue {
+  oneof value {
+    string text = 1;
+    bool boolean = 2;
+    sint64 integer = 3;
+    AnnotationDecimal decimal = 4;
+  }
+}
+message AnnotationSourceReference {
+  // Exact revision and optional owning Thread, with a nonempty relative path.
+  // Lines are one-based, inclusive, and require both endpoints.
+  SourceAnchor source = 1;
+}
+message AnnotationSymbolTag {
+  // Exact, case-sensitive grouping name; not proof of symbol identity.
+  string name = 1;
+  AnnotationSourceReference target = 2;
+}
+message AnnotationProperty {
+  string key = 1;
+  AnnotationValue value = 2;
+}
+message AnnotationTag {
+  oneof tag {
+    string text = 1;
+    AnnotationSymbolTag symbol = 2;
+    AnnotationSourceReference source = 3;
+    EntityRef entity = 4;
+    AnnotationProperty property = 5;
+  }
+}
+message AnnotationPropertyPredicate {
+  string key = 1;
+  enum Comparison {
+    COMPARISON_UNSPECIFIED = 0;
+    COMPARISON_EQUAL = 1;
+    COMPARISON_LESS = 2;
+    COMPARISON_LESS_OR_EQUAL = 3;
+    COMPARISON_GREATER = 4;
+    COMPARISON_GREATER_OR_EQUAL = 5;
+    COMPARISON_EXISTS = 6;
+  }
+  Comparison comparison = 2;
+  // Absent only for EXISTS. No string/numeric or integer/decimal coercion.
+  // Ordering is supported only for integer and decimal values.
+  AnnotationValue value = 3;
+}
+message AnnotationTagPredicate {
+  oneof predicate {
+    AnnotationTag exact = 1;
+    string symbol_name = 2;
+    // Exact relative path, or component-aware directory prefix. Both include
+    // resolved Symbol targets as well as Source tags, within any revision.
+    string file_path = 3;
+    string file_prefix = 4;
+    // Overlap requires the same spool, revision and path. Optional Thread
+    // narrows further. Coordinates on different revisions never overlap.
+    AnnotationSourceReference lines_overlap = 5;
+    AnnotationPropertyPredicate property = 6;
+  }
+}
+message AnnotationQuery {
+  // At most 64 predicates in total. Each predicate matches one complete tag.
+  // ALL must all match; ANY must match at least one unless empty; NONE must
+  // all fail. Missing properties fail positive predicates, including equality.
+  repeated AnnotationTagPredicate all = 1;
+  repeated AnnotationTagPredicate any = 2;
+  repeated AnnotationTagPredicate none = 3;
 }
 
 message ContextRecord {
@@ -54,13 +168,31 @@ message ContextRecord {
   bytes version = 2;
   CollaborationAnchor anchor = 3;
   string content = 4;
-  repeated string tags = 5;
+  repeated AnnotationTag tags = 5;
   string principal_id = 6;
   string agent_id = 7;
   RecordRef supersedes = 8;
   RecordRef extracted_from = 9;
   Coverage anchor_coverage = 10;
   bool superseded = 11;
+  // Context revisions form a causal register. Concurrent current revisions
+  // share ref and version; retain each causal_id instead of choosing a winner.
+  // expected_version uses the aggregate current-frontier version, including
+  // when include_history also returns an earlier revision.
+  bytes causal_id = 12;
+  repeated bytes causal_parents = 13;
+  repeated bytes causal_heads = 14;
+}
+
+// Write input. Actor attribution is carried by the signed canonical operation;
+// coverage and current-view versions are server projections, never client input.
+message ContextDraft {
+  RecordRef ref = 1;
+  CollaborationAnchor anchor = 2;
+  string content = 3;
+  repeated AnnotationTag tags = 4;
+  RecordRef supersedes = 5;
+  RecordRef extracted_from = 6;
 }
 
 message ObserveCollaborationRequest {
@@ -72,6 +204,12 @@ message ObserveCollaborationRequest {
   bool include_history = 6;
   PageRequest page = 7;
   ObserveOptions observe = 8;
+  // Include original author-signed operations for portable replica ingestion.
+  // UI-only consumers can omit them; projection versions are not causal proofs.
+  bool include_operations = 9;
+  // Presence selects context revisions only, including an empty match-all query.
+  // Predicates apply per revision; concurrent heads remain separate results.
+  AnnotationQuery annotations = 10;
 }
 
 message CollaborationEvent {
@@ -82,6 +220,7 @@ message CollaborationEvent {
     ContextRecord context = 4;
     Removal removal = 5;
     SectionStatus status = 6;
+    SignedRecord operation = 7;
   }
 }
 
@@ -92,14 +231,23 @@ message OpenDiscussionRequest {
   string title = 4;
   string initial_body = 5;
   bool blocking = 6;
+  // Canonical actor-signed Thread operation. The request PoP authorizes this
+  // delivery; it cannot substitute for the portable operation signature.
+  SignedRecord signed_operation = 7;
+  // Required explicit audience. Private requires a nonempty audience_label;
+  // other audiences require an empty label. Sharing never widens this audience.
+  Audience audience = 8;
+  string audience_label = 9;
 }
 
 message AppendDiscussionRequest {
   string client_operation_id = 1;
   RecordRef discussion = 2;
-  bytes expected_version = 3;
+  // Heads the author observed; concurrent appends are retained.
+  repeated bytes causal_parents = 3;
   string body = 4;
   repeated EntityRef mentions = 5;
+  SignedRecord signed_operation = 6;
 }
 
 message ResolveDiscussionRequest {
@@ -107,10 +255,11 @@ message ResolveDiscussionRequest {
   RecordRef discussion = 2;
   bytes expected_version = 3;
   oneof resolution {
-    ContextRecord extract_context = 4;
+    ContextDraft extract_context = 4;
     RevisionRef resolved_by_edit = 5;
     string dismissal_reason = 6;
   }
+  SignedRecord signed_operation = 7;
 }
 
 message ReopenDiscussionRequest {
@@ -118,12 +267,14 @@ message ReopenDiscussionRequest {
   RecordRef discussion = 2;
   bytes expected_version = 3;
   string reason = 4;
+  SignedRecord signed_operation = 5;
 }
 
 message PutContextRequest {
   string client_operation_id = 1;
-  ContextRecord context = 2;
+  ContextDraft context = 2;
   bytes expected_version = 3;
+  SignedRecord signed_operation = 4;
   // Empty expected version creates; existing records require the observed
   // version. History is appended, never replaced by editing an old revision.
 }

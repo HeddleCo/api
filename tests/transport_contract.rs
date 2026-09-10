@@ -207,7 +207,7 @@ fn generated_descriptor_preserves_the_list_refs_contract() {
     // 0.22.0 added the six planned NotificationService methods (177 -> 183).
     // 0.27.0 added IdentityService.RevokeDevice (183 -> 184, weft#2047 C5).
     // 0.28.0 adds first-class PullReady.refs / head_thread; method count unchanged.
-    assert_eq!(ALL_METHODS.len(), 184);
+    assert_eq!(ALL_METHODS.len(), 185);
     let by_thread_ref =
         method_descriptor("/heddle.api.v1alpha1.CollaborationService/ListByThreadRef")
             .expect("ListByThreadRef descriptor");
@@ -755,6 +755,7 @@ fn destructive_shipped_methods_match_weft_human_verification_policy() {
 fn call_context_carries_transport_neutral_auth_and_trace_fields() {
     let context = CallContext {
         bearer_capability: b"opaque-biscuit".to_vec(),
+        bearer_authority_proof: b"portable-owner-authority".to_vec(),
         bearer_grant_envelope: b"opaque-grant-envelope".to_vec(),
         request_proof: Some(RequestProof {
             algorithm: "ed25519".to_string(),
@@ -777,6 +778,9 @@ fn call_context_carries_transport_neutral_auth_and_trace_fields() {
         ..Default::default()
     };
 
+    let context =
+        CallContext::decode(context.encode_to_vec().as_slice()).expect("context round trip");
+    assert_eq!(context.bearer_authority_proof, b"portable-owner-authority");
     assert_eq!(context.bearer_capability, b"opaque-biscuit");
     assert_eq!(context.bearer_grant_envelope, b"opaque-grant-envelope");
     assert_eq!(
@@ -877,4 +881,38 @@ fn hosted_call_framing_and_failure_match_the_cross_product_fixture() {
         ResponseFrame::Failure(decoded) => assert_eq!(decoded, failure),
         ResponseFrame::Success(_) => panic!("failure fixture decoded as success"),
     }
+}
+
+#[test]
+fn promotion_is_routed_as_a_pop_signed_durable_write() {
+    use heddle_api::heddle::api::v1alpha1::{PromoteSpoolRequest, PromoteSpoolResponse};
+    let method = method_descriptor("/heddle.api.v1alpha1.RegistryService/PromoteSpool")
+        .expect("promotion route generated from canonical service");
+    assert_eq!(
+        method.route,
+        heddle_api::MethodRoute::RegistryServicePromoteSpool
+    );
+    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
+    assert_eq!(method.effect, RpcEffect::DurableWrite);
+    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
+    let request = PromoteSpoolRequest {
+        full_path: "spool/alice/acme".into(),
+        client_operation_id: "promote-1".into(),
+    };
+    assert_eq!(
+        PromoteSpoolRequest::decode(request.encode_to_vec().as_slice()).expect("decode promotion"),
+        request
+    );
+    let response = PromoteSpoolResponse {
+        spool: Some(heddle_api::heddle::api::v1alpha1::HostedSpool {
+            full_path: "spool/acme".into(),
+            kind: "spool".into(),
+            is_repo: true,
+            ..Default::default()
+        }),
+    };
+    assert_eq!(
+        PromoteSpoolResponse::decode(response.encode_to_vec().as_slice()).expect("decode result"),
+        response
+    );
 }

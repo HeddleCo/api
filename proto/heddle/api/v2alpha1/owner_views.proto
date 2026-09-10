@@ -1,0 +1,33 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
+
+// Account authority and resource ownership are separate. A root can be
+// established before a spool exists. A spool's genesis/transfer chain refers
+// to that authority without changing the resource identity.
+message OwnerState {
+  PrincipalRef owner = 1;
+  bytes version = 2;
+  OwnerKeyBinding binding = 3;
+  SignedOwnerRoot root = 4;
+  repeated SignedOwnerKeyTransition accepted_transitions = 5;
+  repeated OwnerTransitionRecord pending_transitions = 6;
+  // Present only when the caller requested an authorized spool lineage.
+  CloneAuthorizationKeyring resource_keyring = 7;
+}
+
+// A persisted proposal is distinct from an accepted owner state. Its original
+// signatures remain independently verifiable; version governs complete/veto.
+message OwnerTransitionRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  SignedOwnerKeyTransition transition = 3;
+  google.protobuf.Timestamp started_at = 4;
+  google.protobuf.Timestamp eligible_at = 5;
+  bool vetoed = 6;
+  bool completed = 7;
+  repeated Requirement requirements = 8;
+}

@@ -1,22 +1,18 @@
 syntax = "proto3";
 package heddle.api.v2alpha1;
 
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/identity.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
-// Owner records retain their independently versioned canonical formats and
-// purge-only authority. RPC cutover does not create a new trust root.
-message OwnerState {
-  SpoolRef spool = 1;
-  bytes version = 2;
-  SignedRecord genesis = 3;
-  repeated SignedRecord transitions = 4;
-  repeated SignedRecord pending_transitions = 5;
-  SignedRecord recovery_policy = 6;
-}
 message ObserveOwnershipRequest {
-  SpoolRef spool = 1;
-  ObserveOptions observe = 2;
+  PrincipalRef owner = 1;
+  // Optional resource lineage. Reading it also requires access to this spool.
+  SpoolRef spool = 2;
+  ObserveOptions observe = 3;
 }
 message OwnershipEvent {
   StreamFrame frame = 1;
@@ -27,24 +23,92 @@ message OwnershipEvent {
 }
 message BootstrapOwnershipRequest {
   string client_operation_id = 1;
-  SpoolRef spool = 2;
-  SignedRecord genesis = 3;
+  PrincipalRef owner = 2;
+  SignedOwnerRoot root = 3;
+  OwnerKeyBinding binding = 4;
+  // The authenticated caller must match the owner. The host validates the
+  // root-establishment ceremony; an ordinary admin grant cannot install a root.
 }
 message SubmitOwnerTransitionRequest {
   string client_operation_id = 1;
-  SpoolRef spool = 2;
+  PrincipalRef owner = 2;
+  oneof action {
+    SignedOwnerKeyTransition rotation = 4;
+    SignedOwnerKeyTransition recovery = 5;
+    SignedOwnerKeyTransition recovery_policy_change = 6;
+  }
+  // The signed transition kind must equal the selected action. Each action
+  // retains its current-authority, guardian, timelock and veto requirements.
+  // The signed previous_state_hash and sequence are the precondition; there
+  // is no second unsigned version that can contradict the signed evidence.
+}
+// Submission durably records a proposal. A later distinct operation completes
+// it after its signed veto window; retrying submission never commits it.
+message OwnerTransitionResponse {
+  MutationReceipt receipt = 1;
+  OwnerTransitionRecord transition = 2;
+}
+message CompleteOwnerTransitionRequest {
+  string client_operation_id = 1;
+  RecordRef transition = 2;
   bytes expected_version = 3;
-  SignedRecord transition = 4;
+  // heddle.owner-transition-possession.v2 canonical action. Rotation/recovery
+  // prove the proposed key; policy changes prove the current authority key.
+  SignedRecord possession = 4;
+}
+message VetoOwnerTransitionRequest {
+  string client_operation_id = 1;
+  RecordRef transition = 2;
+  bytes expected_version = 3;
+  // heddle.owner-transition-veto.v2, signed by the current owner authority.
+  SignedRecord veto = 4;
 }
 message SubmitOwnerCapabilityRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
-  repeated SignedRecord capability_chain = 3;
+  OwnerAuthorizationBundle authorization = 3;
+  // Acceptance records evidence; every operation revalidates current authority.
 }
 message TransferOwnershipRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
-  bytes expected_version = 3;
-  SignedRecord source_handoff = 4;
-  SignedRecord destination_acceptance = 5;
+  ResourceOwnershipTransfer transfer = 4;
+  // Both owner signatures bind one complete handoff and exact authority states.
+  // Signed transfer_sequence supplies the resource precondition.
+}
+
+// Device-local consent for claiming an agent-rooted human account. Browser
+// possession and the explicit claim authorization are both required. Weft
+// independently verifies the registration; the device never submits it.
+message PrepareAccountClaimRequest {
+  string client_operation_id = 1;
+  bytes browser_public_key = 2;
+  string handle = 3;
+  bytes claim_authorization = 4;
+}
+message PrepareAccountClaimResponse {
+  MutationReceipt receipt = 1;
+  SignedOwnerRoot owner_root = 2;
+  // Short-lived, browser-key-bound attenuation limited to the registration
+  // ceremony. Secret credential material is never an observation payload.
+  bytes ceremony_biscuit = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  // Device-local label for the unclaimed human account, not a registry lookup.
+  string display_name = 5;
+}
+message SignAccountClaimRequest {
+  string client_operation_id = 1;
+  bytes claim_authorization = 2;
+  // Exact intended registration with owner unset. The device binds its digest
+  // to consent and verifies the prepared browser key. Weft independently
+  // verifies the challenged account, handle and passkey proofs on completion.
+  CompleteRegistrationRequest registration = 3;
+  // CLAIM_DEFERRED_HUMAN with next-key/guardian possession proofs. The device
+  // checks the exact prior state and sequence, verifies all proofs and adds
+  // only its originating-authority signature; it cannot replace browser data.
+  SignedOwnerKeyTransition proposed_transition = 4;
+}
+message SignAccountClaimResponse {
+  MutationReceipt receipt = 1;
+  SignedOwnerKeyTransition transition = 2;
 }

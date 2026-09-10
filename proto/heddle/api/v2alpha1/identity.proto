@@ -3,7 +3,22 @@ package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
+
+// Original author evidence bound into each signed Thread metadata operation.
+// Supplied history never establishes trust: receivers verify against separately
+// admitted current account authority at first durable admission. Canonical
+// protobuf encoding is mandatory and the entire envelope is bounded to 64 KiB.
+message ThreadControlAuthority {
+  uint32 format = 1; // Must be 1.
+  OwnerHistory owner = 2;
+  bytes mint_root_public_key = 3; // Ed25519, exactly 32 bytes.
+  SignedMintRootAttachment mint_root_attachment = 4;
+  // Sealed Biscuit only: never publish an appendable credential's proof secret.
+  bytes sealed_biscuit = 5;
+}
 
 // User-root proof is portable. Account association records Weft's acceptance of
 // an already user-authorized key; it is not the source of that key's authority.
@@ -14,6 +29,33 @@ message RootAttachment {
   SignedRecord attachment = 4;
   // Verification binds root, subject, device, scope, validity and possession.
   // An empty attachment is valid only for a directly proved root key.
+}
+// Portable binding of a proved delegated key to its Iroh endpoint. Authority
+// remains the Biscuit's complete attenuation chain, not this locator binding.
+// SignedRecord format heddle.root-attachment.v2 carries canonical bytes signed
+// by both endpoint and subject (one signature when the keys are equal).
+// The shared verifier requires a locally trusted root, verifies the Biscuit's
+// effective proof key and limits, then verifies digest, time and endpoint.
+message RootAttachmentBinding {
+  uint32 format_version = 1;
+  bytes root_public_key = 2;
+  bytes subject_public_key = 3;
+  EndpointRef device = 4;
+  bytes credential_digest = 5;
+  int64 not_before_unix_seconds = 6;
+  int64 expires_at_unix_seconds = 7;
+  string account_id = 8;
+  bytes pairing_challenge = 9;
+}
+// Account onboarding state, never a substitute for a verified capability or
+// owner-root binding. Promotions are explicit; a credential's attenuation must
+// survive promotion of its account. AGENT_ROOTED denotes an unclaimed human
+// account with an empty independent-root slot, not an account owned by an agent.
+enum RootingTier {
+  ROOTING_TIER_UNSPECIFIED = 0;
+  ROOTING_TIER_SELF_ROOTED = 1;
+  ROOTING_TIER_SERVER_ROOTED = 2;
+  ROOTING_TIER_AGENT_ROOTED = 3;
 }
 message PrincipalRecord {
   string id = 1;
@@ -26,19 +68,28 @@ message PrincipalRecord {
   repeated EntityRef authorized_resources = 8;
   repeated ActionAvailability actions = 9;
   EntitlementRecord entitlement = 10;
+  RootingTier rooting_tier = 11;
+  // Generated pet name while agent-rooted and unclaimed; handle stays empty.
+  string display_name = 12;
 }
 message EntitlementRecord {
   string plan = 1;
   uint64 storage_used_bytes = 2;
   uint64 storage_limit_bytes = 3;
-  uint64 credit_balance = 4;
 }
 message SessionRecord {
   RecordRef ref = 1;
+  // Opaque version of durable authorization state, usable directly for revoke.
+  // Serving endpoint and viewer-specific metadata do not affect this version.
   bytes version = 2;
   EndpointRef endpoint = 3;
   google.protobuf.Timestamp expires_at = 4;
   bool revoked = 5;
+  google.protobuf.Timestamp issued_at = 6;
+  google.protobuf.Timestamp last_used_at = 7;
+  string user_agent = 8;
+  string ip_address = 9;
+  bool is_current = 10;
 }
 message DelegationRecord {
   RecordRef ref = 1;
@@ -69,12 +120,53 @@ message InvitationQuota {
   string distribution_id = 1;
   uint32 remaining = 2;
 }
+// Explicit ceremony selection; omitted or unsupported methods are rejected.
+// Password and OAuth authenticate a server-rooted account. They never confer
+// independent mint authority or downgrade an existing self-rooted account.
+enum CredentialMethod {
+  CREDENTIAL_METHOD_UNSPECIFIED = 0;
+  CREDENTIAL_METHOD_PASSKEY = 1;
+  CREDENTIAL_METHOD_PASSWORD = 2;
+  CREDENTIAL_METHOD_OAUTH = 3;
+}
+enum OAuthProvider {
+  O_AUTH_PROVIDER_UNSPECIFIED = 0;
+  O_AUTH_PROVIDER_GOOGLE = 1;
+  O_AUTH_PROVIDER_APPLE = 2;
+  O_AUTH_PROVIDER_GITHUB = 3;
+  O_AUTH_PROVIDER_GITLAB = 4;
+}
+message PasswordProof {
+  // UTF-8 password bytes: at least 15 characters, at most 1024 bytes on signup.
+  // Secret material:
+  // never retained in observations, receipts, logs or challenge metadata.
+  bytes password_utf8 = 1;
+}
+message OAuthProof {
+  // Provider comes from the original challenge. OIDC tokens bind its nonce;
+  // access tokens are verified against that provider's authenticated user API.
+  oneof proof {
+    string id_token = 1;
+    string access_token = 2;
+  }
+}
 message AuthenticationChallenge {
   RecordRef ref = 1;
   bytes challenge = 2;
   string relying_party_id = 3;
   google.protobuf.Timestamp expires_at = 4;
   repeated bytes allowed_credential_ids = 5;
+  UserVerification user_verification = 6;
+  CredentialMethod method = 7;
+  OAuthProvider oauth_provider = 8;
+  // Separate from ceremony expiry; completion cannot extend this upper bound.
+  google.protobuf.Timestamp credential_expires_at = 9;
+}
+enum UserVerification {
+  USER_VERIFICATION_UNSPECIFIED = 0;
+  USER_VERIFICATION_REQUIRED = 1;
+  USER_VERIFICATION_PREFERRED = 2;
+  USER_VERIFICATION_DISCOURAGED = 3;
 }
 message PasskeyProof {
   bytes credential_id = 1;
@@ -82,34 +174,189 @@ message PasskeyProof {
   bytes authenticator_data = 3;
   bytes signature = 4;
   bytes attestation_object = 5;
+  // Raw WebAuthn response.userHandle, bound to the credential's account.
+  bytes user_handle = 6;
 }
 message BeginAuthenticationRequest {
   string account_hint = 1;
+  // Device key whose possession CompleteAuthentication must prove.
+  // The challenge records this exact key and the enrollment choice below.
   bytes caller_public_key = 2;
+  // Explicitly attach a fresh browser key after an existing account passkey
+  // verifies this challenge. False requires an already enrolled active key.
+  // Enrollment never replaces the human's root, revives a revoked key, or
+  // reassigns a key owned by another account. The passkey assertion, request
+  // proof, device admission and session receipt commit as one ceremony.
+  bool enroll_device = 3;
+  string device_label = 4;
+  CredentialMethod method = 5;
+  // Required exactly when method is OAUTH. Never a caller-supplied issuer URL.
+  OAuthProvider oauth_provider = 6;
 }
 message CompleteAuthenticationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
-  PasskeyProof passkey = 3;
-  RootAttachment caller = 4;
-  SignedRecord possession_proof = 5;
+  oneof proof {
+    PasskeyProof passkey = 3;
+    PasswordProof password = 6;
+    OAuthProof oauth = 7;
+  }
+  // Same key as BeginAuthentication. CallContext.request_proof signs the
+  // exact completion request with this key, including the passkey assertion.
+  bytes caller_public_key = 4;
+  // Required for a newly enrolled independent mint root distinct from the
+  // current owner authority; omitted for existing roots or delegated leaves.
+  SignedMintRootAttachment mint_root_attachment = 5;
+  // Set true by the browser only AFTER the user consents ("Remember this
+  // browser?"), so the server enrolls the device (writes the device root) only
+  // on explicit post-consent enroll. The decline path signs in without enrolling.
+  bool enroll_device = 8;
+  // When enroll_device == false, this 32-byte browser-derived ephemeral public
+  // key is what Weft delegates the short-TTL ephemeral session Biscuit to
+  // (PoP-bound to this key). The decline path holds no device root, so the
+  // ephemeral session is renewable and self-revocable against this key only.
+  // Ignored when enroll_device == true (an enrolled device roots its own key).
+  bytes ephemeral_public_key = 9;
 }
 message AuthenticationResponse {
   MutationReceipt receipt = 1;
   PrincipalRecord principal = 2;
+  CredentialResult credential = 4;
+  // Exact accepted root, original binding and current signed transition history.
+  // Available immediately after authentication, including while Weft is offline.
+  OwnerState ownership = 5;
+}
+// Returned only by a successful credential ceremony, never by an observation.
+// Keyed clients retain their own minting authority. Registration attaches their
+// proved key to an account/session; it does not mint a bearer or confer an
+// independent human root on an agent. Keyless/server-rooted ceremonies can
+// return an issued bearer. Account rooting tier and credential class differ.
+message CredentialResult {
+  oneof outcome {
+    ClientOwnedCredential client_owned = 1;
+    IssuedCredential issued = 2;
+  }
   SessionRecord session = 3;
+  // Original accepted owner proofs where established. An unclaimed agent has
+  // no independent human-root bundle; absence does not upgrade its authority.
+  OwnerAuthorizationBundle owner_authorization = 4;
+  // Exact retained public association for this credential’s original mint root.
+  // A paired leaf inherits it; no owner signature or authority is reminted.
+  SignedMintRootAttachment mint_root_attachment = 5;
+  // Verified original human authentication, not inferred from credential kind.
+  // Provisioned agent capabilities have no human authentication method.
+  CredentialMethod method = 6;
+  OAuthProvider oauth_provider = 7;
+}
+enum CredentialKind {
+  CREDENTIAL_KIND_UNSPECIFIED = 0;
+  CREDENTIAL_KIND_DEVICE = 1;
+  CREDENTIAL_KIND_AGENT = 2;
+  CREDENTIAL_KIND_SERVICE = 3;
+  CREDENTIAL_KIND_ANONYMOUS = 4;
+}
+message ClientOwnedCredential {
+  RecordRef ref = 1;
+  // Exact verified credential subject, distinct from the human account UUID.
+  string subject = 2;
+  bytes proof_public_key = 3;
+  CredentialKind kind = 4;
+}
+message IssuedCredential {
+  RecordRef ref = 1;
+  // Raw serialized Biscuit bytes, not a base64 string. Secret bearer material.
+  // No response ever contains an authority or proof private key.
+  bytes biscuit = 2;
+  // Effective Ed25519 PoP key. Required for agent/device credentials; absence
+  // is permitted only for an explicitly bearer-only credential class.
+  bytes proof_public_key = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  // Credential classification is independent of the account's rooting tier.
+  // An agent credential stays attenuated after the human claims the account.
+  CredentialKind kind = 5;
+  // Exact subject of the issued Biscuit, used to construct request possession
+  // identity. Required: never infer it from the human account UUID or handle;
+  // an agent or anonymous credential can have a different subject.
+  string subject = 6;
 }
 message BeginRegistrationRequest {
-  bytes root_public_key = 1;
+  // One Ed25519 device key for Biscuit authority and request possession.
+  // Completion proves this exact key; an existing bearer selects the account
+  // but never substitutes for the enrolling device's signature.
+  bytes caller_public_key = 1;
+  // Required for signup/claim; optional for adding a device. An existing
+  // account is selected by the authenticated UUID, never by a mutable handle.
   string handle = 2;
-  RecordRef signup_invitation = 3;
+  string display_name = 3;
+  // Signup uses one previously admitted reservation. With no admission, an
+  // independently rooted bearer adds a device to its existing account, or a
+  // claimable agent bearer claims its account under a new handle. Anonymous
+  // signup preserves the anonymous account UUID. The challenge records which
+  // ceremony was admitted; completion cannot switch ceremonies or accounts.
+  oneof signup_admission {
+    RecordRef invitation_reservation = 4;
+    RecordRef verified_email = 5;
+  }
+  CredentialMethod method = 6;
+  OAuthProvider oauth_provider = 7;
+}
+message RegistrationChallenge {
+  RecordRef ref = 1;
+  bytes challenge = 2;
+  string relying_party_id = 3;
+  string relying_party_name = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  // Stable UUID fixed before clients sign owner-root records. WebAuthn user.id
+  // is this string's UTF-8 encoding, including for anonymous promotion/claim.
+  string account_id = 6;
+  string handle = 7;
+  string display_name = 8;
+  UserVerification user_verification = 9;
+  // The passkey creation uses attestation="none". A follow-up assertion by
+  // that passkey proves its binding to caller_public_key using these bytes.
+  // The independent CallContext signature proves possession of the device key.
+  bytes device_binding_challenge = 10;
+  // Exact 32-byte nonce for OwnerKeyBinding; no extra challenge RPC is needed.
+  bytes owner_binding_nonce = 11;
+  // Prospective credential lifetime, independent of ten-minute ceremony expiry.
+  // Owner-signed mint-root attachments may use this exact upper bound.
+  google.protobuf.Timestamp credential_expires_at = 12;
+  CredentialMethod method = 13;
+  OAuthProvider oauth_provider = 14;
+}
+message PasskeyRegistration {
+  bytes credential_id = 1;
+  bytes client_data_json = 2;
+  bytes attestation_object = 3;
+}
+message OwnerRegistration {
+  SignedOwnerRoot root = 1;
+  AuthorizationSignature proof_of_possession = 2;
+  OwnerKeyBinding binding = 3;
+  // Omission selects the independent guardians in the signed root; it never
+  // selects custodial recovery. Existing warning/consent rules still apply.
+  RegistrationRecoveryPolicy recovery = 4;
 }
 message CompleteRegistrationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
-  PasskeyProof passkey = 3;
-  RootAttachment root = 4;
-  SignedRecord possession_proof = 5;
+  oneof proof {
+    PasskeyRegistration passkey = 3;
+    PasswordProof password = 10;
+    OAuthProof oauth = 11;
+  }
+  bytes caller_public_key = 4;
+  PasskeyProof device_binding = 5;
+  string device_label = 6;
+  // New signup establishes an owner root. Claim preserves the original
+  // deferred root and appends CLAIM_DEFERRED_HUMAN. Adding a passkey/device
+  // does not implicitly replace an existing owner root or change rooting tier.
+  oneof owner {
+    OwnerRegistration establish_owner = 7;
+    SignedOwnerKeyTransition claim_owner = 8;
+  }
+  // Associates a newly enrolled independent mint root with current ownership.
+  SignedMintRootAttachment mint_root_attachment = 9;
 }
 message RegisterRootAttachmentRequest {
   string client_operation_id = 1;
@@ -119,8 +366,11 @@ message RegisterRootAttachmentRequest {
 }
 message RevokeDeviceRequest {
   string client_operation_id = 1;
-  EndpointRef device = 2;
-  SignedRecord revocation = 3;
+  // Original registry device identity from DeviceIdentity/CurrentCredentialRecord.
+  // Ordinary revocation uses effective delegated account permissions; owner-key
+  // transitions have their separate portable owner-authorization ceremony.
+  RecordRef device = 2;
+  bytes expected_version = 4;
 }
 message PutDelegationRequest {
   string client_operation_id = 1;
@@ -135,8 +385,33 @@ message RevokeDelegationRequest {
 }
 message RevokeSessionRequest {
   string client_operation_id = 1;
+  // Unscoped session ref from a credential ceremony or identity observation.
+  // Ends this session only. Device/delegation revocation is a separate action.
+  // A session-only credential may end its own key-bound session. Managing
+  // another session requires the same human account's authority, which may be
+  // delegated to an agent. All operation/resource/lifetime caveats still apply.
   RecordRef session = 2;
+  // Required exact SessionRecord.version. A conflict changes no session state.
   bytes expected_version = 3;
+}
+// Renews a short-TTL ephemeral (declined-enrollment) session in place. The
+// renewal is proven by the caller's existing ephemeral bearer plus a request
+// PoP signed by the ephemeral key (CallContext.request_proof), so the body
+// carries no session ref: the renewed session is exactly the caller's own.
+message RenewEphemeralSessionRequest {
+  string client_operation_id = 1;
+  // Optional key rotation. When set, this 32-byte key becomes the ephemeral
+  // session's new PoP subject and the renewed Biscuit is delegated to it; the
+  // current request is still signed by the existing ephemeral key. Omitted to
+  // renew the expiry without rotating the key.
+  bytes new_ephemeral_public_key = 2;
+}
+message RenewEphemeralSessionResponse {
+  MutationReceipt receipt = 1;
+  // Renewed ephemeral session: Weft-delegated Biscuit, its PoP public key and
+  // the new expiry. Mirrors the issued-credential token shape returned by the
+  // authentication-completion path; no new token format is introduced here.
+  IssuedCredential credential = 2;
 }
 message IntrospectCredentialRequest {
   bytes biscuit = 1;
@@ -147,35 +422,96 @@ message CredentialInspection {
   google.protobuf.Timestamp expires_at = 3;
   bool revoked = 4;
 }
+// Provisional two-key possession, before an approving account is known.
+// SignedRecord format heddle.pairing-initiation.v2; each actual receiver key signs
+// domain || protobuf bytes in ascending tag order, omitting scalar defaults.
+// Oneof presence is preserved. The host and operation prevent reuse.
+// Credential-only receiver. Its subject key is not an Iroh endpoint.
+message BrowserPairingReceiver {}
+message PairingInitiationBinding {
+  EndpointRef host = 1;
+  string client_operation_id = 2;
+  oneof receiver {
+    EndpointRef device = 3;
+    BrowserPairingReceiver browser = 7;
+  }
+  bytes subject_public_key = 4;
+  int64 not_before_unix_seconds = 5;
+  int64 expires_at_unix_seconds = 6;
+}
 message BeginPairingRequest {
   string client_operation_id = 1;
-  EndpointRef device = 2;
+  oneof receiver {
+    EndpointRef device = 2;
+    BrowserPairingReceiver browser = 5;
+  }
   bytes subject_public_key = 3;
   SignedRecord subject_possession = 4;
 }
 message PairingRecord {
   RecordRef ref = 1;
   bytes version = 2;
-  EndpointRef device = 3;
+  oneof receiver {
+    EndpointRef device = 3;
+    BrowserPairingReceiver browser = 10;
+  }
   bytes challenge = 4;
-  RootAttachment approved_attachment = 5;
+  // Public commitment only. The delegated credential is never observable.
+  oneof approval {
+    RootAttachmentBinding approval_binding = 5;
+    BrowserPairingApprovalBinding browser_approval = 11;
+  }
   google.protobuf.Timestamp expires_at = 6;
   bool completed = 7;
+  bytes subject_public_key = 8;
+  RootAttachment completed_attachment = 9;
 }
 message BeginPairingResponse {
   MutationReceipt receipt = 1;
   PairingRecord pairing = 2;
+  // Configured browser origin with the public pairing reference. No secrets.
+  string verification_uri = 3;
 }
 message ApprovePairingRequest {
   string client_operation_id = 1;
   RecordRef pairing = 2;
-  RootAttachment attachment = 3;
   bytes expected_version = 4;
+  // Browser-created, root-derived Biscuit bound to the pairing's subject key.
+  // The host verifies the same account and descendant authority; it never
+  // substitutes a newly minted independent root. Only the subject's proved
+  // completion receives this secret, never a PairingEvent/identity observation.
+  bytes delegated_biscuit = 5;
+  // Claimed upper lifetime bound, independently checked against the child.
+  // Actual calls still satisfy every original caveat at their execution time.
+  google.protobuf.Timestamp delegated_expires_at = 6;
 }
 message CompletePairingRequest {
   string client_operation_id = 1;
   RecordRef pairing = 2;
-  SignedRecord subject_possession = 3;
+  // Receiver-specific possession before credential release. Browser completion
+  // does not create an endpoint attachment or an independently trusted mint root.
+  oneof proof {
+    RootAttachment attachment = 3;
+    SignedRecord browser_possession = 4;
+  }
+}
+message BrowserPairingApprovalBinding {
+  uint32 format_version = 1;
+  bytes root_public_key = 2;
+  bytes subject_public_key = 3;
+  string account_id = 4;
+  bytes credential_digest = 5;
+  bytes pairing_challenge = 6;
+  int64 not_before_unix_seconds = 7;
+  int64 expires_at_unix_seconds = 8;
+}
+// SignedRecord format heddle.browser-pairing-completion.v1. The current subject
+// key signs domain || deterministic protobuf bytes plus a fresh exact RPC proof.
+message BrowserPairingCompletionBinding {
+  EndpointRef host = 1;
+  string client_operation_id = 2;
+  RecordRef pairing = 3;
+  BrowserPairingApprovalBinding approval = 4;
 }
 message ObservePairingRequest {
   RecordRef pairing = 1;
@@ -232,19 +568,43 @@ message ResolveHandlesRequest {
   repeated string handles = 1;
   ReadBudget budget = 2;
 }
+enum HandleKind {
+  HANDLE_KIND_UNSPECIFIED = 0;
+  HANDLE_KIND_NATIVE = 1;
+  HANDLE_KIND_GITHUB = 2;
+  HANDLE_KIND_GITLAB = 3;
+}
+// Public directory metadata contains no stable subject/account identifiers.
+// ResolveResources supplies those only within an authorized resource scope.
+message PublicHandleRecord {
+  string display_name = 1;
+  string handle = 2;
+  string primary_handle = 3;
+  HandleKind kind = 4;
+  bool verified = 5;
+  string discriminator = 6;
+}
 message HandleResolution {
   string handle = 1;
-  string principal_id = 2;
   enum Status {
     STATUS_UNSPECIFIED = 0;
     STATUS_AVAILABLE = 1;
     STATUS_CLAIMED = 2;
     STATUS_HELD = 3;
     STATUS_UNAVAILABLE = 4;
+    STATUS_RESERVED = 5;
+    STATUS_CONFUSABLE = 6;
   }
   Status status = 3;
   repeated Requirement requirements = 4;
+  PublicHandleRecord public_handle = 5;
+  bool tombstoned = 6;
+  // An active verified-owner hold exists. A caller's own nonblocking hold
+  // yields AVAILABLE plus true; another owner's yields HELD. Never disclose
+  // the holder identity. ClaimHandle rechecks the caller's actual entitlement.
+  bool held_for_verified_owner = 7;
 }
+
 message ResolveHandlesResponse {
   repeated HandleResolution handles = 1;
 }
@@ -252,6 +612,20 @@ message ClaimHandleRequest {
   string client_operation_id = 1;
   string handle = 2;
   SignedRecord entitlement_proof = 3;
+}
+message RequestHeldHandleRequest {
+  string client_operation_id = 1;
+  string handle = 2;
+  // Preserve the existing normalized-name right-of-first-refusal transaction:
+  // an eligible request starts the 30-day window without exposing its owner.
+}
+message RequestHeldHandleResponse {
+  MutationReceipt receipt = 1;
+  google.protobuf.Timestamp right_of_first_refusal_deadline = 2;
+}
+message ClaimHandleResponse {
+  MutationReceipt receipt = 1;
+  PublicHandleRecord public_handle = 2;
 }
 message CreateSignupInvitationRequest {
   string client_operation_id = 1;
@@ -262,48 +636,175 @@ message CreateSignupInvitationResponse {
   SignupInvitation invitation = 2;
   bytes redemption_secret = 3;
 }
+// A held shareable invitation code selects the admission directly; no lookup
+// RPC, account bearer or device root is needed before choosing a passkey.
 message RedeemSignupInvitationRequest {
   string client_operation_id = 1;
-  RecordRef invitation = 2;
-  bytes redemption_secret = 3;
-  RootAttachment principal = 4;
+  bytes redemption_secret = 2;
+}
+message SignupReservation {
+  // Opaque, short-lived admission. BeginRegistration accepts this exact ref.
+  // Reservation does not create an account or consume the invite permanently.
+  RecordRef ref = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+message RedeemSignupInvitationResponse {
+  MutationReceipt receipt = 1;
+  SignupReservation reservation = 2;
 }
 message BeginEmailVerificationRequest {
   string client_operation_id = 1;
   string email = 2;
-  RecordRef invitation = 3;
+  // Optional held shareable code for binding an invitation after mailbox proof.
+  // Empty selects an existing invitation already bound to this email.
+  bytes invitation_code = 3;
+  string handle = 4;
 }
+// Only the endpoint's authenticated, independently rooted signup-mailer
+// service account may begin delivery. Its bearer is the possession factor.
 message EmailVerificationChallenge {
   MutationReceipt receipt = 1;
   RecordRef challenge = 2;
   google.protobuf.Timestamp expires_at = 3;
+  // Secret for the delivery service to send to the specified mailbox. Never
+  // return this field in a browser's begin-signup response. The durable public
+  // receipt excludes it; an authorized retry may retrieve it while still live.
+  bytes delivery_proof = 4;
 }
 message CompleteEmailVerificationRequest {
   string client_operation_id = 1;
   RecordRef challenge = 2;
   bytes proof = 3;
 }
-
-message CreatePrincipalRequest {
-  string client_operation_id = 1;
-  enum Kind {
-    KIND_UNSPECIFIED = 0;
-    KIND_HUMAN = 1;
-    KIND_AGENT = 2;
-    KIND_SERVICE = 3;
-  }
-  Kind kind = 2;
-  string label = 3;
-  RootAttachment authority = 4;
-  SignedRecord principal_genesis = 5;
-  // An unclaimed agent principal cannot assert a human root it does not own.
+message VerifiedEmailReservation {
+  // Use directly as BeginRegistration.verified_email; no bootstrap Biscuit.
+  RecordRef ref = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string handle = 3;
+  string email = 4;
 }
+message CompleteEmailVerificationResponse {
+  MutationReceipt receipt = 1;
+  VerifiedEmailReservation reservation = 2;
+}
+
+// Invite-gated creation of an unclaimed human account. The independent root
+// slot stays empty. The agent proves its own key over this exact request using
+// principal:device-key:<lowercase-hex-agent-public-key>; a human bearer cannot
+// replace that proof. Existing key-bound accounts may be reused without an
+// invitation. Reusing an operation ID with different bytes is rejected.
+message ProvisionAccountRequest {
+  string client_operation_id = 1;
+  bytes invitation_secret = 2;
+  bytes agent_public_key = 3;
+}
+message ProvisionAccountResponse {
+  MutationReceipt receipt = 1;
+  PrincipalRecord principal = 2;
+  // Client-owned AGENT registration bound to the proved key, preserving the
+  // server-enforced agent ceiling. Claiming the human account does not upgrade
+  // this credential. A server-minted bearer is not required for keyed agents.
+  CredentialResult credential = 3;
+  // Authoritative browser origin for the agent's locally generated claim link.
+  // The claim secret and its private state remain on the agent's device.
+  string claim_web_origin = 4;
+  // Original stored ownership proof on key-bound account reuse. Preserve it
+  // exactly; an absent root permits the client to propose its first bootstrap.
+  // This does not populate the account's independent human-root slot.
+  OwnerState ownership = 5;
+}
+
+// Anonymous continuity has no human account and no independent owner root.
+// The endpoint retains its existing anti-abuse, expiry and rotation checks.
+message CreateAnonymousSessionRequest {
+  string client_operation_id = 1;
+  bytes continuity_secret = 2;
+  string abuse_challenge_proof = 3;
+}
+message AnonymousSessionResponse {
+  MutationReceipt receipt = 1;
+  string anonymous_id = 2;
+  IssuedCredential credential = 3;
+  // Rotate after successful use; useful only for this ceremony, never as a
+  // normal RPC bearer. Store separately from the short-lived Biscuit.
+  bytes continuity_secret = 4;
+  google.protobuf.Timestamp continuity_expires_at = 5;
+}
+
+// Creating/updating a delegation record and issuing a credential are different
+// effects. The caller must prove the active delegation authority; the new key
+// must prove possession. Scope/expiry cannot exceed the accepted delegation.
+message IssueDelegationCredentialRequest {
+  string client_operation_id = 1;
+  RecordRef delegation = 2;
+  bytes proof_public_key = 3;
+  SignedRecord authority_proof = 4;
+  // Canonical credential scope grammar, checked against the parent's ceiling.
+  string scope = 5;
+  // Omission requests no expiry only where the parent and server policy allow.
+  google.protobuf.Timestamp expires_at = 6;
+  bytes expected_delegation_version = 7;
+  // Proof by proof_public_key over the credential request's canonical unsigned
+  // statement. Both in-body proofs bind delegation, requested scope/expiry,
+  // expected version and operation ID; neither can be replayed for another key.
+  // CallContext independently authenticates and signs the complete request.
+  SignedRecord subject_possession = 8;
+}
+message DelegationCredentialResponse {
+  MutationReceipt receipt = 1;
+  CredentialResult credential = 2;
+}
+
 message ResolveSignupInvitationRequest {
   bytes redemption_secret = 1;
 }
 message SignupInvitationResolution {
   RecordRef invitation = 1;
-  Coverage availability = 2;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_AVAILABLE = 1;
+    // Includes active reservations: it cannot currently admit another signup.
+    STATUS_IN_USE = 2;
+    STATUS_UNAVAILABLE = 3;
+  }
+  Status status = 2;
   repeated Requirement requirements = 3;
-  // Return only invitation information permitted to the presented capability.
+  // Context authorized by possession of the invitation identifier, sufficient
+  // to populate the invitation page without identity/profile lookups.
+  string inviter_display_handle = 4;
+  uint64 inviter_member_ordinal = 5;
+  string bound_email = 6;
+}
+
+// Metadata for the exact credential authenticating this observation. This is
+// not issuance, and neither account tier nor account role upgrades its rights.
+message CurrentCredentialRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  CredentialKind kind = 3;
+  string subject = 4;
+  bytes proof_public_key = 5;
+  RecordRef device = 6;
+  RecordRef delegation = 7;
+  repeated string authentication_methods = 8;
+  string acting_agent_id = 9;
+  string delegated_by_principal_id = 10;
+  string agent_provider = 11;
+  string agent_model = 12;
+  google.protobuf.Timestamp expires_at = 13;
+  bool revoked = 14;
+  repeated ActionAvailability actions = 15;
+  // Original current session, selected by the verified credential's session
+  // binding and account/mint key, independently of sessions pagination. Absent
+  // for credentials without a persisted session; never synthesized from a
+  // device or credential ID. Its exact ref/version authorizes session revoke.
+  SessionRecord session = 16;
+  // Canonical ThreadControlAuthority for this exact original credential. Sealed
+  // once during identity observation, reusable for local authoring until its
+  // original limits expire; delivery never refreshes or expands this proof.
+  // Absent when portable owner association is unavailable. Receivers separately
+  // validate current authority at first admission. Contains no private key.
+  bytes thread_control_authority = 17;
+  // Revoke the specific device, delegation or session using the corresponding
+  // observed version; this metadata never permits an account-wide revocation.
 }

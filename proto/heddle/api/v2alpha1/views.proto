@@ -6,28 +6,51 @@ import "heddle/api/v1alpha1/repository.proto";
 import "heddle/api/v2alpha1/activity.proto";
 import "heddle/api/v2alpha1/administration.proto";
 import "heddle/api/v2alpha1/analysis.proto";
+import "heddle/api/v2alpha1/billing.proto";
 import "heddle/api/v2alpha1/collaboration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/device.proto";
 import "heddle/api/v2alpha1/identity.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
+import "heddle/api/v2alpha1/owner_views.proto";
 import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/sync.proto";
 import "heddle/api/v2alpha1/thread.proto";
 
+// Independent section windows share one observation's total read budget.
+// Missing windows select bounded defaults only for requested sections.
+message ThreadPages {
+  PageRequest captures = 1;
+  PageRequest reviews = 2;
+  PageRequest collaboration = 3;
+  PageRequest timeline = 4;
+  // Current exact-revision checks and acknowledgements for the current policy.
+  // This independent mixed window has its own opaque cursor and evidence status.
+  PageRequest evidence = 5;
+}
 message ObserveThreadRequest {
   ThreadRef thread = 1;
   repeated ThreadSection sections = 2;
   // Optional exact compared revisions; omitting them resolves once in the
-  // snapshot and returns the resolved IDs in the overview/review records.
+  // snapshot and returns the exact pair in the review comparison payload.
   RevisionRef source = 3;
   RevisionRef base = 4;
-  PageRequest page = 5;
+  ThreadPages pages = 5;
   ObserveOptions observe = 6;
+  // Original portable operations for requested causal sections. Editors and
+  // replica clients can prepare the next signed command from this same view.
+  bool include_operations = 7;
 }
 
 // One typed stream composes a Thread's decision context. Common frame controls
 // have no payload. Every data frame carries exactly one payload; snapshots and
 // delta batches become visible only at their checkpoint.
+// SectionReplacement.section and SectionStatus.section use these exact keys:
+// overview (overview); captures (capture); review (comparison, review, diff); evidence (evidence, check_acknowledgement);
+// collaboration (discussion, turn, context); analysis (analysis); checkouts
+// (checkout); timeline (timeline_event, run, operation); sharing (sharing,
+// publication). Replacement clears only that section's committed collection.
+// Unknown section semantics require a fresh supported view, never silent loss.
 message ThreadEvent {
   StreamFrame frame = 1;
   oneof payload {
@@ -49,6 +72,9 @@ message ThreadEvent {
     TimelineRecord timeline_event = 17;
     PublicationReceipt publication = 18;
     SectionReplacement replace_section = 19;
+    SignedRecord signed_operation = 20;
+    ReviewComparison comparison = 21;
+    CheckAcknowledgementRecord check_acknowledgement = 22;
   }
 }
 
@@ -61,6 +87,23 @@ message SpoolOverview {
   SpoolSettings settings = 6;
   repeated ActionAvailability actions = 7;
   repeated SectionStatus sections = 8;
+  string slug = 9;
+  SignedSpoolOwnerGenesis owner_genesis = 10;
+  // Caller-private preference composed by an exact Spool page. Missing means
+  // unavailable, unrequested, or anonymous (including ordinary list rows).
+  // Present false + empty version proves absence; false + nonempty version is
+  // a retained tombstone. This never changes the Spool resource version.
+  BookmarkRecord current_bookmark = 11;
+}
+
+// Committed overview and independently verifiable owner history seed the
+// caller's view directly. The receipt is not a trust root or a TOFU pin.
+message SpoolMutationResponse {
+  MutationReceipt receipt = 1;
+  SpoolOverview spool = 2;
+  // Creation returns the root and accepted transitions proving its current
+  // signing key. The caller constructs its own local pin after verification.
+  OwnerState ownership = 3;
 }
 
 enum SpoolSection {
@@ -77,11 +120,23 @@ enum SpoolSection {
   SPOOL_SECTION_SUPPORT_ACCESS = 10;
 }
 
+message SpoolPages {
+  PageRequest threads = 1;
+  PageRequest members = 2;
+  PageRequest invitations = 3;
+  PageRequest grants = 4;
+  PageRequest policies = 5;
+  PageRequest approval_groups = 6;
+  PageRequest context = 7;
+  PageRequest operations = 8;
+  PageRequest children = 9;
+  PageRequest support_access = 10;
+}
 message ObserveSpoolRequest {
   SpoolRef spool = 1;
   repeated SpoolSection sections = 2;
   ThreadQuery threads = 3;
-  PageRequest page = 4;
+  SpoolPages pages = 4;
   ObserveOptions observe = 5;
   // Each requested administration section is independently authorized and
   // paginated. SectionStatus distinguishes not requested from unavailable.
@@ -104,12 +159,22 @@ message SpoolEvent {
     SectionReplacement replace_section = 13;
     SpoolMount mount = 14;
     SupportAccessRecord support_access = 15;
+    // Paged child summary, separate from the observed root spool.
+    SpoolOverview child = 16;
   }
 }
 
+message WorkspacePages {
+  PageRequest spools = 1;
+  PageRequest threads = 2;
+  PageRequest attention = 3;
+  PageRequest operations = 4;
+  PageRequest devices = 5;
+  PageRequest bookmarks = 6;
+}
 message ObserveWorkspaceRequest {
   ThreadQuery threads = 1;
-  PageRequest page = 2;
+  WorkspacePages pages = 2;
   ObserveOptions observe = 3;
   bool include_attention = 4;
   bool include_operations = 5;
@@ -165,13 +230,20 @@ message NotificationEvent {
 }
 
 message ObserveIdentityRequest {
-  bool include_devices = 1;
-  bool include_sessions = 2;
-  bool include_signup_invitations = 3;
-  bool include_delegations = 6;
-  bool include_recovery = 7;
-  PageRequest page = 4;
-  ObserveOptions observe = 5;
+  // The principal is always included. Message presence requests a collection;
+  // an empty PageRequest selects its bounded first page. Each collection has
+  // its own SectionStatus.page; no global page token selects a hidden section.
+  PageRequest devices = 1;
+  PageRequest sessions = 2;
+  PageRequest signup_invitations = 3;
+  PageRequest delegations = 4;
+  PageRequest recovery = 5;
+  ObserveOptions observe = 6;
+  // The shared read budget covers all requested sections together. A session
+  // reference/version from this view can be used directly for RevokeSession.
+  bool include_current_credential = 7;
+  bool include_billing = 8;
+  // Optional scalar sections use the same total budget and their own status.
 }
 
 message IdentityEvent {
@@ -187,6 +259,8 @@ message IdentityEvent {
     DelegationRecord delegation = 9;
     RecoveryAttempt recovery = 10;
     InvitationQuota invitation_quota = 11;
+    CurrentCredentialRecord current_credential = 12;
+    BillingRecord billing = 13;
   }
 }
 
@@ -197,6 +271,10 @@ message DeviceIdentity {
   bool revoked = 4;
   // Root attachment verification is independent of Weft account association.
   bytes root_attachment_hash = 5;
+  // Original account-owned registry identity and durable authorization version
+  // for RevokeDevice. Endpoint/key bytes are locators, never substitutes for it.
+  RecordRef ref = 6;
+  bytes version = 7;
 }
 
 message ObserveOperationsRequest {
@@ -222,4 +300,22 @@ message CancelOperationRequest {
   RecordRef operation = 2;
   bytes expected_version = 3;
   // Request acknowledgement is not proof of cancellation or rollback.
+}
+
+// Public resource discovery never includes private grants, devices or account
+// attention. Exact public content still uses the ordinary resource read APIs.
+message ObserveCatalogRequest {
+  // Bounded text search over public spool names, slugs and descriptions.
+  string query = 1;
+  PageRequest spools = 2;
+  ObserveOptions observe = 3;
+}
+message CatalogEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    SpoolOverview spool = 2;
+    SectionStatus status = 3;
+    Removal removal = 4;
+    SectionReplacement replace_section = 5;
+  }
 }

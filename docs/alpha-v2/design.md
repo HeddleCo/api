@@ -156,7 +156,7 @@ The domain/service map is a good foundation, but it does not establish that v2 i
 - **Generate a bounded agent tool surface from the same contracts.** Use curated, task-relevant adapters over canonical typed operations, with progressive tool discovery instead of presenting every RPC for every task. Generate schemas and reuse effect, retry, signature and capability metadata. There is no separately authored agent workflow or untyped universal Execute entry point. Agent-readable identifiers and structured output must round-trip losslessly to the binary contract.
 - **Define evolution beyond protobuf field addition.** Negotiate endpoint support and version canonical signed/hashed records explicitly. Define how older readers preserve opaque durable bytes and handle unknown values. Unknown critical actions or policy meanings must be rejected; an unfamiliar optional display field need not prevent a read. Pin action/signing semantics so decode/re-encode through an older client cannot silently change approved work.
 
-A material unresolved question was put to the user: whether source writers across devices follow #1718's single-writer model with explicit handoff/child Threads, or whether the same Thread admits independent offline writers and reconciles later. A combined read view alone does not decide this. Global writer exclusivity needs defined ownership, handoff and fencing semantics; disconnected devices cannot learn unseen changes immediately. Hosted review and landing must retain the already-confirmed independence from user devices.
+The user decided that separate checkouts may contribute concurrently to one Thread; simultaneous writers to the same checkout are unsupported. Writer ownership is checkout-local. The Thread replicates a causal operation graph, preserving independent captures and discussion turns. Source integration is explicit, and hosted landing remains independent of user devices. Child Threads represent work decomposition rather than mandatory concurrency isolation.
 
 Proposed acceptance examples should be executable end-to-end contract scenarios, not only message round trips: open a useful Thread/worklist without per-row reads; start/capture/recover using the same verbs through human and agent clients; reconnect after an ambiguous capture reply without repeating its effect; receive a structured stale-revision or authority result; complete a human-signable action without changing its payload; hand off work with pinned intent/context and explicit writer behavior; continue private work with Weft unavailable; and accept/reject later publication without misreporting local completion. Measure client round trips, bytes, first useful response, endpoint work, and agent-visible tool/output size. Runtime-supported capabilities need handler and behavioral evidence, beyond descriptor maturity labels.
 
@@ -182,3 +182,147 @@ No runtime tests or performance benchmarks were run for this review. The current
 alpha cutover with no migration bridges. The native v2 RPC surface and
 streaming lifecycle are specified in [streams.md](streams.md). Earlier inventory
 dispositions describe functionality to preserve, not legacy RPC wrappers to ship.
+
+### Account roots and credential results
+
+Account rooting state belongs to the stable principal UUID, independently of
+spool membership and ownership. `OwnershipService` bootstraps and transitions
+that account root with typed signed records. Rotation, recovery, and recovery
+policy changes retain explicit intent; their signed predecessor hash and
+sequence provide the concurrency condition. A spool is required only for
+resource authorization, lineage, and transfer.
+
+All three onboarding tiers remain supported: self-rooted, server-rooted, and
+agent-rooted. The latter is an unclaimed human account with an empty independent
+root slot; an agent holds a separate attenuated credential. `AuthenticationResponse`
+returns a `CredentialResult`: the accepted client-owned credential registration
+or an issued Biscuit, with one session result. Keyed clients mint their own
+Biscuits; Weft attaches the proved key and enforces its account/credential
+ceiling. Registration returns the credential reference, exact subject, PoP key,
+class, and original owner proofs when established. Anonymous/server-rooted
+issuance returns raw serialized bearer bytes. Those exact bytes also populate
+`CallContext.bearer_capability`; base64 is confined to text storage/configuration. Account views
+never return the bearer. Promoting an account does not upgrade an existing agent
+credential or erase its attenuation. Tier metadata never authorizes an operation.
+
+The account/credential types describe the complete intended contract; endpoint
+discovery must still advertise only implemented ceremonies. In particular, the
+canonical identity model distinguishes shipped passkey/agent flows from target
+password onboarding and per-user server custody.
+
+Passkey registration uses two RPCs. `BeginRegistration` accepts the one device
+public key and either an invitation reservation or verified-email reservation
+for signup. An authenticated independent root can instead enroll another
+device on its account; a claimable agent credential can begin human claim.
+Anonymous signup keeps the anonymous account UUID. The response fixes the
+account UUID, relying party, passkey challenge, device-binding challenge and
+owner-binding nonce together, so preparing the completion needs no additional
+identity lookup or challenge call.
+
+`CompleteRegistration` carries the passkey creation and a follow-up assertion
+by that passkey binding the device key. The enrolling Ed25519 key signs the
+exact completion in `CallContext`, including both passkey proofs and owner
+records; an existing bearer cannot substitute for that proof. New signup
+carries typed `OwnerRegistration` evidence. Claim appends the signed
+`CLAIM_DEFERRED_HUMAN` transition to the existing deferred root. Device
+enrollment does not implicitly replace owner roots or promote rooting tiers.
+Owner records retain their original canonical signature domains; ordinary
+spool access continues to use the Biscuit capability.
+
+Completion must commit challenge consumption, account/device/owner changes,
+session and retry receipt together. Failed proof verification or persistence
+must leave the admitted ceremony retryable. Receipt replay still checks current
+credential authority, and secret owner-bundle enrichment is never cached as
+public retry metadata.
+
+
+Account provisioning and credential issuance are separate operations.
+`ProvisionAccount` creates or recovers the agent's key-bound unclaimed human
+account and returns its attenuated agent credential plus the configured claim
+origin. It cannot create an independent human root. `PutDelegation` manages a
+device/agent/service delegation; `IssueDelegationCredential` explicitly returns
+credential material under that delegation's scope and expiry ceiling.
+`CreateAnonymousSession` retains anonymous identity continuity and rotates its
+separate continuity secret under the existing anti-abuse gate. There is no
+generic principal factory or caller-selected rooting tier.
+
+### Signup admission before device establishment
+
+A held invitation code goes directly to `RedeemSignupInvitation`; its typed,
+expiring reservation is the `BeginRegistration.invitation_reservation` input.
+Reservation does not create an account or permanently consume the invitation.
+Retry requires the same operation and secret, and cannot renew an expired or
+consumed reservation. This public pre-device ceremony has no request-key proof;
+code possession and the shared invitation peer budget are its boundary.
+
+`ResolveSignupInvitation` is an optional invitation-page read. It carries typed
+availability, inviter display context and bound email so rendering that page
+needs no profile lookups. Coverage and invitation validity are separate concepts.
+
+Email signup keeps delivery and mailbox possession separate. The dedicated,
+independently rooted signup-mailer service account calls BeginEmailVerification
+with the email, chosen handle and optional held invitation code. Its existing
+bearer-only credential remains supported. Weft returns a challenge and delivery
+proof to that trusted delivery service; Tapestry sends the proof to the mailbox
+and excludes it from the browser's begin response. Without a code, the ceremony
+uses an invitation already bound to the requested email. No email binding or
+account creation occurs merely because delivery was requested.
+
+CompleteEmailVerification proves the delivered challenge without an account
+credential. It atomically consumes the challenge, binds the selected invitation
+if necessary, creates a short-lived VerifiedEmailReservation and records its
+public receipt. The reservation carries the bound handle and email and feeds
+BeginRegistration directly. Retries require the same request, current authority
+for privileged delivery, and still-current admission for completion; neither
+expired proof nor revoked/consumed invitation is revived by a cached receipt.
+Delivery proofs remain outside public deduplication receipts. This replaces the
+former email-bootstrap Biscuit and separate invitation-binding RPC.
+
+### Spool creation and owner rotation
+
+`CreateSpool` names the existing parent by stable reference and supplies a single
+slug plus optional display name. The new UUID comes from the typed,
+owner-signed genesis. No lookup or server-issued creation nonce determines its
+identity. Create and revise return a committed spool overview with their receipt;
+creation also returns the signed owner root and accepted transition history so
+the client can verify the creation key and construct its own local pin.
+
+Creation uses the current owner key. Hosted admission must verify the signed
+root and complete accepted history, bind them to the authenticated account, and
+compare the genesis key with current authority in the same transaction as
+creation. The private key for sequence zero is not an ongoing prerequisite.
+The immutable genesis signature format is unchanged: the original root's signed
+rotation chain proves how the creation key belongs to that owner.
+
+For existing spools, clone and purge verification bind the genesis key to the
+verified history, including keys retired by later rotation. That historical
+relationship does not authorize a retired key to issue capabilities: current
+state, issuer retirement, capability scope and operation signatures are still
+checked independently. An unproven genesis key or incomplete history is denied.
+
+Server-rooted accounts keep their per-user custody path. The creation request
+can instead name a fresh UUIDv7 for the account's existing custodial authority
+to sign in the same operation. This branch requires an active server-rooted
+account, its configured secret store and current per-user authority; it does not
+create a root, export a private key or use the deployment's signing key. Its
+response has the same portable proof shape, without a second signing RPC.
+
+### Delegated spool administration
+
+Spool settings, sharing, invitations and review policies are ordinary
+administration within the caller's delegated permissions. They do not require a
+second owner signature. Grant ceilings, caveats, expiry and resource versions
+remain enforced, and accepted changes retain signed actor audit evidence.
+Identity-root changes, resource ownership transfers and purge retain their
+separate authority boundaries. The old owner-governance requirement must not
+survive as a hidden prerequisite for ordinary v2 spool administration.
+
+Agent derivation preserves the delegating human's effective authority unless
+the human supplies a narrower operation, resource, lifetime or delegation
+ceiling. Being an agent, or having additional Biscuit blocks, is not itself a
+reason to refuse an operation. Every descendant retains all ancestor caveats
+and revocation dependencies; delegation never creates rights the human lacks.
+Operations that create grants or credentials must preserve those ceilings in
+the resulting authority. Owner proofs, recovery windows and required co-signers
+still apply to their specific operations, irrespective of whether a human or
+agent submits the request. Key material is not inherited by copying a Biscuit.

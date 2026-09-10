@@ -3,6 +3,7 @@ syntax = "proto3";
 package heddle.api.v2alpha1;
 
 import "heddle/api/v1alpha1/repository.proto";
+import "heddle/api/v2alpha1/behavior.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
@@ -13,6 +14,7 @@ enum AnalysisKind {
   ANALYSIS_KIND_HOT_SPOTS = 3;
   ANALYSIS_KIND_REVIEW = 4;
   ANALYSIS_KIND_CONTEXT_SUGGESTIONS = 5;
+  ANALYSIS_KIND_BEHAVIOR_CHANGES = 6;
 }
 
 message AnalysisRecord {
@@ -25,7 +27,9 @@ message AnalysisRecord {
   Coverage coverage = 7;
   RecordRef operation = 8;
   bytes version = 9;
-  uint64 finding_count = 10;
+  // Exact total only when known. A bounded/partial projection must not report
+  // the current page's size as the total or use zero to mean unknown.
+  optional uint64 finding_count = 10;
 }
 
 message AnalysisFinding {
@@ -51,6 +55,8 @@ message ObserveAnalysisRequest {
   repeated string paths = 4;
   PageRequest page = 5;
   ObserveOptions observe = 6;
+  // Exact qualified symbol addresses; empty selects all symbols in paths.
+  repeated string symbols = 7;
 }
 
 message AnalysisEvent {
@@ -62,6 +68,10 @@ message AnalysisEvent {
     heddle.api.v1alpha1.FileDiff diff = 5;
     Removal removal = 6;
     SectionStatus status = 7;
+    BehaviorChange behavior_change = 8;
+    BehaviorAnalysisCoverage behavior_coverage = 9;
+    BehaviorChangeRemoval behavior_removal = 10;
+    SectionReplacement replace_section = 11;
   }
 }
 
@@ -74,4 +84,24 @@ message StartAnalysisRequest {
   // because a view asks for analysis. Provider disclosure requires policy.
   EndpointRef execution_endpoint = 5;
   bytes expected_disclosure_policy_version = 6;
+}
+
+// Immutable derived analysis output. Stored under an opaque Thread-scoped
+// artifact identity; this is never an authorization wrapper for source bytes.
+// Readers decode one canonical message, not concatenated stream frames. The
+// producer rejects outputs larger than its advertised artifact byte budget.
+message AnalysisArtifact {
+  // Version 1. Unknown versions must be rejected before interpreting payloads.
+  uint32 schema_version = 1;
+  RevisionRef source = 2;
+  RevisionRef base = 3;
+  repeated AnalysisRecord analyses = 4;
+  repeated AnalysisFinding findings = 5;
+  repeated heddle.api.v1alpha1.FileDiff diffs = 6;
+  repeated heddle.api.v1alpha1.SemanticHotSpot hot_spots = 7;
+  repeated BehaviorChange behavior_changes = 8;
+  repeated BehaviorAnalysisCoverage behavior_coverage = 9;
+  // Each analysis names its implementation/version and reports actual coverage.
+  // Raw transcripts, runtime secrets, and original private attachments are not
+  // analysis output and cannot be placed into this derived-artifact envelope.
 }

@@ -33,7 +33,7 @@ transport bytes; it is not the authority or an application proxy.
 | Identity / Attention / Notification / Operation | Observe server streams | Account state and background changes |
 | Content / Search | Finite server streams | Batched exact-revision selections and bounded results |
 | Mutations | Typed unary request and receipt | Exact targets, versions, operation identity and recovery |
-| Sync | Native bidirectional Publish/Fetch and streamed provider extents | Thread-bound pack, provider and sidecar transfer |
+| Sync | Live ReplicateThread, bounded PublishContent/Fetch and streamed provider extents | Thread-bound pack, provider and sidecar transfer |
 | Integrations | Observe plus typed connection/import/sync commands | Provider setup, repositories and remote links |
 
 One logical RPC uses one reliable, ordered Iroh stream. Reuse the authenticated
@@ -101,6 +101,19 @@ information; missing completion is interruption. Empty and unavailable differ.
 No live Thread tip is silently substituted for an exact RevisionRef, which can
 name native state or an exact Git commit.
 
+Tree selections return `ContentTreeEntry` with an explicit target. Native file
+and tree hashes, Git object IDs, and child-spool identities plus anchored StateIds
+remain distinct. Following a symlink, Git link, or child spool is a separate
+operation; the containing revision does not grant access to a linked resource.
+File size has presence, so an unknown length differs from a known empty file.
+
+Tree paths are repository-relative, including the selected subtree prefix.
+Depth zero requests one level. Pagination preserves component order (a directory
+and its descendants precede its next sibling), and its token binds revision,
+subtree and depth. A completed page can carry a continuation: only `exhausted`
+means there are no more matching entries. A byte budget should shorten the page
+and return a usable continuation whenever an entry and completion can fit.
+
 ## Views, paging and bounded work
 
 Filters define an endpoint-local window, with deterministic order and stable ID
@@ -116,13 +129,26 @@ section followed by its replacement records within one checkpoint batch. Use it
 for head-dependent diffs/evidence and sections whose legacy records lack stable
 keys. Section names are lower-case enum suffixes, e.g. `review`, `collaboration`,
 `threads`, `invitations`; content status uses the request's selection_id. Identity
-uses `identity`, `devices`, `sessions`, `signup_invitations`. Workspace uses
+uses `identity`, `devices`, `sessions`, `signup_invitations`, `delegations`,
+`recovery`. Its principal is always included; an optional `PageRequest` on each
+collection selects that section and its page. Omission skips the collection,
+while an empty message requests its bounded first page. The accepted read budget
+applies across the entire composed view. Continuations live on the corresponding
+`SectionStatus.page`; a checkpoint's page is only a convenience when exactly one
+collection is implemented and requested. Workspace uses
 `spools`, `threads`, `attention`, `operations`, `devices`.
 
 A window change must produce complete membership updates or an explicit
 WINDOW_CHANGED Reset. Never silently drop an event to keep a consumer current.
 A view has one consistency boundary per endpoint, not a distributed transaction
 across Weft and every device. Browser composition preserves source provenance.
+
+RPC metadata declares `live_stream` independently of retry behavior. Observe
+methods and Thread replication allow quiet intervals between complete messages.
+Finite content reads and source transfers retain operation-progress deadlines,
+including transfers that can resume. Every stream still bounds its initial
+response and incomplete frames. A canceled read preserves both partial framing
+and its original deadline; reconnecting is distinct from restarting that timer.
 
 Endpoints advertise positive default and maximum item/frame/snapshot/batch limits.
 Accepted budgets cannot exceed either the requested nonzero limit or endpoint
@@ -147,6 +173,35 @@ bytes. Spool membership read does not authorize invitation secrets, grants or
 administration sections. Apply the corresponding administration guard
 and redaction rules; report unavailable only when even that disclosure is allowed.
 Inspect every nested scope, not only the outer spool selector.
+
+Hosted passkey sign-in uses `BeginAuthentication` and `CompleteAuthentication`.
+The challenge records the existing caller device key; completion proves that
+key with `CallContext.request_proof` over the exact request and separately
+verifies the passkey assertion against its credential owner and `user_handle`.
+An account hint constrains the credential owner even when no account was found.
+Challenges and credential IDs are raw bytes on the wire; WebAuthn client data
+encodes the challenge as base64url without padding. Sign-in never enrolls an
+attachment or promotes the account's rooting tier. Challenge consumption,
+authenticator-counter advancement, session creation and operation completion
+commit atomically. Retries may retain public client-owned session metadata;
+owner bundles containing a subject Biscuit must be retrieved separately after
+successful authentication and excluded from that replay body.
+
+The session collection contains retained records ordered by issuance time
+descending, with session ID as a stable tie breaker. It includes tracked expired
+and revoked sessions; clients use their timestamps and revocation state to render
+an active-session page. Coverage describes the authorized collection: independent
+account roots can inspect account sessions, while an attenuated credential sees
+only its own session bound to the original minting key. A client-chosen session
+label alone never establishes ownership or the `is_current` marker.
+
+Session records' opaque versions identify persisted
+authorization state and remain usable across serving endpoints and viewers.
+`RevokeSession` requires that exact version and changes only the selected
+session. A delegated credential may end its own session; ending a different
+session requires the account's independent-root authority. Device-key and
+delegation revocation remain separate operations. Device enrollment can omit
+the handle: the authenticated account UUID selects the existing account.
 
 Owned-device access first verifies the caller and device attach to the same
 user root, then applies attenuation, resource/action scope and private-facet
@@ -245,39 +300,59 @@ existing schema definitions where their semantics are unchanged. They provide no
 compatibility route or fallback handler. The v1 package remains in this review
 branch to check existing fixtures; consumer deployment is a coordinated cutover.
 
-Publish/Fetch have native v2 openings binding Thread identity, exact revision,
-selected facets, policy version, operation identity and transfer checkpoint.
-Ready resolves the current Thread and advertised refs in the same stream, with
-owner genesis, have/need/missing inventory and explicit closure coverage.
-PackChunk carries an extent plus exactly its declared number of bytes. Negotiated
-frame limits apply before decoding; offsets, extent hashes, final object hashes
-and closure are verified before admission. Native and Git packs/indexes retain
-separate kinds. A transfer checkpoint names only verified durable progress and is
-bound to the opening/plan; changing the plan requires a fresh proof.
+ReplicateThread is the live durable exchange. Its authenticated opening binds
+Thread identity, selected facets, sharing policy, negotiated record formats and
+byte/item budgets. Both peers send Have, Need, Operations and Receipt frames.
+Causal parents are content-addressed operation IDs. Reconnection exchanges
+frontiers and repairs missing ancestry; duplicate delivery has no new effect.
+The stream remains open after catching up and delivers subsequent operations.
+The finite Publish RPC is removed; there is no migration bridge.
 
-Fetch may propose a provider plan. The client approves that exact digest and
-extents before any provider redemption; tickets bind provider, principal, scope,
-plan and extent and are not generic download capabilities. Owner genesis must be
-verified and pinned before admitting source or purge sidecars. Redaction,
-visibility and attachment sidecars retain their own authorship/integrity checks;
-purge additionally requires its owner chain and exact signed operation. A publish
-commit atomically checks expected remote version, still-effective sharing policy
-and the accepted inventory before advancing the remote Thread. PublicationReceipt
-reports that acceptance separately from local capture completion. Partial fetch
-must explicitly list missing material; it cannot imply full closure.
+A receipt distinguishes accepted, pending and rejected records. Accepted means
+the canonical operation and its validated causal closure are durable. Receiving
+bytes, storing a pending child, and having every source blob are different facts.
+Missing source objects remain explicit. Rejected local work is retained locally.
+An observation cursor and a transfer checkpoint are never causal frontiers.
+Each frame and list obeys negotiated bounds; large frontiers and operation sets
+are sent in bounded pages. Implementations must bound queued work and reconnect
+from durable state after lag, rather than buffering an unbounded history.
 
-Do not activate StartThread until the versioned immutable genesis encoding/hash
-is agreed, implemented and covered by cross-language vectors. A changed display
+Source and discussion histories have independent causal closure. Exporting one
+facet cannot force disclosure of an excluded facet or a private parent Thread.
+Changing policy or losing authority must stop further unauthorized export, even
+on an already-open stream. The receiver independently authorizes admission;
+valid signatures alone do not grant spool membership. A Thread view preserves
+all source heads; source integration adds a capture with the selected parents.
+
+Fetch remains a bounded source/object transfer and may propose a provider plan.
+The client approves the exact digest and extents before redemption. Tickets bind
+provider, principal, scope, plan and extent. Pack chunks are bounded and verified
+before object installation. Source, sidecar and owner-purge authority retain
+their independent checks. Bulk transfer should use separate Iroh streams so
+large source objects do not delay discussion or observation updates.
+
+StartThread accepts the same creator-signed genesis record as ReplicateThread.
+The request carries its authorized spool and operation ID; descriptive inputs
+are encoded once in the canonical record. Creation does not use expected-version
+checks against a mutable resource. The receiving endpoint derives identity and
+retains the original record; retrying the same genesis cannot mint another Thread.
+Clients use the negotiated native record encoder before asking their key to sign.
+
+The native `heddle-thread-genesis-v1` encoder and verifier live in Heddle's portable
+object-model/crypto crates. Its spool is a canonical non-nil UUID, never a mutable
+namespace/name address. `tests/fixtures/thread-genesis-v1.txt` is shared with the
+Heddle SDK: Rust checks canonical encoding, signature and typed identity;
+TypeScript checks identity, original signature and lossless protobuf relay using
+the same bytes. This does not provide a TypeScript canonical genesis encoder.
+A changed display
 name, intent version or tip does not change identity. The creation nonce permits
 distinct attempts with otherwise identical descriptive inputs. Existing UUIDs
 are not reinterpreted as 32-byte hashes; clean cutover establishes new identities.
 
-Cross-device writer ownership/handoff remains an open product decision. This
-candidate does not create a global lease or silently permit concurrent offline
-writers. Preserve #1718's local writer behavior and independent hosted landing
-until that policy is decided. Portable user-root attachment, canonical signed
-human actions, private disclosure policy and native v2 transfer proof also need
-versioned formats and real verifiers before their routes are advertised.
+Separate checkouts may write the same Thread, including offline. One checkout
+has one writer. Incoming replication never rewrites its working files. Portable
+user-root attachment, canonical signed human actions and disclosure policy need
+real verifiers before their routes are advertised.
 
 Next consumer work must prove: one useful page read per source without per-row
 fan-out; offline private browser access; hosted landing with devices offline;
@@ -285,3 +360,50 @@ checkout-targeted actions; scoped section/private artifact denial; gap-free
 snapshot/reconnect; ambiguous operation recovery; separate local/publication
 outcomes; real Iroh cancellation/backpressure and a thousands-of-stream load test.
 The SDK/descriptor tests here do not replace those handler and end-to-end gates.
+
+## First publication
+
+`ReplicationOpen.thread_genesis` can carry the creator-signed immutable creation
+record. A hosted receiver authorizes the spool, verifies the creation signature
+and exact Thread identity, and commits a new replica before emitting Ready.
+An existing replica must have the identical canonical genesis. Reconnecting with
+the same record is idempotent and does not create another Thread. A relaying
+device retains the original creator's signature and uses its own authorized
+request proof for the opening. This avoids a separate hosted create request.
+Acceptance of causal metadata does not assert that source-object closure is
+already available; publication of those bytes has its own durable receipt.
+
+`SyncService.PublishContent` uploads the exact source closure of an already
+admitted capture. Its signed opening fixes the Thread, revision, sharing-policy
+version, pack/index addresses and lengths, and operation ID. Source packs exclude
+unselected context, raw transcripts, secret values, and unrelated history. The
+receiver validates the complete closure before installing it and emitting a
+`PublicationReceipt`. That receipt means durable content availability; only causal
+replication and explicit integration determine the Thread's heads. Clients can
+run these bulk streams beside the long-lived metadata exchange on one connection.
+
+Publication openings also name the source and destination endpoint keys. Both
+must match the authenticated transport; signing an opening for one receiver does
+not authorize forwarding it to another receiver. Every later client frame retains
+the opening's operation ID. A transport FIN does not substitute for `Finish`.
+
+The native source transfer sends one full pack followed by its index in the
+opening's inventory. Each artifact address is BLAKE3 of its entire byte stream,
+including its native checksum trailer. Chunk extents retain that artifact address
+and carry a contiguous offset, exact byte length, and BLAKE3 of the chunk bytes.
+Full canonical tree anchors keep private historical delta bases out of the pack.
+
+For this native profile, inventory bytes concatenate the length-delimited protobuf
+encoding of each planned `PackExtent` in order. The accepted inventory uses the
+native typed hash `thread-source-inventory-v1`. The plan digest uses
+`thread-source-transfer-v1` over the encoded opening client frame with its
+checkpoint cleared. Native typed hashes are BLAKE3 of the UTF-8 type prefix,
+the content length as a little-endian u64, one zero byte, and the content bytes.
+The transfer ID is the first 16 bytes of the plan digest.
+
+A receiver that commits complete closures returns a zero-byte checkpoint until
+publication commits. Interrupted scratch bytes are not durable progress. Retrying
+the same operation and plan with a fresh request proof replays the committed
+receipt, or restarts an uncommitted upload. The current receiver accepts that zero
+checkpoint and no resume token. Clients drain responses concurrently with uploads;
+their send loop cannot wait until completion to read checkpoint frames.

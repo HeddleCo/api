@@ -92,18 +92,64 @@ message SetNotificationPreferencesRequest {
   NotificationPreferences preferences = 2;
   bytes expected_version = 3;
 }
+// Public, single-purpose disabling action. The opaque capability determines
+// the recipient and exact allowed selectors; no account credential is required.
+// Each requested rule must select an authorized channel and DISABLED delivery.
 message UnsubscribeNotificationsRequest {
   string client_operation_id = 1;
   bytes unsubscribe_capability = 2;
   repeated NotificationRule rules = 3;
+}
+// Derived presentation of canonical signed evidence. The receiving endpoint
+// verifies original authority independently; a reported pass is not itself
+// cryptographic proof that an external process ran correctly.
+message CheckEvidenceSummary {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_PASSED = 1;
+    OUTCOME_FAILED = 2;
+    OUTCOME_ERROR = 3;
+    OUTCOME_SKIPPED = 4;
+  }
+  Outcome outcome = 1;
+  string detail = 2;
+  PrincipalRef author = 3;
+  string agent_id = 4;
+  repeated RecordRef artifacts = 5;
+  repeated RecordRef supersedes = 6;
+  google.protobuf.Timestamp completed_at = 7;
 }
 message EvidenceRecord {
   RecordRef ref = 1;
   bytes version = 2;
   RevisionRef revision = 3;
   string check = 4;
+  // heddle-check-evidence-v2: canonical named MessagePack CheckEvidence,
+  // Ed25519 over UTF8(format) || 0x00 || canonical_record. Exactly one original
+  // publisher signature. The payload binds this ID, Spool, original Thread, native revision,
+  // check, terminal outcome, original actor/authority, completion time and any
+  // independently authorized artifact references. Signature validity alone
+  // neither grants Spool access nor satisfies the current review policy.
   SignedRecord evidence = 5;
   Coverage coverage = 6;
+  // Always derived from evidence when observed. A command may omit this
+  // projection; if supplied, every field must match the signed original.
+  CheckEvidenceSummary summary = 7;
+  // Required original audience scope, independently of matching source revisions.
+  ThreadRef thread = 8;
+}
+// Immutable review progress for one accepted check result and exact policy.
+// This does not change its outcome, supersede evidence or grant landing approval.
+message CheckAcknowledgementRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  RecordRef evidence = 3;
+  RevisionRef revision = 4;
+  bytes policy_version = 5;
+  PrincipalRef author = 6;
+  string agent_id = 7;
+  google.protobuf.Timestamp acknowledged_at = 8;
+  SignedRecord acknowledgement = 9;
 }
 message RecordEvidenceRequest {
   string client_operation_id = 1;
@@ -125,4 +171,8 @@ message AcknowledgeCheckRequest {
   RecordRef evidence = 2;
   RevisionRef revision = 3;
   bytes policy_version = 4;
+  // heddle-check-acknowledgement-v1. Same canonical/signature rules as evidence;
+  // binds the accepted evidence digest, revision, policy, original actor and
+  // this client_operation_id. Acknowledging never changes the recorded outcome.
+  SignedRecord acknowledgement = 5;
 }

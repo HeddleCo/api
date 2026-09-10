@@ -7,6 +7,18 @@ import "heddle/api/v1alpha1/errors.proto";
 import "heddle/api/v1alpha1/types.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
+message PrincipalRef {
+  // Stable account UUID. Handles and active signing keys can change.
+  string id = 1;
+}
+
+// Public presentation only; never carries credential, account settings or rights.
+message PublicPrincipalSummary {
+  string id = 1;
+  string handle = 2;
+  string display_name = 3;
+}
+
 message SpoolRef {
   // Stable spool UUID; names, paths and account handles are presentation.
   string id = 1;
@@ -44,6 +56,16 @@ message RecordRef {
   string id = 2;
 }
 
+// Caller-private preference identity; changing it never changes its target.
+message BookmarkRef {
+  // Must be the authenticated caller's account, including delegated agents.
+  PrincipalRef account = 1;
+  oneof target {
+    SpoolRef spool = 2;
+    ThreadRef thread = 3;
+  }
+}
+
 message EntityRef {
   oneof entity {
     SpoolRef spool = 1;
@@ -69,6 +91,19 @@ message EntityRef {
     EndpointRef device = 21;
     RecordRef timeline_event = 22;
     RecordRef artifact = 23;
+    BookmarkRef bookmark = 24;
+    RecordRef mount = 25;
+    RecordRef support_access = 26;
+    // Registry identity is distinct from the device's transport locator.
+    RecordRef device_record = 27;
+    RecordRef delegation = 28;
+    RecordRef recovery = 29;
+    RecordRef owner_transition = 30;
+    RecordRef billing = 31;
+    RecordRef evidence = 32;
+    RecordRef check_acknowledgement = 33;
+    RecordRef provider_connection = 34;
+    RecordRef remote_link = 35;
   }
 }
 
@@ -181,6 +216,9 @@ message OperationRecord {
     STATE_FAILED = 4;
     STATE_CANCELED = 5;
     STATE_WAITING_FOR_HUMAN = 6;
+    // Execution has acknowledged a pause. A queued pause request alone does
+    // not establish this state, and resume preserves the same operation/run.
+    STATE_PAUSED = 7;
   }
   State state = 4;
   uint64 completed_units = 5;

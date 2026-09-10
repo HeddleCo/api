@@ -71,6 +71,31 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
             );
             let extension = options.get_extension(&rpc_contract);
             let contract = option_message(extension.as_ref());
+            let runtime = ALL_METHODS
+                .iter()
+                .find(|entry| entry.path == path)
+                .expect("generated route");
+            for (name, actual) in [
+                ("signing_identity", runtime.signing_identity as i32),
+                ("authorization_role", runtime.authorization.role as i32),
+                (
+                    "authorization_scope_source",
+                    runtime.authorization.scope_source as i32,
+                ),
+                (
+                    "authorization_existence",
+                    runtime.authorization.existence as i32,
+                ),
+            ] {
+                assert_eq!(
+                    contract
+                        .get_field_by_name(name)
+                        .expect("declared policy")
+                        .as_ref(),
+                    &Value::EnumNumber(actual),
+                    "{path}: runtime {name} drifted"
+                );
+            }
             for name in [
                 "effect",
                 "retry_behavior",
@@ -92,7 +117,12 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
             let Value::List(targets) = targets.as_ref() else {
                 panic!("target list");
             };
-            for target in targets {
+            assert_eq!(
+                runtime.authorization.targets.len(),
+                targets.len(),
+                "{path}: target count"
+            );
+            for (target, actual) in targets.iter().zip(runtime.authorization.targets) {
                 let target = option_message(target);
                 let target_path = target.get_field_by_name("path").expect("path");
                 let Value::String(target_path) = target_path.as_ref() else {
@@ -100,6 +130,15 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
                 };
                 assert!(!target_path.is_empty(), "{path}: empty guard path");
                 field_path(method.input(), target_path);
+                assert_eq!(target_path, actual.path, "{path}: target path drifted");
+                assert_eq!(
+                    target
+                        .get_field_by_name("role")
+                        .expect("target role")
+                        .as_ref(),
+                    &Value::EnumNumber(actual.role as i32),
+                    "{path}: target role drifted"
+                );
             }
             let multi = contract
                 .get_field_by_name("authorization_multi_target")
@@ -210,5 +249,49 @@ fn hosted_landing_and_checkout_landing_have_distinct_endpoint_owners() {
             .find(|method| method.path == path)
             .expect("landing route");
         assert_eq!(method.deployment_targets, &[expected], "{path}");
+    }
+}
+
+#[test]
+fn device_deployment_covers_private_work_without_hosted_account_administration() {
+    use heddle_api::heddle::api::v1alpha1::DeploymentTarget::{HeddleDaemon, Weft};
+    for name in [
+        "IdentityService/BeginRegistration",
+        "IdentityService/CompleteAuthentication",
+        "IdentityService/CreateSignupInvitation",
+        "IdentityService/BeginEmailVerification",
+        "SpoolService/PutGrant",
+        "SpoolService/CreateInvitation",
+        "SpoolService/SetSupportAccess",
+        "WorkspaceService/ObserveCatalog",
+        "SyncService/ReadProviderExtent",
+    ] {
+        let path = format!("/heddle.api.v2alpha1.{name}");
+        let method = ALL_METHODS
+            .iter()
+            .find(|method| method.path == path)
+            .expect("declared hosted boundary");
+        assert_eq!(method.deployment_targets, &[Weft], "{path}");
+    }
+    for name in [
+        "IdentityService/ObserveIdentity",
+        "IdentityService/IntrospectCredential",
+        "SpoolService/ObserveSpool",
+        "SpoolService/CreateSpool",
+        "SpoolService/SetSpoolMount",
+        "ThreadService/ObserveThread",
+        "ThreadService/StartThread",
+        "CollaborationService/PutContext",
+        "ContentService/ReadContent",
+        "ContentService/ReadArtifact",
+        "SyncService/ReplicateThread",
+    ] {
+        let path = format!("/heddle.api.v2alpha1.{name}");
+        let method = ALL_METHODS
+            .iter()
+            .find(|method| method.path == path)
+            .expect("declared shared boundary");
+        assert!(method.deployment_targets.contains(&Weft), "{path}");
+        assert!(method.deployment_targets.contains(&HeddleDaemon), "{path}");
     }
 }

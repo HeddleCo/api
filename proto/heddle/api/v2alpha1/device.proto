@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package heddle.api.v2alpha1;
 
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/contract.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
@@ -19,6 +21,18 @@ message CheckoutOverview {
   RecordRef active_run = 9;
   // Display only, disclosed solely under device authority.
   string display_path = 10;
+  SourceConflictSet conflicts = 11;
+}
+
+// A bounded set of immutable source alternatives observed at one checkout
+// version. Candidate IDs are opaque and only meaningful within this version.
+message SourceConflictSet {
+  bytes version = 1;
+  repeated SourceConflictCandidate candidates = 2;
+}
+message SourceConflictCandidate {
+  bytes id = 1;
+  RevisionRef revision = 2;
 }
 
 message ObserveCheckoutsRequest {
@@ -46,6 +60,34 @@ message MaterializeCheckoutRequest {
   optional string requested_path = 4;
 }
 
+// The same physical-checkout lease is enforced by CLI and device RPCs.
+// Possessing its token never grants authority: each mutation also authenticates
+// the owner session, verifies current capability, and compares source/version.
+message CheckoutWriterLease {
+  CheckoutRef checkout = 1;
+  bytes token = 2;
+  string actor_session_id = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+message ClaimCheckoutWriterRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  google.protobuf.Duration requested_duration = 4;
+  // Omit to acquire; supply the current token to renew the same session's lease.
+  // An expired token cannot revive a lease superseded by another writer.
+  bytes current_token = 5;
+}
+message ClaimCheckoutWriterResponse {
+  MutationReceipt receipt = 1;
+  CheckoutWriterLease lease = 2;
+}
+message ReleaseCheckoutWriterRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes token = 3;
+}
+
 message CaptureCheckoutRequest {
   string client_operation_id = 1;
   CheckoutRef checkout = 2;
@@ -54,6 +96,7 @@ message CaptureCheckoutRequest {
   string summary = 5;
   repeated string selected_paths = 6;
   // One-shot selection follows Heddle capture semantics; no separate index.
+  bytes writer_lease_token = 7;
 }
 
 message RefreshCheckoutRequest {
@@ -62,6 +105,7 @@ message RefreshCheckoutRequest {
   bytes expected_checkout_version = 3;
   RevisionRef expected_source = 4;
   RevisionRef target = 5;
+  bytes writer_lease_token = 6;
 }
 
 message ResolveCheckoutRequest {
@@ -73,6 +117,7 @@ message ResolveCheckoutRequest {
   repeated bytes chosen_candidate_ids = 6;
   // Candidate selection is attributed. A working capture alone never resolves
   // source conflicts; ambiguous or stale candidate sets fail explicitly.
+  bytes writer_lease_token = 7;
 }
 
 message RecoverCheckoutRequest {
@@ -81,6 +126,7 @@ message RecoverCheckoutRequest {
   bytes expected_checkout_version = 3;
   RevisionRef recover_to = 4;
   // Active writers and working edits are checked by Heddle before materializing.
+  bytes writer_lease_token = 5;
 }
 
 message CheckoutMutationResponse {
@@ -155,7 +201,40 @@ message RunRecord {
   string model = 8;
   OperationRecord.State state = 9;
   repeated ActionAvailability actions = 10;
+  // Exact controls consumed by this run's harness. Advertising ControlRun in
+  // actions does not imply support for every control variant.
+  repeated ControlRunRequest.Action supported_controls = 11;
+  // Pending exact harness intents. Decisions compare request_digest; observing
+  // a prompt never grants permission and timeout/disconnection never implies allow.
+  repeated RunPermission pending_permissions = 12;
+  // Explicitly retained artifacts currently readable under this Run's policy.
+  // Raw material remains device-local unless separately published by consent.
+  repeated RunArtifact artifacts = 13;
 }
+message RunArtifact {
+  RecordRef ref = 1;
+  string kind = 2;
+  string media_type = 3;
+  uint64 size = 4;
+  // Integrity only. ReadArtifact authorizes the catalog reference, never a hash.
+  bytes content_hash = 5;
+  google.protobuf.Timestamp retained_until = 6;
+}
+message RunPermission {
+  string id = 1;
+  // Claude v1: BLAKE3(prefix UTF-8 || JSON length as LE u64 || 0x00 || JSON),
+  // prefix = "heddle.claude-permission.v1". JSON uses sorted object keys.
+  bytes request_digest = 2;
+  string harness = 3;
+  string tool_name = 4;
+  // Exact decision-bound intent JSON captured by the device adapter (format,
+  // run_id, permission_id, tool_name, tool_input, cwd); bounded to 64 KiB.
+  // Preserve the original bytes when comparing or approving an intent.
+  bytes canonical_input_json = 5;
+  // Device-clock deadline. Expired prompts cannot be approved after a crash.
+  google.protobuf.Timestamp expires_at = 6;
+}
+
 message TimelineRecord {
   RecordRef ref = 1;
   RecordRef run = 2;
@@ -194,4 +273,5 @@ message LandCheckoutRequest {
   ThreadRef target = 5;
   RevisionRef expected_target = 6;
   bytes expected_policy_version = 7;
+  bytes writer_lease_token = 8;
 }

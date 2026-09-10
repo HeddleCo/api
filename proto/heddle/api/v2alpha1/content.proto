@@ -2,15 +2,55 @@ syntax = "proto3";
 
 package heddle.api.v2alpha1;
 
-import "heddle/api/v1alpha1/repo_sync.proto";
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/repository.proto";
+import "heddle/api/v1alpha1/types.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 message TreeRead {
+  // Empty selects the root; otherwise a normalized repository-relative path.
   string path = 1;
+  // Zero selects one level. Endpoints advertise bounded read budgets and reject
+  // a depth they cannot support; zero never requests an unbounded walk.
   uint32 depth = 2;
+  // The token is bound to the exact revision, subtree and depth. A complete
+  // page may still have next_page; exhausted alone means the query has no more.
   PageRequest page = 3;
+}
+
+message ContentFile {
+  // Exact native blob hash, 32 bytes. A symlink's blob stores its target path;
+  // browsing a tree never follows the link.
+  bytes object_hash = 1;
+  // Absent means unknown, distinct from a known empty file.
+  optional uint64 size = 2;
+  // Applies to file targets; false for symlinks.
+  bool executable = 3;
+}
+
+message ContentSpoolLink {
+  // Exact namespace/name identity embedded in the native source tree. This is
+  // not a hosted SpoolRef UUID or an authorization grant. ResolveResources can
+  // resolve it to a hosted resource when the caller wants to follow the edge.
+  string native_spool_id = 1;
+  heddle.api.v1alpha1.StateId state = 2;
+}
+
+message ContentTreeEntry {
+  // Repository-root-relative path, including the requested subtree prefix.
+  string path = 1;
+  oneof target {
+    bytes tree_hash = 2;
+    ContentFile file = 3;
+    ContentFile symlink = 4;
+    heddle.api.v1alpha1.GitObjectId gitlink = 5;
+    ContentSpoolLink spoollink = 6;
+  }
+  // Present only when the corresponding provenance has been published and
+  // authorized. Absence does not mean that the source has no history.
+  google.protobuf.Timestamp last_changed_at = 7;
+  heddle.api.v1alpha1.StatePrincipal last_changed_by = 8;
 }
 
 message BlobRead {
@@ -50,14 +90,11 @@ message ContentRead {
   }
 }
 
-message StateRead {
-  bool include_summary = 1;
-  bool include_attachments = 2;
-  repeated heddle.api.v1alpha1.StateAttachmentKind attachment_kinds = 3;
-  PageRequest page = 4;
-  // Attachments are independently authorized; an empty kind filter does not
-  // confer permission to see private material. Conflicts retain resolved items.
-}
+// Exact immutable source summary. Authored sidecars (including risk signals,
+// conflict resolutions and semantic attachment attribution) are not source
+// objects: use audience-checked Thread, checkout and Analysis projections.
+// The selection emits one StateSummary followed by selection_complete.
+message StateRead {}
 
 message ReadContentRequest {
   RevisionRef revision = 1;
@@ -78,13 +115,12 @@ message ContentEvent {
   string selection_id = 1;
   RevisionRef revision = 2;
   oneof payload {
-    heddle.api.v1alpha1.TreeEntry tree_entry = 3;
+    ContentTreeEntry tree_entry = 3;
     BlobChunk blob = 4;
     heddle.api.v1alpha1.FileDiff diff = 5;
     ProvenanceResult provenance = 6;
     SectionStatus selection_complete = 7;
     heddle.api.v1alpha1.StateSummary state = 8;
-    heddle.api.v1alpha1.StateAttachment attachment = 9;
   }
   // Each requested selection ends with selection_complete. Missing completion
   // before FIN means interruption, not an empty file or exhausted collection.

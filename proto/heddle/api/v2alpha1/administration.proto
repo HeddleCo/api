@@ -4,6 +4,7 @@ package heddle.api.v2alpha1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/owner_records.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
 // Account names and paths resolve to stable resources once. They never become
@@ -46,6 +47,9 @@ enum ResourceRole {
   RESOURCE_ROLE_WRITER = 2;
   RESOURCE_ROLE_ADMINISTRATOR = 3;
 }
+// Fresh bootstrap permits child creation and has no implicit approval mandate.
+// Explicit review policies still apply. A revision supplies the complete record;
+// its settings participate in the observed review policy version.
 message SpoolSettings {
   Audience audience = 1;
   Audience default_state_audience = 2;
@@ -68,6 +72,8 @@ message MemberRecord {
   string principal_id = 2;
   ResourceRole role = 3;
   bytes version = 4;
+  // When present, id must equal principal_id; absent means display unavailable.
+  PublicPrincipalSummary principal = 5;
 }
 message GrantRecord {
   RecordRef ref = 1;
@@ -115,9 +121,15 @@ message ReviewPolicyRecord {
   repeated string required_checks = 13;
 }
 message BookmarkRecord {
-  EntityRef resource = 1;
+  BookmarkRef ref = 1;
   bytes version = 2;
   string label = 3;
+  // False is a retained tombstone with its own CAS version.
+  bool bookmarked = 4;
+}
+message BookmarkMutationResponse {
+  MutationReceipt receipt = 1;
+  BookmarkRecord bookmark = 2;
 }
 message SupportAccessRecord {
   RecordRef ref = 1;
@@ -129,17 +141,41 @@ message SupportAccessRecord {
 }
 message CreateSpoolRequest {
   string client_operation_id = 1;
-  SpoolRef spool = 2;
-  string name = 3;
+  // Existing parent; omit only for an authorized top-level creation.
+  SpoolRef parent = 2;
+  // One address segment. The stable new spool UUID comes only from genesis.
+  string slug = 3;
   SpoolSettings settings = 4;
-  SignedRecord owner_genesis = 5;
+  oneof ownership {
+    // Signed by the account's current owner authority. Admission verifies the
+    // account's root and accepted rotation history and compares its current key
+    // atomically with creation. Historical membership alone cannot create a
+    // new spool. Retry the original signed genesis and operation ID.
+    SignedSpoolOwnerGenesis owner_genesis = 5;
+    // Explicit creation through this account's existing server-held authority.
+    // The client supplies a fresh UUIDv7. Only an active server-rooted account
+    // with configured per-user custody can use this branch; it never establishes
+    // a root or falls back to the deployment key. The response contains the same
+    // portable signed genesis and owner history as client-signed creation.
+    SpoolRef custodial_spool = 7;
+  }
+  optional string display_name = 6;
 }
+// Compare and replace display name and complete settings atomically. The stable
+// UUID, address slug, parent, and immutable owner genesis are unchanged.
 message ReviseSpoolRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
   bytes expected_version = 3;
   string name = 4;
   SpoolSettings settings = 5;
+}
+// Move a personal-root child to the account's root-level address at its current
+// slug. UUID, genesis, descendants, and direct grants survive.
+message PromoteSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
 }
 message DeleteSpoolRequest {
   string client_operation_id = 1;
@@ -207,9 +243,11 @@ message DeleteApprovalGroupRequest {
 }
 message SetBookmarkRequest {
   string client_operation_id = 1;
-  BookmarkRecord bookmark = 2;
+  BookmarkRef bookmark = 2;
   bool bookmarked = 3;
+  // Empty means no bookmark has ever existed; tombstones retain a version.
   bytes expected_version = 4;
+  string label = 5;
 }
 message SetSupportAccessRequest {
   string client_operation_id = 1;

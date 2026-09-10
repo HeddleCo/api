@@ -80,6 +80,13 @@ message CallContext {
   // absent selector is rejected, never trusted. Empty = legacy scan fallback during
   // cutover.
   bytes bearer_authority_key_selector = 9;
+  // Optional canonical v2 ThreadControlAuthority for an owned-device call.
+  // At most 64 KiB. The sealed Biscuit MUST exactly equal bearer_capability;
+  // its mint root MUST match any supplied key selector and the verified proof
+  // chain. The receiver verifies accepted owner history and mint attachment
+  // against its independently pinned owner and current revocations. This
+  // evidence cannot establish a new trusted owner or broaden any caveat.
+  bytes bearer_authority_proof = 10;
 }
 
 enum DeploymentTarget {
@@ -106,6 +113,12 @@ enum SigningTier {
   SIGNING_TIER_PROOF_OF_POSSESSION = 2;
   SIGNING_TIER_HUMAN_VERIFICATION = 3;
   SIGNING_TIER_STREAMING_PROOF_OF_POSSESSION = 4;
+  // Public reads may omit credentials or carry an anonymous quota token.
+  // A supplied account/device/delegation credential MUST have its verified
+  // leaf proof bound to this exact request. Invalid supplied credentials or
+  // proofs never downgrade to public access. Resource authorization still
+  // restricts unauthenticated/anonymous reads to public content.
+  SIGNING_TIER_PROOF_IF_AUTHENTICATED = 5;
 }
 
 enum RpcEffect {
@@ -140,6 +153,8 @@ enum CapabilityArea {
   CAPABILITY_AREA_SEARCH = 13;
   CAPABILITY_AREA_ASYNCHRONOUS_OPERATIONS = 14;
   CAPABILITY_AREA_NOTIFICATIONS = 15;
+  // Account subscription and billing administration under effective delegation.
+  CAPABILITY_AREA_BILLING = 16;
 }
 
 // Authorization is declarative contract metadata. Producers still own runtime
@@ -236,6 +251,11 @@ message RpcContract {
   repeated DeploymentTarget deployment_targets = 13;
   // Optional per-method maturity override. UNSPECIFIED inherits the service contract.
   ServiceMaturity maturity = 14;
+  // True only for long-lived response streams that may be quiet between
+  // complete messages. Initial response and partial-frame deadlines still
+  // apply. False retains finite-operation progress deadlines. Resumability
+  // alone does not imply liveness: source transfers are finite streams.
+  bool live_stream = 15;
 }
 
 // Machine-readable lifecycle semantics for the canonical Operation state enum.

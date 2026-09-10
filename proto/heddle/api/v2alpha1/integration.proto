@@ -2,6 +2,7 @@ syntax = "proto3";
 package heddle.api.v2alpha1;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
@@ -39,6 +40,11 @@ message RemoteLinkRecord {
   bool enabled = 8;
   repeated ThreadRef diverged_threads = 9;
   RecordRef latest_operation = 10;
+  // Exact native source destination. A remote never selects a Thread from a
+  // mutable latest-import pointer; divergence preserves this Thread unchanged.
+  ThreadRef target = 11;
+  // Optional explicit recurring-policy deadline, independent of bearer age.
+  google.protobuf.Timestamp expires_at = 12;
 }
 message ObserveIntegrationsRequest {
   repeated SpoolRef spools = 1;
@@ -55,6 +61,7 @@ message IntegrationEvent {
     RemoteLinkRecord remote = 4;
     SectionStatus status = 5;
     Removal removal = 6;
+    SectionReplacement replace_section = 7;
   }
 }
 message BeginProviderConnectionRequest {
@@ -77,7 +84,10 @@ message CompleteProviderConnectionRequest {
 message StoreProviderCredentialRequest {
   string client_operation_id = 1;
   string provider = 2;
-  bytes sealed_credential = 3;
+  // Provider bearer input travels only over the authenticated encrypted RPC
+  // transport. Weft validates it with the named provider and encrypts it using
+  // server credential custody before storage. Never project or log this value.
+  string access_token = 3;
 }
 message RevokeProviderConnectionRequest {
   string client_operation_id = 1;
@@ -94,6 +104,16 @@ message ImportSourceRequest {
   SpoolRef destination = 2;
   ProviderRepository source = 3;
   bytes expected_destination_version = 4;
+  // Original creator-signed canonical Thread genesis, as in StartThread. Import
+  // never fabricates the caller's creator signature. The hosted executor signs
+  // its later import receipt and preserves Git attribution in the Capture.
+  SignedRecord thread_genesis = 5;
+  bytes creator_authority = 6;
+  // Optional canonical synthetic empty State, at most 4096 bytes, whose identity
+  // exactly matches thread_genesis.base. Enables a fresh Spool import in one
+  // call without requiring a pre-existing hosted base. Nonempty source closures
+  // use SyncService publication instead. The creator signature binds this base.
+  bytes initial_base_state = 7;
 }
 message SynchronizeRemoteRequest {
   string client_operation_id = 1;

@@ -3,6 +3,7 @@ syntax = "proto3";
 package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/administration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
@@ -50,7 +51,10 @@ message ThreadOverview {
   string name = 2;
   bytes version = 3;
   ThreadIntent intent = 4;
-  RevisionRef tip = 5;
+  // All non-dominated accepted captures at this endpoint. Concurrent heads are
+  // preserved until explicit source integration; arrival time is not authority.
+  // The source endpoint and coverage remain part of the observation.
+  repeated RevisionRef source_heads = 5;
   RevisionRef base = 6;
   ThreadLifecycle lifecycle = 7;
   ReviewReadiness readiness = 8;
@@ -58,11 +62,80 @@ message ThreadOverview {
   repeated ThreadRelationship relationships = 10;
   repeated ActionAvailability actions = 11;
   repeated SectionStatus sections = 12;
-  uint64 capture_count = 13;
+  // Count only captures visible to this reader. Absent when a bounded window
+  // cannot establish the reader-visible total; never expose an unfiltered count.
+  optional uint64 capture_count = 13;
   uint64 open_discussion_count = 14;
   google.protobuf.Timestamp updated_at = 15;
-  // The source endpoint is in StreamOpen; never overwrite another source's tip
-  // merely because this observation arrived later.
+  RevisionRef integrated_revision = 16;
+  // Exact aggregate policy/group version required by review and landing,
+  // including the explicit empty-policy set. Never inferred from no records.
+  bytes review_policy_version = 17;
+  // Caller-private preference composed by an exact Thread page. Missing means
+  // unavailable, unrequested, or anonymous (including ordinary list rows).
+  // Present false + empty version proves no bookmark exists at this snapshot;
+  // present false + nonempty version is a retained tombstone. Never substitute
+  // this version for Thread.version. The ref binds the authenticated account.
+  BookmarkRecord current_bookmark = 18;
+  // Independent causal fields compose across devices. Concurrent candidates
+  // for one field remain explicit until a caller signs a successor observing
+  // every candidate; timestamps never select a winner.
+  repeated ThreadMetadataConflict metadata_conflicts = 19;
+  // Includes empty frontiers for genesis/default fields. Supplies all parent
+  // operation IDs needed to sign an update without another round trip.
+  repeated ThreadPropertyFrontier metadata_frontiers = 20;
+  ThreadAudiencePolicy audience = 21;
+  ThreadRetentionPolicy retention = 22;
+  // Independently admitted effective owner. Missing means unavailable, never
+  // infer ownership from the connected endpoint or current account.
+  ThreadOwnership ownership = 23;
+  // Exact signed source operation IDs, not materialized revision hashes.
+  // An incomplete frontier cannot be used for an ownership claim.
+  SourceOperationFrontier source_frontier = 24;
+}
+
+message ThreadOwnership {
+  oneof owner {
+    bytes local_key = 1;
+    PrincipalRef account = 2;
+    ThreadOwnershipConflict conflict = 3;
+  }
+  // Present only after an explicit admitted local-key to account claim.
+  bytes claim_id = 4;
+}
+message ThreadOwnershipConflict {
+  // At most two distinct admitted claims. Neither candidate wins by time.
+  repeated bytes claim_ids = 1;
+}
+message SourceOperationFrontier {
+  // At most 128 distinct, ordered IDs. Empty and complete means genesis only.
+  repeated bytes operation_ids = 1;
+  bool complete = 2;
+}
+
+enum ThreadProperty {
+  THREAD_PROPERTY_UNSPECIFIED = 0;
+  THREAD_PROPERTY_NAME = 1;
+  THREAD_PROPERTY_INTENT = 2;
+  THREAD_PROPERTY_LIFECYCLE = 3;
+  THREAD_PROPERTY_SHARING = 4;
+  THREAD_PROPERTY_REVIEW = 5;
+  THREAD_PROPERTY_AUDIENCE = 6;
+  THREAD_PROPERTY_RETENTION = 7;
+}
+message ThreadPropertyFrontier {
+  ThreadProperty property = 1;
+  // Canonical review UUID for REVIEW; empty for the singleton properties.
+  string record_id = 2;
+  bytes version = 3;
+  repeated bytes operation_ids = 4;
+}
+message ThreadMetadataConflict {
+  ThreadPropertyFrontier frontier = 1;
+  // Exact original caller-signed metadata operations, not projections or
+  // device-synthesized user approval. Each operation binds actor, Spool,
+  // Thread, property, causal parents and value.
+  repeated SignedRecord candidates = 2;
 }
 
 message ThreadQuery {
@@ -92,6 +165,7 @@ enum ThreadSection {
   THREAD_SECTION_CHECKOUTS = 6;
   THREAD_SECTION_TIMELINE = 7;
   THREAD_SECTION_SHARING = 8;
+  THREAD_SECTION_EVIDENCE = 9;
 }
 
 message CaptureSummary {
@@ -110,6 +184,7 @@ enum SharedFacet {
   SHARED_FACET_COLLABORATION = 2;
   SHARED_FACET_EVIDENCE = 3;
   SHARED_FACET_SCRUBBED_TIMELINE = 4;
+  SHARED_FACET_METADATA = 5;
   // Raw forensic and confidential runtime disclosure are separate explicit
   // consent contracts; these values cannot sweep them into ordinary sync.
 }
@@ -121,10 +196,66 @@ message SharingDestination {
 }
 
 message ThreadSharingPolicy {
+  // Sync destinations/material only. Uploading does not change audience.
   ThreadRef thread = 1;
   bytes version = 2;
   repeated SharingDestination destinations = 3;
   bool ongoing = 4;
+}
+
+message ThreadInvitee {
+  string principal_id = 1;
+  // Empty includes this principal's otherwise-authorized delegates; nonempty
+  // selects one exact agent attribution. Capability attenuation still applies.
+  string agent_id = 2;
+}
+message ThreadAudiencePolicy {
+  ThreadRef thread = 1;
+  bytes version = 2;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_OWNER = 1;
+    KIND_INVITED = 2;
+    KIND_SPOOL = 3;
+  }
+  // Missing policy defaults to OWNER. The owner is the account verified at
+  // original genesis admission, independent of uploader and Spool ownership.
+  Kind kind = 3;
+  repeated ThreadInvitee invitees = 4;
+  // Concurrent candidates intersect audience until explicitly resolved.
+}
+
+message MaterialRetention {
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    MODE_DISCARD = 1;
+    MODE_BOUNDED = 2;
+    MODE_RETAIN = 3;
+  }
+  Mode mode = 1;
+  // Positive only for BOUNDED; measured from original retention admission.
+  // Re-sync/replay never restarts a material's retention deadline.
+  uint64 seconds = 2;
+}
+message ThreadRetentionPolicy {
+  ThreadRef thread = 1;
+  bytes version = 2;
+  MaterialRetention source = 3;
+  MaterialRetention collaboration = 4;
+  MaterialRetention evidence = 5;
+  MaterialRetention scrubbed_timeline = 6;
+  // Raw retention requires explicit bounded consent. Runtime secrets are not
+  // ordinary Thread material and cannot be enabled by this policy.
+  MaterialRetention raw_transcripts = 7;
+}
+
+// Exact comparison resolved within a review-section snapshot. A client submits
+// these source/base/policy bytes when recording a decision; a Thread's genesis
+// base and an arbitrary source head are not substitutes for this binding.
+message ReviewComparison {
+  RevisionRef source = 1;
+  RevisionRef base = 2;
+  bytes policy_version = 3;
 }
 
 message ReviewDecision {
@@ -145,6 +276,7 @@ message ReviewDecision {
   string explanation = 8;
   RecordRef revokes = 9;
   google.protobuf.Timestamp expires_at = 10;
+  string agent_id = 11;
 }
 
 message ObserveThreadsRequest {
@@ -164,14 +296,42 @@ message ThreadListEvent {
 message StartThreadRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
-  ThreadRef parent = 3;
-  RevisionRef base = 4;
-  string name = 5;
-  ThreadIntent intent = 6;
-  // Persisted once for retries and replicas. Same descriptive inputs may still
-  // name distinct attempts. The negotiated genesis format defines the hash.
-  bytes creation_nonce = 7;
-  repeated ExpectedVersion expected_versions = 8;
+  // The same original creator-signed record as ReplicationOpen.thread_genesis.
+  // Its negotiated canonical format owns parent, base, name, initial intent,
+  // creator and creation nonce. The endpoint validates its signature, derives
+  // the Thread ID and verifies the spool binding; it never synthesizes a creator.
+  // Retrying the record preserves identity even with a new RPC operation ID.
+  SignedRecord thread_genesis = 3;
+  // Original portable account/key authority, independently verified against the
+  // creator and owner bound by the canonical genesis. Never the courier's proof.
+  bytes creator_authority = 4;
+}
+
+// The owner and accepting account publisher co-sign one exact canonical claim.
+// Upload and device enrollment never invoke this transition implicitly.
+message ClaimThreadOwnershipRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  // heddle-thread-ownership-claim-v1; one acceptor signature requests local
+  // co-signing, or two signatures ordered local-owner, acceptor import full proof.
+  SignedRecord claim = 3;
+}
+message ClaimThreadOwnershipResponse {
+  MutationReceipt receipt = 1;
+  ThreadRef thread = 2;
+  PrincipalRef owner = 3;
+  bytes claim_id = 4;
+  SignedRecord claim = 5;
+}
+
+// The current owner adjudicates a competing-ownership fork with one exact
+// canonical resolution. Never invoked implicitly by upload or enrollment.
+message ResolveOwnershipConflictRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  // heddle-thread-ownership-resolution-v1; canonical ThreadOwnershipResolution
+  // carries the accepted lineage and losing forks, with one owner signature.
+  SignedRecord resolution = 3;
 }
 
 message ThreadMutationResponse {
@@ -184,6 +344,9 @@ message ReviseIntentRequest {
   ThreadRef thread = 2;
   bytes expected_intent_version = 3;
   ThreadIntent proposed_intent = 4;
+  // Original caller-signed native Thread metadata operation. The endpoint
+  // verifies exact request/value/actor/scope/parent binding before admission.
+  SignedRecord operation = 5;
   // Agent attribution cannot set principal_approved; endpoint authority decides.
 }
 
@@ -191,12 +354,27 @@ message SetThreadSharingRequest {
   string client_operation_id = 1;
   ThreadSharingPolicy policy = 2;
   bytes expected_policy_version = 3;
+  SignedRecord operation = 4;
+}
+
+message SetThreadAudienceRequest {
+  string client_operation_id = 1;
+  ThreadAudiencePolicy policy = 2;
+  bytes expected_policy_version = 3;
+  SignedRecord operation = 4;
+}
+message SetThreadRetentionRequest {
+  string client_operation_id = 1;
+  ThreadRetentionPolicy policy = 2;
+  bytes expected_policy_version = 3;
+  SignedRecord operation = 4;
 }
 
 message RecordReviewRequest {
   string client_operation_id = 1;
   ReviewDecision decision = 2;
   repeated ExpectedVersion expected_versions = 3;
+  SignedRecord operation = 4;
 }
 
 message LandThreadRequest {
@@ -214,6 +392,7 @@ message ChangeThreadLifecycleRequest {
   ThreadRef thread = 2;
   bytes expected_version = 3;
   ThreadLifecycle lifecycle = 4;
+  SignedRecord operation = 5;
   // READY revalidates requirements. LANDED is rejected here; use LandThread.
 }
 
@@ -222,7 +401,11 @@ message RenameThreadRequest {
   ThreadRef thread = 2;
   bytes expected_version = 3;
   string name = 4;
+  SignedRecord operation = 5;
 }
+// Each source is the exact revision supplied by the caller. For every distinct
+// target, expected_target is compared once against the initial transaction
+// snapshot. Ordered members then integrate into that target's evolving frontier.
 message StackLanding {
   ThreadRef thread = 1;
   RevisionRef source = 2;
@@ -233,5 +416,8 @@ message StackLanding {
 message LandStackRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
+  // Apply in request order. Source and target Thread sets must be disjoint; a
+  // source never implicitly means the result of an earlier member. All members
+  // and their receipts commit atomically, or none do.
   repeated StackLanding landings = 3;
 }

@@ -324,6 +324,16 @@ message ClaimThreadOwnershipResponse {
   SignedRecord claim = 5;
 }
 
+// The current owner adjudicates a competing-ownership fork with one exact
+// canonical resolution. Never invoked implicitly by upload or enrollment.
+message ResolveOwnershipConflictRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  // heddle-thread-ownership-resolution-v1; canonical ThreadOwnershipResolution
+  // carries the accepted lineage and losing forks, with one owner signature.
+  SignedRecord resolution = 3;
+}
+
 message ThreadMutationResponse {
   MutationReceipt receipt = 1;
   ThreadOverview thread = 2;

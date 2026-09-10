@@ -207,6 +207,10 @@ message CompleteAuthenticationRequest {
   // Required for a newly enrolled independent mint root distinct from the
   // current owner authority; omitted for existing roots or delegated leaves.
   SignedMintRootAttachment mint_root_attachment = 5;
+  // Set true by the browser only AFTER the user consents ("Remember this
+  // browser?"), so the server enrolls the device (writes the device root) only
+  // on explicit post-consent enroll. The decline path signs in without enrolling.
+  bool enroll_device = 8;
 }
 message AuthenticationResponse {
   MutationReceipt receipt = 1;

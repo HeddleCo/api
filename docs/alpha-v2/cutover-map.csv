@@ -122,6 +122,7 @@ RegistryService.ListExploreMetadata,SpoolService.ObserveSpool,native_contract,"S
 RegistryService.ListSupportAccessGrants,SpoolService.ObserveSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
 RegistryService.ListActors,SpoolService.ObserveSpool,native_contract,Separate actor/run provenance from device-local checkout state; advertise support per endpoint.
 RegistryService.ListWorktrees,CheckoutService.ObserveCheckouts,native_contract,Separate actor/run provenance from device-local checkout state; advertise support per endpoint.
+RegistryService.PromoteSpool,SpoolService.PromoteSpool,native_contract,"Preserve personal-root→root-level promotion gated on slug availability, account standing, and owner role."
 RegistryService.ResolveMonorepo,WorkspaceService.ResolveResources;SpoolService.ObserveSpool,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
 RegistryService.ResolveSubjects,WorkspaceService.ResolveResources;SpoolService.ObserveSpool,native_contract,Include principal summaries in views; retain a bounded batch resolver for additional identities.
 RegistryService.RevokeInvitation,SpoolService.RevokeInvitation,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."

@@ -193,7 +193,9 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
         panic!("typed issued credential")
     };
     assert_eq!(
-        issued.get_field_by_name("subject").map(|field| field.kind()),
+        issued
+            .get_field_by_name("subject")
+            .map(|field| field.kind()),
         Some(Kind::String),
         "issued credentials must identify their exact proof subject without conflating it with the human account UUID"
     );

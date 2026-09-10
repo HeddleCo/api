@@ -1,6 +1,6 @@
 //! Shared v2 client behavior. Transport adapters retain key and connection ownership.
-pub mod identity_management;
 pub mod client;
+pub mod identity_management;
 use crate::StreamingShape;
 use crate::heddle::api::v1alpha1::{
     AuthorizationAccess, AuthorizationExistence, AuthorizationRole, AuthorizationScopeSource,

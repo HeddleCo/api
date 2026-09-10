@@ -81,42 +81,96 @@ fn content_tree_entries_preserve_typed_native_and_foreign_targets() {
 #[test]
 fn raw_state_reads_cannot_disclose_authored_sidecars() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
-    let event = pool.get_message_by_name("heddle.api.v2alpha1.ContentEvent")
+    let event = pool
+        .get_message_by_name("heddle.api.v2alpha1.ContentEvent")
         .expect("content event");
-    assert!(event.get_field_by_name("attachment").is_none(),
-        "authored sidecars require their originating Thread authority");
+    assert!(
+        event.get_field_by_name("attachment").is_none(),
+        "authored sidecars require their originating Thread authority"
+    );
     assert!(event.get_field_by_name("state").is_some());
     assert!(event.get_field_by_name("selection_complete").is_some());
-    let state = pool.get_message_by_name("heddle.api.v2alpha1.StateRead")
+    let state = pool
+        .get_message_by_name("heddle.api.v2alpha1.StateRead")
         .expect("state selection");
-    assert_eq!(state.fields().count(), 0, "State selection always returns its summary");
-    assert!(pool.get_message_by_name("heddle.api.v2alpha1.StateAttachmentContent").is_none());
-    assert!(pool.get_enum_by_name("heddle.api.v2alpha1.SourceAttachmentKind").is_none());
+    assert_eq!(
+        state.fields().count(),
+        0,
+        "State selection always returns its summary"
+    );
+    assert!(
+        pool.get_message_by_name("heddle.api.v2alpha1.StateAttachmentContent")
+            .is_none()
+    );
+    assert!(
+        pool.get_enum_by_name("heddle.api.v2alpha1.SourceAttachmentKind")
+            .is_none()
+    );
 }
 
 #[test]
 fn source_transfers_share_original_operation_and_authority_receipt_batches() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     for name in ["FetchServerFrame", "PublishContentClientFrame"] {
-        let frame = pool.get_message_by_name(&format!("heddle.api.v2alpha1.{name}")).expect("source frame");
-        let batch = frame.get_field_by_name("operations").expect("original operation batch");
+        let frame = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .expect("source frame");
+        let batch = frame
+            .get_field_by_name("operations")
+            .expect("original operation batch");
         assert_eq!(batch.number(), 6);
-        assert_eq!(batch.kind().as_message().expect("batch message").full_name(), "heddle.api.v2alpha1.ReplicationOperations");
-        assert!(frame.get_field_by_name("operation").is_none(), "no separate unreceipted source framing");
+        assert_eq!(
+            batch
+                .kind()
+                .as_message()
+                .expect("batch message")
+                .full_name(),
+            "heddle.api.v2alpha1.ReplicationOperations"
+        );
+        assert!(
+            frame.get_field_by_name("operation").is_none(),
+            "no separate unreceipted source framing"
+        );
     }
-    let batch = pool.get_message_by_name("heddle.api.v2alpha1.ReplicationOperations").expect("shared batch");
-    assert!(batch.get_field_by_name("operations").expect("original signatures").is_list());
-    assert!(batch.get_field_by_name("authority_admissions").expect("retained testimony").is_list());
+    let batch = pool
+        .get_message_by_name("heddle.api.v2alpha1.ReplicationOperations")
+        .expect("shared batch");
+    assert!(
+        batch
+            .get_field_by_name("operations")
+            .expect("original signatures")
+            .is_list()
+    );
+    assert!(
+        batch
+            .get_field_by_name("authority_admissions")
+            .expect("retained testimony")
+            .is_list()
+    );
 }
 
 #[test]
 fn source_genesis_transfers_preserve_claim_conflicts_and_matched_admission() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
-    let wrapper = pool.get_message_by_name("heddle.api.v2alpha1.ThreadGenesisRecord").expect("original wrapper");
+    let wrapper = pool
+        .get_message_by_name("heddle.api.v2alpha1.ThreadGenesisRecord")
+        .expect("original wrapper");
     for (name, number) in [("ownership_claims", 4), ("ownership_claim_admissions", 5)] {
-        let field = wrapper.get_field_by_name(name).expect("claim provenance survives transfer");
+        let field = wrapper
+            .get_field_by_name(name)
+            .expect("claim provenance survives transfer");
         assert_eq!(field.number(), number);
-        assert!(field.is_list(), "preserve conflicts rather than choosing an owner");
-        assert_eq!(field.kind().as_message().expect("signed claim or admission").full_name(), "heddle.api.v2alpha1.SignedRecord");
+        assert!(
+            field.is_list(),
+            "preserve conflicts rather than choosing an owner"
+        );
+        assert_eq!(
+            field
+                .kind()
+                .as_message()
+                .expect("signed claim or admission")
+                .full_name(),
+            "heddle.api.v2alpha1.SignedRecord"
+        );
     }
 }

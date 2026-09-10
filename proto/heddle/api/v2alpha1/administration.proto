@@ -170,6 +170,13 @@ message ReviseSpoolRequest {
   string name = 4;
   SpoolSettings settings = 5;
 }
+// Move a personal-root child to the account's root-level address at its current
+// slug. UUID, genesis, descendants, and direct grants survive.
+message PromoteSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+}
 message DeleteSpoolRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;

@@ -778,7 +778,8 @@ fn call_context_carries_transport_neutral_auth_and_trace_fields() {
         ..Default::default()
     };
 
-    let context = CallContext::decode(context.encode_to_vec().as_slice()).expect("context round trip");
+    let context =
+        CallContext::decode(context.encode_to_vec().as_slice()).expect("context round trip");
     assert_eq!(context.bearer_authority_proof, b"portable-owner-authority");
     assert_eq!(context.bearer_capability, b"opaque-biscuit");
     assert_eq!(context.bearer_grant_envelope, b"opaque-grant-envelope");

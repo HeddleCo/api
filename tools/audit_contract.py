@@ -101,7 +101,7 @@ def audit_new_descriptor(decoded: str) -> None:
         r"principal_id|root_spool_uuid|signer_key_id|spool_uuid|state_hash|"
         r".*(?:public_key|pubkey|signature|proof|client_data_json|attestation.*|assertion|"
         r"authenticator_data|user_handle|biscuit.*|bootstrap_token|grant_envelope|nonce)|"
-        r"checkpoint|data|redactions_blob|state_visibility_blob|attachment_object|pack_chunk|pack_id|"
+        r"checkpoint|data|redactions_blob|state_visibility_blob|entry_visibility_blob|attachment_object|pack_chunk|pack_id|"
         r"grant_batch_digest|final_digest|pack_digest|pack_header|"
         # SearchHit.change_id / StateHit.change_id: raw 16-byte rewrite-stable id
         # (api#104; never a biscuit subject). SymbolHit/ContentHit.object_id: raw

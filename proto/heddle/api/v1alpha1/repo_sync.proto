@@ -289,6 +289,14 @@ enum HostedObjectType {
   HOSTED_OBJECT_TYPE_STATE_VISIBILITY = 6;
   HOSTED_OBJECT_TYPE_STATE_ATTACHMENT = 7;
   HOSTED_OBJECT_TYPE_PURGE = 8;
+  // Discriminants 9 and 10 are NOT free. heddle-client transmits AnnotatedTag
+  // (9) and KeyBinding (10) closure objects over the sync wire using these
+  // out-of-band values — they predate this enum and are decoded/encoded
+  // client-side (hosted-client parse_object_type/object_type_to_proto). They
+  // are reserved here so the proto reflects the live wire contract and no
+  // future value reuses them. The next genuinely free discriminant is 11.
+  reserved 9, 10;
+  HOSTED_OBJECT_TYPE_ENTRY_VISIBILITY = 11;
 }
 
 message ObjectDescriptor {
@@ -397,6 +405,29 @@ message RedactionTransfer {
 message StateVisibilityTransfer {
   StateId state_id = 1;
   bytes state_visibility_blob = 2;
+}
+
+// Out-of-pack transport for entry-visibility sidecars. Where
+// StateVisibilityTransfer declares one audience tier for a whole state,
+// EntryVisibility declares per-entry tiers for the entries of a v4 salted
+// (redactable-Merkle) tree, so individual entries can be served redacted to
+// opaque leaf hashes. Like state-visibility records, entry-visibility records
+// live structurally outside `.heddle/objects/` and cannot ride the native-pack
+// object channel; they ship one `EntryVisibilityTransfer` per sidecar on the
+// sidecar lane. Acceptance uses ordinary spool-write authority and carries no
+// owner authorization sidecar.
+//
+// The sidecar is keyed by the rewrite-stable logical `change_id` of the state
+// whose trees it covers (leaf hashes are stable across states that share a
+// subtree under sticky salts, so a change-id-keyed record survives rebasing the
+// way the object-model type does). `change_id` is the exact 16-byte ChangeId.
+// `entry_visibility_blob` is the rmp-encoded `EntryVisibility` byte payload —
+// byte-identical to what the sender staged on disk; it independently carries
+// the change_id, root tree id, and the per-entry `(tree_id, leaf_hash, tier)`
+// overrides.
+message EntryVisibilityTransfer {
+  ChangeId change_id = 1;
+  bytes entry_visibility_blob = 2;
 }
 
 // Out-of-pack transport for state-attachment sidecars. State attachments
@@ -736,6 +767,7 @@ message PushClientFrame {
     GitLaneTransfer git_lane = 6;
     StateAttachmentTransfer state_attachment = 8;
     PurgeTransfer purge = 9;
+    EntryVisibilityTransfer entry_visibility = 10;
   }
   string client_operation_id = 7;
 }

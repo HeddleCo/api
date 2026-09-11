@@ -466,6 +466,26 @@ message PurgeTransfer {
   SidecarAuthorization authorization = 3;
 }
 
+// Out-of-pack transport for a REDACTED (HRT1) partial tree on bulk pull
+// (structural visibility gate, pull-frame leg). Where a full tree rides the
+// native pack as a hash-addressed object, an HRT1 projection CANNOT — the pack
+// rejects it at `validate_tree_serialized`, and its bytes do not hash to the
+// canonical tree id (it is a projection, not the object). It therefore ships
+// on this dedicated frame and the client installs it via the partial-tree slot
+// (`ObjectStore::put_partial_tree`), NOT as a canonical object.
+//
+// `tree_hash` is the 64-hex canonical (HSR1) tree id the projection
+// reconstructs to (`PartialTree::reconstruct_root`); the client binds the
+// projection to it via `decode_partial_tree(redacted_tree, tree_hash)`.
+// `redacted_tree` is the HRT1 body — visible entries carry their salt+frame,
+// withheld entries only their opaque leaf hash. Only leaf/content-dimension
+// redaction rides this frame; path-tainted (embargo) lineages are whole-tip
+// withheld on pull and never reach it.
+message RedactedTreeTransfer {
+  string tree_hash = 1;
+  bytes redacted_tree = 2;
+}
+
 // Identity used only to construct the canonical purge operation-signing body.
 // It does not replace the fields on PurgeTransfer.
 message PurgeSidecarIdentity {
@@ -798,6 +818,7 @@ message PullServerFrame {
     ProviderPullManifest provider_manifest = 8;
     StateAttachmentTransfer state_attachment = 9;
     PurgeTransfer purge = 10;
+    RedactedTreeTransfer redacted_tree = 11;
   }
 }
 

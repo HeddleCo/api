@@ -132,6 +132,14 @@ message ImportSourceRequest {
   // use SyncService publication instead. The creator signature binds this base.
   bytes initial_base_state = 7;
 }
+// Retry a failed native source fetch/adoption into its original Thread. The
+// original operation remains immutable; this command creates a new operation
+// and never creates a second Spool or Thread genesis.
+message RetryImportSourceRequest {
+  string client_operation_id = 1;
+  RecordRef original_operation = 2;
+  bytes expected_operation_version = 3;
+}
 message SynchronizeRemoteRequest {
   string client_operation_id = 1;
   RecordRef remote = 2;

@@ -573,11 +573,43 @@ message RecoveryAttempt {
 message BeginRecoveryResponse {
   MutationReceipt receipt = 1;
   RecoveryAttempt recovery = 2;
+  // Real or synthetic material for the selected paper-code method. A public
+  // begin never discloses whether an account or method exists.
+  PaperCodeKdfMaterial paper_code_kdf = 3;
+}
+message RecoveryArgon2idParams {
+  uint32 memory_kib = 1;
+  uint32 iterations = 2;
+  uint32 parallelism = 3;
+}
+message PaperCodeKdfMaterial {
+  bytes salt = 1;
+  RecoveryArgon2idParams params = 2;
+}
+message PaperCodeUnlock {
+  // Fixed-length Argon2id result derived locally from the 24-word kit. The
+  // original words never cross this boundary.
+  bytes argon2id_hash = 1;
 }
 message SubmitRecoveryProofRequest {
   string client_operation_id = 1;
   RecordRef recovery = 2;
-  SignedRecord proof = 3;
+  oneof proof {
+    // Portable guardian threshold plus proposed-root possession. For a paper
+    // method this follows a successful paper_unlock on the same attempt.
+    SignedRecord signed_transition = 3;
+    // First paper stage: bounded method verification unlocks the current
+    // owner history needed to sign the portable transition on a lost device.
+    PaperCodeUnlock paper_unlock = 4;
+  }
+}
+message SubmitRecoveryProofResponse {
+  MutationReceipt receipt = 1;
+  oneof outcome {
+    // Only returned after a real declared paper method is verified.
+    OwnerState unlocked_ownership = 2;
+    RecoveryAttempt accepted = 3;
+  }
 }
 message CompleteRecoveryRequest {
   string client_operation_id = 1;

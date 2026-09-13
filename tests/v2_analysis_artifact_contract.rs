@@ -2,6 +2,53 @@
 use prost_reflect::{DescriptorPool, Kind};
 
 #[test]
+fn analysis_execution_only_reads_its_base() {
+    use heddle_api::heddle::api::v1alpha1::AuthorizationRole;
+    let method =
+        heddle_api::v2::method_descriptor("/heddle.api.v2alpha1.AnalysisService/StartAnalysis")
+            .expect("analysis route");
+    let targets: Vec<_> = method
+        .authorization
+        .targets
+        .iter()
+        .map(|target| (target.path, target.role))
+        .collect();
+    assert_eq!(
+        targets,
+        vec![
+            ("thread.spool", AuthorizationRole::ResourceWriter),
+            ("base_thread.spool", AuthorizationRole::ResourceReader)
+        ],
+        "a comparison reads its base without requiring permission to mutate it"
+    );
+}
+
+#[test]
+fn semantic_index_artifact_retains_its_usable_closure() {
+    let pool = DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("contract");
+    let artifact = pool
+        .get_message_by_name("heddle.api.v2alpha1.AnalysisArtifact")
+        .expect("artifact");
+    let Kind::Message(index) = artifact
+        .get_field_by_name("semantic_index")
+        .expect("usable index artifact")
+        .kind()
+    else {
+        panic!("typed index");
+    };
+    assert_eq!(
+        index.full_name(),
+        "heddle.api.v2alpha1.SemanticIndexArtifact"
+    );
+    for field in ["root_hash", "nodes", "parsed_files", "opaque_files"] {
+        assert!(
+            index.get_field_by_name(field).is_some(),
+            "index must retain {field}"
+        );
+    }
+}
+
+#[test]
 fn analysis_inputs_preserve_exact_owning_threads() {
     let pool = DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("contract");
     for name in [

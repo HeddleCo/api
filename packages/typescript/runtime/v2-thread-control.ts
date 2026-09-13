@@ -242,6 +242,8 @@ function controlValue(control: ThreadControlValue, spool: string, thread: Uint8A
       if (!names[review.kind]) throw new Error("Invalid review kind");
       const isAttestation = review.kind === ReviewDecision_Kind.READ || review.kind === ReviewDecision_Kind.AGENT_PREVIEW || review.kind === ReviewDecision_Kind.AGENT_CO_REVIEW;
       if (isAttestation !== Boolean(review.coverage)) throw new Error("Review coverage must match attestation kind");
+      if ((review.kind === ReviewDecision_Kind.AGENT_PREVIEW || review.kind === ReviewDecision_Kind.AGENT_CO_REVIEW) && !actor.agentId)
+        throw new Error("Agent review attestation requires an agent actor");
       let coverage: Value | null = null;
       if (review.coverage) {
         const selection = review.coverage.selection;

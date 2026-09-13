@@ -111,6 +111,8 @@ test('read attestations bind bounded exact source coverage and never encode appr
   review.kind = ReviewDecision_Kind.AGENT_PREVIEW;
   review.coverage = undefined;
   await assert.rejects(signThreadControl(input.overview, input.command, input.author), /coverage must match/);
+  review.coverage = { selection: { case: 'wholeSource', value: true } };
+  await assert.rejects(signThreadControl(input.overview, input.command, input.author), /requires an agent actor/);
 });
 
 test('Rust-emitted Read record verifies against its original in the browser', async () => {

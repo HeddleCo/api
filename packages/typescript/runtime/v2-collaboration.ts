@@ -526,7 +526,7 @@ function annotationEntityValue(ref: EntityRef): MapValue {
       const r = entity.value; if (!r.spool || !r.device || r.device.kind !== 2) throw new Error("Checkout requires spool and device");
       return mentionValue({ kind: "checkout", spoolId: r.spool.id, device: r.device.publicKey, id: r.id });
     }
-    case undefined: case "bookmark": throw new Error("Unsupported annotation entity reference");
+    case undefined: case "bookmark": case "principal": case "agent": throw new Error("Unsupported annotation entity reference");
     default: {
       const kind = entity.case.replace(/[A-Z]/g, c => "_" + c.toLowerCase());
       if (!RECORD_KINDS.has(kind)) throw new Error("Unsupported annotation record reference");

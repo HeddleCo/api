@@ -156,6 +156,27 @@ enum SearchDomain {
   SEARCH_DOMAIN_THREAD = 1;
   SEARCH_DOMAIN_DISCUSSION = 2;
   SEARCH_DOMAIN_CONTEXT = 3;
+  SEARCH_DOMAIN_SOURCE_CONTENT = 4;
+  SEARCH_DOMAIN_SOURCE_SYMBOL = 5;
+  SEARCH_DOMAIN_REVISION = 6;
+  SEARCH_DOMAIN_SPOOL = 7;
+  SEARCH_DOMAIN_PRINCIPAL = 8;
+  SEARCH_DOMAIN_AGENT = 9;
+  SEARCH_DOMAIN_ACTIVITY = 10;
+  SEARCH_DOMAIN_DISCUSSION_TURN = 11;
+}
+
+// How this match was established; score is only comparable within this query.
+enum SearchMatchKind {
+  SEARCH_MATCH_KIND_UNSPECIFIED = 0;
+  SEARCH_MATCH_KIND_EXACT = 1;
+  SEARCH_MATCH_KIND_PREFIX = 2;
+  SEARCH_MATCH_KIND_FUZZY = 3;
+  SEARCH_MATCH_KIND_FULLTEXT = 4;
+  SEARCH_MATCH_KIND_SEMANTIC = 5;
+  SEARCH_MATCH_KIND_HASH_EXACT = 6;
+  SEARCH_MATCH_KIND_HASH_PREFIX = 7;
+  SEARCH_MATCH_KIND_STRUCTURED = 8;
 }
 
 message SearchRequest {
@@ -188,8 +209,11 @@ message SearchRequest {
 message SearchHit {
   EntityRef subject = 1;
   string summary = 2;
-  string path = 3;
-  optional uint32 line = 4;
+  // Present for source content, symbol and revision hits. The exact revision,
+  // path, symbol and line bounds share one proof-bearing source location.
+  // Its Thread must equal thread below; all coordinates pass the live gate.
+  SourceLocation location = 3;
+  SearchDomain domain = 4;
   double score = 5;
   // Owning Thread lets clients navigate a record without another lookup. It
   // conveys no additional authority over that Thread or its source revisions.
@@ -197,13 +221,31 @@ message SearchHit {
   // Exact current operation for context hits. Concurrent revisions remain
   // separate hits even when subject is the same addressable context record.
   bytes causal_id = 7;
+  SearchMatchKind match_kind = 8;
+  // Human-readable symbol spelling; the stable symbol identity is in location.
+  optional string symbol_name = 9;
+}
+
+// Per-domain readiness is independent of result count and hidden matches.
+// An unavailable index is not represented as an empty, complete result set.
+message SearchDomainStatus {
+  SearchDomain domain = 1;
+  Coverage coverage = 2;
+  repeated SearchRequest.Mode supported_modes = 3;
 }
 
 message SearchEvent {
   EndpointRef source = 1;
+  // Exactly one domain_status for each selected supported domain precedes
+  // the hits. Its readiness considers authorized candidates only; hidden
+  // records never change coverage or pagination. A terminal complete uses
+  // section "search" and conservatively combines the domain coverage.
+  // PageInfo.exhausted describes visible candidate pagination, independently
+  // of whether a requested index is still pending or unavailable.
   oneof payload {
     SearchHit hit = 2;
     SectionStatus complete = 3;
+    SearchDomainStatus domain_status = 4;
   }
 }
 

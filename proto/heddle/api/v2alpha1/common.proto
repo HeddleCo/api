@@ -12,6 +12,13 @@ message PrincipalRef {
   string id = 1;
 }
 
+// Stable delegated agent identity, scoped to its owning account. Neither a
+// display name nor a rotating signing key is an agent's resource identity.
+message AgentRef {
+  PrincipalRef account = 1;
+  string id = 2;
+}
+
 // Public presentation only; never carries credential, account settings or rights.
 message PublicPrincipalSummary {
   string id = 1;
@@ -112,6 +119,8 @@ message EntityRef {
     RecordRef provider_connection = 34;
     RecordRef remote_link = 35;
     RecordRef passkey = 36;
+    PrincipalRef principal = 37;
+    AgentRef agent = 38;
   }
 }
 

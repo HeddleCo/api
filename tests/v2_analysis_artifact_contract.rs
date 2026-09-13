@@ -2,6 +2,30 @@
 use prost_reflect::{DescriptorPool, Kind};
 
 #[test]
+fn analysis_inputs_preserve_exact_owning_threads() {
+    let pool = DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("contract");
+    for name in [
+        "ObserveAnalysisRequest",
+        "StartAnalysisRequest",
+        "AnalysisRecord",
+        "AnalysisArtifact",
+    ] {
+        let message = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .expect("analysis message");
+        for field in ["thread", "base_thread"] {
+            let owner = message
+                .get_field_by_name(field)
+                .unwrap_or_else(|| panic!("{name}.{field} must identify its source owner"));
+            let Kind::Message(owner) = owner.kind() else {
+                panic!("typed source ownership required")
+            };
+            assert_eq!(owner.full_name(), "heddle.api.v2alpha1.ThreadRef");
+        }
+    }
+}
+
+#[test]
 fn retained_analysis_is_versioned_and_preserves_typed_results() {
     let pool = DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("contract");
     let artifact = pool

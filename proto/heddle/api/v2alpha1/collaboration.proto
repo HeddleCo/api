@@ -89,6 +89,13 @@ message SourceTargetResolutionEvent {
   }
 }
 
+// Exact view selection for a Thread's inherited target bindings. This selects
+// resolution only; it grants no source access and does not select more records.
+message SourceTargetView {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2;
+}
+
 message CollaborationAnchor {
   oneof target {
     ThreadRef thread = 1;
@@ -260,6 +267,11 @@ message ObserveCollaborationRequest {
   // Presence selects context revisions only, including an empty match-all query.
   // Predicates apply per revision; concurrent heads remain separate results.
   AnnotationQuery annotations = 10;
+  // At most 64, unique by Thread, in this request's Spool. Each revision must
+  // belong to its named Thread. ViewedThread bindings resolve at this revision;
+  // omission uses that Thread's unique current source head. NamedThread and
+  // PinnedRevision bindings retain their explicit policies.
+  repeated SourceTargetView source_views = 11;
 }
 
 message CollaborationEvent {

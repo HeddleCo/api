@@ -33,6 +33,7 @@ message ObserveThreadRequest {
   repeated ThreadSection sections = 2;
   // Optional exact compared revisions; omitting them resolves once in the
   // snapshot and returns the exact pair in the review comparison payload.
+  // Source also selects the revision for ViewedThread collaboration targets.
   RevisionRef source = 3;
   RevisionRef base = 4;
   ThreadPages pages = 5;

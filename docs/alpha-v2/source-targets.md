@@ -13,6 +13,10 @@ Thread. The current revision is a value, so a capture replaces one map entry
 without rewriting every referring record. Historical Thread views resolve
 against their selected revision; named bindings follow their named Thread and
 pinned bindings retain the requested revision.
+`ObserveThread.source` supplies that selected revision. Standalone collaboration
+queries use `source_views`, with at most one exact revision per Thread; an omitted
+Thread uses its unique current source head. These selectors do not broaden the
+record query or grant source access.
 
 An upsert reports resolved, ambiguous, deleted or unavailable. Only resolved
 includes an exact `SourceLocation`. Ambiguous and deleted can identify the
@@ -22,6 +26,12 @@ material and inaccessible material produce the same projection. An event never
 grants access to the original or current source. Both original signed evidence
 and emitted current locations must pass the relevant resource and visibility
 gates before their identifiers leave the endpoint.
+
+An inaccessible current projection does not erase an independently readable
+authored discussion. Its signed original referents (including explicitly named
+Threads and pinned revisions) must still be visible; the optional derived
+location then reports unavailable without identifiers. This keeps discussion
+history usable when a target is deleted or source transfer is incomplete.
 
 Snapshot frames carry only upserts. Live upserts and removals use the matching
 stream data kind. They stage and commit at the same checkpoint as referring

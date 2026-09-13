@@ -50,6 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "PublishContentServerFrame.body",
         "CreateSpoolRequest.ownership",
         "CollaborationAnchor.target",
+        "SourceTargetResolutionEvent.change",
         "CheckoutEvent.payload",
         "PairingEvent.payload",
         "ThreadEvent.payload",

@@ -92,6 +92,17 @@ message ThreadOverview {
   // Exact signed source operation IDs, not materialized revision hashes.
   // An incomplete frontier cannot be used for an ownership claim.
   SourceOperationFrontier source_frontier = 24;
+  // Present only when ObserveThread selected an independently readable target.
+  LandingAssessment landing_assessment = 25;
+}
+
+message LandingAssessment {
+  ThreadRef target = 1;
+  RevisionRef source = 2;
+  RevisionRef expected_target = 3;
+  bytes policy_version = 4;
+  ReviewReadiness readiness = 5;
+  repeated Requirement requirements = 6;
 }
 
 message ThreadOwnership {

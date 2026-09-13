@@ -40,6 +40,9 @@ message ObserveThreadRequest {
   // Original portable operations for requested causal sections. Editors and
   // replica clients can prepare the next signed command from this same view.
   bool include_operations = 7;
+  // Readiness is meaningful only against an explicitly selected target Thread.
+  // A missing target leaves ThreadOverview.readiness UNKNOWN.
+  ThreadRef landing_target = 8;
 }
 
 // One typed stream composes a Thread's decision context. Common frame controls

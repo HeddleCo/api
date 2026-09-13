@@ -237,6 +237,9 @@ message OperationRecord {
   heddle.api.v1alpha1.CallFailure failure = 10;
   repeated EntityRef results = 11;
   repeated Requirement requirements = 12;
+  // Current observed affordances. Clients still submit against this record's
+  // exact version; the server rechecks authorization at command admission.
+  repeated ActionAvailability actions = 13;
 }
 
 // A durable, versioned record. Its format defines canonical bytes, domain,

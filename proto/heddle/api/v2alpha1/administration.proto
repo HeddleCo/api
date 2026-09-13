@@ -82,6 +82,10 @@ message GrantRecord {
   ResourceRole role = 4;
   bool include_descendants = 5;
   google.protobuf.Timestamp expires_at = 6;
+  // Optional display projection, as on MemberRecord. When present, id equals
+  // principal_id. Authorization always uses principal_id and the grant itself;
+  // a handle or display name is never an authority assertion.
+  PublicPrincipalSummary principal = 7;
   // Ordinary grants never imply owner purge authority.
 }
 message InvitationRecord {

@@ -30,6 +30,9 @@ message AnalysisRecord {
   // Exact total only when known. A bounded/partial projection must not report
   // the current page's size as the total or use zero to mean unknown.
   optional uint64 finding_count = 10;
+  ThreadRef thread = 11;
+  // Exact base owner; absent only when this analysis has no base revision.
+  ThreadRef base_thread = 12;
 }
 
 message AnalysisFinding {
@@ -57,6 +60,11 @@ message ObserveAnalysisRequest {
   ObserveOptions observe = 6;
   // Exact qualified symbol addresses; empty selects all symbols in paths.
   repeated string symbols = 7;
+  // Required owning Thread of source. A shared revision does not grant access
+  // through another Thread. Its Spool must match source.spool.
+  ThreadRef thread = 8;
+  // Absent uses thread. An explicit comparison Thread is independently read.
+  ThreadRef base_thread = 9;
 }
 
 message AnalysisEvent {
@@ -84,6 +92,10 @@ message StartAnalysisRequest {
   // because a view asks for analysis. Provider disclosure requires policy.
   EndpointRef execution_endpoint = 5;
   bytes expected_disclosure_policy_version = 6;
+  // Required owning Thread of source; matches source.spool.
+  ThreadRef thread = 7;
+  // Absent uses thread when base is present.
+  ThreadRef base_thread = 8;
 }
 
 // Immutable derived analysis output. Stored under an opaque Thread-scoped
@@ -101,6 +113,8 @@ message AnalysisArtifact {
   repeated heddle.api.v1alpha1.SemanticHotSpot hot_spots = 7;
   repeated BehaviorChange behavior_changes = 8;
   repeated BehaviorAnalysisCoverage behavior_coverage = 9;
+  ThreadRef thread = 10;
+  ThreadRef base_thread = 11;
   // Each analysis names its implementation/version and reports actual coverage.
   // Raw transcripts, runtime secrets, and original private attachments are not
   // analysis output and cannot be placed into this derived-artifact envelope.

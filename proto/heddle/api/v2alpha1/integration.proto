@@ -11,7 +11,8 @@ message ProviderConnection {
   bytes version = 2;
   string provider = 3;
   string provider_account_id = 4;
-  string installation_id = 5;
+  // All active installations authorized by this account's provider credential.
+  repeated string installation_ids = 5;
   repeated ActionAvailability actions = 6;
   bool revoked = 7;
   // This record contains no provider token or OAuth authorization code.
@@ -22,6 +23,9 @@ message ProviderRepository {
   string clone_url = 3;
   string name = 4;
   bool private = 5;
+  // Exact installation whose user grant listed this repository. ImportSource
+  // verifies this association again before selecting provider custody.
+  string installation_id = 6;
 }
 message RemoteLinkRecord {
   RecordRef ref = 1;
@@ -45,6 +49,8 @@ message RemoteLinkRecord {
   ThreadRef target = 11;
   // Optional explicit recurring-policy deadline, independent of bearer age.
   google.protobuf.Timestamp expires_at = 12;
+  // Exact granted installation for a connected GitHub remote.
+  string installation_id = 13;
 }
 message ObserveIntegrationsRequest {
   repeated SpoolRef spools = 1;

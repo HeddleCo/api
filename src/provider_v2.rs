@@ -3,8 +3,9 @@
 
 use crate::heddle::api::v2alpha1::{
     Coverage, EndpointKind, ProviderAssemblyRecord, ProviderExtent, ProviderOffer,
-    ProviderPhysicalRange, ProviderPlan, ProviderPlanChallenge, ProviderReadTicket, RevisionRef,
-    SharedFacet, ThreadRef, provider_assembly_record, revision_ref,
+    ProviderPhysicalRange, ProviderPlan, ProviderPlanChallenge, ProviderPlanRegistration,
+    ProviderReadTicket, RevisionRef, SharedFacet, ThreadRef, provider_assembly_record,
+    revision_ref,
 };
 use std::collections::HashSet;
 
@@ -459,7 +460,9 @@ pub fn validate_provider_plan(plan: &ProviderPlan) -> Result<(), ProviderCanonic
 /// Materialize a capability-free offer as an in-memory layout. This is never
 /// a serving grant: empty capabilities make `validate_provider_plan` reject it.
 /// It exists so offer and final-plan digests share one canonical implementation.
-pub fn provider_offer_as_plan(offer: &ProviderOffer) -> Result<ProviderPlan, ProviderCanonicalError> {
+pub fn provider_offer_as_plan(
+    offer: &ProviderOffer,
+) -> Result<ProviderPlan, ProviderCanonicalError> {
     let challenge = offer
         .challenge
         .as_ref()
@@ -546,11 +549,15 @@ pub fn validate_plan_for_offer(
         || candidate.records != plan.records
         || candidate.extents.len() != plan.extents.len()
     {
-        return Err(ProviderCanonicalError::Invalid("issued plan differs from offer"));
+        return Err(ProviderCanonicalError::Invalid(
+            "issued plan differs from offer",
+        ));
     }
     for (candidate, issued) in candidate.extents.iter().zip(&plan.extents) {
         if candidate.provider != issued.provider || candidate.range != issued.range {
-            return Err(ProviderCanonicalError::Invalid("issued range differs from offer"));
+            return Err(ProviderCanonicalError::Invalid(
+                "issued range differs from offer",
+            ));
         }
         let Some(candidate_ticket) = candidate.ticket.as_ref() else {
             return Err(ProviderCanonicalError::Invalid("offer scope"));
@@ -563,8 +570,61 @@ pub fn validate_plan_for_offer(
             || candidate_ticket.audience != issued_ticket.audience
             || candidate_ticket.content_root != issued_ticket.content_root
         {
-            return Err(ProviderCanonicalError::Invalid("issued scope differs from offer"));
+            return Err(ProviderCanonicalError::Invalid(
+                "issued scope differs from offer",
+            ));
         }
+    }
+    Ok(())
+}
+
+/// Validate the trusted publisher's private R2 placement map. Only the
+/// operator-authenticated registration path may persist this message; it is
+/// never a client-visible grant or a substitute for live source admission.
+pub fn validate_provider_registration(
+    registration: &ProviderPlanRegistration,
+) -> Result<(), ProviderCanonicalError> {
+    let plan = registration
+        .plan
+        .as_ref()
+        .ok_or(ProviderCanonicalError::Invalid("registered plan"))?;
+    validate_provider_plan(plan)?;
+    if registration.packs.is_empty() || registration.packs.len() > plan.extents.len() {
+        return Err(ProviderCanonicalError::Invalid("registered pack count"));
+    }
+    let mut locations = std::collections::HashSet::with_capacity(registration.packs.len());
+    for pack in &registration.packs {
+        exact_32(&pack.pack_id, "registered pack ID")?;
+        if pack.object_key.is_empty()
+            || pack.object_key.len() > 1024
+            || pack.object_key.chars().any(char::is_control)
+            || !locations.insert(pack.pack_id.as_slice())
+        {
+            return Err(ProviderCanonicalError::Invalid("registered pack location"));
+        }
+    }
+    for extent in &plan.extents {
+        let range = extent
+            .range
+            .as_ref()
+            .ok_or(ProviderCanonicalError::Invalid("registered range"))?;
+        if !locations.contains(range.pack_id.as_slice()) {
+            return Err(ProviderCanonicalError::Invalid("registered pack missing"));
+        }
+    }
+    if locations.len() != registration.packs.len()
+        || registration.packs.iter().any(|pack| {
+            !plan.extents.iter().any(|extent| {
+                extent
+                    .range
+                    .as_ref()
+                    .is_some_and(|range| range.pack_id == pack.pack_id)
+            })
+        })
+    {
+        return Err(ProviderCanonicalError::Invalid(
+            "unreferenced registered pack",
+        ));
     }
     Ok(())
 }

@@ -4,6 +4,7 @@ import { EndpointKind, type EndpointRef } from "./stream_pb.js";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { create } from "@bufbuild/protobuf";
 import { ProviderPlanSchema, ProviderExtentSchema, ProviderReadTicketSchema, type ProviderOffer, type ProviderPlanChallenge, type ProviderPlan, type ProviderPhysicalRange, type ProviderAssemblyRecord } from "./sync_pb.js";
+import type { ProviderPlanRegistration } from "./provider_internal_pb.js";
 
 const utf8 = new TextEncoder();
 export const PROVIDER_CONSENT_FORMAT = "heddle.provider-consent.v2";
@@ -228,6 +229,25 @@ export function validatePlanForOffer(offer: ProviderOffer, plan: ProviderPlan): 
     || !equal(plan.assemblyDigest, offer.assemblyDigest)
     || !equal(providerAssemblyDigest(plan), providerAssemblyDigest(providerOfferAsPlan(offer))))
     throw new Error("Issued provider plan differs from offer");
+}
+/** Structural validation for operator-authenticated, private R2 placement. */
+export function validateProviderRegistration(registration: ProviderPlanRegistration): void {
+  const plan = registration.plan;
+  if (!plan) throw new Error("Missing registered provider plan");
+  validateProviderPlan(plan);
+  if (!registration.packs.length || registration.packs.length > plan.extents.length)
+    throw new Error("Invalid registered pack count");
+  const locations = new Set<string>();
+  for (const pack of registration.packs) {
+    if (pack.packId.length !== 32 || !pack.objectKey || utf8.encode(pack.objectKey).length > 1024
+      || /\p{Cc}/u.test(pack.objectKey)) throw new Error("Invalid registered pack location");
+    const key = hexBytes(pack.packId);
+    if (locations.has(key)) throw new Error("Duplicate registered pack location");
+    locations.add(key);
+  }
+  const referenced = new Set(plan.extents.map(extent => hexBytes(exact32(extent.range?.packId, "pack ID"))));
+  if (referenced.size !== locations.size || [...referenced].some(key => !locations.has(key)))
+    throw new Error("Registered pack coverage differs from plan");
 }
 function exact32(value: Uint8Array | undefined, name: string): Uint8Array {
   if (value?.length !== 32) throw new Error(`Invalid provider ${name}`);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { EndpointKind } from '../packages/typescript/dist/v2alpha1/stream_pb.js';
 import { blake3 } from '@noble/hashes/blake3.js';
-import { providerRecordSetCommitment, providerExtentSetDigest, providerAssemblyDigest, providerConsentSigningBytes, validateProviderPlan } from '../packages/typescript/dist/v2alpha1/provider.js';
+import { providerRecordSetCommitment, providerExtentSetDigest, providerAssemblyDigest, providerConsentSigningBytes, validateProviderPlan, providerOfferAsPlan, validateProviderOffer, validatePlanForOffer } from '../packages/typescript/dist/v2alpha1/provider.js';
 
 const filled = (byte, length = 32) => new Uint8Array(length).fill(byte);
 const hex = value => Buffer.from(value).toString('hex');
@@ -38,6 +38,27 @@ function fixture() {
   plan.extents[0].ticket.assemblyDigest = plan.assemblyDigest;
   return plan;
 }
+test('capability-free offer binds the same layout but never serves bytes', () => {
+  const plan = fixture();
+  const offer = {
+    extentSetDigest: plan.extentSetDigest,
+    extents: plan.extents.map(extent => ({
+      provider: extent.provider, range: extent.range, spool: extent.ticket.spool,
+      facet: extent.ticket.facet, audience: extent.ticket.audience,
+      contentRoot: extent.ticket.contentRoot,
+    })),
+    challenge: plan.challenge, assemblyDigest: plan.assemblyDigest,
+    packHeader: plan.packHeader, outputPackLength: plan.outputPackLength,
+    records: plan.records,
+  };
+  validateProviderOffer(offer);
+  validatePlanForOffer(offer, plan);
+  assert.throws(() => validateProviderPlan(providerOfferAsPlan(offer)), /digest disagreement/);
+  const moved = structuredClone(offer); moved.records[0].outputOffset += 1n;
+  assert.throws(() => validateProviderOffer(moved), /output tiling/);
+  const changed = structuredClone(plan); changed.extents[0].ticket.contentRoot = filled(12);
+  assert.throws(() => validatePlanForOffer(offer, changed), /extent set/);
+});
 test('TS and Rust commit the same mixed provider/inline plan and consent bytes', () => {
   const plan = fixture();
   validateProviderPlan(plan);

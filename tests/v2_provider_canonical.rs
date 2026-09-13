@@ -1,13 +1,56 @@
 use heddle_api::heddle::api::v2alpha1::{
     EndpointKind, EndpointRef, ObjectAddress, ProviderAssemblyRecord, ProviderExtent,
     ProviderInlineSource, ProviderPhysicalRange, ProviderPlan, ProviderPlanChallenge,
+    ProviderOffer, ProviderOfferExtent,
     ProviderRangeSource, ProviderReadTicket, RevisionRef, SpoolRef, ThreadId, ThreadRef,
     TransferObject, provider_assembly_record, revision_ref,
 };
 use heddle_api::provider_v2::{
     provider_assembly_digest, provider_consent_signing_bytes, provider_extent_set_digest,
     provider_record_set_commitment, validate_provider_plan,
+    provider_offer_as_plan, validate_provider_offer, validate_plan_for_offer,
 };
+
+fn offer_from(plan: &ProviderPlan) -> ProviderOffer {
+    ProviderOffer {
+        extent_set_digest: plan.extent_set_digest.clone(),
+        extents: plan.extents.iter().map(|extent| {
+            let ticket = extent.ticket.as_ref().expect("fixture ticket");
+            ProviderOfferExtent {
+                provider: extent.provider.clone(),
+                range: extent.range.clone(),
+                spool: ticket.spool.clone(),
+                facet: ticket.facet,
+                audience: ticket.audience.clone(),
+                content_root: ticket.content_root.clone(),
+            }
+        }).collect(),
+        challenge: plan.challenge.clone(),
+        assembly_digest: plan.assembly_digest.clone(),
+        pack_header: plan.pack_header.clone(),
+        output_pack_length: plan.output_pack_length,
+        records: plan.records.clone(),
+    }
+}
+
+#[test]
+fn capability_free_offer_and_ticketed_plan_share_exact_layout() {
+    let plan = fixture();
+    let offer = offer_from(&plan);
+    validate_provider_offer(&offer).expect("candidate layout");
+    validate_plan_for_offer(&offer, &plan).expect("issued exact offer");
+    assert!(validate_provider_plan(&provider_offer_as_plan(&offer).expect("layout")).is_err(), "offer never serves bytes");
+
+    let mut moved = offer.clone();
+    moved.records[0].output_offset += 1;
+    assert!(validate_provider_offer(&moved).is_err(), "changed candidate placement");
+    let mut other = plan.clone();
+    other.extents[0].ticket.as_mut().expect("ticket").content_root = vec![12; 32];
+    assert!(validate_plan_for_offer(&offer, &other).is_err(), "changed issued scope");
+    let mut no_cap = plan;
+    no_cap.extents[0].ticket.as_mut().expect("ticket").attenuated_capability.clear();
+    assert!(validate_provider_plan(&no_cap).is_err(), "issued plan needs capability");
+}
 
 fn endpoint(kind: EndpointKind, byte: u8) -> EndpointRef {
     EndpointRef {

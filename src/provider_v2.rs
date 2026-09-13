@@ -2,9 +2,9 @@
 //! Protobuf is a transport container; these bytes are the portable proof.
 
 use crate::heddle::api::v2alpha1::{
-    Coverage, EndpointKind, ProviderAssemblyRecord, ProviderPhysicalRange, ProviderPlan,
-    ProviderPlanChallenge, RevisionRef, SharedFacet, ThreadRef, provider_assembly_record,
-    revision_ref,
+    Coverage, EndpointKind, ProviderAssemblyRecord, ProviderExtent, ProviderOffer,
+    ProviderPhysicalRange, ProviderPlan, ProviderPlanChallenge, ProviderReadTicket, RevisionRef,
+    SharedFacet, ThreadRef, provider_assembly_record, revision_ref,
 };
 use std::collections::HashSet;
 
@@ -451,6 +451,119 @@ pub fn validate_provider_plan(plan: &ProviderPlan) -> Result<(), ProviderCanonic
             .ok_or(ProviderCanonicalError::Invalid("ticket"))?;
         if ticket.attenuated_capability.is_empty() || ticket.assembly_digest != assembly {
             return Err(ProviderCanonicalError::Invalid("ticket assembly digest"));
+        }
+    }
+    Ok(())
+}
+
+/// Materialize a capability-free offer as an in-memory layout. This is never
+/// a serving grant: empty capabilities make `validate_provider_plan` reject it.
+/// It exists so offer and final-plan digests share one canonical implementation.
+pub fn provider_offer_as_plan(offer: &ProviderOffer) -> Result<ProviderPlan, ProviderCanonicalError> {
+    let challenge = offer
+        .challenge
+        .as_ref()
+        .ok_or(ProviderCanonicalError::Invalid("offer challenge"))?;
+    let client = challenge
+        .client
+        .as_ref()
+        .ok_or(ProviderCanonicalError::Invalid("offer client"))?;
+    let expiry = challenge
+        .expires_at
+        .as_ref()
+        .ok_or(ProviderCanonicalError::Invalid("offer expiry"))?;
+    if offer.extents.is_empty() || offer.extents.len() > MAX_RECORDS {
+        return Err(ProviderCanonicalError::Bound);
+    }
+    let extents = offer
+        .extents
+        .iter()
+        .map(|offered| {
+            let range = offered
+                .range
+                .as_ref()
+                .ok_or(ProviderCanonicalError::Invalid("offer range"))?;
+            Ok(ProviderExtent {
+                provider: offered.provider.clone(),
+                range: Some(range.clone()),
+                ticket: Some(ProviderReadTicket {
+                    attenuated_capability: Vec::new(),
+                    extent_set_digest: offer.extent_set_digest.clone(),
+                    spool: offered.spool.clone(),
+                    facet: offered.facet,
+                    audience: offered.audience.clone(),
+                    content_root: offered.content_root.clone(),
+                    pack_id: range.pack_id.clone(),
+                    object_etag: range.object_etag.clone(),
+                    offset: range.offset,
+                    length: range.length,
+                    provider: offered.provider.clone(),
+                    client: Some(client.clone()),
+                    assembly_digest: offer.assembly_digest.clone(),
+                    expires_at: Some(*expiry),
+                    record_set_commitment: range.record_set_commitment.clone(),
+                }),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ProviderPlan {
+        extent_set_digest: offer.extent_set_digest.clone(),
+        extents,
+        challenge: offer.challenge.clone(),
+        assembly_digest: offer.assembly_digest.clone(),
+        pack_header: offer.pack_header.clone(),
+        output_pack_length: offer.output_pack_length,
+        records: offer.records.clone(),
+    })
+}
+
+/// Verify an unsigned offer's exact physical and virtual layout. The offer
+/// cannot authorize serving because it carries no capability-bearing ticket.
+pub fn validate_provider_offer(offer: &ProviderOffer) -> Result<(), ProviderCanonicalError> {
+    let layout = provider_offer_as_plan(offer)?;
+    if layout.extent_set_digest != provider_extent_set_digest(&layout)?
+        || layout.assembly_digest != provider_assembly_digest(&layout)?
+    {
+        return Err(ProviderCanonicalError::Invalid("offer digest disagreement"));
+    }
+    Ok(())
+}
+
+/// The issued plan must preserve exactly the candidate layout the client
+/// signed. Ticket capabilities are added only after consent.
+pub fn validate_plan_for_offer(
+    offer: &ProviderOffer,
+    plan: &ProviderPlan,
+) -> Result<(), ProviderCanonicalError> {
+    validate_provider_offer(offer)?;
+    validate_provider_plan(plan)?;
+    let candidate = provider_offer_as_plan(offer)?;
+    if candidate.extent_set_digest != plan.extent_set_digest
+        || candidate.assembly_digest != plan.assembly_digest
+        || candidate.challenge != plan.challenge
+        || candidate.pack_header != plan.pack_header
+        || candidate.output_pack_length != plan.output_pack_length
+        || candidate.records != plan.records
+        || candidate.extents.len() != plan.extents.len()
+    {
+        return Err(ProviderCanonicalError::Invalid("issued plan differs from offer"));
+    }
+    for (candidate, issued) in candidate.extents.iter().zip(&plan.extents) {
+        if candidate.provider != issued.provider || candidate.range != issued.range {
+            return Err(ProviderCanonicalError::Invalid("issued range differs from offer"));
+        }
+        let Some(candidate_ticket) = candidate.ticket.as_ref() else {
+            return Err(ProviderCanonicalError::Invalid("offer scope"));
+        };
+        let Some(issued_ticket) = issued.ticket.as_ref() else {
+            return Err(ProviderCanonicalError::Invalid("issued ticket"));
+        };
+        if candidate_ticket.spool != issued_ticket.spool
+            || candidate_ticket.facet != issued_ticket.facet
+            || candidate_ticket.audience != issued_ticket.audience
+            || candidate_ticket.content_root != issued_ticket.content_root
+        {
+            return Err(ProviderCanonicalError::Invalid("issued scope differs from offer"));
         }
     }
     Ok(())

@@ -2,7 +2,8 @@
  * length-delimited bytes are the exact client signature input. */
 import { EndpointKind, type EndpointRef } from "./stream_pb.js";
 import { blake3 } from "@noble/hashes/blake3.js";
-import type { ProviderPlanChallenge, ProviderPlan, ProviderPhysicalRange, ProviderAssemblyRecord } from "./sync_pb.js";
+import { create } from "@bufbuild/protobuf";
+import { ProviderPlanSchema, ProviderExtentSchema, ProviderReadTicketSchema, type ProviderOffer, type ProviderPlanChallenge, type ProviderPlan, type ProviderPhysicalRange, type ProviderAssemblyRecord } from "./sync_pb.js";
 
 const utf8 = new TextEncoder();
 export const PROVIDER_CONSENT_FORMAT = "heddle.provider-consent.v2";
@@ -173,6 +174,60 @@ export function validateProviderPlan(plan: ProviderPlan): void {
   if (!equal(plan.assemblyDigest, digest) || !equal(plan.challenge?.assemblyDigest ?? new Uint8Array(), digest)
     || plan.extents.some(extent => !extent.ticket?.attenuatedCapability.length || !equal(extent.ticket.assemblyDigest, digest)))
     throw new Error("Provider assembly digest disagreement");
+}
+/** Convert an unsigned candidate to the canonical layout shared with final plans.
+ * The synthetic empty capability is private and can never pass final validation. */
+export function providerOfferAsPlan(offer: ProviderOffer): ProviderPlan {
+  const challenge = offer.challenge;
+  if (!challenge?.client || !challenge.expiresAt || !offer.extents.length || offer.extents.length > maxRecords)
+    throw new Error("Invalid provider offer challenge or extent bound");
+  return create(ProviderPlanSchema, {
+    extentSetDigest: offer.extentSetDigest,
+    extents: offer.extents.map(extent => {
+      const range = extent.range;
+      if (!range) throw new Error("Missing provider offer range");
+      return create(ProviderExtentSchema, {
+        provider: extent.provider,
+        range,
+        ticket: create(ProviderReadTicketSchema, {
+          attenuatedCapability: new Uint8Array(),
+          extentSetDigest: offer.extentSetDigest,
+          spool: extent.spool,
+          facet: extent.facet,
+          audience: extent.audience,
+          contentRoot: extent.contentRoot,
+          packId: range.packId,
+          objectEtag: range.objectEtag,
+          offset: range.offset,
+          length: range.length,
+          provider: extent.provider,
+          client: challenge.client,
+          assemblyDigest: offer.assemblyDigest,
+          expiresAt: challenge.expiresAt,
+          recordSetCommitment: range.recordSetCommitment,
+        }),
+      });
+    }),
+    challenge,
+    assemblyDigest: offer.assemblyDigest,
+    packHeader: offer.packHeader,
+    outputPackLength: offer.outputPackLength,
+    records: offer.records,
+  });
+}
+export function validateProviderOffer(offer: ProviderOffer): void {
+  const layout = providerOfferAsPlan(offer);
+  if (!equal(providerExtentSetDigest(layout), offer.extentSetDigest)
+    || !equal(providerAssemblyDigest(layout), offer.assemblyDigest))
+    throw new Error("Provider offer digest disagreement");
+}
+export function validatePlanForOffer(offer: ProviderOffer, plan: ProviderPlan): void {
+  validateProviderOffer(offer);
+  validateProviderPlan(plan);
+  if (!equal(plan.extentSetDigest, offer.extentSetDigest)
+    || !equal(plan.assemblyDigest, offer.assemblyDigest)
+    || !equal(providerAssemblyDigest(plan), providerAssemblyDigest(providerOfferAsPlan(offer))))
+    throw new Error("Issued provider plan differs from offer");
 }
 function exact32(value: Uint8Array | undefined, name: string): Uint8Array {
   if (value?.length !== 32) throw new Error(`Invalid provider ${name}`);

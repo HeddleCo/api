@@ -41,6 +41,12 @@ message FetchOpen {
   TransferSelection selection = 3;
   TransferCheckpoint checkpoint = 4;
   reserved 5;
+  enum Delivery {
+    DELIVERY_UNSPECIFIED = 0; // Defaults to direct transfer.
+    DELIVERY_DIRECT = 1;
+    DELIVERY_PROVIDER_PREFERRED = 2;
+  }
+  Delivery delivery = 6;
 }
 message PackExtent {
   ObjectAddress pack = 1;
@@ -189,6 +195,26 @@ message ProviderPlan {
   uint64 output_pack_length = 6;
   repeated ProviderAssemblyRecord records = 7;
 }
+// Capability-free candidate layout. It is not a serving grant. The client
+// consents to its exact challenge before the issuer publishes ticket-bearing
+// ProviderPlan; both phases use the same canonical layout commitments.
+message ProviderOfferExtent {
+  EndpointRef provider = 1;
+  ProviderPhysicalRange range = 2;
+  SpoolRef spool = 3;
+  SharedFacet facet = 4;
+  string audience = 5;
+  bytes content_root = 6;
+}
+message ProviderOffer {
+  bytes extent_set_digest = 1;
+  repeated ProviderOfferExtent extents = 2;
+  ProviderPlanChallenge challenge = 3;
+  bytes assembly_digest = 4;
+  bytes pack_header = 5;
+  uint64 output_pack_length = 6;
+  repeated ProviderAssemblyRecord records = 7;
+}
 message ProviderConsent {
   bytes extent_set_digest = 1;
   SignedRecord exact_plan_consent = 2;
@@ -244,6 +270,7 @@ message FetchServerFrame {
     // dependency. Target access never grants access to this dependency.
     ThreadGenesisRecord thread_genesis = 7;
     ProviderInlineChunk provider_inline = 8;
+    ProviderOffer provider_offer = 9;
   }
 }
 // Bulk content availability for an already admitted Thread capture. Metadata

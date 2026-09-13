@@ -589,7 +589,21 @@ pub fn validate_provider_registration(
         .as_ref()
         .ok_or(ProviderCanonicalError::Invalid("registered plan"))?;
     validate_provider_plan(plan)?;
-    if registration.packs.is_empty() || registration.packs.len() > plan.extents.len() {
+    let serving_provider = endpoint_key(&registration.serving_provider, EndpointKind::Provider)?;
+    let selected = plan
+        .extents
+        .iter()
+        .filter(|extent| {
+            extent
+                .provider
+                .as_ref()
+                .is_some_and(|provider| provider.public_key == serving_provider)
+        })
+        .collect::<Vec<_>>();
+    if selected.is_empty()
+        || registration.packs.is_empty()
+        || registration.packs.len() > selected.len()
+    {
         return Err(ProviderCanonicalError::Invalid("registered pack count"));
     }
     let mut locations = std::collections::HashSet::with_capacity(registration.packs.len());
@@ -603,7 +617,7 @@ pub fn validate_provider_registration(
             return Err(ProviderCanonicalError::Invalid("registered pack location"));
         }
     }
-    for extent in &plan.extents {
+    for extent in &selected {
         let range = extent
             .range
             .as_ref()
@@ -614,7 +628,7 @@ pub fn validate_provider_registration(
     }
     if locations.len() != registration.packs.len()
         || registration.packs.iter().any(|pack| {
-            !plan.extents.iter().any(|extent| {
+            !selected.iter().any(|extent| {
                 extent
                     .range
                     .as_ref()

@@ -235,7 +235,9 @@ export function validateProviderRegistration(registration: ProviderPlanRegistrat
   const plan = registration.plan;
   if (!plan) throw new Error("Missing registered provider plan");
   validateProviderPlan(plan);
-  if (!registration.packs.length || registration.packs.length > plan.extents.length)
+  const servingProvider = endpointKey(registration.servingProvider, EndpointKind.PROVIDER);
+  const selected = plan.extents.filter(extent => equal(endpointKey(extent.provider, EndpointKind.PROVIDER), servingProvider));
+  if (!selected.length || !registration.packs.length || registration.packs.length > selected.length)
     throw new Error("Invalid registered pack count");
   const locations = new Set<string>();
   for (const pack of registration.packs) {
@@ -245,7 +247,7 @@ export function validateProviderRegistration(registration: ProviderPlanRegistrat
     if (locations.has(key)) throw new Error("Duplicate registered pack location");
     locations.add(key);
   }
-  const referenced = new Set(plan.extents.map(extent => hexBytes(exact32(extent.range?.packId, "pack ID"))));
+  const referenced = new Set(selected.map(extent => hexBytes(exact32(extent.range?.packId, "pack ID"))));
   if (referenced.size !== locations.size || [...referenced].some(key => !locations.has(key)))
     throw new Error("Registered pack coverage differs from plan");
 }

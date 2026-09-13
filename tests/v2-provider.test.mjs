@@ -61,7 +61,7 @@ test('capability-free offer binds the same layout but never serves bytes', () =>
 });
 test('typed private pack registration covers exactly the issued ranges', () => {
   const plan = fixture();
-  const registration = { plan, packs: [{ packId: plan.extents[0].range.packId, objectKey: 'source/pack-1' }] };
+  const registration = { plan, servingProvider: plan.extents[0].provider, packs: [{ packId: plan.extents[0].range.packId, objectKey: 'source/pack-1' }] };
   validateProviderRegistration(registration);
   const duplicate = structuredClone(registration); duplicate.packs.push(duplicate.packs[0]);
   assert.throws(() => validateProviderRegistration(duplicate), /pack count|Duplicate/);

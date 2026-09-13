@@ -90,6 +90,7 @@ fn private_pack_registration_covers_exact_plan_without_duplicate_or_extra_keys()
                 .clone(),
             object_key: "source/pack-1".into(),
         }],
+        serving_provider: plan.extents[0].provider.clone(),
         plan: Some(plan),
     };
     validate_provider_registration(&registration).expect("trusted placement map");
@@ -102,8 +103,85 @@ fn private_pack_registration_covers_exact_plan_without_duplicate_or_extra_keys()
     registration.packs[0].pack_id = vec![99; 32];
     assert!(matches!(
         validate_provider_registration(&registration),
-        Err(heddle_api::provider_v2::ProviderCanonicalError::Invalid("registered pack missing"))
+        Err(heddle_api::provider_v2::ProviderCanonicalError::Invalid(
+            "registered pack missing"
+        ))
     ));
+}
+
+#[test]
+fn each_provider_registers_only_its_own_private_pack_keys() {
+    let mut plan = fixture();
+    plan.records[1].source = Some(provider_assembly_record::Source::Provider(
+        ProviderRangeSource {
+            extent_index: 1,
+            source_offset: 0,
+        },
+    ));
+    let mut second = plan.extents[0].clone();
+    second.provider = Some(endpoint(EndpointKind::Provider, 12));
+    let range = second.range.as_mut().expect("range");
+    range.pack_id = vec![13; 32];
+    range.offset = 256;
+    range.record_set_commitment = provider_record_set_commitment(range, &plan.records, 1)
+        .expect("second provider range")
+        .to_vec();
+    let ticket = second.ticket.as_mut().expect("ticket");
+    ticket.provider = second.provider.clone();
+    ticket.pack_id = range.pack_id.clone();
+    ticket.offset = range.offset;
+    ticket.record_set_commitment = range.record_set_commitment.clone();
+    plan.extents.push(second);
+    let set = provider_extent_set_digest(&plan).expect("two-provider set");
+    plan.extent_set_digest = set.to_vec();
+    plan.challenge
+        .as_mut()
+        .expect("challenge")
+        .extent_set_digest = set.to_vec();
+    for extent in &mut plan.extents {
+        extent.ticket.as_mut().expect("ticket").extent_set_digest = set.to_vec();
+    }
+    let assembly = provider_assembly_digest(&plan).expect("two-provider assembly");
+    plan.assembly_digest = assembly.to_vec();
+    plan.challenge.as_mut().expect("challenge").assembly_digest = assembly.to_vec();
+    for extent in &mut plan.extents {
+        extent.ticket.as_mut().expect("ticket").assembly_digest = assembly.to_vec();
+    }
+    validate_provider_plan(&plan).expect("final two-provider plan");
+    let first = ProviderPlanRegistration {
+        plan: Some(plan.clone()),
+        serving_provider: plan.extents[0].provider.clone(),
+        packs: vec![ProviderPackLocation {
+            pack_id: plan.extents[0]
+                .range
+                .as_ref()
+                .expect("first range")
+                .pack_id
+                .clone(),
+            object_key: "provider-one/private".into(),
+        }],
+    };
+    let second = ProviderPlanRegistration {
+        plan: Some(plan.clone()),
+        serving_provider: plan.extents[1].provider.clone(),
+        packs: vec![ProviderPackLocation {
+            pack_id: plan.extents[1]
+                .range
+                .as_ref()
+                .expect("second range")
+                .pack_id
+                .clone(),
+            object_key: "provider-two/private".into(),
+        }],
+    };
+    validate_provider_registration(&first).expect("first provider keeps only its key");
+    validate_provider_registration(&second).expect("second provider keeps only its key");
+    let mut foreign = first;
+    foreign.packs.push(second.packs[0].clone());
+    assert!(
+        validate_provider_registration(&foreign).is_err(),
+        "foreign private key is refused"
+    );
 }
 
 fn endpoint(kind: EndpointKind, byte: u8) -> EndpointRef {

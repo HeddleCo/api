@@ -3,6 +3,7 @@ syntax = "proto3";
 package heddle.api.v2alpha1;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/stream.proto";
 import "heddle/api/v2alpha1/sync.proto";
 
 // Trusted issuer-to-provider control-plane registration. Never sent over the
@@ -16,6 +17,8 @@ message ProviderPackLocation {
 message ProviderPlanRegistration {
   ProviderPlan plan = 1;
   repeated ProviderPackLocation packs = 2;
+  // The receiving DO checks this key against its live Iroh endpoint identity.
+  EndpointRef serving_provider = 3;
 }
 
 message ProviderPlanRegistrationReceipt {

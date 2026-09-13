@@ -99,8 +99,10 @@ message StartAnalysisRequest {
 }
 
 // One existing Heddle semantic root/file/directory object. The canonical bytes
-// use the versioned Heddle semantic index codec; hash is their 32-byte BLAKE3
-// content hash. This object grants no right to fetch other CAS objects.
+// use the versioned Heddle semantic index codec. The 32-byte hash uses Heddle's
+// Blob identity: BLAKE3(UTF8("blob") || uint64_le(canonical.length) || 0x00 ||
+// canonical), matching Blob::hash(). Hashing canonical alone is incorrect.
+// This object grants no right to fetch other CAS objects.
 message SemanticIndexObject {
   bytes hash = 1;
   bytes canonical = 2;

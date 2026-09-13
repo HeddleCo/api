@@ -179,6 +179,15 @@ enum SearchMatchKind {
   SEARCH_MATCH_KIND_STRUCTURED = 8;
 }
 
+// Which accepted source revisions participate in content and symbol search.
+enum SearchSourceHistory {
+  SEARCH_SOURCE_HISTORY_UNSPECIFIED = 0;
+  // All concurrent source heads of each selected Thread. A withheld head does
+  // not fall back to an older visible revision.
+  SEARCH_SOURCE_HISTORY_CURRENT = 1;
+  SEARCH_SOURCE_HISTORY_RETAINED = 2;
+}
+
 message SearchRequest {
   // Empty discovers authorized Spools, or uses the Spools of selected Threads.
   repeated SpoolRef spools = 1;
@@ -204,6 +213,20 @@ message SearchRequest {
   // context revisions only; selecting other domains with this filter is invalid.
   // Predicates apply to each current revision, not a union of concurrent tags.
   AnnotationQuery annotations = 8;
+  // Applies only to SOURCE_CONTENT and SOURCE_SYMBOL. Omission or UNSPECIFIED
+  // means CURRENT. An explicit scope requires at least one of those domains;
+  // other selected domains retain their own semantics (in particular, REVISION
+  // still resolves accepted historical identifiers).
+  // Scope, visibility and index readiness are evaluated before pagination;
+  // cursors are bound to this selection. Neither scope grants source access.
+  oneof source_scope {
+    SearchSourceHistory source_history = 9;
+    // Search within one exact revision, intersected with the selected Threads
+    // and Spools. Requires nonempty threads belonging to this revision's Spool;
+    // each result must originate from that Thread's accepted source history.
+    // An unknown, unaccepted or withheld revision yields no visible candidates.
+    RevisionRef source_revision = 10;
+  }
 }
 
 message SearchHit {

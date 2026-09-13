@@ -1,5 +1,6 @@
 import { createServiceClient, type RpcTransport } from "../packages/typescript/dist/v2alpha1/client.js";
-import { ThreadService } from "../packages/typescript/dist/v2alpha1/services_pb.js";
+import { SearchService, ThreadService } from "../packages/typescript/dist/v2alpha1/services_pb.js";
+import { SearchSourceHistory } from "../packages/typescript/dist/v2alpha1/content_pb.js";
 import type { ThreadListEvent, ThreadMutationResponse } from "../packages/typescript/dist/v2alpha1/thread_pb.js";
 
 declare const transport: RpcTransport;
@@ -11,3 +12,10 @@ client.startThread({ manualHeartbeat: true });
 // @ts-expect-error Observations are streams, not unary promises.
 const wrong: Promise<ThreadListEvent> = client.observeThreads({});
 void observation; void mutation; void wrong;
+
+const search = createServiceClient(SearchService, transport, new Set<string>());
+search.search({ text: "authorize", sourceScope: { case: "sourceHistory", value: SearchSourceHistory.RETAINED } });
+search.search({ text: "authorize", threads: [{ spool: { id: "spool" }, id: { value: new Uint8Array(32) } }],
+  sourceScope: { case: "sourceRevision", value: { spool: { id: "spool" }, revision: { case: "state", value: { value: new Uint8Array(32) } } } } });
+// @ts-expect-error Exact revision and history are mutually exclusive selections.
+search.search({ text: "authorize", sourceScope: { case: "sourceHistory", value: { spool: { id: "spool" } } } });

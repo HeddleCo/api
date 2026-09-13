@@ -49,6 +49,7 @@ enum EndpointKind {
   ENDPOINT_KIND_UNSPECIFIED = 0;
   ENDPOINT_KIND_WEFT = 1;
   ENDPOINT_KIND_DEVICE = 2;
+  ENDPOINT_KIND_PROVIDER = 3;
 }
 
 message EndpointRef {

@@ -254,7 +254,7 @@ fn hosted_landing_and_checkout_landing_have_distinct_endpoint_owners() {
 
 #[test]
 fn device_deployment_covers_private_work_without_hosted_account_administration() {
-    use heddle_api::heddle::api::v1alpha1::DeploymentTarget::{HeddleDaemon, Weft};
+    use heddle_api::heddle::api::v1alpha1::DeploymentTarget::{HeddleDaemon, Provider, Weft};
     for name in [
         "IdentityService/BeginRegistration",
         "IdentityService/CompleteAuthentication",
@@ -264,7 +264,6 @@ fn device_deployment_covers_private_work_without_hosted_account_administration()
         "SpoolService/CreateInvitation",
         "SpoolService/SetSupportAccess",
         "WorkspaceService/ObserveCatalog",
-        "SyncService/ReadProviderExtent",
     ] {
         let path = format!("/heddle.api.v2alpha1.{name}");
         let method = ALL_METHODS
@@ -273,6 +272,15 @@ fn device_deployment_covers_private_work_without_hosted_account_administration()
             .expect("declared hosted boundary");
         assert_eq!(method.deployment_targets, &[Weft], "{path}");
     }
+    let provider_read = ALL_METHODS
+        .iter()
+        .find(|method| method.path == "/heddle.api.v2alpha1.SyncService/ReadProviderExtent")
+        .expect("native provider extent route");
+    assert_eq!(provider_read.deployment_targets, &[Provider]);
+    assert_eq!(
+        provider_read.signing_tier,
+        heddle_api::heddle::api::v1alpha1::SigningTier::ProofOfPossession,
+    );
     for name in [
         "IdentityService/ObserveIdentity",
         "IdentityService/IntrospectCredential",

@@ -1,6 +1,7 @@
 syntax = "proto3";
 package heddle.api.v2alpha1;
 
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/errors.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/owner_records.proto";
@@ -106,21 +107,103 @@ message TransferReady {
 }
 message ProviderExtent {
   EndpointRef provider = 1;
-  bytes ticket = 2;
-  PackExtent extent = 3;
+  ProviderReadTicket ticket = 2;
+  ProviderPhysicalRange range = 3;
+}
+// A physical R2 range exactly tiled by independently hashed encoded records.
+// record_set_commitment is a metadata commitment over pack identity, offset,
+// length and ordered encoded record digests; it is not a hash of range bytes.
+message ProviderPhysicalRange {
+  bytes pack_id = 1;
+  string object_etag = 2;
+  uint64 offset = 3;
+  uint64 length = 4;
+  bytes record_set_commitment = 5;
+}
+// The provider verifies this typed ticket against the published canonical
+// extent set and the attenuated caller capability. A ticket alone grants no
+// access; the opening's native request proof binds the bearer key, the
+// authenticated Iroh client peer matches client, and the receiver's endpoint
+// matches provider. Root rotation and expiry are independently checked.
+message ProviderReadTicket {
+  bytes attenuated_capability = 1;
+  bytes extent_set_digest = 2;
+  SpoolRef spool = 3;
+  SharedFacet facet = 4;
+  string audience = 5;
+  bytes content_root = 6;
+  bytes pack_id = 7;
+  string object_etag = 8;
+  uint64 offset = 9;
+  uint64 length = 10;
+  EndpointRef provider = 11;
+  EndpointRef client = 12;
+  bytes assembly_digest = 13;
+  google.protobuf.Timestamp expires_at = 14;
+  bytes record_set_commitment = 15;
+}
+// One record in output-pack order. Provider bytes must occupy an exact tiled
+// physical range; inline bytes arrive as bounded ProviderInlineChunk frames.
+// In either case the client verifies the encoded bytes and decoded object.
+message ProviderAssemblyRecord {
+  TransferObject object = 1;
+  uint64 encoded_length = 2;
+  ObjectAddress encoded_digest = 3;
+  uint64 output_offset = 4;
+  oneof source {
+    ProviderRangeSource provider = 5;
+    ProviderInlineSource inline = 6;
+  }
+}
+message ProviderRangeSource {
+  uint32 extent_index = 1;
+  // Offset relative to that ProviderPhysicalRange, starting at zero.
+  uint64 source_offset = 2;
+}
+message ProviderInlineSource {}
+message ProviderInlineChunk {
+  bytes assembly_digest = 1;
+  uint32 record_index = 2;
+  uint64 offset = 3;
+  bytes data = 4;
+}
+// An unsigned challenge carried over an already authenticated Fetch stream.
+// Only the client's exact-plan consent is signed. Both digests and the
+// selected Thread/revision bind all tickets and virtual-pack placement.
+message ProviderPlanChallenge {
+  bytes nonce = 1;
+  ThreadRef thread = 2;
+  RevisionRef revision = 3;
+  EndpointRef issuer = 4;
+  EndpointRef client = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  bytes extent_set_digest = 7;
+  bytes assembly_digest = 8;
 }
 message ProviderPlan {
-  bytes digest = 1;
+  bytes extent_set_digest = 1;
   repeated ProviderExtent extents = 2;
-  SignedRecord challenge = 3;
+  ProviderPlanChallenge challenge = 3;
+  bytes assembly_digest = 4;
+  // Canonical LMPK v4 header: 16 bytes, including the exact record count.
+  bytes pack_header = 5;
+  // Must equal 16 + sum(encoded record lengths) + the final 32-byte
+  // BLAKE3(header || ordered encoded record bytes) trailer.
+  uint64 output_pack_length = 6;
+  repeated ProviderAssemblyRecord records = 7;
 }
 message ProviderConsent {
-  bytes plan_digest = 1;
+  bytes extent_set_digest = 1;
   SignedRecord exact_plan_consent = 2;
+  bytes assembly_digest = 3;
 }
 message ProviderResult {
-  bytes plan_digest = 1;
-  repeated ObjectAddress verified_extents = 2;
+  bytes extent_set_digest = 1;
+  bytes assembly_digest = 2;
+  // Ordered metadata commitments for ranges actually verified by the client.
+  // This report never authorizes source publication or claims server truth.
+  repeated bytes verified_range_commitments = 3;
+  ObjectAddress assembled_pack = 4;
 }
 message PublicationReceipt {
   string client_operation_id = 1;
@@ -163,6 +246,7 @@ message FetchServerFrame {
     // Original creator-signed genesis for a required cross-Thread source
     // dependency. Target access never grants access to this dependency.
     ThreadGenesisRecord thread_genesis = 7;
+    ProviderInlineChunk provider_inline = 8;
   }
 }
 // Bulk content availability for an already admitted Thread capture. Metadata
@@ -221,15 +305,20 @@ message PublishContentServerFrame {
 }
 
 message ReadProviderExtentRequest {
-  bytes ticket = 1;
-  bytes plan_digest = 2;
-  PackExtent extent = 3;
-  SignedRecord opening_proof = 4;
+  ProviderReadTicket ticket = 1;
+  bytes extent_set_digest = 2;
+  ProviderPhysicalRange range = 3;
+  reserved 4;
+}
+message ProviderRangeChunk {
+  // Offset within the single ticket-bound physical range.
+  uint64 offset = 1;
+  bytes data = 2;
 }
 message ProviderExtentEvent {
   oneof body {
-    PackExtent ready = 1;
-    PackChunk chunk = 3;
+    ProviderPhysicalRange ready = 1;
+    ProviderRangeChunk chunk = 3;
     TransferCheckpoint complete = 2;
   }
 }

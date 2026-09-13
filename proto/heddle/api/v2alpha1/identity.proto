@@ -557,9 +557,12 @@ message PutRecoveryPolicyRequest {
 }
 message BeginRecoveryRequest {
   string client_operation_id = 1;
+  // Exactly one account selector is required. A lost device may know only the
+  // public native handle; both unknown selectors receive synthetic KDF data.
   string account_id = 2;
   bytes proposed_root_public_key = 3;
   string method_id = 4;
+  string account_handle = 5;
 }
 message RecoveryAttempt {
   RecordRef ref = 1;

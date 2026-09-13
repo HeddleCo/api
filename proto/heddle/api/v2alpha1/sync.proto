@@ -183,6 +183,15 @@ message ProviderPlanChallenge {
   bytes extent_set_digest = 7;
   bytes assembly_digest = 8;
 }
+// Authenticated transport hints only. The connected Iroh peer must still
+// match provider.public_key; a URL is never a source of authority.
+message ProviderDialRoute {
+  EndpointRef provider = 1;
+  oneof address {
+    string relay_url = 2;
+    string websocket_url = 3;
+  }
+}
 message ProviderPlan {
   bytes extent_set_digest = 1;
   repeated ProviderExtent extents = 2;
@@ -194,6 +203,7 @@ message ProviderPlan {
   // BLAKE3(header || ordered encoded record bytes) trailer.
   uint64 output_pack_length = 6;
   repeated ProviderAssemblyRecord records = 7;
+  repeated ProviderDialRoute routes = 8;
 }
 // Capability-free candidate layout. It is not a serving grant. The client
 // consents to its exact challenge before the issuer publishes ticket-bearing
@@ -214,6 +224,7 @@ message ProviderOffer {
   bytes pack_header = 5;
   uint64 output_pack_length = 6;
   repeated ProviderAssemblyRecord records = 7;
+  repeated ProviderDialRoute routes = 8;
 }
 message ProviderConsent {
   bytes extent_set_digest = 1;

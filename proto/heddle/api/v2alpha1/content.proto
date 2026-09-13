@@ -72,6 +72,9 @@ message DiffRead {
   RevisionRef base = 1;
   repeated string paths = 2;
   PageRequest page = 3;
+  // Absent uses ReadContentRequest.thread. An explicit cross-Thread base is
+  // independently admitted under this Thread's audience and source policy.
+  ThreadRef base_thread = 4;
 }
 
 message ProvenanceRead {
@@ -101,6 +104,10 @@ message ReadContentRequest {
   RevisionRef revision = 1;
   repeated ContentRead selections = 2;
   ReadBudget budget = 3;
+  // Required owning Thread. The revision must belong to this exact Thread;
+  // another Thread containing the same source object grants no authority here.
+  // Its Spool must match revision.spool.
+  ThreadRef thread = 4;
   // Finite exact-revision read. Resume ranges/pages explicitly; no live follow.
 }
 

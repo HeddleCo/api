@@ -250,8 +250,10 @@ message ThreadGenesisRecord {
   // Original account authority admitted by an independently pinned hosted executor.
   // Does not authorize current disclosure or enroll the original account locally.
   SignedRecord admission = 3;
-  // At most two exact co-signed claims. Conflicting claims fail closed; a
-  // transport must never select a winner or rewrite the immutable genesis.
+  // Exact co-signed claims, including those retained as resolved history.
+  // Unresolved conflicting claims fail closed; a transport must never select a
+  // winner or rewrite immutable genesis. Claims and their resolutions share the
+  // metadata/frame budgets below; large histories require bounded sync batches.
   repeated SignedRecord ownership_claims = 4;
   // Optional independently trusted first-admission testimony matched by claim
   // identity. Original acceptance expiry does not invalidate retained admission.
@@ -268,6 +270,15 @@ message ThreadGenesisRecord {
   // Deduplicate identical evidence across wrappers/batches; reject conflicting
   // or unreferenced evidence. No executor/root trust is enrolled from this field.
   repeated SignedRecord boundary_acceptances = 6;
+  // Original local-owner/recipient co-signed ownership resolutions in causal
+  // order. Retain losing claims as evidence. Duplicate records are idempotent;
+  // a settled claim replay cannot reopen the same conflict. Admission verifies
+  // exact Thread, Spool, conflict set and observed source frontier.
+  repeated SignedRecord ownership_resolutions = 7;
+  // Independently trusted first-admission testimony for the matching resolution
+  // identities. Current authorization governs a new admission; retained exact
+  // history is not invalidated merely by the accepting credential's expiry.
+  repeated SignedRecord ownership_resolution_admissions = 8;
 }
 
 message ReplicationOpen {

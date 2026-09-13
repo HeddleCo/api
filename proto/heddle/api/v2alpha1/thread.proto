@@ -324,13 +324,18 @@ message ClaimThreadOwnershipResponse {
   SignedRecord claim = 5;
 }
 
-// The current owner adjudicates a competing-ownership fork with one exact
-// canonical resolution. Never invoked implicitly by upload or enrollment.
+// The original local owner chooses the winning account; that account's currently
+// authorized owner or delegate accepts. Neither arrival order nor a claimant's
+// signature alone adjudicates the conflict. Never implicit in upload/enrollment.
 message ResolveOwnershipConflictRequest {
   string client_operation_id = 1;
   ThreadRef thread = 2;
   // heddle-thread-ownership-resolution-v1; canonical ThreadOwnershipResolution
-  // carries the accepted lineage and losing forks, with one owner signature.
+  // binds the exact conflict set and observed source frontier, original local
+  // owner key, winning account and its fresh acceptance authority. Exactly two
+  // signatures, in order: local owner, accepting publisher. Each signature's
+  // public key must equal its corresponding canonical role key. Retain the
+  // signed resolution and all claims as replicated history; do not delete losers.
   SignedRecord resolution = 3;
 }
 

@@ -12,7 +12,9 @@ const key = seed => createPrivateKey({ key: Buffer.concat([Buffer.from('302e0201
 const publicKey = seed => new Uint8Array(createPublicKey(key(seed)).export({ format: 'der', type: 'spki' }).subarray(-32));
 const owner = { publicKey: publicKey(81), sign: async digest => new Uint8Array(sign(null, digest, key(81))) };
 const hex = bytes => Buffer.from(bytes).toString('hex');
-const decode = vector => fromBinary(SignedMintRootAttachmentSchema, Buffer.from(vector.attachment_proto_hex, 'hex'));
+// Use browser Uint8Array semantics: Buffer.slice() is a view and would make
+// protobuf clones alias the fixture across independent negative cases.
+const decode = vector => fromBinary(SignedMintRootAttachmentSchema, new Uint8Array(Buffer.from(vector.attachment_proto_hex, 'hex')));
 function expectation(value, now) {
   return { accountUuid: new Uint8Array(16).fill(0x11), ownerStateHash: value.attachment.ownerStateHash.slice(),
     ownerSequence: 0n, ownerPublicKey: publicKey(81), mintRootPublicKey: publicKey(83), nowUnixSeconds: BigInt(now) };

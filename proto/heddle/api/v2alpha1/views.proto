@@ -63,7 +63,7 @@ message ThreadEvent {
     DiscussionRecord discussion = 4;
     DiscussionTurn turn = 5;
     ContextRecord context = 6;
-    ReviewDecision review = 7;
+    ReviewRecord review = 7;
     CheckoutOverview checkout = 8;
     AnalysisRecord analysis = 9;
     ThreadSharingPolicy sharing = 10;

@@ -282,12 +282,41 @@ message ReviewDecision {
     KIND_APPROVAL = 2;
     KIND_REJECTION = 3;
     KIND_REVOCATION = 4;
+    // Attestations describe what was read; none satisfies an approval policy.
+    KIND_READ = 5;
+    KIND_AGENT_PREVIEW = 6;
+    KIND_AGENT_CO_REVIEW = 7;
   }
   Kind kind = 7;
   string explanation = 8;
   RecordRef revokes = 9;
   google.protobuf.Timestamp expires_at = 10;
   string agent_id = 11;
+  // Required for read attestations and absent for other decisions.
+  ReviewCoverage coverage = 12;
+}
+
+message ReviewCoverage {
+  // Exactly one arm. A symbol selection is bounded and tied to source.
+  oneof selection {
+    bool whole_source = 1;
+    ReviewSymbols symbols = 2;
+  }
+}
+
+message ReviewSymbols {
+  repeated ReviewSymbolAnchor anchors = 1;
+}
+
+message ReviewSymbolAnchor {
+  string path = 1;
+  string symbol = 2;
+}
+
+// The observed decision and the exact portable signed control that authored it.
+message ReviewRecord {
+  ReviewDecision decision = 1;
+  SignedRecord original = 2;
 }
 
 message ObserveThreadsRequest {

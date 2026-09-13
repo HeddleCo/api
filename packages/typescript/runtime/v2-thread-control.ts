@@ -2,9 +2,9 @@ import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type RevisionRef, type SignedRecord } from "./common_pb.js";
 import { EndpointKind } from "./stream_pb.js";
-import { ThreadAudiencePolicy_Kind, MaterialRetention_Mode, type ThreadAudiencePolicy, type ThreadRetentionPolicy, type MaterialRetention, SharedFacet, ThreadLifecycle, ThreadProperty, ThreadPropertyFrontierSchema, ReviewDecision_Kind, type ThreadIntent, type ThreadOverview, type ThreadPropertyFrontier, type ThreadSharingPolicy, type ReviewDecision } from "./thread_pb.js";
+import { ThreadAudiencePolicy_Kind, MaterialRetention_Mode, type ThreadAudiencePolicy, type ThreadRetentionPolicy, type MaterialRetention, SharedFacet, ThreadLifecycle, ThreadProperty, ThreadPropertyFrontierSchema, ReviewDecision_Kind, type ThreadIntent, type ThreadOverview, type ThreadPropertyFrontier, type ThreadSharingPolicy, type ReviewDecision, type ReviewRecord } from "./thread_pb.js";
 import type { CollaborationActor, CollaborationSigner } from "./collaboration.js";
-import { encode, equal, type Value } from "./_collaboration-msgpack.js";
+import { decode, encode, equal, type Value } from "./_collaboration-msgpack.js";
 
 const OPERATION_FORMAT = "heddle-thread-operation-v1";
 const AUTHORITY_FORMAT = "heddle-thread-control-authority-v1";
@@ -29,6 +29,53 @@ export interface ThreadControlAuthor {
   /** Original portable authority, independently validated by every receiver. */
   authorityEnvelope: Uint8Array;
   signer: CollaborationSigner;
+}
+
+/** Check that an observed review is exactly the value in its portable signed
+ * Thread control. Admission of its authority remains the endpoint's job. */
+export async function verifyThreadReviewRecord(record: ReviewRecord): Promise<ReviewDecision> {
+  const decision = record.decision;
+  const original = record.original;
+  if (!decision || !original || original.format !== OPERATION_FORMAT || original.signatures.length !== 1)
+    throw new Error("Review lacks its portable signed original");
+  const signature = original.signatures[0]!;
+  const publisher = fixed(signature.publicKey, 32);
+  const signedBytes = concat(utf8.encode(OPERATION_FORMAT), Uint8Array.of(0), original.canonicalRecord);
+  const key = await crypto.subtle.importKey("raw", publisher, { name: "Ed25519" }, false, ["verify"]);
+  if (!await crypto.subtle.verify("Ed25519", key, fixed(signature.signature, 64), signedBytes))
+    throw new Error("Review original signature is invalid");
+  const outer = decodedMap(decode(original.canonicalRecord));
+  const body = decodedMap(outer.body);
+  if (body.kind !== "metadata" || !equal(fixed(Uint8Array.from(decodedArray(outer.publisher)), 32), publisher))
+    throw new Error("Review original publisher or body differs");
+  const control = decodedMap(decode(Uint8Array.from(decodedArray(body.canonical))));
+  const actor = decodedMap(control.actor);
+  const actorId = byteUuid(decodedArray(actor.principal_id));
+  const agentId = actor.agent_id === null ? undefined : actor.agent_id;
+  if (typeof agentId !== "undefined" && typeof agentId !== "string") throw new Error("Review original agent differs");
+  if (control.control === null || decodedMap(control.control).kind !== "review") throw new Error("Original is not a review");
+  const spool = decision.thread?.spool?.id ?? "";
+  const thread = fixed(decision.thread?.id?.value, 32);
+  if (!equal(Uint8Array.from(decodedArray(outer.thread)), thread) || byteUuid(decodedArray(control.spool)) !== spool)
+    throw new Error("Review original names another Thread");
+  const expected = controlValue({ kind: "review", value: decision }, spool, thread,
+    { principalId: actorId, ...(agentId === undefined ? {} : { agentId }) }, BigInt(control.occurred_at_ms as number | bigint));
+  if (!equal(encode(decodedMap(control.control).value), encode(decodedMap(expected).value))) throw new Error("Review projection differs from signed original");
+  return decision;
+}
+function decodedMap(value: Value): { [key: string]: Value } {
+  if (!value || typeof value !== "object" || Array.isArray(value) || value instanceof Uint8Array) throw new Error("Malformed signed review record");
+  return value;
+}
+function decodedArray(value: Value): number[] {
+  if (value instanceof Uint8Array) return Array.from(value);
+  if (!Array.isArray(value) || value.some(byte => typeof byte !== "number" || !Number.isInteger(byte) || byte < 0 || byte > 255)) throw new Error("Malformed signed review bytes");
+  return value as number[];
+}
+function byteUuid(bytes: number[]): string {
+  if (bytes.length !== 16) throw new Error("Malformed signed review UUID");
+  const hex = bytes.map(byte => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** Sign from the page's exact per-property frontier. Every concurrent candidate
@@ -191,15 +238,34 @@ function controlValue(control: ThreadControlValue, spool: string, thread: Uint8A
       const id = review.ref?.id ?? "";
       if (review.ref?.spool?.id !== spool || review.thread?.spool?.id !== spool || !review.thread.id || !equal(review.thread.id.value, thread)) throw new Error("Review belongs to another Thread");
       if (review.principalId !== actor.principalId || review.agentId !== (actor.agentId ?? "")) throw new Error("Review actor differs from original authority");
-      const names: Partial<Record<ReviewDecision_Kind, string>> = { [ReviewDecision_Kind.OPINION]: "opinion", [ReviewDecision_Kind.APPROVAL]: "approval", [ReviewDecision_Kind.REJECTION]: "rejection", [ReviewDecision_Kind.REVOCATION]: "revocation" };
+      const names: Partial<Record<ReviewDecision_Kind, string>> = { [ReviewDecision_Kind.OPINION]: "opinion", [ReviewDecision_Kind.APPROVAL]: "approval", [ReviewDecision_Kind.REJECTION]: "rejection", [ReviewDecision_Kind.REVOCATION]: "revocation", [ReviewDecision_Kind.READ]: "read", [ReviewDecision_Kind.AGENT_PREVIEW]: "agent_preview", [ReviewDecision_Kind.AGENT_CO_REVIEW]: "agent_co_review" };
       if (!names[review.kind]) throw new Error("Invalid review kind");
+      const isAttestation = review.kind === ReviewDecision_Kind.READ || review.kind === ReviewDecision_Kind.AGENT_PREVIEW || review.kind === ReviewDecision_Kind.AGENT_CO_REVIEW;
+      if (isAttestation !== Boolean(review.coverage)) throw new Error("Review coverage must match attestation kind");
+      let coverage: Value | null = null;
+      if (review.coverage) {
+        const selection = review.coverage.selection;
+        if (selection.case === "wholeSource" && selection.value) coverage = "whole_source";
+        else if (selection.case === "symbols") {
+          const anchors = selection.value.anchors;
+          if (!anchors.length || anchors.length > 128) throw new Error("Review symbol coverage exceeds bounds");
+          coverage = { symbols: anchors.map(anchor => {
+            const file = anchor.path;
+            const symbol = anchor.symbol;
+            text(file, 4096); text(symbol, 1024);
+            if (file.startsWith("/") || file.split("/").some(part => !part || part === "." || part === "..")) throw new Error("Review symbol path must be relative and canonical");
+            return { file, symbol };
+          }) };
+        } else throw new Error("Review coverage requires a selection");
+      }
       const revokes = review.revokes;
       if ((review.kind === ReviewDecision_Kind.REVOCATION) !== Boolean(revokes) || revokes && (revokes.spool?.id !== spool || revokes.id === id)) throw new Error("Invalid review revocation");
       text(review.explanation, 32768, true);
       const expires = review.expiresAt;
       if (expires && (expires.nanos !== 0 || expires.seconds <= at / 1000n || expires.seconds > 9223372036854775807n)) throw new Error("Review expiry must be a future whole second");
       value = { id: uuid(id), source: Array.from(stateRevision(review.source, spool)), target: Array.from(stateRevision(review.target, spool)), policy_version: Array.from(fixed(review.policyVersion, 32)), kind: names[review.kind]!, explanation: review.explanation,
-        revokes: revokes ? uuid(revokes.id) : null, expires_at_unix_seconds: expires?.seconds ?? null }; break;
+        revokes: revokes ? uuid(revokes.id) : null, expires_at_unix_seconds: expires?.seconds ?? null,
+        ...(coverage === null ? {} : { coverage }) }; break;
     }
   }
   return { kind: control.kind, value };

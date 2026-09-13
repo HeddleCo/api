@@ -4,9 +4,9 @@ import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
-import { ThreadAudiencePolicySchema, ThreadAudiencePolicy_Kind, ThreadRetentionPolicySchema, MaterialRetention_Mode, ThreadOverviewSchema, ThreadProperty, ThreadLifecycle, SharedFacet, ThreadIntentSchema, ThreadSharingPolicySchema, ReviewDecisionSchema, ReviewDecision_Kind } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
+import { ThreadAudiencePolicySchema, ThreadAudiencePolicy_Kind, ThreadRetentionPolicySchema, MaterialRetention_Mode, ThreadOverviewSchema, ThreadProperty, ThreadLifecycle, SharedFacet, ThreadIntentSchema, ThreadSharingPolicySchema, ReviewDecisionSchema, ReviewDecision_Kind, ReviewRecordSchema } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
 import { EndpointKind } from '../packages/typescript/dist/v2alpha1/stream_pb.js';
-import { signThreadControl, threadPropertyVersion } from '../packages/typescript/dist/v2alpha1/thread-control.js';
+import { signThreadControl, threadPropertyVersion, verifyThreadReviewRecord } from '../packages/typescript/dist/v2alpha1/thread-control.js';
 import { decode } from '../packages/typescript/dist/v2alpha1/_collaboration-msgpack.js';
 
 // Produced by Rust's repository metadata test, never by the JS encoder.
@@ -83,6 +83,34 @@ test('a fresh review gets its own empty CAS frontier without inventing singleton
   const signed = await signThreadControl(review.overview, review.command, review.author);
   assert.deepEqual(decode(signed.operation.canonicalRecord).parents, []);
   assert.equal(Buffer.from(signed.expectedVersion).toString('hex'), fixtures[4].empty_property_version);
+});
+
+test('read attestations bind bounded exact source coverage and never encode approval', async () => {
+  const input = inputs(fixtures[4]);
+  const review = input.command.control.value;
+  review.kind = ReviewDecision_Kind.READ;
+  review.coverage = { selection: { case: 'symbols', value: { anchors: [{ path: 'src/main.rs', symbol: 'run' }] } } };
+  const signed = await signThreadControl(input.overview, input.command, input.author);
+  const projected = create(ReviewRecordSchema, { decision: review, original: signed.operation });
+  assert.equal((await verifyThreadReviewRecord(projected)).kind, ReviewDecision_Kind.READ);
+  projected.decision = structuredClone(review);
+  projected.decision.kind = ReviewDecision_Kind.APPROVAL;
+  projected.decision.coverage = undefined;
+  await assert.rejects(verifyThreadReviewRecord(projected), /differs from signed original/);
+  projected.decision = review;
+  projected.original.signatures[0].signature[0] ^= 1;
+  await assert.rejects(verifyThreadReviewRecord(projected), /signature is invalid/);
+  const decoded = decode(Uint8Array.from(decode(signed.operation.canonicalRecord).body.canonical));
+  assert.equal(decoded.control.value.kind, 'read');
+  assert.equal(JSON.stringify(decoded.control.value.coverage), JSON.stringify({ symbols: [{ file: 'src/main.rs', symbol: 'run' }] }));
+  review.coverage.selection.value.anchors[0].path = '../private.rs';
+  await assert.rejects(signThreadControl(input.overview, input.command, input.author), /relative and canonical/);
+  review.coverage.selection.value.anchors[0].path = 'src/main.rs';
+  review.kind = ReviewDecision_Kind.APPROVAL;
+  await assert.rejects(signThreadControl(input.overview, input.command, input.author), /coverage must match/);
+  review.kind = ReviewDecision_Kind.AGENT_PREVIEW;
+  review.coverage = undefined;
+  await assert.rejects(signThreadControl(input.overview, input.command, input.author), /coverage must match/);
 });
 
 test('byte views from another browser realm retain the canonical signing identity', async () => {

@@ -98,6 +98,26 @@ message StartAnalysisRequest {
   ThreadRef base_thread = 8;
 }
 
+// One existing Heddle semantic root/file/directory object. The canonical bytes
+// use the versioned Heddle semantic index codec; hash is their 32-byte BLAKE3
+// content hash. This object grants no right to fetch other CAS objects.
+message SemanticIndexObject {
+  bytes hash = 1;
+  bytes canonical = 2;
+}
+
+// Self-contained derived index, readable in one bounded artifact stream.
+// Nodes are unique and sorted by hash; root_hash is 32 bytes and must name an
+// included root. All derived root/tree/file nodes are included and verified.
+// Opaque file entries may identify source commitments, but their raw source
+// bytes are never included. Parsed/opaque counts describe this exact source.
+message SemanticIndexArtifact {
+  bytes root_hash = 1;
+  repeated SemanticIndexObject nodes = 2;
+  uint64 parsed_files = 3;
+  uint64 opaque_files = 4;
+}
+
 // Immutable derived analysis output. Stored under an opaque Thread-scoped
 // artifact identity; this is never an authorization wrapper for source bytes.
 // Readers decode one canonical message, not concatenated stream frames. The
@@ -115,6 +135,7 @@ message AnalysisArtifact {
   repeated BehaviorAnalysisCoverage behavior_coverage = 9;
   ThreadRef thread = 10;
   ThreadRef base_thread = 11;
+  SemanticIndexArtifact semantic_index = 12;
   // Each analysis names its implementation/version and reports actual coverage.
   // Raw transcripts, runtime secrets, and original private attachments are not
   // analysis output and cannot be placed into this derived-artifact envelope.

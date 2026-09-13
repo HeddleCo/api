@@ -1381,11 +1381,11 @@ service AnalysisService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
       authorization_request_targets: {
-        path: "source.spool"
+        path: "thread.spool"
         role: AUTHORIZATION_ROLE_RESOURCE_READER
       }
       authorization_request_targets: {
-        path: "base.spool"
+        path: "base_thread.spool"
         role: AUTHORIZATION_ROLE_RESOURCE_READER
       }
     };
@@ -1404,12 +1404,12 @@ service AnalysisService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
       authorization_multi_target: true
       authorization_request_targets: {
-        path: "source.spool"
+        path: "thread.spool"
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
       authorization_request_targets: {
-        path: "base.spool"
-        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+        path: "base_thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
       }
     };
   }

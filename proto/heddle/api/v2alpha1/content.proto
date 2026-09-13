@@ -5,6 +5,7 @@ package heddle.api.v2alpha1;
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/repository.proto";
 import "heddle/api/v1alpha1/types.proto";
+import "heddle/api/v2alpha1/collaboration.proto";
 import "heddle/api/v2alpha1/common.proto";
 import "heddle/api/v2alpha1/stream.proto";
 
@@ -143,8 +144,18 @@ message ArtifactEvent {
   }
 }
 
+enum SearchDomain {
+  SEARCH_DOMAIN_UNSPECIFIED = 0;
+  SEARCH_DOMAIN_THREAD = 1;
+  SEARCH_DOMAIN_DISCUSSION = 2;
+  SEARCH_DOMAIN_CONTEXT = 3;
+}
+
 message SearchRequest {
+  // Empty discovers authorized Spools, or uses the Spools of selected Threads.
   repeated SpoolRef spools = 1;
+  // Literal search text. A structured annotation query can omit text; an empty
+  // unfiltered query is invalid. User text never supplies an authorization scope.
   string text = 2;
   enum Mode {
     MODE_UNSPECIFIED = 0;
@@ -155,6 +166,16 @@ message SearchRequest {
   Mode mode = 3;
   PageRequest page = 4;
   ReadBudget budget = 5;
+  // Empty selects all supported domains, or CONTEXT when annotations is present.
+  // An explicit unsupported domain or mode is rejected, never silently ignored.
+  repeated SearchDomain domains = 6;
+  // Exact Thread identities, intersected with spools when both are supplied.
+  // Empty searches all authorized Threads in the selected Spools.
+  repeated ThreadRef threads = 7;
+  // The same typed predicates used by ObserveCollaboration. Presence selects
+  // context revisions only; selecting other domains with this filter is invalid.
+  // Predicates apply to each current revision, not a union of concurrent tags.
+  AnnotationQuery annotations = 8;
 }
 
 message SearchHit {
@@ -163,6 +184,12 @@ message SearchHit {
   string path = 3;
   optional uint32 line = 4;
   double score = 5;
+  // Owning Thread lets clients navigate a record without another lookup. It
+  // conveys no additional authority over that Thread or its source revisions.
+  ThreadRef thread = 6;
+  // Exact current operation for context hits. Concurrent revisions remain
+  // separate hits even when subject is the same addressable context record.
+  bytes causal_id = 7;
 }
 
 message SearchEvent {

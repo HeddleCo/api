@@ -150,6 +150,36 @@ fn source_transfers_share_original_operation_and_authority_receipt_batches() {
 }
 
 #[test]
+fn provider_dial_routes_are_fetch_transport_hints_only() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
+    let fetch = pool
+        .get_message_by_name("heddle.api.v2alpha1.FetchOpen")
+        .expect("existing native Fetch opening");
+    let routes = fetch
+        .get_field_by_name("routes")
+        .expect("provider transport routes");
+    assert_eq!(routes.number(), 7);
+    assert!(routes.is_list());
+    assert_eq!(
+        routes
+            .kind()
+            .as_message()
+            .expect("typed provider route")
+            .full_name(),
+        "heddle.api.v2alpha1.ProviderDialRoute"
+    );
+    for plan in ["ProviderPlan", "ProviderOffer"] {
+        let message = pool
+            .get_message_by_name(&format!("heddle.api.v2alpha1.{plan}"))
+            .expect("existing provider contract");
+        assert!(
+            message.get_field_by_name("routes").is_none(),
+            "{plan} commitments must not include transport hints"
+        );
+    }
+}
+
+#[test]
 fn source_genesis_transfers_preserve_claim_conflicts_and_matched_admission() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let wrapper = pool

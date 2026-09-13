@@ -47,6 +47,8 @@ message FetchOpen {
     DELIVERY_PROVIDER_PREFERRED = 2;
   }
   Delivery delivery = 6;
+  // Transport hints only. The connected peer identity remains authoritative.
+  repeated ProviderDialRoute routes = 7;
 }
 message PackExtent {
   ObjectAddress pack = 1;
@@ -203,7 +205,6 @@ message ProviderPlan {
   // BLAKE3(header || ordered encoded record bytes) trailer.
   uint64 output_pack_length = 6;
   repeated ProviderAssemblyRecord records = 7;
-  repeated ProviderDialRoute routes = 8;
 }
 // Capability-free candidate layout. It is not a serving grant. The client
 // consents to its exact challenge before the issuer publishes ticket-bearing
@@ -224,7 +225,6 @@ message ProviderOffer {
   bytes pack_header = 5;
   uint64 output_pack_length = 6;
   repeated ProviderAssemblyRecord records = 7;
-  repeated ProviderDialRoute routes = 8;
 }
 message ProviderConsent {
   bytes extent_set_digest = 1;

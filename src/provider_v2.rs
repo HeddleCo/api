@@ -5,7 +5,6 @@ use crate::heddle::api::v2alpha1::{
     Coverage, EndpointKind, ProviderAssemblyRecord, ProviderExtent, ProviderOffer,
     ProviderPhysicalRange, ProviderPlan, ProviderPlanChallenge, ProviderPlanRegistration,
     ProviderReadTicket, RevisionRef, SharedFacet, ThreadRef, provider_assembly_record,
-    provider_dial_route,
     revision_ref,
 };
 use std::collections::HashSet;
@@ -19,58 +18,6 @@ const MAX_RECORDS: usize = 4096;
 const MAX_PACK_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_DECODED_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_CAPABILITY_BYTES: usize = 64 * 1024;
-const MAX_PROVIDER_ROUTES: usize = 16;
-
-fn provider_route_bytes(plan: &ProviderPlan) -> Result<Vec<u8>, ProviderCanonicalError> {
-    if plan.routes.is_empty() || plan.routes.len() > MAX_PROVIDER_ROUTES {
-        return Err(ProviderCanonicalError::Bound);
-    }
-    let providers = plan.extents.iter().map(|extent| endpoint_key(&extent.provider, EndpointKind::Provider))
-        .collect::<Result<HashSet<_>, _>>()?;
-    if providers.len() > 8 {
-        return Err(ProviderCanonicalError::Bound);
-    }
-    let mut counts = std::collections::HashMap::<[u8; 32], u8>::new();
-    let mut unique = HashSet::new();
-    let mut out = Vec::new();
-    out.extend_from_slice(&(plan.routes.len() as u32).to_be_bytes());
-    for route in &plan.routes {
-        let key = *endpoint_key(&route.provider, EndpointKind::Provider)?;
-        if !providers.contains(&&key) {
-            return Err(ProviderCanonicalError::Invalid("unselected provider route"));
-        }
-        let (kind, url) = match route.address.as_ref() {
-            Some(provider_dial_route::Address::RelayUrl(value)) => (1_u8, value.as_str()),
-            Some(provider_dial_route::Address::WebsocketUrl(value)) => (2_u8, value.as_str()),
-            None => return Err(ProviderCanonicalError::Invalid("provider route address")),
-        };
-        let allowed = if kind == 1 { ["https://", "http://"] } else { ["wss://", "ws://"] };
-        let Some((scheme, rest)) = allowed.iter().find_map(|prefix| url.strip_prefix(prefix).map(|rest| (*prefix, rest))) else {
-            return Err(ProviderCanonicalError::Invalid("provider route URL"));
-        };
-        let host = rest.split('/').next().unwrap_or_default();
-        let loopback = host == "localhost" || host.starts_with("localhost:")
-            || host == "127.0.0.1" || host.starts_with("127.0.0.1:")
-            || host == "[::1]" || host.starts_with("[::1]:");
-        if url.len() > 2048 || host.is_empty() || url.bytes().any(|byte| byte <= 0x20 || byte == 0x7f)
-            || url.contains(['@', '?', '#']) || ((scheme == "http://" || scheme == "ws://") && !loopback)
-        {
-            return Err(ProviderCanonicalError::Invalid("provider route URL"));
-        }
-        let count = counts.entry(key).or_default();
-        *count += 1;
-        if *count > 2 || !unique.insert((key, kind, url)) {
-            return Err(ProviderCanonicalError::Invalid("duplicate provider route"));
-        }
-        sized(&mut out, &key)?;
-        out.push(kind);
-        sized(&mut out, url.as_bytes())?;
-    }
-    if counts.len() != providers.len() {
-        return Err(ProviderCanonicalError::Invalid("missing provider route"));
-    }
-    Ok(out)
-}
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ProviderCanonicalError {
@@ -570,7 +517,6 @@ pub fn provider_offer_as_plan(
         pack_header: offer.pack_header.clone(),
         output_pack_length: offer.output_pack_length,
         records: offer.records.clone(),
-        routes: offer.routes.clone(),
     })
 }
 

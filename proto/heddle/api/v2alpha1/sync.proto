@@ -1,0 +1,194 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "heddle/api/v1alpha1/errors.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+import "heddle/api/v2alpha1/thread.proto";
+
+// These are native v2 transfers, not envelopes carrying v1 Push/Pull requests.
+// A signed opening binds exact v2 scope, operation, policy, inventory and resume
+// context. Packs and indexes travel as bounded protobuf chunks under flow control.
+message ObjectAddress {
+  string algorithm = 1;
+  bytes digest = 2;
+}
+message TransferCheckpoint {
+  bytes transfer_id = 1;
+  bytes plan_digest = 2;
+  bytes resume_token = 3;
+  uint64 committed_bytes = 4;
+}
+message TransferObject {
+  ObjectAddress address = 1;
+  string kind = 2;
+  SharedFacet facet = 3;
+  uint64 size = 4;
+  Coverage availability = 5;
+}
+message TransferSelection {
+  repeated SharedFacet facets = 1;
+  repeated RevisionRef exclude_revisions = 2;
+  uint32 depth = 3;
+  bool allow_partial = 4;
+}
+message TransferProof {
+  SignedRecord opening = 1;
+}
+message PublishOpen {
+  ThreadRef thread = 1;
+  RevisionRef source = 2;
+  bytes expected_remote_version = 3;
+  bytes sharing_policy_version = 4;
+  TransferSelection selection = 5;
+  repeated TransferObject inventory = 6;
+  TransferCheckpoint checkpoint = 7;
+  TransferProof proof = 8;
+  SignedRecord thread_genesis = 9;
+}
+message FetchOpen {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2;
+  TransferSelection selection = 3;
+  TransferCheckpoint checkpoint = 4;
+  TransferProof proof = 5;
+}
+message PackExtent {
+  ObjectAddress pack = 1;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_NATIVE_PACK = 1;
+    KIND_NATIVE_INDEX = 2;
+    KIND_GIT_PACK = 3;
+    KIND_GIT_INDEX = 4;
+  }
+  Kind kind = 2;
+  uint64 offset = 3;
+  uint64 length = 4;
+  ObjectAddress extent_digest = 5;
+  // Admission verifies extent and whole-object hashes and closure.
+  // Receiving an extent alone is not acceptance.
+}
+message PackChunk {
+  PackExtent extent = 1;
+  bytes data = 2;
+}
+
+message TransferSidecar {
+  RevisionRef revision = 1;
+  ObjectAddress address = 2;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_REDACTION = 1;
+    KIND_VISIBILITY = 2;
+    KIND_ATTACHMENT = 3;
+    KIND_PURGE = 4;
+  }
+  Kind kind = 3;
+  string record_format = 4;
+  bytes canonical_record = 5;
+  repeated SignedRecord owner_authorization = 6;
+  // PURGE requires the independently verified owner authorization chain and
+  // exact operation signature. Ordinary write cannot satisfy that requirement.
+}
+message TransferReady {
+  EndpointRef endpoint = 1;
+  ThreadRef thread = 2;
+  RevisionRef current = 3;
+  bytes current_version = 4;
+  SignedRecord owner_genesis = 5;
+  repeated TransferObject have = 6;
+  repeated TransferObject need = 7;
+  TransferCheckpoint checkpoint = 8;
+  ReadBudget budget = 9;
+  bool full_closure_available = 10;
+  repeated TransferObject missing = 11;
+  repeated ThreadOverview advertised_threads = 12;
+  PageInfo page = 13;
+}
+message ProviderExtent {
+  EndpointRef provider = 1;
+  bytes ticket = 2;
+  PackExtent extent = 3;
+}
+message ProviderPlan {
+  bytes digest = 1;
+  repeated ProviderExtent extents = 2;
+  SignedRecord challenge = 3;
+}
+message ProviderConsent {
+  bytes plan_digest = 1;
+  SignedRecord exact_plan_consent = 2;
+}
+message ProviderResult {
+  bytes plan_digest = 1;
+  repeated ObjectAddress verified_extents = 2;
+}
+message TransferCommit {
+  bytes plan_digest = 1;
+  ObjectAddress inventory_digest = 2;
+}
+message PublishClientFrame {
+  string client_operation_id = 1;
+  oneof body {
+    PublishOpen open = 2;
+    PackChunk pack = 3;
+    TransferSidecar sidecar = 4;
+    TransferCommit commit = 5;
+  }
+}
+message PublicationReceipt {
+  string client_operation_id = 1;
+  EndpointRef destination = 2;
+  ThreadRef thread = 3;
+  RevisionRef revision = 4;
+  bytes sharing_policy_version = 5;
+  ObjectAddress accepted_inventory = 6;
+  oneof outcome {
+    Applied accepted = 7;
+    heddle.api.v1alpha1.CallFailure rejected = 8;
+  }
+}
+message PublishServerFrame {
+  oneof body {
+    TransferReady ready = 1;
+    TransferCheckpoint checkpoint = 2;
+    PublicationReceipt receipt = 3;
+  }
+}
+message FetchClientFrame {
+  oneof body {
+    FetchOpen open = 1;
+    ProviderConsent consent = 2;
+    ProviderResult provider_result = 3;
+    TransferCheckpoint checkpoint = 4;
+  }
+}
+message FetchComplete {
+  RevisionRef revision = 1;
+  TransferCheckpoint checkpoint = 2;
+  Coverage closure = 3;
+  repeated TransferObject missing = 4;
+}
+message FetchServerFrame {
+  oneof body {
+    TransferReady ready = 1;
+    PackChunk pack = 2;
+    TransferSidecar sidecar = 3;
+    ProviderPlan provider_plan = 4;
+    FetchComplete complete = 5;
+  }
+}
+message ReadProviderExtentRequest {
+  bytes ticket = 1;
+  bytes plan_digest = 2;
+  PackExtent extent = 3;
+  SignedRecord opening_proof = 4;
+}
+message ProviderExtentEvent {
+  oneof body {
+    PackExtent ready = 1;
+    PackChunk chunk = 3;
+    TransferCheckpoint complete = 2;
+  }
+}

@@ -1,0 +1,237 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+enum ThreadLifecycle {
+  THREAD_LIFECYCLE_UNSPECIFIED = 0;
+  THREAD_LIFECYCLE_DRAFT = 1;
+  THREAD_LIFECYCLE_ACTIVE = 2;
+  THREAD_LIFECYCLE_READY = 3;
+  THREAD_LIFECYCLE_LANDED = 4;
+  THREAD_LIFECYCLE_ABANDONED = 5;
+}
+
+enum ReviewReadiness {
+  REVIEW_READINESS_UNSPECIFIED = 0;
+  REVIEW_READINESS_UNKNOWN = 1;
+  REVIEW_READINESS_NEEDS_APPROVAL = 2;
+  REVIEW_READINESS_BLOCKED = 3;
+  REVIEW_READINESS_ELIGIBLE = 4;
+}
+
+message ThreadIntent {
+  string outcome = 1;
+  repeated string acceptance_criteria = 2;
+  string principal_id = 3;
+  string agent_id = 4;
+  bytes version = 5;
+  bool principal_approved = 6;
+  repeated string origin_urls = 7;
+}
+
+message ThreadRelationship {
+  ThreadRef thread = 1;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_PARENT = 1;
+    KIND_CHILD = 2;
+    KIND_DEPENDENCY = 3;
+    KIND_SUPERSEDES = 4;
+  }
+  Kind kind = 2;
+}
+
+message ThreadOverview {
+  ThreadRef ref = 1;
+  string name = 2;
+  bytes version = 3;
+  ThreadIntent intent = 4;
+  RevisionRef tip = 5;
+  RevisionRef base = 6;
+  ThreadLifecycle lifecycle = 7;
+  ReviewReadiness readiness = 8;
+  repeated Requirement requirements = 9;
+  repeated ThreadRelationship relationships = 10;
+  repeated ActionAvailability actions = 11;
+  repeated SectionStatus sections = 12;
+  uint64 capture_count = 13;
+  uint64 open_discussion_count = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  // The source endpoint is in StreamOpen; never overwrite another source's tip
+  // merely because this observation arrived later.
+}
+
+message ThreadQuery {
+  repeated SpoolRef spools = 1;
+  repeated ThreadLifecycle lifecycle = 2;
+  repeated ReviewReadiness readiness = 3;
+  string attention_for_principal = 4;
+  string participating_principal = 5;
+  ThreadRef parent = 6;
+  string text = 7;
+  enum Order {
+    ORDER_UNSPECIFIED = 0;
+    ORDER_UPDATED_DESC = 1;
+    ORDER_NAME_ASC = 2;
+  }
+  Order order = 8;
+  // Endpoint-local results only. Browser composition reports source coverage.
+}
+
+enum ThreadSection {
+  THREAD_SECTION_UNSPECIFIED = 0;
+  THREAD_SECTION_OVERVIEW = 1;
+  THREAD_SECTION_CAPTURES = 2;
+  THREAD_SECTION_REVIEW = 3;
+  THREAD_SECTION_COLLABORATION = 4;
+  THREAD_SECTION_ANALYSIS = 5;
+  THREAD_SECTION_CHECKOUTS = 6;
+  THREAD_SECTION_TIMELINE = 7;
+  THREAD_SECTION_SHARING = 8;
+}
+
+message CaptureSummary {
+  RevisionRef revision = 1;
+  ThreadRef thread = 2;
+  string summary = 3;
+  uint64 changed_files = 4;
+  string principal_id = 5;
+  string agent_id = 6;
+  google.protobuf.Timestamp captured_at = 7;
+}
+
+enum SharedFacet {
+  SHARED_FACET_UNSPECIFIED = 0;
+  SHARED_FACET_SOURCE = 1;
+  SHARED_FACET_COLLABORATION = 2;
+  SHARED_FACET_EVIDENCE = 3;
+  SHARED_FACET_SCRUBBED_TIMELINE = 4;
+  // Raw forensic and confidential runtime disclosure are separate explicit
+  // consent contracts; these values cannot sweep them into ordinary sync.
+}
+
+message SharingDestination {
+  EndpointRef endpoint = 1;
+  SpoolRef spool = 2;
+  repeated SharedFacet facets = 3;
+}
+
+message ThreadSharingPolicy {
+  ThreadRef thread = 1;
+  bytes version = 2;
+  repeated SharingDestination destinations = 3;
+  bool ongoing = 4;
+}
+
+message ReviewDecision {
+  RecordRef ref = 1;
+  ThreadRef thread = 2;
+  RevisionRef source = 3;
+  RevisionRef target = 4;
+  bytes policy_version = 5;
+  string principal_id = 6;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_OPINION = 1;
+    KIND_APPROVAL = 2;
+    KIND_REJECTION = 3;
+    KIND_REVOCATION = 4;
+  }
+  Kind kind = 7;
+  string explanation = 8;
+  RecordRef revokes = 9;
+  google.protobuf.Timestamp expires_at = 10;
+}
+
+message ObserveThreadsRequest {
+  ThreadQuery query = 1;
+  PageRequest page = 2;
+  ObserveOptions observe = 3;
+}
+
+message ThreadListEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    ThreadOverview thread = 2;
+    Removal removal = 3;
+  }
+}
+
+message StartThreadRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  ThreadRef parent = 3;
+  RevisionRef base = 4;
+  string name = 5;
+  ThreadIntent intent = 6;
+  // Persisted once for retries and replicas. Same descriptive inputs may still
+  // name distinct attempts. The negotiated genesis format defines the hash.
+  bytes creation_nonce = 7;
+  repeated ExpectedVersion expected_versions = 8;
+}
+
+message ThreadMutationResponse {
+  MutationReceipt receipt = 1;
+  ThreadOverview thread = 2;
+}
+
+message ReviseIntentRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  bytes expected_intent_version = 3;
+  ThreadIntent proposed_intent = 4;
+  // Agent attribution cannot set principal_approved; endpoint authority decides.
+}
+
+message SetThreadSharingRequest {
+  string client_operation_id = 1;
+  ThreadSharingPolicy policy = 2;
+  bytes expected_policy_version = 3;
+}
+
+message RecordReviewRequest {
+  string client_operation_id = 1;
+  ReviewDecision decision = 2;
+  repeated ExpectedVersion expected_versions = 3;
+}
+
+message LandThreadRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  RevisionRef source = 3;
+  ThreadRef target = 4;
+  RevisionRef expected_target = 5;
+  bytes expected_policy_version = 6;
+  // Weft owns hosted landing; no checkout or online device is required.
+}
+
+message ChangeThreadLifecycleRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  bytes expected_version = 3;
+  ThreadLifecycle lifecycle = 4;
+  // READY revalidates requirements. LANDED is rejected here; use LandThread.
+}
+
+message RenameThreadRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  bytes expected_version = 3;
+  string name = 4;
+}
+message StackLanding {
+  ThreadRef thread = 1;
+  RevisionRef source = 2;
+  ThreadRef target = 3;
+  RevisionRef expected_target = 4;
+  bytes expected_policy_version = 5;
+}
+message LandStackRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  repeated StackLanding landings = 3;
+}

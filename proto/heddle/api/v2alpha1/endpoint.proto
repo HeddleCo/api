@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "heddle/api/v2alpha1/stream.proto";
+
+message DescribeEndpointRequest {
+  repeated string understood_packages = 1;
+}
+
+message DescribeEndpointResponse {
+  EndpointRef endpoint = 1;
+  repeated string supported_packages = 2;
+  // Implemented handlers only. Compiled descriptors and PLANNED routes cannot
+  // populate this list automatically. Availability does not imply permission.
+  repeated string implemented_methods = 3;
+  repeated string understood_signed_record_formats = 4;
+  ReadBudget default_read_budget = 5;
+  ReadBudget maximum_read_budget = 6;
+  uint32 max_concurrent_streams_per_connection = 7;
+  uint32 max_pending_batch_bytes = 8;
+  uint32 max_cursor_bytes = 9;
+  uint64 operation_deduplication_retention_seconds = 10;
+  bool portable_root_attachment_verification = 11;
+}

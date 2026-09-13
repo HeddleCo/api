@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "heddle/api/v1alpha1/repository.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+enum AnalysisKind {
+  ANALYSIS_KIND_UNSPECIFIED = 0;
+  ANALYSIS_KIND_SEMANTIC_INDEX = 1;
+  ANALYSIS_KIND_SEMANTIC_DIFF = 2;
+  ANALYSIS_KIND_HOT_SPOTS = 3;
+  ANALYSIS_KIND_REVIEW = 4;
+  ANALYSIS_KIND_CONTEXT_SUGGESTIONS = 5;
+}
+
+message AnalysisRecord {
+  RecordRef ref = 1;
+  RevisionRef source = 2;
+  RevisionRef base = 3;
+  AnalysisKind kind = 4;
+  string analyzer = 5;
+  string analyzer_version = 6;
+  Coverage coverage = 7;
+  RecordRef operation = 8;
+  bytes version = 9;
+  uint64 finding_count = 10;
+}
+
+message AnalysisFinding {
+  RecordRef analysis = 1;
+  string id = 2;
+  string path = 3;
+  optional uint32 line = 4;
+  string explanation = 5;
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    SEVERITY_INFORMATIONAL = 1;
+    SEVERITY_WARNING = 2;
+    SEVERITY_BLOCKING = 3;
+  }
+  Severity severity = 6;
+  repeated EntityRef evidence = 7;
+}
+
+message ObserveAnalysisRequest {
+  RevisionRef source = 1;
+  RevisionRef base = 2;
+  repeated AnalysisKind kinds = 3;
+  repeated string paths = 4;
+  PageRequest page = 5;
+  ObserveOptions observe = 6;
+}
+
+message AnalysisEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    AnalysisRecord analysis = 2;
+    AnalysisFinding finding = 3;
+    heddle.api.v1alpha1.SemanticHotSpot hot_spot = 4;
+    heddle.api.v1alpha1.FileDiff diff = 5;
+    Removal removal = 6;
+    SectionStatus status = 7;
+  }
+}
+
+message StartAnalysisRequest {
+  string client_operation_id = 1;
+  RevisionRef source = 2;
+  RevisionRef base = 3;
+  repeated AnalysisKind kinds = 4;
+  // Explicit execution destination; private content is not uploaded merely
+  // because a view asks for analysis. Provider disclosure requires policy.
+  EndpointRef execution_endpoint = 5;
+  bytes expected_disclosure_policy_version = 6;
+}

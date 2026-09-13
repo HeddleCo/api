@@ -7,7 +7,7 @@
   "scripts": {
     "generate": "buf generate && node tools/generate-attachment-authorization.mjs && node tools/generate-ts-exports.mjs",
     "build": "npm run generate && tsc -p packages/typescript/tsconfig.json",
-    "typecheck": "tsc -p packages/typescript/tsconfig.json --noEmit",
+    "typecheck": "tsc -p packages/typescript/tsconfig.json --noEmit && tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext tests/v2-client-types.ts",
     "pack:api": "npm pack --workspace @heddleco/api",
     "treadle-compile": "node packages/typescript/compile-treadle.mjs"
   },

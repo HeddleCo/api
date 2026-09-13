@@ -1,0 +1,103 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "google/protobuf/duration.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+message ProviderConnection {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string provider = 3;
+  string provider_account_id = 4;
+  string installation_id = 5;
+  repeated ActionAvailability actions = 6;
+  bool revoked = 7;
+  // This record contains no provider token or OAuth authorization code.
+}
+message ProviderRepository {
+  RecordRef connection = 1;
+  string provider_repository_id = 2;
+  string clone_url = 3;
+  string name = 4;
+  bool private = 5;
+}
+message RemoteLinkRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string clone_url = 3;
+  RecordRef connection = 4;
+  enum Direction {
+    DIRECTION_UNSPECIFIED = 0;
+    DIRECTION_FETCH = 1;
+    DIRECTION_PUSH = 2;
+    DIRECTION_BOTH = 3;
+  }
+  Direction configured_direction = 5;
+  repeated Direction supported_directions = 6;
+  google.protobuf.Duration sync_interval = 7;
+  bool enabled = 8;
+  repeated ThreadRef diverged_threads = 9;
+  RecordRef latest_operation = 10;
+}
+message ObserveIntegrationsRequest {
+  repeated SpoolRef spools = 1;
+  repeated RecordRef connections = 2;
+  bool include_repositories = 3;
+  PageRequest page = 4;
+  ObserveOptions observe = 5;
+}
+message IntegrationEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    ProviderConnection connection = 2;
+    ProviderRepository repository = 3;
+    RemoteLinkRecord remote = 4;
+    SectionStatus status = 5;
+    Removal removal = 6;
+  }
+}
+message BeginProviderConnectionRequest {
+  string client_operation_id = 1;
+  string provider = 2;
+  string return_uri = 3;
+}
+message ProviderChallenge {
+  MutationReceipt receipt = 1;
+  RecordRef challenge = 2;
+  bytes state = 3;
+  string authorization_url = 4;
+}
+message CompleteProviderConnectionRequest {
+  string client_operation_id = 1;
+  RecordRef challenge = 2;
+  bytes authorization_code = 3;
+  string installation_id = 4;
+}
+message StoreProviderCredentialRequest {
+  string client_operation_id = 1;
+  string provider = 2;
+  bytes sealed_credential = 3;
+}
+message RevokeProviderConnectionRequest {
+  string client_operation_id = 1;
+  RecordRef connection = 2;
+  bytes expected_version = 3;
+}
+message SetRemoteLinkRequest {
+  string client_operation_id = 1;
+  RemoteLinkRecord remote = 2;
+  bytes expected_version = 3;
+}
+message ImportSourceRequest {
+  string client_operation_id = 1;
+  SpoolRef destination = 2;
+  ProviderRepository source = 3;
+  bytes expected_destination_version = 4;
+}
+message SynchronizeRemoteRequest {
+  string client_operation_id = 1;
+  RecordRef remote = 2;
+  RemoteLinkRecord.Direction direction = 3;
+  bytes expected_version = 4;
+}

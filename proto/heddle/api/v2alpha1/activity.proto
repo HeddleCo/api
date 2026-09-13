@@ -1,0 +1,128 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/thread.proto";
+
+message AttentionItem {
+  RecordRef ref = 1;
+  bytes version = 2;
+  EntityRef subject = 3;
+  string headline = 4;
+  string detail = 5;
+  uint32 priority = 6;
+  enum Resolution {
+    RESOLUTION_UNSPECIFIED = 0;
+    RESOLUTION_PENDING = 1;
+    RESOLUTION_DISMISSED = 2;
+    RESOLUTION_ACTED_ON = 3;
+  }
+  Resolution resolution = 7;
+  bool pinned = 8;
+  CaptureSummary capture = 9;
+  repeated ActionAvailability actions = 10;
+  repeated Requirement requirements = 11;
+  Coverage analysis_coverage = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+message RecordInteractionRequest {
+  string client_operation_id = 1;
+  EntityRef subject = 2;
+  RecordRef attention_item = 3;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_VIEW = 1;
+    KIND_ACT = 2;
+    KIND_DISMISS = 3;
+  }
+  Kind kind = 4;
+}
+message SetAttentionStateRequest {
+  string client_operation_id = 1;
+  RecordRef item = 2;
+  bytes expected_version = 3;
+  AttentionItem.Resolution resolution = 4;
+  bool pinned = 5;
+}
+message NotificationRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  EntityRef subject = 3;
+  string kind = 4;
+  string title = 5;
+  string body = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp read_at = 8;
+  repeated ActionAvailability actions = 9;
+}
+message NotificationRule {
+  string kind = 1;
+  SpoolRef spool = 2;
+  string actor_origin = 3;
+  enum Channel {
+    CHANNEL_UNSPECIFIED = 0;
+    CHANNEL_IN_APP = 1;
+    CHANNEL_EMAIL = 2;
+    CHANNEL_PUSH = 3;
+  }
+  Channel channel = 4;
+  enum Delivery {
+    DELIVERY_UNSPECIFIED = 0;
+    DELIVERY_IMMEDIATE = 1;
+    DELIVERY_DIGEST = 2;
+    DELIVERY_DISABLED = 3;
+  }
+  Delivery delivery = 5;
+}
+message NotificationPreferences {
+  bytes version = 1;
+  repeated NotificationRule rules = 2;
+  google.protobuf.Duration digest_interval = 3;
+  string timezone = 4;
+}
+message MarkNotificationsReadRequest {
+  string client_operation_id = 1;
+  repeated RecordRef notifications = 2;
+  google.protobuf.Timestamp through = 3;
+}
+message SetNotificationPreferencesRequest {
+  string client_operation_id = 1;
+  NotificationPreferences preferences = 2;
+  bytes expected_version = 3;
+}
+message UnsubscribeNotificationsRequest {
+  string client_operation_id = 1;
+  bytes unsubscribe_capability = 2;
+  repeated NotificationRule rules = 3;
+}
+message EvidenceRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  RevisionRef revision = 3;
+  string check = 4;
+  SignedRecord evidence = 5;
+  Coverage coverage = 6;
+}
+message RecordEvidenceRequest {
+  string client_operation_id = 1;
+  EvidenceRecord evidence = 2;
+}
+message VerifyEvidenceRequest {
+  repeated EvidenceRecord evidence = 1;
+}
+message EvidenceVerification {
+  RecordRef evidence = 1;
+  bool verified = 2;
+  repeated Requirement requirements = 3;
+}
+message VerifyEvidenceResponse {
+  repeated EvidenceVerification results = 1;
+}
+message AcknowledgeCheckRequest {
+  string client_operation_id = 1;
+  RecordRef evidence = 2;
+  RevisionRef revision = 3;
+  bytes policy_version = 4;
+}

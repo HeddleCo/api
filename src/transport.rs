@@ -72,7 +72,7 @@ impl MethodDescriptor {
 #[error("invalid request metadata protobuf: {0}")]
 pub struct RequestMetadataError(&'static str);
 
-fn protobuf_string_field(
+pub(crate) fn protobuf_string_field(
     mut request: &[u8],
     target_field: u32,
 ) -> Result<Option<&str>, RequestMetadataError> {

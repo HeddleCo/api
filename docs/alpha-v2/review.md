@@ -1,0 +1,81 @@
+**Heddle API alpha v2 — preliminary review, 7 September 2026**
+
+This is a design review, not an implementation or a runtime benchmark. Source snapshots are pinned to api `7204a004`, heddle PR #1718 `f446099d`, tapestry `950cd797`, and weft `1c2dee83`. Full revisions are in [revisions.txt](revisions.txt); the descriptor inventory is in [rpc-inventory.json](v1-inventory.json). Existing working checkouts were not changed.
+
+**Confirmed intent**
+
+Heddle owns the local-first VCS and its reusable operations. A Thread is the durable unit of work and human decision; capture is the everyday save boundary. Checkouts, agent runs, and timeline cursors are related objects with different lifetimes. Tapestry and Heddle are equal clients of the shared contract.
+
+The user clarified that Tapestry must also be a full remote client of owned Heddle devices: unpublished source, captures, timelines, retained forensic material, and local actions such as capture, resolve, and land. Private data remains on owned devices unless the user opts into persistence on Weft. Connecting one's own browser does not itself authorize Weft persistence. Existing runtime-broker semantics remain relevant: remote execution does not imply exporting secret keys or adding a secret-unwrapping API.
+
+The user's root is the credential authority. Browser credentials are that root or directly attached to it; Heddle credentials must have a verifiable attachment to the same root. Device/browser authorization must work without Weft involvement. An Iroh relay may provide connectivity without becoming the application endpoint or credential authority. For hosted access, Weft verifies the root's account binding and the operation's applicable authority.
+
+Primary product reference: [#1718 CONTEXT.md](https://github.com/HeddleCo/heddle/blob/f446099d451d34318b4ab9389b4f12ce3e8c9b1d/CONTEXT.md), especially Thread, capture, facets, forensic consent, local versus hosted acceptance, and client parity. Its [Weft handoff](https://github.com/HeddleCo/heddle/blob/f446099d451d34318b4ab9389b4f12ce3e8c9b1d/docs/WEFT_CLEAN_CUT_HANDOFF.md) establishes the current-format codec, storage, and transport boundaries. Definitions of intended behavior are not treated as proof that every feature is implemented.
+
+**Current contract inventory**
+
+There are 184 RPCs across 16 services. Applying method maturity overrides to service defaults yields 144 declared SHIPPED and 40 PLANNED. These are descriptor labels, not runtime availability: some planned methods have handlers, some routed methods return unimplemented for unsupported operations, and some planned methods have no handler.
+
+| Domain | Current services | RPCs | V2 direction to evaluate |
+| --- | --- | ---: | --- |
+| Identity and authority | Identity, OwnerAuthorization | 57 | Portable root attachments, device capabilities, account binding, distinct human ceremonies and owner governance |
+| Resource management | Registry | 31 | One spool identity and hierarchy; remove parallel authorization resource vocabularies |
+| Source, workflow, transfer | Repository, Workflow, RepoSync | 43 | Thread views and typed actions; separate durable thread data from checkout/run overlays; preserve efficient transfer |
+| Collaboration and attention | Collaboration, Attention, Notification | 18 | Shared causal records and projections; common snapshot/update rules; retain attention versus delivery semantics |
+| Review and evidence | StateReview, PullRequestReview, Attestation | 12 | One review domain view; distinguish opinion, verification evidence, and authorization to land |
+| Background operations | Operation | 10 | Reuse lifecycle, progress, idempotency, and cancellation; retain typed domain inputs/results |
+| Agent activity | Agent, AgentGateway | 12 | Reconsider hosted-only assumptions; typed timeline reads and device execution/control coverage |
+| Search | Search | 1 | Shared selectors and result identities; explicit coverage of selected sources |
+
+Treadle contributes definition messages without an RPC service here. Keep execution definitions and evidence references in the completeness map without assuming the API must absorb Treadle's execution protocol.
+
+**Findings that change the design**
+
+1. **Ordinary device login does not currently establish the portable root relationship the user described.** In #1718, Heddle registers its device key through Weft's device flow, then calls `mint_independent_root` using that device key. The exchange result retained by Heddle contains subject, credential/session identifiers, and expiry, rather than a browser-root delegation chain. Weft's approval handler associates the key with a user through registry writes. This is an implementation gap relative to the confirmed target; client-minted is not equivalent to derived from the human root. The API must carry a portable root attachment and its verification context, with independent device possession proof. See [Heddle login](https://github.com/HeddleCo/heddle/blob/f446099d451d34318b4ab9389b4f12ce3e8c9b1d/crates/hosted-client/src/hosted_runtime/auth.rs#L987) and [Weft device approval](https://github.com/HeddleCo/weft/blob/1c2dee83fe4cd05bcf9501a019ddcf97e5f4ce79/crates/weft-hosted/src/server/hosted/identity/device_authz.rs#L66). The canonical identity document's online-only key-to-human lookup is insufficient for this target.
+
+2. **Thread identity still requires hosted resolution.** `ThreadSummary`, `ThreadMetadata`, and `RefEntry` describe server-assigned thread identities; requests often require both immutable ID and mutable name. Heddle's `require_thread_id` pages through `ListThreads` to resolve a name. Ordinary pull uses that lookup, and metadata retrieval can resolve again before `GetThread`. A local-first v2 should evaluate client-created durable IDs that survive publication, rename, and multiple devices, plus explicit selectors for initial name resolution. This is a proposal, not an assertion that local IDs already have the necessary semantics. See [workflow types](https://github.com/HeddleCo/api/blob/7204a0042d9de1d58185b967c0c1d03d35c6de61/proto/heddle/api/v1alpha1/workflow.proto#L119) and [Heddle resolver](https://github.com/HeddleCo/heddle/blob/f446099d451d34318b4ab9389b4f12ce3e8c9b1d/crates/hosted-client/src/hosted_runtime/hosted/thread_identity.rs#L6).
+
+3. **Tapestry reconstructs domain views across many calls.** `loadTasksView` reads the thread list then one history per displayed thread. `loadStatesView` reads refs, thread metadata, a HEAD state, and one history per displayed thread; the display cap is 40 threads. `loadAppReviewSurface` starts five operations, then discussions, signatures, and optional provenance, which depends on the diff. The dashboard enumerates spools and fans out workspace, context, and operation reads across subsets. These are static call paths; actual request totals depend on pagination, memoization, and selected data. See [spool views](https://github.com/HeddleCo/tapestry/blob/950cd797c5d505a3b613f05d413fca78b79dd6b3/src/lib/server/spool-views.ts#L178), [review assembly](https://github.com/HeddleCo/tapestry/blob/950cd797c5d505a3b613f05d413fca78b79dd6b3/src/lib/server/app-review.ts#L266), and [dashboard](https://github.com/HeddleCo/tapestry/blob/950cd797c5d505a3b613f05d413fca78b79dd6b3/src/routes/app/+page.server.ts#L155).
+
+4. **Some anticipated batching is contract-only.** `ListThreadHistories`, `ListDiscussionsByStates`, and `StreamWorkspaceSummary` are planned and absent from the inspected native dispatch. Merely adopting those names will not reduce current calls. `ListThreadHistories` also has no history continuation token, so its present shape would replace fan-out with a capped response rather than solve complete history traversal. See [batch history contract](https://github.com/HeddleCo/api/blob/7204a0042d9de1d58185b967c0c1d03d35c6de61/proto/heddle/api/v1alpha1/repository.proto#L458) and [registration test](https://github.com/HeddleCo/weft/blob/1c2dee83fe4cd05bcf9501a019ddcf97e5f4ce79/crates/weft-hosted/tests/native_service_registration.rs#L114).
+
+5. **The direct-device product is larger than the existing deployment-target metadata.** Only CollaborationService and StateReviewService declare a Heddle daemon target. Source/workspace reads and local VCS actions need device coverage for the confirmed target. Heddle's persistent network daemon currently mounts the claim router; that is useful connection infrastructure, not a general private-state/control server. Tapestry's page loaders still use server-side gRPC-web. Private device bytes need a browser-side path that never passes through those server loaders. See [daemon](https://github.com/HeddleCo/heddle/blob/f446099d451d34318b4ab9389b4f12ce3e8c9b1d/crates/cli/src/cli/commands/netdaemon/server.rs#L91) and [Tapestry transport](https://github.com/HeddleCo/tapestry/blob/950cd797c5d505a3b613f05d413fca78b79dd6b3/src/lib/server/grpc.ts#L25).
+
+6. **The intended local model is richer than its shared read/action contract.** Examples include versioned thread intent, timeline seek/fork/recovery, source conflict versions, and separate confidential-runtime/forensic facets. Agent timeline transport currently carries opaque canonical operation bytes; that is a valid durable-transfer carrier, but does not itself provide the typed derived views a browser needs. Likewise, adding every missing fact to the already-large ThreadSummary would perpetuate its mixture of durable thread facts, machine paths, agent/session activity, and review summaries.
+
+7. **Several representations duplicate the same meaning.** Examples include namespace/repository grant targets versus the canonical spool resource, paired name/ID arrays for thread relationships, multiple review/signature entry points, parallel reading-order fields, and multiple paging/resume conventions. Consolidation should remove duplicate meaning while preserving differences that matter: local validity versus hosted acceptance, mutable refs versus immutable states, review opinion versus authority, and ordinary writes versus owner-gated purge.
+
+**Proposed shape to test against complete user journeys**
+
+Use shared domain views implemented by the appropriate endpoints. Candidate shapes are an account/spool workspace view, a Thread view, and a source-content read that can batch requested trees/blobs/diff windows at one resolved revision. These are usable by CLI, agents, and browser; they are not Tapestry route payloads.
+
+A Thread view should carry a bounded initial slice of intent, exact tip/base, capture history, conflicts, review evidence, discussion digests, readiness requirements, and available actions. Large diffs, full transcripts, and deep history remain paged or streamed on demand. Requested sections need honest completeness/freshness states, rather than interpreting omitted data as empty or green.
+
+For live views, one request should be able to deliver an initial snapshot and continue with updates. Define the snapshot/update boundary, cursor scope, reconnect behavior, filter and authority binding, deletions, and resynchronization explicitly. Each endpoint has its own revision/cursor; a browser combining devices and Weft must not claim a global atomic snapshot it cannot obtain.
+
+Reuse one authenticated Iroh connection per endpoint and independent streams for view updates, commands, and bulk bytes. The optimization target is one bounded initial domain-view request per participating endpoint, after discovery/authentication, with additional calls proportional to deliberate expansion or paging rather than the number of visible rows. This is a target to benchmark, not a measured latency claim.
+
+Use typed local actions to invoke Heddle's reusable verbs against an explicit device/checkout. Carry an idempotency identity and the expected source/target/conflict/policy versions needed by that action. Return the resulting view revision and typed outcome so the client need not refetch every panel. Preserve distinct local completion and hosted publication/acceptance outcomes. A review preview may be useful, but execution must independently validate its preconditions; a mandatory preflight should not be necessary merely to submit an operation.
+
+For remote content, preserve the existing stream-native Push/Pull foundation: bounded buffering, partial fetch, resumability, exact immutable identities, owner genesis verification, CAS ref changes, and verified provider handoff. Recent PullReady refs/HEAD already remove a side channel. Evaluate initial selector resolution and metadata return within the same logical exchange to eliminate repeated thread lookups. Preserve any extra exchanges that obtain necessary exact-plan consent.
+
+For confidential data, keep facet-specific meanings above a reusable encrypted storage/transfer substrate. Viewing local data and executing local actions must not implicitly publish it. An explicit publication policy can select data classes and destinations; retention consent for raw material remains separate from consent to persist it remotely.
+
+For authority, carry the user's portable root/device relationship and verify proof of possession at the destination. Keep the passkey's human-attestation role distinct from an Ed25519 Biscuit signing key. Existing owner/purge bundles should not be silently reinterpreted as generic device enrollment. Root transitions and revocation distribution need defined offline semantics; no disconnected verifier can learn an unseen revocation instantaneously.
+
+Retain the strong existing contract machinery: deterministic Rust/TypeScript signing, typed failures, explicit effect/retry metadata, endpoint capability declarations, and conformance checks. Simplify historical payload duplication rather than removing these guarantees. Use a separate alpha package generation for a clean cut if selected, with coordinated client/server releases and durable data-format changes assessed separately from protobuf versioning.
+
+**Combined-device decision**
+
+The user confirmed that Tapestry should combine one Thread across devices and Weft while keeping device checkouts distinct. Local actions explicitly target a checkout. This affects identity, view composition, and mutation routing; it does not imply syncing private state to Weft.
+
+The [candidate surface map](v1-disposition.csv) assigns a proposed disposition and rationale to all 184 methods. It includes account/device lifecycle, collaboration/review, policy/governance, imports and Git remotes, search, background work, and optional confidential persistence so fewer first-page calls do not conceal missing functionality. These are design dispositions, not proof that every candidate removal has no remaining caller. The [v2 proposal](design.md) adds the missing device operations and cross-cutting contracts that an inventory of existing RPCs cannot capture.
+# Heddle client exercise
+
+The Heddle client experiment based on merged Heddle #1718 adds three concrete
+requirements to the candidate contract: exact-revision blob selection by native
+hash as well as path; operation-ID extraction on generated v2 descriptors; and
+explicit cancellation on typed Rust observations. Hash reads must prove
+reachability from the authorized requested revision. The hash itself grants no
+access. These changes support lazy hydration and a single typed Iroh adapter
+without adding name lookups, route catalogs, or v1 RPC forwarding.

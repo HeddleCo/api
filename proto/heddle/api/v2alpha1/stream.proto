@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "google/protobuf/timestamp.proto";
+
+// Shared observation protocol. Each RPC has a typed event payload alongside
+// StreamFrame. Only a data frame carries a payload. See docs/alpha-v2/streams.md.
+// A logical RPC occupies one reliable, ordered Iroh stream; this contract does
+// not turn protobuf frames into unreliable UDP datagrams.
+enum ObservationMode {
+  OBSERVATION_MODE_UNSPECIFIED = 0;
+  // End after the initial consistent snapshot (or replay to a fixed watermark).
+  OBSERVATION_MODE_ONCE = 1;
+  // Continue with changes after the initial snapshot or accepted resume cursor.
+  OBSERVATION_MODE_FOLLOW = 2;
+}
+
+message ReadBudget {
+  // Zero selects the endpoint's advertised default; it never means unbounded.
+  uint32 max_items = 1;
+  uint32 max_frame_bytes = 2;
+  uint64 max_snapshot_bytes = 3;
+}
+
+message ObserveOptions {
+  // Unspecified selects FOLLOW for Observe RPCs. Finite Read RPCs reject FOLLOW.
+  ObservationMode mode = 1;
+  // Opaque checkpoint from this endpoint, method, scope, projection and caller.
+  // A cursor resumes an observation; it is not a collection pagination token.
+  bytes after_cursor = 2;
+  ReadBudget budget = 3;
+}
+
+message PageRequest {
+  uint32 size = 1;
+  // Opaque, query-bound token. Changing filters/order requires a new first page.
+  bytes after_page = 2;
+}
+
+message PageInfo {
+  bytes next_page = 1;
+  // True only when the authorized query is exhausted at the snapshot boundary.
+  bool exhausted = 2;
+  optional uint64 matching_count = 3;
+}
+
+enum EndpointKind {
+  ENDPOINT_KIND_UNSPECIFIED = 0;
+  ENDPOINT_KIND_WEFT = 1;
+  ENDPOINT_KIND_DEVICE = 2;
+}
+
+message EndpointRef {
+  // Stable Iroh endpoint public key, exactly 32 bytes. Never a relay address.
+  bytes public_key = 1;
+  EndpointKind kind = 2;
+}
+
+message StreamOpen {
+  EndpointRef source = 1;
+  // Digest of method, normalized query/projection, caller scope and schema.
+  // The server binds opaque cursors to these same inputs. Not a bearer token.
+  bytes binding_digest = 2;
+  // Empty starts a replacement snapshot. Otherwise MUST equal after_cursor.
+  bytes resumed_from = 3;
+  ReadBudget accepted_budget = 4;
+  // An observation cannot outlive its validated authority. Reconnect with fresh
+  // proof and the last committed cursor; no authority widening within a stream.
+  google.protobuf.Timestamp authority_valid_until = 5;
+}
+
+enum StreamDataKind {
+  STREAM_DATA_KIND_UNSPECIFIED = 0;
+  STREAM_DATA_KIND_SNAPSHOT = 1;
+  STREAM_DATA_KIND_UPSERT = 2;
+  STREAM_DATA_KIND_REMOVE = 3;
+}
+
+message StreamData {
+  StreamDataKind kind = 1;
+}
+
+message StreamCheckpoint {
+  // The first checkpoint commits the staged snapshot. Later checkpoints commit
+  // a bounded batch of typed upserts/removals. Only committed cursors may resume.
+  bytes cursor = 1;
+  // Empty for a replacement snapshot; otherwise the last committed cursor.
+  bytes previous_cursor = 2;
+  bool snapshot_complete = 3;
+  PageInfo page = 4;
+}
+
+enum StreamResetReason {
+  STREAM_RESET_REASON_UNSPECIFIED = 0;
+  STREAM_RESET_REASON_CURSOR_EXPIRED = 1;
+  STREAM_RESET_REASON_SCOPE_CHANGED = 2;
+  STREAM_RESET_REASON_SLOW_CONSUMER = 3;
+  STREAM_RESET_REASON_SOURCE_RESTARTED = 4;
+  STREAM_RESET_REASON_WINDOW_CHANGED = 5;
+}
+
+message StreamReset {
+  StreamResetReason reason = 1;
+  // Reset ends the stream. Discard uncommitted data and restart a snapshot;
+  // retaining the old rendered view requires visibly marking it stale.
+}
+
+message StreamComplete {
+  // Equal to the last committed checkpoint. FIN without this control is an
+  // interrupted observation, never evidence that a snapshot finished.
+  bytes cursor = 1;
+}
+
+message StreamHeartbeat {
+  // Optional liveness, never a cursor advance or a substitute for a checkpoint.
+  google.protobuf.Timestamp observed_at = 1;
+}
+
+message StreamFrame {
+  // Starts at one on each connection and increases by exactly one per frame.
+  // This detects application loss/reordering; durable resumption uses cursor.
+  uint64 sequence = 1;
+  oneof body {
+    StreamOpen open = 2;
+    StreamData data = 3;
+    StreamCheckpoint checkpoint = 4;
+    StreamReset reset = 5;
+    StreamComplete complete = 6;
+    StreamHeartbeat heartbeat = 7;
+  }
+}

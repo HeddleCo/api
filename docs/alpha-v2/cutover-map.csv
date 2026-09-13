@@ -1,0 +1,185 @@
+old_rpc,v2_rpcs,status,semantic_obligation
+AgentService.ListAgentRuns,RunService.ObserveRuns,native_contract,"Expose typed views, stable IDs and navigability; raw forensic material is a separate opt-in facet."
+AgentService.GetAgentRun,RunService.ObserveRuns,native_contract,"Expose typed views, stable IDs and navigability; raw forensic material is a separate opt-in facet."
+AgentService.ListAgentTimelineEvents,RunService.ObserveRuns,native_contract,"Expose typed views, stable IDs and navigability; raw forensic material is a separate opt-in facet."
+AgentService.WatchAgentRun,RunService.ObserveRuns,native_contract,"Expose typed views, stable IDs and navigability; raw forensic material is a separate opt-in facet."
+AgentService.ControlAgent,RunService.ControlRun,native_contract,Commands explicitly target an execution device/checkout and bind to exact capability and action.
+AgentService.DecideAgentPermission,RunService.DecidePermission,native_contract,Commands explicitly target an execution device/checkout and bind to exact capability and action.
+AgentService.GetAgentCommand,RunService.ObserveRuns,native_contract,Commands explicitly target an execution device/checkout and bind to exact capability and action.
+AgentService.GetAgentPolicy,RunService.ObserveRuns,native_contract,"Align signed delegation, retention/disclosure separation and user-root authority before committing to existing shapes."
+AgentService.UpdateAgentPolicy,RunService.PutRunPolicy,native_contract,"Align signed delegation, retention/disclosure separation and user-root authority before committing to existing shapes."
+AgentService.ListHarnessPreferences,RunService.ObserveRuns,native_contract,"Align signed delegation, retention/disclosure separation and user-root authority before committing to existing shapes."
+AgentService.DeleteHarnessPreference,RunService.PutRunPolicy,native_contract,"Align signed delegation, retention/disclosure separation and user-root authority before committing to existing shapes."
+AgentGatewayService.Connect,SyncService.Publish;RunService.ObserveRuns;RunService.ControlRun,native_contract,"Keep distinct durable replication, ephemeral activity and delivery lifecycles over shared connections."
+AttentionService.GetFeedSnapshot,AttentionService.ObserveAttention,native_contract,Page beyond current cap; attach enough typed target data to render/action cards without hydration fan-out.
+AttentionService.RecordInteraction,AttentionService.RecordInteraction,native_contract,Preserve interaction and resolution semantics separately from underlying discussion/thread records.
+AttentionService.StreamFeed,AttentionService.ObserveAttention,native_contract,Page beyond current cap; attach enough typed target data to render/action cards without hydration fan-out.
+AttentionService.UpdateFeedItem,AttentionService.SetAttentionState,native_contract,Preserve interaction and resolution semantics separately from underlying discussion/thread records.
+AttestationService.RecordSignature,EvidenceService.RecordEvidence,native_contract,Cryptographic evidence recording/verification is distinct from review opinion and owner authorization.
+AttestationService.VerifySignature,EvidenceService.VerifyEvidence,native_contract,Cryptographic evidence recording/verification is distinct from review opinion and owner authorization.
+CollaborationService.AppendTurn,CollaborationService.AppendTurn,native_contract,"Use stable local IDs, causal operation identities, idempotency and explicit local/hosted acceptance."
+CollaborationService.GetDiscussion,CollaborationService.ObserveCollaboration,native_contract,"Use stable local IDs, causal operation identities, idempotency and explicit local/hosted acceptance."
+CollaborationService.ListByState,CollaborationService.ObserveCollaboration,native_contract,"One paged query vocabulary for thread, revision and semantic anchors; replace planned batching with a delivered view."
+CollaborationService.ListBySymbol,CollaborationService.ObserveCollaboration,native_contract,"One paged query vocabulary for thread, revision and semantic anchors; replace planned batching with a delivered view."
+CollaborationService.ListByThreadRef,CollaborationService.ObserveCollaboration,native_contract,"One paged query vocabulary for thread, revision and semantic anchors; replace planned batching with a delivered view."
+CollaborationService.ListDiscussionsByStates,CollaborationService.ObserveCollaboration,native_contract,"One paged query vocabulary for thread, revision and semantic anchors; replace planned batching with a delivered view."
+CollaborationService.OpenDiscussion,CollaborationService.OpenDiscussion,native_contract,"Use stable local IDs, causal operation identities, idempotency and explicit local/hosted acceptance."
+CollaborationService.ResolveDiscussion,CollaborationService.ResolveDiscussion,native_contract,"Use stable local IDs, causal operation identities, idempotency and explicit local/hosted acceptance."
+IdentityService.ApproveDeviceAuthorization,IdentityService.ApprovePairing,native_contract,User-root attachment and possession proof must survive without Weft; hosted rendezvous is optional assistance.
+IdentityService.BeginRecovery,IdentityService.BeginRecovery,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.BeginWebAuthnAuthentication,IdentityService.BeginAuthentication,native_contract,Retain ceremony boundaries; return or accept portable root/device bindings rather than relying only on registry membership.
+IdentityService.BeginWebAuthnRegistration,IdentityService.BeginRegistration;IdentityService.CompleteRegistration,native_contract,Retain ceremony boundaries; return or accept portable root/device bindings rather than relying only on registry membership.
+IdentityService.BindSignupInviteEmail,IdentityService.BeginEmailVerification,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ClaimNextDropCode,IdentityService.CreateSignupInvitation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ClaimSignupInvite,IdentityService.RedeemSignupInvitation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ClaimHandle,IdentityService.ClaimHandle,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.CompleteRecovery,IdentityService.CompleteRecovery,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.CreateSignupInvite,IdentityService.CreateSignupInvitation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ListSignupInvites,IdentityService.ObserveIdentity,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.CreateAgentAccount,IdentityService.CreatePrincipal,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.CreateDeviceAuthorization,IdentityService.BeginPairing,native_contract,User-root attachment and possession proof must survive without Weft; hosted rendezvous is optional assistance.
+IdentityService.CreateServiceAccount,IdentityService.CreatePrincipal,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.DeclareRecoveryMethod,IdentityService.PutRecoveryPolicy,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ExchangeDeviceAuthorization,IdentityService.CompletePairing,native_contract,User-root attachment and possession proof must survive without Weft; hosted rendezvous is optional assistance.
+IdentityService.FinishWebAuthnAuthentication,IdentityService.CompleteAuthentication,native_contract,Retain ceremony boundaries; return or accept portable root/device bindings rather than relying only on registry membership.
+IdentityService.GetInvitationSummary,IdentityService.ObserveIdentity,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.GetHandleStatus,IdentityService.ResolveHandles,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.IntrospectCredential,IdentityService.IntrospectCredential,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.IssuePresenceToken,,retired,Presence uses the authenticated endpoint session; no separate Weft-minted browser-to-device authority.
+IdentityService.IssueServiceAccountCredential,IdentityService.PutDelegation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.IssueSignupEmailChallenge,IdentityService.BeginEmailVerification,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.LinkOAuthIdentity,IntegrationService.BeginProviderConnection;IntegrationService.CompleteProviderConnection,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ListScopeCapabilities,IdentityService.ObserveIdentity,native_contract,Include identity and effective actions in bootstrap views without forcing repeat calls per page.
+IdentityService.ListServiceAccounts,IdentityService.ObserveIdentity,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ListSessions,IdentityService.ObserveIdentity,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.MintAnonBiscuit,IdentityService.CreatePrincipal,native_contract,Preserve abuse controls; decide separately whether public application reads need anonymous capability minting.
+IdentityService.MintGitHubAppSetupChallenge,IntegrationService.BeginProviderConnection;IntegrationService.CompleteProviderConnection,native_contract,Keep provider-specific setup outside core VCS/device authority; retain account-scoped authorization.
+IdentityService.PromoteAgentAccount,IdentityService.RegisterRootAttachment,native_contract,Retired claim model; preserve current claim semantics in the supported ceremony.
+IdentityService.ListInstallationRepositories,IntegrationService.ObserveIntegrations,native_contract,Keep provider-specific setup outside core VCS/device authority; retain account-scoped authorization.
+IdentityService.RegisterGitHubInstallation,IntegrationService.BeginProviderConnection;IntegrationService.CompleteProviderConnection,native_contract,Keep provider-specific setup outside core VCS/device authority; retain account-scoped authorization.
+IdentityService.RegisterPublicKey,IdentityService.RegisterRootAttachment,native_contract,Retain ceremony boundaries; return or accept portable root/device bindings rather than relying only on registry membership.
+IdentityService.RequestHeldName,IdentityService.ClaimHandle,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.RemainingDropCodes,IdentityService.ObserveIdentity,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ResolveHandle,IdentityService.ResolveHandles,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.ResolveSignupInvite,IdentityService.ResolveSignupInvitation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.RevokeCredential,IdentityService.RevokeDelegation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.RevokeDevice,IdentityService.RevokeDevice,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.RevokeServiceAccount,IdentityService.RevokeDelegation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.RevokeSession,IdentityService.RevokeSession,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.RotateCredential,IdentityService.PutDelegation,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.StoreProviderToken,IntegrationService.StoreProviderCredential,native_contract,Keep provider-specific setup outside core VCS/device authority; retain account-scoped authorization.
+IdentityService.SubmitRecoveryProof,IdentityService.SubmitRecoveryProof,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.VerifySignupEmail,IdentityService.CompleteEmailVerification,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.VetoRecovery,IdentityService.VetoRecovery,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
+IdentityService.WaitForDeviceAuthorization,IdentityService.ObservePairing,native_contract,User-root attachment and possession proof must survive without Weft; hosted rendezvous is optional assistance.
+IdentityService.WhoAmI,IdentityService.ObserveIdentity,native_contract,Include identity and effective actions in bootstrap views without forcing repeat calls per page.
+NotificationService.ListNotifications,NotificationService.ObserveNotifications,native_contract,Reuse snapshot/update/cursor conventions while retaining notification delivery semantics.
+NotificationService.SubscribeNotifications,NotificationService.ObserveNotifications,native_contract,Reuse snapshot/update/cursor conventions while retaining notification delivery semantics.
+NotificationService.MarkNotificationRead,NotificationService.MarkNotificationsRead,native_contract,"Do not conflate notification read state, subscription preferences and attention resolution."
+NotificationService.GetNotificationPreferences,NotificationService.ObserveNotifications,native_contract,"Do not conflate notification read state, subscription preferences and attention resolution."
+NotificationService.SetNotificationPreferences,NotificationService.SetNotificationPreferences,native_contract,"Do not conflate notification read state, subscription preferences and attention resolution."
+NotificationService.Unsubscribe,NotificationService.UnsubscribeNotifications,native_contract,"Do not conflate notification read state, subscription preferences and attention resolution."
+OperationService.SubmitOperation,IntegrationService.ImportSource;IntegrationService.SynchronizeRemote,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OperationService.SubmitOperationBatch,IntegrationService.ImportSource;IntegrationService.SynchronizeRemote,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OperationService.SetRemoteLink,IntegrationService.SetRemoteLink,native_contract,Retain truthful supported-direction reporting; include remote health in workspace/spool view.
+OperationService.GetRemoteLink,IntegrationService.ObserveIntegrations,native_contract,Retain truthful supported-direction reporting; include remote health in workspace/spool view.
+OperationService.GetOperation,OperationService.ObserveOperations,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OperationService.BatchGetOperations,OperationService.ObserveOperations,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OperationService.GetOperationBatch,OperationService.ObserveOperations,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OperationService.ListOperations,OperationService.ObserveOperations,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OperationService.WatchOperations,OperationService.ObserveOperations,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OperationService.CancelOperation,OperationService.CancelOperation,native_contract,"Reuse idempotency, typed spec/result, watch and honest cancellation; atomic batches remain a capability until implemented."
+OwnerAuthorizationService.BootstrapOwnerRoot,OwnerAuthorizationService.BootstrapOwnership,native_contract,"Keep exact signed transitions, recovery delay/veto and purge authority distinct from ordinary device access."
+OwnerAuthorizationService.RotateOwnerKey,OwnerAuthorizationService.SubmitOwnerTransition,native_contract,"Keep exact signed transitions, recovery delay/veto and purge authority distinct from ordinary device access."
+OwnerAuthorizationService.RecoverOwnerKey,OwnerAuthorizationService.SubmitOwnerTransition,native_contract,"Keep exact signed transitions, recovery delay/veto and purge authority distinct from ordinary device access."
+OwnerAuthorizationService.ChangeOwnerRecoveryPolicy,OwnerAuthorizationService.SubmitOwnerTransition,native_contract,"Keep exact signed transitions, recovery delay/veto and purge authority distinct from ordinary device access."
+OwnerAuthorizationService.GetCurrentOwnerKeyring,OwnerAuthorizationService.ObserveOwnership,native_contract,Return relevant root state with enrollment/sync/views; retain an explicit proof-chain read when needed.
+OwnerAuthorizationService.BeginAgentOwnerClaim,,retired,Retired hosted owner-claim ceremony; portable principal attachment is the accepted authority model.
+OwnerAuthorizationService.ClaimAgentOwner,,retired,Retired hosted owner-claim ceremony; portable principal attachment is the accepted authority model.
+OwnerAuthorizationService.SubmitOwnerAuthorization,OwnerAuthorizationService.SubmitOwnerCapability,native_contract,"Keep exact signed transitions, recovery delay/veto and purge authority distinct from ordinary device access."
+OwnerAuthorizationService.TransferResourceOwnership,OwnerAuthorizationService.TransferOwnership,native_contract,"Keep exact signed transitions, recovery delay/veto and purge authority distinct from ordinary device access."
+PullRequestReviewService.GetReviewAnalysisResult,AnalysisService.ObserveAnalysis,native_contract,Provider PR remains an input selector; use common background progress/result/watch semantics.
+PullRequestReviewService.GetReviewAnalysisStatus,AnalysisService.ObserveAnalysis,native_contract,Provider PR remains an input selector; use common background progress/result/watch semantics.
+PullRequestReviewService.StartReviewAnalysis,AnalysisService.StartAnalysis,native_contract,Provider PR remains an input selector; use common background progress/result/watch semantics.
+RegistryService.AttachChild,SpoolService.SetSpoolMount,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.CreateGrant,SpoolService.PutGrant,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.CreateInvitation,SpoolService.CreateInvitation,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.CreateSpool,SpoolService.CreateSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.DeleteBookmark,SpoolService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.DeleteGrant,SpoolService.RevokeGrant,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.DeleteSpool,SpoolService.DeleteSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.DetachChild,SpoolService.RemoveSpoolMount,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.GetCurrentUserSpool,WorkspaceService.ObserveWorkspace,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
+RegistryService.GetSpool,SpoolService.ObserveSpool,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
+RegistryService.GrantSupportAccess,SpoolService.SetSupportAccess,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.ListBookmarks,WorkspaceService.ObserveWorkspace,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.ListChildren,SpoolService.ObserveSpool,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
+RegistryService.ListGrants,SpoolService.ObserveSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.ListInvitations,SpoolService.ObserveSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.ListMembers,SpoolService.ObserveSpool,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
+RegistryService.ListSpools,WorkspaceService.ObserveWorkspace,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
+RegistryService.ListExploreMetadata,SpoolService.ObserveSpool,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
+RegistryService.ListSupportAccessGrants,SpoolService.ObserveSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.ListActors,SpoolService.ObserveSpool,native_contract,Separate actor/run provenance from device-local checkout state; advertise support per endpoint.
+RegistryService.ListWorktrees,CheckoutService.ObserveCheckouts,native_contract,Separate actor/run provenance from device-local checkout state; advertise support per endpoint.
+RegistryService.ResolveMonorepo,WorkspaceService.ResolveResources;SpoolService.ObserveSpool,native_contract,"Serve bounded requested catalog, hierarchy, membership and summary sections without per-row client joins."
+RegistryService.ResolveSubjects,WorkspaceService.ResolveResources;SpoolService.ObserveSpool,native_contract,Include principal summaries in views; retain a bounded batch resolver for additional identities.
+RegistryService.RevokeInvitation,SpoolService.RevokeInvitation,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.RevokeSupportAccess,SpoolService.SetSupportAccess,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.SetNamespaceVisibility,SpoolService.ReviseSpool,native_contract,Namespace is a spool facet; one resource identity and visibility operation.
+RegistryService.SetSpoolVisibility,SpoolService.ReviseSpool,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.UpdateGrant,SpoolService.PutGrant,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RegistryService.UpdateSpool,SpoolService.ReviseSpool,native_contract,Typed update masks and preconditions; preserve per-field authority rather than one broad settings permission.
+RegistryService.UpdateSpoolSettings,SpoolService.ReviseSpool,native_contract,Typed update masks and preconditions; preserve per-field authority rather than one broad settings permission.
+RegistryService.UpsertBookmark,SpoolService.SetBookmark,native_contract,"Use canonical spool IDs/targets; preserve grants, invitations, edges, support access and bookmarks."
+RepoSyncService.ListRefs,ThreadService.ObserveThreads;SyncService.Fetch,native_contract,Advertise refs/HEAD/identities within transfer opening when useful; retain paging for large catalogs.
+RepoSyncService.Pull,SyncService.Fetch,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
+RepoSyncService.Push,SyncService.Publish,native_contract,"Preserve streaming, partial fetch, resumability, owner evidence and provider-plan consent; include required metadata in the exchange."
+RepoSyncService.UpdateRef,SyncService.Publish,native_contract,Stable typed selector and exact old/new revision; no redundant name+ID discovery once identity is known.
+RepositoryService.GetBlame,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
+RepositoryService.GetBlob,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
+RepositoryService.GetCompare,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
+RepositoryService.GetContextHistory,CollaborationService.ObserveCollaboration,native_contract,Keep context snapshots/history separate from live context; share canonical record operations and typed read projections.
+RepositoryService.GetDiff,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
+RepositoryService.GetRefs,ThreadService.ObserveThreads,native_contract,"Resolve ref once; return stable identities, exact revisions and bounded history in requested projections."
+RepositoryService.GetSemanticHotSpots,AnalysisService.ObserveAnalysis,native_contract,Expose availability/freshness and use paged scoped analysis.
+RepositoryService.GetState,ContentService.ReadContent,native_contract,"Resolve ref once; return stable identities, exact revisions and bounded history in requested projections."
+RepositoryService.GetTree,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
+RepositoryService.ListActions,ContentService.ReadContent,native_contract,Expose useful typed facts in views while retaining durable transfer identities; planned attachment read needs implementation.
+RepositoryService.ListContext,CollaborationService.ObserveCollaboration,native_contract,Keep context snapshots/history separate from live context; share canonical record operations and typed read projections.
+RepositoryService.ListContextSuggestions,AnalysisService.ObserveAnalysis,native_contract,Keep context snapshots/history separate from live context; share canonical record operations and typed read projections.
+RepositoryService.ListProvenanceSummaries,ContentService.ReadContent,native_contract,Typed batch/projection requests pinned to exact revision(s); stream large bytes and avoid client-dependent followups.
+RepositoryService.ListStateAttachments,ContentService.ReadContent,native_contract,Expose useful typed facts in views while retaining durable transfer identities; planned attachment read needs implementation.
+RepositoryService.ListStates,ThreadService.ObserveThread,native_contract,"Resolve ref once; return stable identities, exact revisions and bounded history in requested projections."
+RepositoryService.ListThreadHistories,ThreadService.ObserveThreads,native_contract,"Remove per-thread fan-out and add real continuation/completeness, not a larger capped result."
+RepositoryService.ReviseContext,CollaborationService.PutContext,native_contract,Keep context snapshots/history separate from live context; share canonical record operations and typed read projections.
+RepositoryService.SetContext,CollaborationService.PutContext,native_contract,Keep context snapshots/history separate from live context; share canonical record operations and typed read projections.
+RepositoryService.SupersedeContext,CollaborationService.PutContext,native_contract,Keep context snapshots/history separate from live context; share canonical record operations and typed read projections.
+RepositoryService.SubscribeRepoEvents,ThreadService.ObserveThread,native_contract,"Define replay cursor, resync, filtering, revocation and completion at the view boundary."
+SearchService.Search,SearchService.Search,native_contract,"Typed scope/facet selectors, stable result identities, paging and explicit per-source completeness."
+StateReviewService.GetRepoSignalHealth,ThreadService.ObserveThread,native_contract,"Keep human opinion distinct from evidence, source state lifecycle and permission to land."
+StateReviewService.GetReviewPayload,ThreadService.ObserveThread,native_contract,"Return exact source, evidence, discussion/readiness and progress sections without repeated client joins."
+StateReviewService.GetReviewProgress,ThreadService.ObserveThread,native_contract,"Return exact source, evidence, discussion/readiness and progress sections without repeated client joins."
+StateReviewService.ListSignatures,ThreadService.ObserveThread,native_contract,"Return exact source, evidence, discussion/readiness and progress sections without repeated client joins."
+StateReviewService.RecordCheckAck,EvidenceService.AcknowledgeCheck,native_contract,"Keep human opinion distinct from evidence, source state lifecycle and permission to land."
+StateReviewService.RecordVerdict,ThreadService.RecordReview,native_contract,"Keep human opinion distinct from evidence, source state lifecycle and permission to land."
+StateReviewService.SignState,ThreadService.RecordReview,native_contract,Positive verdict already overlaps signing; preserve ReviewKind and exact signed payload semantics.
+WorkflowService.GetThread,ThreadService.ObserveThread,native_contract,One bounded domain read per source; separate durable thread identity from device checkout/run overlays.
+WorkflowService.GetWorkspaceSummary,WorkspaceService.ObserveWorkspace,native_contract,One bounded domain read per source; separate durable thread identity from device checkout/run overlays.
+WorkflowService.ListThreads,ThreadService.ObserveThreads,native_contract,One bounded domain read per source; separate durable thread identity from device checkout/run overlays.
+WorkflowService.StreamWorkspaceSummary,WorkspaceService.ObserveWorkspace,native_contract,One bounded domain read per source; separate durable thread identity from device checkout/run overlays.
+WorkflowService.AddApprovalGroupMember,SpoolService.PutApprovalGroup,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.AddPolicyGroupRequirement,SpoolService.PutReviewPolicy,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.ApproveThread,ThreadService.RecordReview,native_contract,Do not equate approval with evidence signatures; bind to exact reviewed revision and policy context.
+WorkflowService.CheckMergeEligibility,ThreadService.ObserveThread,native_contract,Include requirements and policy version in view; execution independently rechecks exact preconditions.
+WorkflowService.LandStack,ThreadService.LandStack,native_contract,Keep atomic same-spool semantics; explicitly select local checkout or hosted target and report publication separately.
+WorkflowService.CreateApprovalGroup,SpoolService.PutApprovalGroup,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.CreateThreadPolicy,SpoolService.PutReviewPolicy,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.DeleteApprovalGroup,SpoolService.DeleteApprovalGroup,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.DeleteThreadPolicy,SpoolService.DeleteReviewPolicy,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.ListApprovalGroups,SpoolService.ObserveSpool,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.ListThreadApprovals,ThreadService.ObserveThread,native_contract,Do not equate approval with evidence signatures; bind to exact reviewed revision and policy context.
+WorkflowService.ListThreadPolicies,SpoolService.ObserveSpool,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.RemoveApprovalGroupMember,SpoolService.PutApprovalGroup,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.RemovePolicyGroupRequirement,SpoolService.PutReviewPolicy,native_contract,Keep structured groups/requirements and distinct mutation permissions; include policy summaries in settings views.
+WorkflowService.RevokeApproval,ThreadService.RecordReview,native_contract,Do not equate approval with evidence signatures; bind to exact reviewed revision and policy context.

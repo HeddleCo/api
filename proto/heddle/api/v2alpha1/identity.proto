@@ -1,0 +1,309 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+// User-root proof is portable. Account association records Weft's acceptance of
+// an already user-authorized key; it is not the source of that key's authority.
+message RootAttachment {
+  bytes root_public_key = 1;
+  bytes subject_public_key = 2;
+  EndpointRef device = 3;
+  SignedRecord attachment = 4;
+  // Verification binds root, subject, device, scope, validity and possession.
+  // An empty attachment is valid only for a directly proved root key.
+}
+message PrincipalRecord {
+  string id = 1;
+  string handle = 2;
+  bytes version = 3;
+  bytes root_public_key = 4;
+  repeated RootAttachment attachments = 5;
+  string account_id = 6;
+  string acting_agent_id = 7;
+  repeated EntityRef authorized_resources = 8;
+  repeated ActionAvailability actions = 9;
+  EntitlementRecord entitlement = 10;
+}
+message EntitlementRecord {
+  string plan = 1;
+  uint64 storage_used_bytes = 2;
+  uint64 storage_limit_bytes = 3;
+  uint64 credit_balance = 4;
+}
+message SessionRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  EndpointRef endpoint = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  bool revoked = 5;
+}
+message DelegationRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string label = 3;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_AGENT = 1;
+    KIND_SERVICE = 2;
+    KIND_DEVICE = 3;
+  }
+  Kind kind = 4;
+  RootAttachment subject = 5;
+  SignedRecord delegation = 6;
+  bool revoked = 7;
+  // Secret bearer material is never returned as an account-view record.
+}
+message SignupInvitation {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string bound_email = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  bool redeemed = 5;
+  bool revoked = 6;
+  string distribution_id = 7;
+}
+message InvitationQuota {
+  string distribution_id = 1;
+  uint32 remaining = 2;
+}
+message AuthenticationChallenge {
+  RecordRef ref = 1;
+  bytes challenge = 2;
+  string relying_party_id = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  repeated bytes allowed_credential_ids = 5;
+}
+message PasskeyProof {
+  bytes credential_id = 1;
+  bytes client_data_json = 2;
+  bytes authenticator_data = 3;
+  bytes signature = 4;
+  bytes attestation_object = 5;
+}
+message BeginAuthenticationRequest {
+  string account_hint = 1;
+  bytes caller_public_key = 2;
+}
+message CompleteAuthenticationRequest {
+  string client_operation_id = 1;
+  RecordRef challenge = 2;
+  PasskeyProof passkey = 3;
+  RootAttachment caller = 4;
+  SignedRecord possession_proof = 5;
+}
+message AuthenticationResponse {
+  MutationReceipt receipt = 1;
+  PrincipalRecord principal = 2;
+  SessionRecord session = 3;
+}
+message BeginRegistrationRequest {
+  bytes root_public_key = 1;
+  string handle = 2;
+  RecordRef signup_invitation = 3;
+}
+message CompleteRegistrationRequest {
+  string client_operation_id = 1;
+  RecordRef challenge = 2;
+  PasskeyProof passkey = 3;
+  RootAttachment root = 4;
+  SignedRecord possession_proof = 5;
+}
+message RegisterRootAttachmentRequest {
+  string client_operation_id = 1;
+  RootAttachment attachment = 2;
+  SignedRecord subject_possession = 3;
+  string label = 4;
+}
+message RevokeDeviceRequest {
+  string client_operation_id = 1;
+  EndpointRef device = 2;
+  SignedRecord revocation = 3;
+}
+message PutDelegationRequest {
+  string client_operation_id = 1;
+  DelegationRecord delegation = 2;
+  bytes expected_version = 3;
+}
+message RevokeDelegationRequest {
+  string client_operation_id = 1;
+  RecordRef delegation = 2;
+  SignedRecord revocation = 3;
+  bytes expected_version = 4;
+}
+message RevokeSessionRequest {
+  string client_operation_id = 1;
+  RecordRef session = 2;
+  bytes expected_version = 3;
+}
+message IntrospectCredentialRequest {
+  bytes biscuit = 1;
+}
+message CredentialInspection {
+  RootAttachment authority = 1;
+  repeated ActionAvailability actions = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  bool revoked = 4;
+}
+message BeginPairingRequest {
+  string client_operation_id = 1;
+  EndpointRef device = 2;
+  bytes subject_public_key = 3;
+  SignedRecord subject_possession = 4;
+}
+message PairingRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  EndpointRef device = 3;
+  bytes challenge = 4;
+  RootAttachment approved_attachment = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  bool completed = 7;
+}
+message BeginPairingResponse {
+  MutationReceipt receipt = 1;
+  PairingRecord pairing = 2;
+}
+message ApprovePairingRequest {
+  string client_operation_id = 1;
+  RecordRef pairing = 2;
+  RootAttachment attachment = 3;
+  bytes expected_version = 4;
+}
+message CompletePairingRequest {
+  string client_operation_id = 1;
+  RecordRef pairing = 2;
+  SignedRecord subject_possession = 3;
+}
+message ObservePairingRequest {
+  RecordRef pairing = 1;
+  ObserveOptions observe = 2;
+}
+message PairingEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    PairingRecord pairing = 2;
+    SectionStatus status = 3;
+  }
+}
+message PutRecoveryPolicyRequest {
+  string client_operation_id = 1;
+  SignedRecord policy = 2;
+  bytes expected_version = 3;
+}
+message BeginRecoveryRequest {
+  string client_operation_id = 1;
+  string account_id = 2;
+  bytes proposed_root_public_key = 3;
+  string method_id = 4;
+}
+message RecoveryAttempt {
+  RecordRef ref = 1;
+  bytes version = 2;
+  bytes challenge = 3;
+  google.protobuf.Timestamp eligible_at = 4;
+  bool vetoed = 5;
+  bool completed = 6;
+  repeated Requirement requirements = 7;
+}
+message BeginRecoveryResponse {
+  MutationReceipt receipt = 1;
+  RecoveryAttempt recovery = 2;
+}
+message SubmitRecoveryProofRequest {
+  string client_operation_id = 1;
+  RecordRef recovery = 2;
+  SignedRecord proof = 3;
+}
+message CompleteRecoveryRequest {
+  string client_operation_id = 1;
+  RecordRef recovery = 2;
+  SignedRecord new_root_possession = 3;
+  bytes expected_version = 4;
+}
+message VetoRecoveryRequest {
+  string client_operation_id = 1;
+  RecordRef recovery = 2;
+  SignedRecord veto = 3;
+}
+message ResolveHandlesRequest {
+  repeated string handles = 1;
+  ReadBudget budget = 2;
+}
+message HandleResolution {
+  string handle = 1;
+  string principal_id = 2;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_AVAILABLE = 1;
+    STATUS_CLAIMED = 2;
+    STATUS_HELD = 3;
+    STATUS_UNAVAILABLE = 4;
+  }
+  Status status = 3;
+  repeated Requirement requirements = 4;
+}
+message ResolveHandlesResponse {
+  repeated HandleResolution handles = 1;
+}
+message ClaimHandleRequest {
+  string client_operation_id = 1;
+  string handle = 2;
+  SignedRecord entitlement_proof = 3;
+}
+message CreateSignupInvitationRequest {
+  string client_operation_id = 1;
+  SignupInvitation invitation = 2;
+}
+message CreateSignupInvitationResponse {
+  MutationReceipt receipt = 1;
+  SignupInvitation invitation = 2;
+  bytes redemption_secret = 3;
+}
+message RedeemSignupInvitationRequest {
+  string client_operation_id = 1;
+  RecordRef invitation = 2;
+  bytes redemption_secret = 3;
+  RootAttachment principal = 4;
+}
+message BeginEmailVerificationRequest {
+  string client_operation_id = 1;
+  string email = 2;
+  RecordRef invitation = 3;
+}
+message EmailVerificationChallenge {
+  MutationReceipt receipt = 1;
+  RecordRef challenge = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+message CompleteEmailVerificationRequest {
+  string client_operation_id = 1;
+  RecordRef challenge = 2;
+  bytes proof = 3;
+}
+
+message CreatePrincipalRequest {
+  string client_operation_id = 1;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_HUMAN = 1;
+    KIND_AGENT = 2;
+    KIND_SERVICE = 3;
+  }
+  Kind kind = 2;
+  string label = 3;
+  RootAttachment authority = 4;
+  SignedRecord principal_genesis = 5;
+  // An unclaimed agent principal cannot assert a human root it does not own.
+}
+message ResolveSignupInvitationRequest {
+  bytes redemption_secret = 1;
+}
+message SignupInvitationResolution {
+  RecordRef invitation = 1;
+  Coverage availability = 2;
+  repeated Requirement requirements = 3;
+  // Return only invitation information permitted to the presented capability.
+}

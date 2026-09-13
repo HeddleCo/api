@@ -35,15 +35,12 @@ message TransferSelection {
   uint32 depth = 3;
   bool allow_partial = 4;
 }
-message TransferProof {
-  SignedRecord opening = 1;
-}
 message FetchOpen {
   ThreadRef thread = 1;
   RevisionRef revision = 2;
   TransferSelection selection = 3;
   TransferCheckpoint checkpoint = 4;
-  TransferProof proof = 5;
+  reserved 5;
 }
 message PackExtent {
   ObjectAddress pack = 1;

@@ -17,6 +17,12 @@ function number(value: number): Uint8Array {
 }
 function sized(value: Uint8Array): Uint8Array { return joined(number(value.length), value); }
 
+export function ownerActionSigningBytes(format: typeof OWNER_TRANSITION_POSSESSION | typeof OWNER_RECOVERY_POSSESSION,
+  canonicalRecord: Uint8Array): Uint8Array {
+  if (canonicalRecord.length > 128 * 1024) throw new Error("Owner action exceeds its bound");
+  return joined(utf8.encode(format), Uint8Array.of(0), canonicalRecord);
+}
+
 /** Rust identity_management::recovery_action version 1, including the
  * unscoped transition/recovery reference. Protobuf is only its envelope. */
 export function canonicalOwnerAction(accountId: string, clientOperationId: string, reference: RecordRef,
@@ -43,7 +49,7 @@ export async function signOwnerActionPossession(format: typeof OWNER_TRANSITION_
   const publicKey = signer.publicKey.slice();
   if (publicKey.length !== 32 || !publicKey.every((byte, index) => byte === proposedKey[index]))
     throw new Error("Owner action signer must be the proposed key");
-  const signingBytes = joined(utf8.encode(format), Uint8Array.of(0), canonicalRecord);
+  const signingBytes = ownerActionSigningBytes(format, canonicalRecord);
   const signature = (await signer.sign(signingBytes.slice())).slice();
   if (signature.length !== 64) throw new Error("Invalid owner action signature length");
   const verifier = await crypto.subtle.importKey("raw", publicKey as BufferSource, "Ed25519", false, ["verify"]);

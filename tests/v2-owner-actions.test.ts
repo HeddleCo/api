@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { canonicalOwnerAction, OWNER_TRANSITION_POSSESSION, signOwnerActionPossession } from "../packages/typescript/dist/v2alpha1/owner-actions.js";
+import { readFileSync } from "node:fs";
+import { canonicalOwnerAction, ownerActionSigningBytes, OWNER_RECOVERY_POSSESSION, OWNER_TRANSITION_POSSESSION, signOwnerActionPossession } from "../packages/typescript/dist/v2alpha1/owner-actions.js";
+
+const rust = JSON.parse(readFileSync(new URL("./fixtures/owner_recovery_action_v1.json", import.meta.url), "utf8"));
+const bytes = (hex: string) => new Uint8Array(Buffer.from(hex, "hex"));
 
 describe("native owner action possession", () => {
+  it("matches the independently produced Rust canonical and signing bytes", () => {
+    const canonical = canonicalOwnerAction(rust.account_id, rust.client_operation_id,
+      { $typeName: "heddle.api.v2alpha1.RecordRef", id: rust.reference_id },
+      bytes(rust.version_hex), bytes(rust.proposed_key_hex));
+    expect(Buffer.from(canonical).toString("hex")).toBe(rust.canonical_hex);
+    expect(Buffer.from(ownerActionSigningBytes(OWNER_RECOVERY_POSSESSION, canonical)).toString("hex"))
+      .toBe(rust.signing_hex);
+  });
   it("signs the exact canonical transition, rejects a mismatched signer and snapshots async inputs", async () => {
     const pair = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
     const publicKey = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));

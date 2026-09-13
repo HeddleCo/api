@@ -72,6 +72,8 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
         ownership_claims: vec![evidence()],
         ownership_claim_admissions: vec![evidence()],
         boundary_acceptances: vec![evidence()],
+        ownership_resolutions: vec![evidence()],
+        ownership_resolution_admissions: vec![evidence()],
     };
     let bytes = wrapper.encode_to_vec();
     let dynamic = DynamicMessage::decode(

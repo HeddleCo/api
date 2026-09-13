@@ -55,6 +55,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ThreadEvent.payload",
         "IdentityEvent.payload",
         "CatalogEvent.payload",
+        "WorkspaceEvent.payload",
+        "SubmitRecoveryProofResponse.outcome",
     ] {
         config.type_attribute(
             format!(".heddle.api.v2alpha1.{oneof}"),

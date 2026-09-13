@@ -211,7 +211,51 @@ message MintRootAttachment {
 }
 message SignedMintRootAttachment {
   MintRootAttachment attachment = 1;
+  // Exactly one of owner_signature or passkey_delegation is required.
   AuthorizationSignature owner_signature = 2;
+  PasskeyMintDelegation passkey_delegation = 3;
+}
+
+// Current owner authorization for a passkey to attach temporary Ed25519 mint
+// keys. This certifies key lineage, not operations: Biscuit attenuation, resource
+// audience and current revocation remain mandatory. It confers no independent
+// owner/root-establishment authority. Canonical fields follow tag order using
+// fixed-width/length-prefixed encoding; domain "heddle-passkey-authority-v1".
+message PasskeyAuthority {
+  uint32 format_version = 1;
+  bytes account_uuid = 2;
+  bytes owner_state_hash = 3;
+  uint64 owner_sequence = 4;
+  AuthorizationVerificationKey owner_key = 5;
+  bytes credential_id = 6;
+  // New passkeys support ES256 (-7) and Ed25519 (-8).
+  int32 cose_algorithm = 7;
+  // DER SubjectPublicKeyInfo returned by AuthenticatorAttestationResponse.
+  // Enrollment compares this key with the verified credential's COSE key.
+  bytes public_key_spki = 8;
+  string relying_party_id = 9;
+  // Exact serialized origins, sorted and unique; no wildcard matching.
+  repeated string allowed_origins = 10;
+  // Nonzero and at most 43200. Every issued attachment's interval is bounded by
+  // this value. Renewal beyond the interval requires a new passkey assertion.
+  uint32 max_session_ttl_seconds = 11;
+  bytes nonce = 12;
+}
+message SignedPasskeyAuthority {
+  PasskeyAuthority authority = 1;
+  AuthorizationSignature owner_signature = 2;
+}
+message PasskeyMintDelegation {
+  SignedPasskeyAuthority authority = 1;
+  // WebAuthn get assertion over base64url-no-padding of the existing
+  // mint_root_signing_digest(attachment). The challenge therefore commits to
+  // account, owner state, temporary key, validity interval and fresh nonce.
+  // Verification requires exact origin, RP hash, user presence and verification,
+  // same-origin context, and the credential's signature. No registry signature
+  // participates; receivers establish current owner trust independently.
+  bytes client_data_json = 2;
+  bytes authenticator_data = 3;
+  bytes signature = 4;
 }
 
 // A creator's statement of exact intended creation. created_at is NOT an

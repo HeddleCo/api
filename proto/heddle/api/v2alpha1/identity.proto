@@ -161,6 +161,12 @@ message AuthenticationChallenge {
   OAuthProvider oauth_provider = 8;
   // Separate from ceremony expiry; completion cannot extend this upper bound.
   google.protobuf.Timestamp credential_expires_at = 9;
+  // For passkey-backed temporary authoring, assert the signing digest of this
+  // exact prospective attachment. Completion cannot replace any of its fields.
+  MintRootAttachment mint_root_attachment = 10;
+  // Owner-signed certificates for the allowed credentials. Certificate order
+  // matches allowed_credential_ids; each id and key are verified at registration.
+  repeated SignedPasskeyAuthority passkey_authorities = 11;
 }
 enum UserVerification {
   USER_VERIFICATION_UNSPECIFIED = 0;
@@ -178,6 +184,9 @@ message PasskeyProof {
   bytes user_handle = 6;
 }
 message BeginAuthenticationRequest {
+  // Required for PASSKEY so one assertion can bind the selected account's
+  // current owner authority and temporary mint key. Select the account before
+  // starting the ceremony; no weaker account-discovery authorization fallback.
   string account_hint = 1;
   // Device key whose possession CompleteAuthentication must prove.
   // The challenge records this exact key and the enrollment choice below.
@@ -357,6 +366,9 @@ message CompleteRegistrationRequest {
   }
   // Associates a newly enrolled independent mint root with current ownership.
   SignedMintRootAttachment mint_root_attachment = 9;
+  // Required for a self-rooted passkey: owner certifies the verified credential
+  // so a fresh browser can obtain temporary signing authority with devices offline.
+  SignedPasskeyAuthority passkey_authority = 12;
 }
 message RegisterRootAttachmentRequest {
   string client_operation_id = 1;

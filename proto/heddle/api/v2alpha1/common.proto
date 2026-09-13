@@ -111,6 +111,7 @@ message EntityRef {
     RecordRef check_acknowledgement = 33;
     RecordRef provider_connection = 34;
     RecordRef remote_link = 35;
+    RecordRef passkey = 36;
   }
 }
 

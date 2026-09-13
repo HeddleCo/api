@@ -94,6 +94,17 @@ message SessionRecord {
   string ip_address = 9;
   bool is_current = 10;
 }
+
+// Account-private passkey inventory, requested through ObserveIdentity. The
+// certificate is public verification material; no credential private key or
+// reusable assertion is returned. Device registration is a separate lifecycle.
+message PasskeyRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string label = 3;
+  SignedPasskeyAuthority certificate = 4;
+  bool revoked = 5;
+}
 message DelegationRecord {
   RecordRef ref = 1;
   bytes version = 2;
@@ -573,6 +584,12 @@ message CompleteRecoveryRequest {
   RecordRef recovery = 2;
   SignedRecord new_root_possession = 3;
   bytes expected_version = 4;
+  // Explicitly retained passkeys, re-certified by the proposed new owner key
+  // for the exact resulting owner state. Existing credential IDs and verified
+  // public keys must match. Completion atomically replaces these certificates
+  // and retires unselected old certificates; an empty list retains none.
+  // At most 256 certificates; request PoP binds the complete list.
+  repeated SignedPasskeyAuthority renewed_passkeys = 5;
 }
 message VetoRecoveryRequest {
   string client_operation_id = 1;

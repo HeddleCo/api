@@ -55,6 +55,11 @@ message CompleteOwnerTransitionRequest {
   // heddle.owner-transition-possession.v2 canonical action. Rotation/recovery
   // prove the proposed key; policy changes prove the current authority key.
   SignedRecord possession = 4;
+  // Every accepted owner-state change, including a recovery-policy change,
+  // renews explicitly retained passkeys under the resulting state atomically
+  // with the owner CAS. Unselected certificates are retired. Registered
+  // credential IDs and public keys must match; at most 256 certificates.
+  repeated SignedPasskeyAuthority renewed_passkeys = 5;
 }
 message VetoOwnerTransitionRequest {
   string client_operation_id = 1;

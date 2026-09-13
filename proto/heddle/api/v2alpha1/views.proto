@@ -246,6 +246,7 @@ message ObserveIdentityRequest {
   // reference/version from this view can be used directly for RevokeSession.
   bool include_current_credential = 7;
   bool include_billing = 8;
+  PageRequest passkeys = 9;
   // Optional scalar sections use the same total budget and their own status.
 }
 
@@ -264,6 +265,7 @@ message IdentityEvent {
     InvitationQuota invitation_quota = 11;
     CurrentCredentialRecord current_credential = 12;
     BillingRecord billing = 13;
+    PasskeyRecord passkey = 14;
   }
 }
 

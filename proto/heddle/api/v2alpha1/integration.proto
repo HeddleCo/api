@@ -80,6 +80,17 @@ message CompleteProviderConnectionRequest {
   RecordRef challenge = 2;
   bytes authorization_code = 3;
   string installation_id = 4;
+  // Exact opaque state returned by Begin and echoed by the provider callback.
+  bytes state = 5;
+}
+// Attach a GitHub App installation that became available after OAuth consent.
+// The hosted service validates the exact installation against the caller's
+// stored provider credential before updating the connection.
+message AttachProviderInstallationRequest {
+  string client_operation_id = 1;
+  RecordRef connection = 2;
+  bytes expected_version = 3;
+  string installation_id = 4;
 }
 message StoreProviderCredentialRequest {
   string client_operation_id = 1;

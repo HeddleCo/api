@@ -10,6 +10,10 @@ import "heddle/api/v2alpha1/owner_records.proto";
 // to that authority without changing the resource identity.
 message OwnerState {
   PrincipalRef owner = 1;
+  // Canonical hash of the independently verifiable accepted owner state.
+  // Together with root and accepted_transitions it forms an OwnerHistory for
+  // immediate signed authoring. Pending proposals have their own versions and
+  // never change the accepted authority hash.
   bytes version = 2;
   OwnerKeyBinding binding = 3;
   SignedOwnerRoot root = 4;
@@ -17,11 +21,6 @@ message OwnerState {
   repeated OwnerTransitionRecord pending_transitions = 6;
   // Present only when the caller requested an authorized spool lineage.
   CloneAuthorizationKeyring resource_keyring = 7;
-  // Canonical hash of the independently verifiable accepted owner state. This
-  // differs from the observation/version hash, which includes presentation and
-  // pending proposals. Together with root and accepted_transitions it forms an
-  // OwnerHistory for immediate signed authoring after authentication.
-  bytes state_hash = 8;
 }
 
 // A persisted proposal is distinct from an accepted owner state. Its original

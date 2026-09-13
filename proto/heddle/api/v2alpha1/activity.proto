@@ -79,8 +79,19 @@ message NotificationRule {
 message NotificationPreferences {
   bytes version = 1;
   repeated NotificationRule rules = 2;
+  // Account default: zero disables digests; supported nonzero intervals are
+  // one hour, one day and one week. This does not change rule delivery modes.
   google.protobuf.Duration digest_interval = 3;
   string timezone = 4;
+  // One override per Spool. Removing an override restores the account default.
+  // Cadence can be overridden without overriding any routing rules.
+  repeated NotificationDigestOverride digest_overrides = 5;
+}
+message NotificationDigestOverride {
+  SpoolRef spool = 1;
+  // Required, with the same values as the account default. Explicit zero means
+  // off for this Spool, even when the account default enables digests.
+  google.protobuf.Duration digest_interval = 2;
 }
 message MarkNotificationsReadRequest {
   string client_operation_id = 1;

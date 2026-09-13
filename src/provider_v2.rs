@@ -590,7 +590,7 @@ pub fn validate_provider_registration(
         .ok_or(ProviderCanonicalError::Invalid("registered plan"))?;
     validate_provider_plan(plan)?;
     let serving_provider = endpoint_key(&registration.serving_provider, EndpointKind::Provider)?;
-    let selected = plan
+    let required = plan
         .extents
         .iter()
         .filter(|extent| {
@@ -599,10 +599,17 @@ pub fn validate_provider_registration(
                 .as_ref()
                 .is_some_and(|provider| provider.public_key == serving_provider)
         })
-        .collect::<Vec<_>>();
-    if selected.is_empty()
+        .map(|extent| {
+            extent
+                .range
+                .as_ref()
+                .map(|range| range.pack_id.as_slice())
+                .ok_or(ProviderCanonicalError::Invalid("registered range"))
+        })
+        .collect::<Result<HashSet<_>, _>>()?;
+    if required.is_empty()
         || registration.packs.is_empty()
-        || registration.packs.len() > selected.len()
+        || registration.packs.len() > required.len()
     {
         return Err(ProviderCanonicalError::Invalid("registered pack count"));
     }
@@ -617,25 +624,10 @@ pub fn validate_provider_registration(
             return Err(ProviderCanonicalError::Invalid("registered pack location"));
         }
     }
-    for extent in &selected {
-        let range = extent
-            .range
-            .as_ref()
-            .ok_or(ProviderCanonicalError::Invalid("registered range"))?;
-        if !locations.contains(range.pack_id.as_slice()) {
-            return Err(ProviderCanonicalError::Invalid("registered pack missing"));
-        }
+    if required.iter().any(|pack| !locations.contains(pack)) {
+        return Err(ProviderCanonicalError::Invalid("registered pack missing"));
     }
-    if locations.len() != registration.packs.len()
-        || registration.packs.iter().any(|pack| {
-            !selected.iter().any(|extent| {
-                extent
-                    .range
-                    .as_ref()
-                    .is_some_and(|range| range.pack_id == pack.pack_id)
-            })
-        })
-    {
+    if locations.iter().any(|pack| !required.contains(pack)) {
         return Err(ProviderCanonicalError::Invalid(
             "unreferenced registered pack",
         ));

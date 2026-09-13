@@ -71,6 +71,9 @@ message PrincipalRecord {
   RootingTier rooting_tier = 11;
   // Generated pet name while agent-rooted and unclaimed; handle stays empty.
   string display_name = 12;
+  // Personal namespace for creation and remote provisioning. Omitted when it
+  // has not been created or is unavailable to this observing credential.
+  SpoolAddress personal_spool = 13;
 }
 message EntitlementRecord {
   string plan = 1;
@@ -574,7 +577,17 @@ message CompleteRecoveryRequest {
 message VetoRecoveryRequest {
   string client_operation_id = 1;
   RecordRef recovery = 2;
-  SignedRecord veto = 3;
+  oneof authorization {
+    // Exact signed veto by the current owner or owner-certified passkey session.
+    // A passkey session also presents its verifiable mint attachment and current
+    // capability; a registered device/key label is not owner authorization.
+    SignedRecord veto = 3;
+    // Opaque secret delivered for this recovery attempt. This public branch
+    // requires no account session. The server checks its retained secret hash
+    // and atomically closes only the exact still-open attempt. Never observable,
+    // logged, or usable to complete recovery or obtain an account credential.
+    string email_secret = 4;
+  }
 }
 message ResolveHandlesRequest {
   repeated string handles = 1;

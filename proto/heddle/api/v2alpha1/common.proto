@@ -24,6 +24,13 @@ message SpoolRef {
   string id = 1;
 }
 
+// Observed address of a stable Spool identity. Renames change the address,
+// never the UUID. An address is presentation/routing metadata, not authority.
+message SpoolAddress {
+  SpoolRef ref = 1;
+  repeated string path_segments = 2;
+}
+
 message ThreadId {
   // Exactly 32 bytes: hash of a versioned immutable creation record.
   // Canonical genesis encoding is a separate durable-format decision; endpoints

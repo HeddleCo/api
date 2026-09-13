@@ -162,13 +162,17 @@ message CreateSpoolRequest {
   optional string display_name = 6;
 }
 // Compare and replace display name and complete settings atomically. The stable
-// UUID, address slug, parent, and immutable owner genesis are unchanged.
+// UUID, parent, and immutable owner genesis are unchanged.
 message ReviseSpoolRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
   bytes expected_version = 3;
   string name = 4;
   SpoolSettings settings = 5;
+  // Optional new single address segment. Omission retains the current slug.
+  // Rename updates descendant addresses in the same transaction and preserves
+  // UUID-based references, grants and ownership. Empty is invalid when present.
+  optional string slug = 6;
 }
 // Move a personal-root child to the account's root-level address at its current
 // slug. UUID, genesis, descendants, and direct grants survive.

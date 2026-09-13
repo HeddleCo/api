@@ -94,6 +94,9 @@ message SpoolOverview {
   // Present false + empty version proves absence; false + nonempty version is
   // a retained tombstone. This never changes the Spool resource version.
   BookmarkRecord current_bookmark = 11;
+  // Current canonical address; clients need not fetch ancestors to display or
+  // select this Spool. UUIDs remain the identity for mutations and references.
+  repeated string path_segments = 12;
 }
 
 // Committed overview and independently verifiable owner history seed the

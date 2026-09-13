@@ -1,4 +1,4 @@
-import { clone, create } from "@bufbuild/protobuf";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { AuthorizationKeyAlgorithm, AuthorizationVerificationKeySchema, OwnerHistorySchema, SignedMintRootAttachmentSchema, SpoolOwnerGenesisSchema, SignedSpoolOwnerGenesisSchema, SpoolCreationStatementSchema,
   type AuthorizationVerificationKey, type SpoolOwnerGenesis, type SpoolCreationStatement,
@@ -41,8 +41,8 @@ export async function signDelegatedSpoolCreation(input: DelegatedSpoolCreationIn
   const statement = create(SpoolCreationStatementSchema, { formatVersion: 1, genesisDigest: spoolGenesisDigest(genesis), accountUuid: input.accountUuid.slice(),
     ownerStateHash: input.ownerStateHash.slice(), ownerSequence: input.ownerSequence, creatorKey, parentSpoolUuid: input.parentSpoolUuid?.slice() ?? new Uint8Array(),
     parentPathSegments: [...(input.parentPathSegments ?? [])], name: input.name, createdAtUnixSeconds: input.createdAtUnixSeconds });
-  const history = clone(OwnerHistorySchema, input.ownerHistory);
-  const mintRootAttachment = input.mintRootAttachment ? clone(SignedMintRootAttachmentSchema, input.mintRootAttachment) : undefined;
+  const history = fromBinary(OwnerHistorySchema, toBinary(OwnerHistorySchema, input.ownerHistory));
+  const mintRootAttachment = input.mintRootAttachment ? fromBinary(SignedMintRootAttachmentSchema, toBinary(SignedMintRootAttachmentSchema, input.mintRootAttachment)) : undefined;
   const sealedBiscuit = input.sealedBiscuit.slice();
   if (!sealedBiscuit.length || !history.root || history.stateHash.length !== 32 || !history.stateHash.every((byte, index) => byte === statement.ownerStateHash[index])) throw new Error("Incomplete creation bearer or owner history");
   const digest = spoolCreationSigningDigest(statement);

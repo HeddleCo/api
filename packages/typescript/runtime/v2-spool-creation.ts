@@ -1,6 +1,6 @@
-import { create } from "@bufbuild/protobuf";
+import { clone, create } from "@bufbuild/protobuf";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { AuthorizationKeyAlgorithm, AuthorizationVerificationKeySchema, SpoolOwnerGenesisSchema, SignedSpoolOwnerGenesisSchema, SpoolCreationStatementSchema,
+import { AuthorizationKeyAlgorithm, AuthorizationVerificationKeySchema, OwnerHistorySchema, SignedMintRootAttachmentSchema, SpoolOwnerGenesisSchema, SignedSpoolOwnerGenesisSchema, SpoolCreationStatementSchema,
   type AuthorizationVerificationKey, type SpoolOwnerGenesis, type SpoolCreationStatement,
   type SignedSpoolOwnerGenesis, type SignedMintRootAttachment, type OwnerHistory } from "./owner_records_pb.js";
 
@@ -35,16 +35,22 @@ export interface DelegatedSpoolCreationInput {
 }
 /** Assemble the portable proof; the caller narrows and seals its existing bearer first. */
 export async function signDelegatedSpoolCreation(input: DelegatedSpoolCreationInput): Promise<SignedSpoolOwnerGenesis> {
-  const ownerKey = create(AuthorizationVerificationKeySchema, { algorithm: AuthorizationKeyAlgorithm.ED25519, publicKey: input.ownerPublicKey });
-  const creatorKey = create(AuthorizationVerificationKeySchema, { algorithm: AuthorizationKeyAlgorithm.ED25519, publicKey: input.creatorPublicKey });
-  const genesis = create(SpoolOwnerGenesisSchema, { spoolUuid: input.spoolUuid, ownerPublicKey: ownerKey });
-  const statement = create(SpoolCreationStatementSchema, { formatVersion: 1, genesisDigest: spoolGenesisDigest(genesis), accountUuid: input.accountUuid,
-    ownerStateHash: input.ownerStateHash, ownerSequence: input.ownerSequence, creatorKey, parentSpoolUuid: input.parentSpoolUuid ?? new Uint8Array(),
-    parentPathSegments: input.parentPathSegments ?? [], name: input.name, createdAtUnixSeconds: input.createdAtUnixSeconds });
-  if (!input.sealedBiscuit.length || !input.ownerHistory.root || input.ownerHistory.stateHash.length !== 32 || !input.ownerHistory.stateHash.every((byte, index) => byte === input.ownerStateHash[index])) throw new Error("Incomplete creation bearer or owner history");
-  const signature = await input.sign(spoolCreationSigningDigest(statement));
+  const ownerKey = create(AuthorizationVerificationKeySchema, { algorithm: AuthorizationKeyAlgorithm.ED25519, publicKey: input.ownerPublicKey.slice() });
+  const creatorKey = create(AuthorizationVerificationKeySchema, { algorithm: AuthorizationKeyAlgorithm.ED25519, publicKey: input.creatorPublicKey.slice() });
+  const genesis = create(SpoolOwnerGenesisSchema, { spoolUuid: input.spoolUuid.slice(), ownerPublicKey: ownerKey });
+  const statement = create(SpoolCreationStatementSchema, { formatVersion: 1, genesisDigest: spoolGenesisDigest(genesis), accountUuid: input.accountUuid.slice(),
+    ownerStateHash: input.ownerStateHash.slice(), ownerSequence: input.ownerSequence, creatorKey, parentSpoolUuid: input.parentSpoolUuid?.slice() ?? new Uint8Array(),
+    parentPathSegments: [...(input.parentPathSegments ?? [])], name: input.name, createdAtUnixSeconds: input.createdAtUnixSeconds });
+  const history = clone(OwnerHistorySchema, input.ownerHistory);
+  const mintRootAttachment = input.mintRootAttachment ? clone(SignedMintRootAttachmentSchema, input.mintRootAttachment) : undefined;
+  const sealedBiscuit = input.sealedBiscuit.slice();
+  if (!sealedBiscuit.length || !history.root || history.stateHash.length !== 32 || !history.stateHash.every((byte, index) => byte === statement.ownerStateHash[index])) throw new Error("Incomplete creation bearer or owner history");
+  const digest = spoolCreationSigningDigest(statement);
+  const signature = await input.sign(digest.slice());
   if (signature.length !== 64) throw new Error("Invalid creator signature length");
+  const verifier = await crypto.subtle.importKey("raw", creatorKey.publicKey as BufferSource, "Ed25519", false, ["verify"]);
+  if (!await crypto.subtle.verify("Ed25519", verifier, signature as BufferSource, digest as BufferSource)) throw new Error("Invalid creator signature");
   const signerKeyId = sha256(join(utf8.encode("heddle-key-v1"), key(creatorKey).subarray(0, 4), input.creatorPublicKey));
-  return create(SignedSpoolOwnerGenesisSchema, { genesis, delegatedCreation: { statement, creatorSignature: { signerKeyId, signature }, sealedBiscuit: input.sealedBiscuit,
-    mintRootAttachment: input.mintRootAttachment, ownerHistory: input.ownerHistory } });
+  return create(SignedSpoolOwnerGenesisSchema, { genesis, delegatedCreation: { statement, creatorSignature: { signerKeyId, signature }, sealedBiscuit,
+    mintRootAttachment, ownerHistory: history } });
 }

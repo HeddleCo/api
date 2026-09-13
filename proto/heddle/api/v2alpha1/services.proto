@@ -457,6 +457,19 @@ service SpoolService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  rpc ResolveInvitation(ResolveInvitationRequest) returns (InvitationResolution) {
+    option (heddle.api.v1alpha1.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_NONE
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
 }
 
 service IdentityService {

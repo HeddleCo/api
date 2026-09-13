@@ -219,6 +219,26 @@ message CreateInvitationResponse {
   InvitationRecord invitation = 2;
   bytes redemption_secret = 3;
 }
+// Public capability preview. The invitation ID alone reveals nothing; the
+// redemption secret is passed in the request body and never placed in a URL
+// path or query. No recipient email or inviter identity is disclosed.
+message ResolveInvitationRequest {
+  RecordRef invitation = 1;
+  bytes redemption_secret = 2;
+}
+message InvitationResolution {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_AVAILABLE = 1;
+    STATUS_REDEEMED = 2;
+    STATUS_UNAVAILABLE = 3;
+  }
+  Status status = 1;
+  SpoolAddress spool = 2;
+  string spool_name = 3;
+  ResourceRole role = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
 message RedeemInvitationRequest {
   string client_operation_id = 1;
   RecordRef invitation = 2;

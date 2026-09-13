@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
-import { create } from '@bufbuild/protobuf';
+import { create, fromBinary } from '@bufbuild/protobuf';
 import { ThreadAudiencePolicySchema, ThreadAudiencePolicy_Kind, ThreadRetentionPolicySchema, MaterialRetention_Mode, ThreadOverviewSchema, ThreadProperty, ThreadLifecycle, SharedFacet, ThreadIntentSchema, ThreadSharingPolicySchema, ReviewDecisionSchema, ReviewDecision_Kind, ReviewRecordSchema } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
 import { EndpointKind } from '../packages/typescript/dist/v2alpha1/stream_pb.js';
 import { signThreadControl, threadPropertyVersion, verifyThreadReviewRecord } from '../packages/typescript/dist/v2alpha1/thread-control.js';
@@ -111,6 +111,16 @@ test('read attestations bind bounded exact source coverage and never encode appr
   review.kind = ReviewDecision_Kind.AGENT_PREVIEW;
   review.coverage = undefined;
   await assert.rejects(signThreadControl(input.overview, input.command, input.author), /coverage must match/);
+});
+
+test('Rust-emitted Read record verifies against its original in the browser', async () => {
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/review_record_rust_v1.json', import.meta.url), 'utf8'));
+  const record = fromBinary(ReviewRecordSchema, bytes(fixture.review_record_hex));
+  const decision = await verifyThreadReviewRecord(record);
+  assert.equal(decision.kind, ReviewDecision_Kind.READ);
+  assert.equal(decision.coverage.selection.value.anchors[0].path, 'src/main.rs');
+  record.decision.coverage.selection.value.anchors[0].symbol = 'other';
+  await assert.rejects(verifyThreadReviewRecord(record), /differs from signed original/);
 });
 
 test('byte views from another browser realm retain the canonical signing identity', async () => {

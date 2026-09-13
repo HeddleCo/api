@@ -50,7 +50,7 @@ message ObserveThreadRequest {
 // delta batches become visible only at their checkpoint.
 // SectionReplacement.section and SectionStatus.section use these exact keys:
 // overview (overview); captures (capture); review (comparison, review, diff); evidence (evidence, check_acknowledgement);
-// collaboration (discussion, turn, context); analysis (analysis); checkouts
+// collaboration (discussion, turn, context, source_target); analysis (analysis); checkouts
 // (checkout); timeline (timeline_event, run, operation); sharing (sharing,
 // publication). Replacement clears only that section's committed collection.
 // Unknown section semantics require a fresh supported view, never silent loss.
@@ -78,6 +78,7 @@ message ThreadEvent {
     SignedRecord signed_operation = 20;
     ReviewComparison comparison = 21;
     CheckAcknowledgementRecord check_acknowledgement = 22;
+    SourceTargetResolutionEvent source_target = 23;
   }
 }
 
@@ -167,6 +168,7 @@ message SpoolEvent {
     SupportAccessRecord support_access = 15;
     // Paged child summary, separate from the observed root spool.
     SpoolOverview child = 16;
+    SourceTargetResolutionEvent source_target = 17;
   }
 }
 

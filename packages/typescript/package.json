@@ -52,6 +52,7 @@
     "./v2/spool-creation": "./dist/v2alpha1/spool-creation.js",
     "./v2/owner-actions": "./dist/v2alpha1/owner-actions.js",
     "./v2/collaboration": "./dist/v2alpha1/collaboration.js",
+    "./v2/source-targets": "./dist/v2alpha1/source-targets.js",
     "./v2/pairing": "./dist/v2alpha1/pairing.js",
     "./v2/thread-control": "./dist/v2alpha1/thread-control.js",
     "./v2/thread-genesis": "./dist/v2alpha1/thread-genesis.js",

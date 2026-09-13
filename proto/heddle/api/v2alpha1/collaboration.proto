@@ -39,6 +39,56 @@ message PinnedSourceTargetRevision {
   ThreadRef thread = 2;
 }
 
+// Exact current coordinates, never an authoring input or a replacement for the
+// original evidence in SourceAnchor. No implicit tracking from these fields.
+message SourceLocation {
+  RevisionRef revision = 1;
+  string path = 2;
+  string symbol_id = 3;
+  optional uint32 start_line = 4;
+  optional uint32 end_line = 5;
+  ThreadRef thread = 6;
+}
+
+// Stable within an endpoint observation. Only a viewed_thread binding requires
+// viewed_thread here; named and pinned bindings MUST omit it. The selected
+// revision is a value, so capture moves one shared entry, not every referrer.
+message SourceTargetResolutionKey {
+  SourceTargetReference reference = 1;
+  ThreadRef viewed_thread = 2;
+}
+
+message SourceTargetResolution {
+  SourceTargetResolutionKey key = 1;
+  // Exact revision actually checked; must respect a historical viewed revision.
+  // Absent for UNAVAILABLE. Emission requires that revision's visibility proof.
+  RevisionRef computed_for = 2;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_RESOLVED = 1;
+    STATUS_AMBIGUOUS = 2;
+    STATUS_DELETED = 3;
+    // Absent or inaccessible source/descriptor, indistinguishable to the caller.
+    STATUS_UNAVAILABLE = 4;
+  }
+  Status status = 3;
+  // Present only for RESOLVED, with revision equal to computed_for. Both the
+  // source Thread and whole-tip/entry visibility are independently authorized.
+  SourceLocation location = 4;
+}
+
+// Shared map updates for anchors and tags. Snapshot/Upsert frames carry upsert;
+// Remove frames carry remove. Deduplicate by key within a checkpoint batch.
+// Maps clear with Thread collaboration / Spool context section replacement and
+// replacement snapshots. Remove the entry when its last referrer leaves the
+// observed window. Neither missing targets nor these events grant source access.
+message SourceTargetResolutionEvent {
+  oneof change {
+    SourceTargetResolution upsert = 1;
+    SourceTargetResolutionKey remove = 2;
+  }
+}
+
 message CollaborationAnchor {
   oneof target {
     ThreadRef thread = 1;
@@ -221,6 +271,7 @@ message CollaborationEvent {
     Removal removal = 5;
     SectionStatus status = 6;
     SignedRecord operation = 7;
+    SourceTargetResolutionEvent source_target = 8;
   }
 }
 

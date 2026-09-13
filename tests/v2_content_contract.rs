@@ -174,3 +174,77 @@ fn source_genesis_transfers_preserve_claim_conflicts_and_matched_admission() {
         );
     }
 }
+
+#[test]
+fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
+    let hit = pool
+        .get_message_by_name("heddle.api.v2alpha1.SearchHit")
+        .expect("native search hit");
+    let location = hit
+        .get_field_by_name("location")
+        .expect("one exact source location")
+        .kind();
+    assert_eq!(
+        location.as_message().expect("typed location").full_name(),
+        "heddle.api.v2alpha1.SourceLocation"
+    );
+    assert!(
+        hit.get_field_by_name("path").is_none(),
+        "path cannot drift from its exact source location"
+    );
+    assert!(
+        hit.get_field_by_name("line").is_none(),
+        "line bounds belong to the same source location"
+    );
+    assert!(
+        hit.get_field_by_name("thread").is_some(),
+        "owning Thread avoids a navigation lookup"
+    );
+    assert_eq!(
+        hit.get_field_by_name("domain")
+            .expect("domain")
+            .kind()
+            .as_enum()
+            .expect("typed domain")
+            .full_name(),
+        "heddle.api.v2alpha1.SearchDomain"
+    );
+    assert_eq!(
+        hit.get_field_by_name("match_kind")
+            .expect("match provenance")
+            .kind()
+            .as_enum()
+            .expect("typed match")
+            .full_name(),
+        "heddle.api.v2alpha1.SearchMatchKind"
+    );
+    let entity = pool
+        .get_message_by_name("heddle.api.v2alpha1.EntityRef")
+        .expect("entity");
+    assert_eq!(
+        entity
+            .get_field_by_name("principal")
+            .expect("stable account identity")
+            .kind()
+            .as_message()
+            .expect("typed account")
+            .full_name(),
+        "heddle.api.v2alpha1.PrincipalRef"
+    );
+    let agent = entity
+        .get_field_by_name("agent")
+        .expect("agent identity")
+        .kind();
+    let agent = agent.as_message().expect("typed scoped agent");
+    assert_eq!(
+        agent
+            .get_field_by_name("account")
+            .expect("agent authority account")
+            .kind()
+            .as_message()
+            .expect("account")
+            .full_name(),
+        "heddle.api.v2alpha1.PrincipalRef"
+    );
+}

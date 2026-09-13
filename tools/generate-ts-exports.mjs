@@ -36,6 +36,7 @@ copyFileSync("packages/typescript/runtime/v2-observation.ts", join(v2Root, "obse
 copyFileSync("packages/typescript/runtime/v2-client.ts", join(v2Root, "client.ts"));
 copyFileSync("packages/typescript/runtime/v2-owner-certificates.ts", join(v2Root, "owner-certificates.ts"));
 copyFileSync("packages/typescript/runtime/v2-spool-creation.ts", join(v2Root, "spool-creation.ts"));
+copyFileSync("packages/typescript/runtime/v2-owner-actions.ts", join(v2Root, "owner-actions.ts"));
 copyFileSync("packages/typescript/runtime/v2-pairing.ts", join(v2Root, "pairing.ts"));
 copyFileSync("packages/typescript/runtime/v2-thread-control.ts", join(v2Root, "thread-control.ts"));
 copyFileSync("packages/typescript/runtime/v2-thread-ownership.ts", join(v2Root, "thread-ownership.ts"));

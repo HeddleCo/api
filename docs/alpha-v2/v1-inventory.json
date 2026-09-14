@@ -1,0 +1,2041 @@
+[
+  {
+    "service": "AgentService",
+    "method": "ListAgentRuns",
+    "request": "ListAgentRunsRequest",
+    "response": "ListAgentRunsResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "GetAgentRun",
+    "request": "GetAgentRunRequest",
+    "response": "AgentRun",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "ListAgentTimelineEvents",
+    "request": "ListAgentTimelineEventsRequest",
+    "response": "ListAgentTimelineEventsResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "WatchAgentRun",
+    "request": "WatchAgentRunRequest",
+    "response": "stream AgentTimelineEvent",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "ControlAgent",
+    "request": "ControlAgentRequest",
+    "response": "AgentCommandAudit",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "DecideAgentPermission",
+    "request": "DecideAgentPermissionRequest",
+    "response": "PermissionDecision",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "GetAgentCommand",
+    "request": "GetAgentCommandRequest",
+    "response": "AgentCommandAudit",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "GetAgentPolicy",
+    "request": "GetAgentPolicyRequest",
+    "response": "AgentPolicySnapshot",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "UpdateAgentPolicy",
+    "request": "UpdateAgentPolicyRequest",
+    "response": "AgentPolicySnapshot",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "ListHarnessPreferences",
+    "request": "ListHarnessPreferencesRequest",
+    "response": "ListHarnessPreferencesResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentService",
+    "method": "DeleteHarnessPreference",
+    "request": "DeleteHarnessPreferenceRequest",
+    "response": "DeleteHarnessPreferenceResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent.proto"
+  },
+  {
+    "service": "AgentGatewayService",
+    "method": "Connect",
+    "request": "stream AgentDaemonFrame",
+    "response": "stream AgentGatewayFrame",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/agent_gateway.proto"
+  },
+  {
+    "service": "AttentionService",
+    "method": "GetFeedSnapshot",
+    "request": "GetFeedSnapshotRequest",
+    "response": "FeedSnapshot",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/attention.proto"
+  },
+  {
+    "service": "AttentionService",
+    "method": "RecordInteraction",
+    "request": "RecordInteractionRequest",
+    "response": "RecordInteractionResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/attention.proto"
+  },
+  {
+    "service": "AttentionService",
+    "method": "StreamFeed",
+    "request": "StreamFeedRequest",
+    "response": "stream FeedItem",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/attention.proto"
+  },
+  {
+    "service": "AttentionService",
+    "method": "UpdateFeedItem",
+    "request": "UpdateFeedItemRequest",
+    "response": "UpdateFeedItemResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/attention.proto"
+  },
+  {
+    "service": "AttestationService",
+    "method": "RecordSignature",
+    "request": "RecordSignatureRequest",
+    "response": "SignatureReceipt",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/attestation.proto"
+  },
+  {
+    "service": "AttestationService",
+    "method": "VerifySignature",
+    "request": "VerifySignatureRequest",
+    "response": "SignatureChain",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/attestation.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "AppendTurn",
+    "request": "AppendTurnRequest",
+    "response": "Discussion",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "GetDiscussion",
+    "request": "GetDiscussionRequest",
+    "response": "Discussion",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "ListByState",
+    "request": "ListDiscussionsByStateRequest",
+    "response": "stream ListDiscussionsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "ListBySymbol",
+    "request": "ListDiscussionsBySymbolRequest",
+    "response": "ListDiscussionsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "ListByThreadRef",
+    "request": "ListByThreadRefRequest",
+    "response": "ListByThreadRefResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "ListDiscussionsByStates",
+    "request": "ListDiscussionsByStatesRequest",
+    "response": "ListDiscussionsByStatesResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "OpenDiscussion",
+    "request": "OpenDiscussionRequest",
+    "response": "Discussion",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "CollaborationService",
+    "method": "ResolveDiscussion",
+    "request": "ResolveDiscussionRequest",
+    "response": "Discussion",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ApproveDeviceAuthorization",
+    "request": "ApproveDeviceAuthorizationRequest",
+    "response": "AccessTokenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "BeginRecovery",
+    "request": "BeginRecoveryRequest",
+    "response": "BeginRecoveryResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "BeginWebAuthnAuthentication",
+    "request": "BeginWebAuthnAuthenticationRequest",
+    "response": "AuthChallengeResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "BeginWebAuthnRegistration",
+    "request": "BeginWebAuthnRegistrationRequest",
+    "response": "AuthChallengeResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "BindSignupInviteEmail",
+    "request": "BindSignupInviteEmailRequest",
+    "response": "BindSignupInviteEmailResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ClaimNextDropCode",
+    "request": "ClaimNextDropCodeRequest",
+    "response": "ClaimNextDropCodeResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ClaimSignupInvite",
+    "request": "ClaimSignupInviteRequest",
+    "response": "ClaimSignupInviteResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ClaimHandle",
+    "request": "ClaimHandleRequest",
+    "response": "ClaimHandleResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "CompleteRecovery",
+    "request": "CompleteRecoveryRequest",
+    "response": "AccessTokenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "CreateSignupInvite",
+    "request": "CreateSignupInviteRequest",
+    "response": "CreateSignupInviteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ListSignupInvites",
+    "request": "ListSignupInvitesRequest",
+    "response": "ListSignupInvitesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "CreateAgentAccount",
+    "request": "CreateAgentAccountRequest",
+    "response": "CreateAgentAccountResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "CreateDeviceAuthorization",
+    "request": "CreateDeviceAuthorizationRequest",
+    "response": "DeviceAuthorizationResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "CreateServiceAccount",
+    "request": "CreateServiceAccountRequest",
+    "response": "ServiceAccountResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "DeclareRecoveryMethod",
+    "request": "DeclareRecoveryMethodRequest",
+    "response": "DeclareRecoveryMethodResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ExchangeDeviceAuthorization",
+    "request": "ExchangeDeviceAuthorizationRequest",
+    "response": "AccessTokenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "FinishWebAuthnAuthentication",
+    "request": "FinishWebAuthnAuthenticationRequest",
+    "response": "AccessTokenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "GetInvitationSummary",
+    "request": "GetInvitationSummaryRequest",
+    "response": "InvitationSummary",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "GetHandleStatus",
+    "request": "GetHandleStatusRequest",
+    "response": "GetHandleStatusResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "IntrospectCredential",
+    "request": "IntrospectCredentialRequest",
+    "response": "CredentialInfo",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "IssuePresenceToken",
+    "request": "IssuePresenceTokenRequest",
+    "response": "IssuePresenceTokenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "IssueServiceAccountCredential",
+    "request": "IssueServiceAccountCredentialRequest",
+    "response": "IssuedCredentialResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "IssueSignupEmailChallenge",
+    "request": "IssueSignupEmailChallengeRequest",
+    "response": "IssueSignupEmailChallengeResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "LinkOAuthIdentity",
+    "request": "LinkOAuthIdentityRequest",
+    "response": "AccessTokenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ListScopeCapabilities",
+    "request": "ListScopeCapabilitiesRequest",
+    "response": "ListScopeCapabilitiesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ListServiceAccounts",
+    "request": "ListServiceAccountsRequest",
+    "response": "ListServiceAccountsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ListSessions",
+    "request": "ListSessionsRequest",
+    "response": "ListSessionsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "MintAnonBiscuit",
+    "request": "MintAnonBiscuitRequest",
+    "response": "MintAnonBiscuitResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "MintGitHubAppSetupChallenge",
+    "request": "MintGitHubAppSetupChallengeRequest",
+    "response": "MintGitHubAppSetupChallengeResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "PromoteAgentAccount",
+    "request": "PromoteAgentAccountRequest",
+    "response": "PromoteAgentAccountResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ListInstallationRepositories",
+    "request": "ListInstallationRepositoriesRequest",
+    "response": "ListInstallationRepositoriesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RegisterGitHubInstallation",
+    "request": "RegisterGitHubInstallationRequest",
+    "response": "RegisterGitHubInstallationResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RegisterPublicKey",
+    "request": "RegisterPublicKeyRequest",
+    "response": "AccessTokenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RequestHeldName",
+    "request": "RequestHeldNameRequest",
+    "response": "RequestHeldNameResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RemainingDropCodes",
+    "request": "RemainingDropCodesRequest",
+    "response": "RemainingDropCodesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ResolveHandle",
+    "request": "ResolveHandleRequest",
+    "response": "ResolveHandleResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "ResolveSignupInvite",
+    "request": "ResolveSignupInviteRequest",
+    "response": "ResolveSignupInviteResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RevokeCredential",
+    "request": "RevokeCredentialRequest",
+    "response": "RevokeCredentialResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RevokeDevice",
+    "request": "RevokeDeviceRequest",
+    "response": "RevokeDeviceResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RevokeServiceAccount",
+    "request": "RevokeServiceAccountRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RevokeSession",
+    "request": "RevokeSessionRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "RotateCredential",
+    "request": "RotateCredentialRequest",
+    "response": "IssuedCredentialResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "StoreProviderToken",
+    "request": "StoreProviderTokenRequest",
+    "response": "StoreProviderTokenResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "SubmitRecoveryProof",
+    "request": "SubmitRecoveryProofRequest",
+    "response": "SubmitRecoveryProofResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "VerifySignupEmail",
+    "request": "VerifySignupEmailRequest",
+    "response": "VerifySignupEmailResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "VetoRecovery",
+    "request": "VetoRecoveryRequest",
+    "response": "VetoRecoveryResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "WaitForDeviceAuthorization",
+    "request": "WaitForDeviceAuthorizationRequest",
+    "response": "stream DeviceAuthorizationEvent",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "IdentityService",
+    "method": "WhoAmI",
+    "request": "WhoAmIRequest",
+    "response": "WhoAmIResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/identity.proto"
+  },
+  {
+    "service": "NotificationService",
+    "method": "ListNotifications",
+    "request": "ListNotificationsRequest",
+    "response": "ListNotificationsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/notification.proto"
+  },
+  {
+    "service": "NotificationService",
+    "method": "SubscribeNotifications",
+    "request": "SubscribeNotificationsRequest",
+    "response": "stream Notification",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/notification.proto"
+  },
+  {
+    "service": "NotificationService",
+    "method": "MarkNotificationRead",
+    "request": "MarkNotificationReadRequest",
+    "response": "MarkNotificationReadResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/notification.proto"
+  },
+  {
+    "service": "NotificationService",
+    "method": "GetNotificationPreferences",
+    "request": "GetNotificationPreferencesRequest",
+    "response": "GetNotificationPreferencesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/notification.proto"
+  },
+  {
+    "service": "NotificationService",
+    "method": "SetNotificationPreferences",
+    "request": "SetNotificationPreferencesRequest",
+    "response": "SetNotificationPreferencesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/notification.proto"
+  },
+  {
+    "service": "NotificationService",
+    "method": "Unsubscribe",
+    "request": "UnsubscribeRequest",
+    "response": "UnsubscribeResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/notification.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "SubmitOperation",
+    "request": "SubmitOperationRequest",
+    "response": "SubmitOperationResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "SubmitOperationBatch",
+    "request": "SubmitOperationBatchRequest",
+    "response": "SubmitOperationBatchResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "SetRemoteLink",
+    "request": "SetRemoteLinkRequest",
+    "response": "RemoteLink",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "GetRemoteLink",
+    "request": "GetRemoteLinkRequest",
+    "response": "RemoteLink",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "GetOperation",
+    "request": "GetOperationRequest",
+    "response": "Operation",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "BatchGetOperations",
+    "request": "BatchGetOperationsRequest",
+    "response": "BatchGetOperationsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "GetOperationBatch",
+    "request": "GetOperationBatchRequest",
+    "response": "GetOperationBatchResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "ListOperations",
+    "request": "ListOperationsRequest",
+    "response": "ListOperationsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "WatchOperations",
+    "request": "WatchOperationsRequest",
+    "response": "stream OperationWatchEvent",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OperationService",
+    "method": "CancelOperation",
+    "request": "CancelOperationRequest",
+    "response": "CancelOperationResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/operation.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "BootstrapOwnerRoot",
+    "request": "BootstrapOwnerRootRequest",
+    "response": "BootstrapOwnerRootResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "RotateOwnerKey",
+    "request": "RotateOwnerKeyRequest",
+    "response": "OwnerKeyTransitionResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "RecoverOwnerKey",
+    "request": "RecoverOwnerKeyRequest",
+    "response": "OwnerKeyTransitionResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "ChangeOwnerRecoveryPolicy",
+    "request": "ChangeOwnerRecoveryPolicyRequest",
+    "response": "OwnerKeyTransitionResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "GetCurrentOwnerKeyring",
+    "request": "GetCurrentOwnerKeyringRequest",
+    "response": "GetCurrentOwnerKeyringResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "BeginAgentOwnerClaim",
+    "request": "BeginAgentOwnerClaimRequest",
+    "response": "BeginAgentOwnerClaimResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "ClaimAgentOwner",
+    "request": "ClaimAgentOwnerRequest",
+    "response": "ClaimAgentOwnerResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "SubmitOwnerAuthorization",
+    "request": "SubmitOwnerAuthorizationRequest",
+    "response": "SubmitOwnerAuthorizationResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "OwnerAuthorizationService",
+    "method": "TransferResourceOwnership",
+    "request": "TransferResourceOwnershipRequest",
+    "response": "TransferResourceOwnershipResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+  },
+  {
+    "service": "PullRequestReviewService",
+    "method": "GetReviewAnalysisResult",
+    "request": "GetReviewAnalysisResultRequest",
+    "response": "GetReviewAnalysisResultResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/pull_request_review.proto"
+  },
+  {
+    "service": "PullRequestReviewService",
+    "method": "GetReviewAnalysisStatus",
+    "request": "GetReviewAnalysisStatusRequest",
+    "response": "GetReviewAnalysisStatusResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/pull_request_review.proto"
+  },
+  {
+    "service": "PullRequestReviewService",
+    "method": "StartReviewAnalysis",
+    "request": "StartReviewAnalysisRequest",
+    "response": "StartReviewAnalysisResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/pull_request_review.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "AttachChild",
+    "request": "AttachChildRequest",
+    "response": "ChildEdge",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "CreateGrant",
+    "request": "CreateGrantRequest",
+    "response": "HostedGrant",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "CreateInvitation",
+    "request": "CreateInvitationRequest",
+    "response": "Invitation",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "CreateSpool",
+    "request": "CreateSpoolRequest",
+    "response": "HostedSpool",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "DeleteBookmark",
+    "request": "DeleteBookmarkRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "DeleteGrant",
+    "request": "DeleteGrantRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "DeleteSpool",
+    "request": "DeleteSpoolRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "DetachChild",
+    "request": "DetachChildRequest",
+    "response": "DetachChildResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "GetCurrentUserSpool",
+    "request": "GetCurrentUserSpoolRequest",
+    "response": "HostedSpool",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "GetSpool",
+    "request": "GetSpoolRequest",
+    "response": "HostedSpool",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "GrantSupportAccess",
+    "request": "GrantSupportAccessRequest",
+    "response": "SupportAccessGrant",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListBookmarks",
+    "request": "ListBookmarksRequest",
+    "response": "ListBookmarksResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListChildren",
+    "request": "ListChildrenRequest",
+    "response": "ListChildrenResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListGrants",
+    "request": "ListGrantsRequest",
+    "response": "ListGrantsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListInvitations",
+    "request": "ListInvitationsRequest",
+    "response": "ListInvitationsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListMembers",
+    "request": "ListMembersRequest",
+    "response": "ListMembersResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListSpools",
+    "request": "ListSpoolsRequest",
+    "response": "ListSpoolsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListExploreMetadata",
+    "request": "ListExploreMetadataRequest",
+    "response": "ListExploreMetadataResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListSupportAccessGrants",
+    "request": "ListSupportAccessGrantsRequest",
+    "response": "ListSupportAccessGrantsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListActors",
+    "request": "ListActorsRequest",
+    "response": "ListActorsResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ListWorktrees",
+    "request": "ListWorktreesRequest",
+    "response": "ListWorktreesResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ResolveMonorepo",
+    "request": "ResolveMonorepoRequest",
+    "response": "MonorepoNode",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "ResolveSubjects",
+    "request": "ResolveSubjectsRequest",
+    "response": "ResolveSubjectsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "RevokeInvitation",
+    "request": "RevokeInvitationRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "RevokeSupportAccess",
+    "request": "RevokeSupportAccessRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "SetNamespaceVisibility",
+    "request": "SetNamespaceVisibilityRequest",
+    "response": "HostedNamespace",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "SetSpoolVisibility",
+    "request": "SetSpoolVisibilityRequest",
+    "response": "HostedSpool",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "UpdateGrant",
+    "request": "UpdateGrantRequest",
+    "response": "HostedGrant",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "UpdateSpool",
+    "request": "UpdateSpoolRequest",
+    "response": "HostedSpool",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "UpdateSpoolSettings",
+    "request": "UpdateSpoolSettingsRequest",
+    "response": "HostedSpool",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RegistryService",
+    "method": "UpsertBookmark",
+    "request": "UpsertBookmarkRequest",
+    "response": "Bookmark",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/registry.proto"
+  },
+  {
+    "service": "RepoSyncService",
+    "method": "ListRefs",
+    "request": "ListRefsRequest",
+    "response": "stream ListRefsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+  },
+  {
+    "service": "RepoSyncService",
+    "method": "Pull",
+    "request": "stream PullClientFrame",
+    "response": "stream PullServerFrame",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+  },
+  {
+    "service": "RepoSyncService",
+    "method": "Push",
+    "request": "stream PushClientFrame",
+    "response": "stream PushServerFrame",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+  },
+  {
+    "service": "RepoSyncService",
+    "method": "UpdateRef",
+    "request": "UpdateRefRequest",
+    "response": "UpdateRefResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetBlame",
+    "request": "GetBlameRequest",
+    "response": "GetBlameResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetBlob",
+    "request": "GetBlobRequest",
+    "response": "BlobResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetCompare",
+    "request": "GetCompareRequest",
+    "response": "CompareResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetContextHistory",
+    "request": "GetContextHistoryRequest",
+    "response": "stream GetContextHistoryResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetDiff",
+    "request": "GetStateRequest",
+    "response": "DiffResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetRefs",
+    "request": "GetRefsRequest",
+    "response": "GetRefsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetSemanticHotSpots",
+    "request": "GetSemanticHotSpotsRequest",
+    "response": "GetSemanticHotSpotsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetState",
+    "request": "GetStateRequest",
+    "response": "StateSummary",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "GetTree",
+    "request": "GetTreeRequest",
+    "response": "TreeResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ListActions",
+    "request": "GetStateRequest",
+    "response": "ActionsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ListContext",
+    "request": "ListContextRequest",
+    "response": "stream ListContextResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ListContextSuggestions",
+    "request": "ListContextSuggestionsRequest",
+    "response": "ListContextSuggestionsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ListProvenanceSummaries",
+    "request": "ListProvenanceSummariesRequest",
+    "response": "ListProvenanceSummariesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ListStateAttachments",
+    "request": "ListStateAttachmentsRequest",
+    "response": "ListStateAttachmentsResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ListStates",
+    "request": "ListStatesRequest",
+    "response": "ListStatesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ListThreadHistories",
+    "request": "ListThreadHistoriesRequest",
+    "response": "ListThreadHistoriesResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "ReviseContext",
+    "request": "ReviseContextRequest",
+    "response": "ReviseContextResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "SetContext",
+    "request": "SetContextRequest",
+    "response": "SetContextResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "SupersedeContext",
+    "request": "SupersedeContextRequest",
+    "response": "SupersedeContextResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "RepositoryService",
+    "method": "SubscribeRepoEvents",
+    "request": "SubscribeRepoEventsRequest",
+    "response": "stream RepoEvent",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/repository.proto"
+  },
+  {
+    "service": "SearchService",
+    "method": "Search",
+    "request": "SearchRequest",
+    "response": "stream SearchEvent",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/search.proto"
+  },
+  {
+    "service": "StateReviewService",
+    "method": "GetRepoSignalHealth",
+    "request": "GetRepoSignalHealthRequest",
+    "response": "RepoSignalHealthReport",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+  },
+  {
+    "service": "StateReviewService",
+    "method": "GetReviewPayload",
+    "request": "GetReviewPayloadRequest",
+    "response": "ReviewPayload",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+  },
+  {
+    "service": "StateReviewService",
+    "method": "GetReviewProgress",
+    "request": "GetReviewProgressRequest",
+    "response": "GetReviewProgressResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+  },
+  {
+    "service": "StateReviewService",
+    "method": "ListSignatures",
+    "request": "ListSignaturesRequest",
+    "response": "ListSignaturesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+  },
+  {
+    "service": "StateReviewService",
+    "method": "RecordCheckAck",
+    "request": "RecordCheckAckRequest",
+    "response": "RecordCheckAckResponse",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+  },
+  {
+    "service": "StateReviewService",
+    "method": "RecordVerdict",
+    "request": "RecordVerdictRequest",
+    "response": "RecordVerdictResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+  },
+  {
+    "service": "StateReviewService",
+    "method": "SignState",
+    "request": "SignStateRequest",
+    "response": "SignStateResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT",
+      "HEDDLE_DAEMON"
+    ],
+    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "GetThread",
+    "request": "GetThreadRequest",
+    "response": "ThreadSummary",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "GetWorkspaceSummary",
+    "request": "GetWorkspaceSummaryRequest",
+    "response": "WorkspaceSummary",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "ListThreads",
+    "request": "ListThreadsRequest",
+    "response": "stream ListThreadsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "StreamWorkspaceSummary",
+    "request": "GetWorkspaceSummaryRequest",
+    "response": "stream WorkspaceSummary",
+    "maturity": "PLANNED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "AddApprovalGroupMember",
+    "request": "AddApprovalGroupMemberRequest",
+    "response": "ApprovalGroupMember",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "AddPolicyGroupRequirement",
+    "request": "AddPolicyGroupRequirementRequest",
+    "response": "PolicyGroupRequirement",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "ApproveThread",
+    "request": "ApproveThreadRequest",
+    "response": "ThreadApproval",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "CheckMergeEligibility",
+    "request": "CheckMergeEligibilityRequest",
+    "response": "CheckMergeEligibilityResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "LandStack",
+    "request": "LandStackRequest",
+    "response": "LandStackResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "CreateApprovalGroup",
+    "request": "CreateApprovalGroupRequest",
+    "response": "ApprovalGroup",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "CreateThreadPolicy",
+    "request": "CreateThreadPolicyRequest",
+    "response": "ThreadPolicy",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "DeleteApprovalGroup",
+    "request": "DeleteApprovalGroupRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "DeleteThreadPolicy",
+    "request": "DeleteThreadPolicyRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "ListApprovalGroups",
+    "request": "ListApprovalGroupsRequest",
+    "response": "ListApprovalGroupsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "ListThreadApprovals",
+    "request": "ListThreadApprovalsRequest",
+    "response": "ListThreadApprovalsResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "ListThreadPolicies",
+    "request": "ListThreadPoliciesRequest",
+    "response": "ListThreadPoliciesResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "RemoveApprovalGroupMember",
+    "request": "RemoveApprovalGroupMemberRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "RemovePolicyGroupRequirement",
+    "request": "RemovePolicyGroupRequirementRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  },
+  {
+    "service": "WorkflowService",
+    "method": "RevokeApproval",
+    "request": "RevokeApprovalRequest",
+    "response": "DeleteResponse",
+    "maturity": "SHIPPED",
+    "targets": [
+      "WEFT"
+    ],
+    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+  }
+]

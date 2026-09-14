@@ -1,0 +1,277 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha1/contract.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+import "heddle/api/v2alpha1/thread.proto";
+
+message CheckoutOverview {
+  CheckoutRef ref = 1;
+  ThreadRef thread = 2;
+  bytes version = 3;
+  RevisionRef materialized = 4;
+  bool dirty = 5;
+  uint64 changed_paths = 6;
+  repeated Requirement requirements = 7;
+  repeated ActionAvailability actions = 8;
+  RecordRef active_run = 9;
+  // Display only, disclosed solely under device authority.
+  string display_path = 10;
+  SourceConflictSet conflicts = 11;
+}
+
+// A bounded set of immutable source alternatives observed at one checkout
+// version. Candidate IDs are opaque and only meaningful within this version.
+message SourceConflictSet {
+  bytes version = 1;
+  repeated SourceConflictCandidate candidates = 2;
+}
+message SourceConflictCandidate {
+  bytes id = 1;
+  RevisionRef revision = 2;
+}
+
+message ObserveCheckoutsRequest {
+  SpoolRef spool = 1;
+  repeated ThreadRef threads = 2;
+  repeated CheckoutRef checkouts = 3;
+  PageRequest page = 4;
+  ObserveOptions observe = 5;
+}
+
+message CheckoutEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    CheckoutOverview checkout = 2;
+    Removal removal = 3;
+    SectionStatus status = 4;
+  }
+}
+
+message MaterializeCheckoutRequest {
+  string client_operation_id = 1;
+  ThreadRef thread = 2;
+  RevisionRef revision = 3;
+  // Omitted for an automatically managed disposable checkout.
+  optional string requested_path = 4;
+}
+
+// The same physical-checkout lease is enforced by CLI and device RPCs.
+// Possessing its token never grants authority: each mutation also authenticates
+// the owner session, verifies current capability, and compares source/version.
+message CheckoutWriterLease {
+  CheckoutRef checkout = 1;
+  bytes token = 2;
+  string actor_session_id = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+message ClaimCheckoutWriterRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  google.protobuf.Duration requested_duration = 4;
+  // Omit to acquire; supply the current token to renew the same session's lease.
+  // An expired token cannot revive a lease superseded by another writer.
+  bytes current_token = 5;
+}
+message ClaimCheckoutWriterResponse {
+  MutationReceipt receipt = 1;
+  CheckoutWriterLease lease = 2;
+}
+message ReleaseCheckoutWriterRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes token = 3;
+}
+
+message CaptureCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef expected_source = 4;
+  string summary = 5;
+  repeated string selected_paths = 6;
+  // One-shot selection follows Heddle capture semantics; no separate index.
+  bytes writer_lease_token = 7;
+}
+
+message RefreshCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef expected_source = 4;
+  RevisionRef target = 5;
+  bytes writer_lease_token = 6;
+}
+
+message ResolveCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef expected_source = 4;
+  bytes conflict_set_version = 5;
+  repeated bytes chosen_candidate_ids = 6;
+  // Candidate selection is attributed. A working capture alone never resolves
+  // source conflicts; ambiguous or stale candidate sets fail explicitly.
+  bytes writer_lease_token = 7;
+}
+
+message RecoverCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef recover_to = 4;
+  // Active writers and working edits are checked by Heddle before materializing.
+  bytes writer_lease_token = 5;
+}
+
+message CheckoutMutationResponse {
+  MutationReceipt receipt = 1;
+  CheckoutOverview checkout = 2;
+  CaptureSummary capture = 3;
+}
+
+message ObserveRunsRequest {
+  SpoolRef spool = 1;
+  repeated ThreadRef threads = 2;
+  repeated RecordRef runs = 3;
+  bool include_timeline = 4;
+  PageRequest page = 5;
+  ObserveOptions observe = 6;
+}
+
+message RunEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    RunRecord run = 2;
+    TimelineRecord timeline = 3;
+    RunPolicy policy = 6;
+    Removal removal = 4;
+    SectionStatus status = 5;
+  }
+}
+
+message ControlRunRequest {
+  string client_operation_id = 1;
+  RecordRef run = 2;
+  bytes expected_version = 3;
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_PAUSE = 1;
+    ACTION_RESUME = 2;
+    ACTION_STOP = 3;
+    ACTION_STEER = 4;
+  }
+  Action action = 4;
+  string instruction = 5;
+}
+
+message DecideRunPermissionRequest {
+  string client_operation_id = 1;
+  RecordRef run = 2;
+  string permission_id = 3;
+  bytes request_digest = 4;
+  bool allow = 5;
+}
+
+message ProposedHumanAction {
+  string method = 1;
+  // Exact deterministic protobuf request. Preserve bytes across older clients;
+  // unknown methods/critical semantics cannot be approved by an unaware client.
+  bytes canonical_request = 2;
+  bytes request_digest = 3;
+  string client_operation_id = 4;
+  repeated EntityRef targets = 5;
+  heddle.api.v1alpha1.RequestProof request_proof = 6;
+  heddle.api.v1alpha1.HumanVerification human_verification = 7;
+}
+
+message RunRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  ThreadRef thread = 3;
+  CheckoutRef checkout = 4;
+  string principal_id = 5;
+  string agent_id = 6;
+  string harness = 7;
+  string model = 8;
+  OperationRecord.State state = 9;
+  repeated ActionAvailability actions = 10;
+  // Exact controls consumed by this run's harness. Advertising ControlRun in
+  // actions does not imply support for every control variant.
+  repeated ControlRunRequest.Action supported_controls = 11;
+  // Pending exact harness intents. Decisions compare request_digest; observing
+  // a prompt never grants permission and timeout/disconnection never implies allow.
+  repeated RunPermission pending_permissions = 12;
+  // Explicitly retained artifacts currently readable under this Run's policy.
+  // Raw material remains device-local unless separately published by consent.
+  repeated RunArtifact artifacts = 13;
+}
+message RunArtifact {
+  RecordRef ref = 1;
+  string kind = 2;
+  string media_type = 3;
+  uint64 size = 4;
+  // Integrity only. ReadArtifact authorizes the catalog reference, never a hash.
+  bytes content_hash = 5;
+  google.protobuf.Timestamp retained_until = 6;
+}
+message RunPermission {
+  string id = 1;
+  // Claude v1: BLAKE3(prefix UTF-8 || JSON length as LE u64 || 0x00 || JSON),
+  // prefix = "heddle.claude-permission.v1". JSON uses sorted object keys.
+  bytes request_digest = 2;
+  string harness = 3;
+  string tool_name = 4;
+  // Exact decision-bound intent JSON captured by the device adapter (format,
+  // run_id, permission_id, tool_name, tool_input, cwd); bounded to 64 KiB.
+  // Preserve the original bytes when comparing or approving an intent.
+  bytes canonical_input_json = 5;
+  // Device-clock deadline. Expired prompts cannot be approved after a crash.
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message TimelineRecord {
+  RecordRef ref = 1;
+  RecordRef run = 2;
+  uint64 position = 3;
+  string kind = 4;
+  string summary = 5;
+  RevisionRef captured_revision = 6;
+  repeated RecordRef artifacts = 7;
+  SignedRecord source_operation = 8;
+  // Summary is the authorized projection. Raw artifacts require separate reads.
+}
+message RunPolicy {
+  SpoolRef spool = 1;
+  bytes version = 2;
+  uint64 structured_retention_seconds = 3;
+  uint64 raw_retention_seconds = 4;
+  bool retain_raw = 5;
+  repeated HarnessPreference preferences = 6;
+}
+message HarnessPreference {
+  string harness = 1;
+  string category = 2;
+  bool permitted = 3;
+  SignedRecord principal_authorization = 4;
+}
+message PutRunPolicyRequest {
+  string client_operation_id = 1;
+  RunPolicy policy = 2;
+  bytes expected_version = 3;
+}
+message LandCheckoutRequest {
+  string client_operation_id = 1;
+  CheckoutRef checkout = 2;
+  bytes expected_checkout_version = 3;
+  RevisionRef source = 4;
+  ThreadRef target = 5;
+  RevisionRef expected_target = 6;
+  bytes expected_policy_version = 7;
+  bytes writer_lease_token = 8;
+}

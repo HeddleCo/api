@@ -1,0 +1,6 @@
+[
+  {"kind":"message","body_hex":"616263","frame_hex":"0000000003616263"},
+  {"kind":"message","body_hex":"","frame_hex":"0000000000"},
+  {"kind":"failure","code":1,"message":"x","frame_hex":"01000000050801120178"},
+  {"kind":"raw_body","length":"512","frame_hex":"020000000000000200"}
+]

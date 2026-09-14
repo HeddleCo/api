@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.30.0",
+  "version": "0.31.0-alpha.1",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {
@@ -44,7 +44,20 @@
     "./presence": "./dist/presence_pb.js",
     "./owner-authorization": "./dist/owner_authorization_pb.js",
     "./owner-governance": "./dist/owner_governance_pb.js",
-    "./attachment-authorization": "./dist/attachment-authorization.js"
+    "./attachment-authorization": "./dist/attachment-authorization.js",
+    "./v2": "./dist/v2alpha1/index.js",
+    "./v2/observation": "./dist/v2alpha1/observation.js",
+    "./v2/client": "./dist/v2alpha1/client.js",
+    "./v2/owner-certificates": "./dist/v2alpha1/owner-certificates.js",
+    "./v2/spool-creation": "./dist/v2alpha1/spool-creation.js",
+    "./v2/owner-actions": "./dist/v2alpha1/owner-actions.js",
+    "./v2/provider": "./dist/v2alpha1/provider.js",
+    "./v2/collaboration": "./dist/v2alpha1/collaboration.js",
+    "./v2/source-targets": "./dist/v2alpha1/source-targets.js",
+    "./v2/pairing": "./dist/v2alpha1/pairing.js",
+    "./v2/thread-control": "./dist/v2alpha1/thread-control.js",
+    "./v2/thread-genesis": "./dist/v2alpha1/thread-genesis.js",
+    "./v2/evidence": "./dist/v2alpha1/evidence.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.0",

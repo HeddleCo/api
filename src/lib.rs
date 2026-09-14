@@ -1,10 +1,14 @@
 //! Generated transport-neutral Rust types for the Heddle API.
 
 pub mod descriptor_trust;
+mod failure;
 pub mod framing;
+pub mod provider_v2;
+pub mod request_proof;
 pub mod signing;
 mod transport;
 pub mod treadle;
+pub mod v2;
 
 pub use transport::{
     ALL_METHODS, HOSTED_ALPN_V1, MethodDescriptor, MethodRoute, PROVIDER_ALPN_V1,
@@ -52,6 +56,10 @@ pub mod heddle {
         /// Breaking pre-1.0 API generation.
         pub mod v1alpha1 {
             include!(concat!(env!("OUT_DIR"), "/heddle.api.v1alpha1.rs"));
+        }
+        /// Candidate Thread-oriented contract; endpoint support is negotiated.
+        pub mod v2alpha1 {
+            include!(concat!(env!("OUT_DIR"), "/heddle.api.v2alpha1.rs"));
         }
     }
 }

@@ -1,0 +1,222 @@
+syntax = "proto3";
+
+package heddle.api.v2alpha1;
+
+import "heddle/api/v2alpha1/common.proto";
+
+// Source navigation is pinned to bytes, never just a semantic digest. Byte
+// offsets are zero-based, half-open UTF-8 byte ranges. No inferred locations.
+message BehaviorSource {
+  RevisionRef revision = 1;
+  string path = 2;
+  bytes blob_hash = 3;
+  uint32 start_byte = 4;
+  uint32 end_byte = 5;
+  string text = 6;
+  string symbol_address = 7;
+}
+
+enum BehaviorSupport {
+  BEHAVIOR_SUPPORT_UNSPECIFIED = 0;
+  BEHAVIOR_SUPPORT_SUPPORTED = 1;
+  BEHAVIOR_SUPPORT_PARTIAL = 2;
+  BEHAVIOR_SUPPORT_UNSUPPORTED = 3;
+  BEHAVIOR_SUPPORT_UNAVAILABLE = 4;
+}
+
+enum BehaviorLimitation {
+  BEHAVIOR_LIMITATION_UNSPECIFIED = 0;
+  BEHAVIOR_LIMITATION_PARSE_ERROR = 1;
+  BEHAVIOR_LIMITATION_LANGUAGE = 2;
+  BEHAVIOR_LIMITATION_MISSING_ELSE = 3;
+  BEHAVIOR_LIMITATION_SYNTAX = 4;
+  BEHAVIOR_LIMITATION_MUTABLE_BINDING = 5;
+  BEHAVIOR_LIMITATION_UNRESOLVED_BINDING = 6;
+  BEHAVIOR_LIMITATION_AMBIGUOUS_MATCH = 7;
+  BEHAVIOR_LIMITATION_BUDGET = 8;
+  BEHAVIOR_LIMITATION_MISSING_SOURCE = 9;
+}
+
+// Each entry describes only this analyzer's supported pattern, not all behavior
+// in a file or file group. Empty supported scope means no supported changes;
+// omitted scope, partial analysis and interrupted streams are different states.
+message BehaviorScope {
+  string path = 1;
+  string symbol_address = 2;
+  string target = 3;
+  BehaviorSupport support = 4;
+  repeated BehaviorLimitation limitations = 5;
+  repeated BehaviorSource sources = 6;
+}
+
+message BehaviorVersions {
+  string analyzer = 1;
+  string analyzer_version = 2;
+  string grammar_version = 3;
+  uint32 symbol_extractor_version = 4;
+  uint32 expression_extractor_version = 5;
+  uint32 binding_resolver_version = 6;
+  uint32 comparison_version = 7;
+}
+
+message BehaviorDependencies {
+  // Extraction: exact blob bytes + grammar + symbol/expression versions.
+  // Binding: extraction + the complete containing lexical source, including
+  // declarations and writes. Comparison: both binding artifacts + comparison
+  // version + exact revision pair/path. Selection caches additionally bind
+  // query paths/symbols. Hashes are domain-separated.
+  bytes base_extraction = 1;
+  bytes source_extraction = 2;
+  bytes base_bindings = 3;
+  bytes source_bindings = 4;
+  bytes comparison = 5;
+}
+
+enum BehaviorProvenance {
+  BEHAVIOR_PROVENANCE_UNSPECIFIED = 0;
+  BEHAVIOR_PROVENANCE_SYNTAX = 1;
+  BEHAVIOR_PROVENANCE_BINDING_RESOLUTION = 2;
+  BEHAVIOR_PROVENANCE_STRUCTURAL_COMPARISON = 3;
+}
+
+message BehaviorOperation {
+  string id = 1;
+  string symbol_address = 2;
+  bytes semantic_hash = 3;
+  BehaviorSource source = 4;
+  BehaviorProvenance provenance = 5;
+}
+
+message BehaviorAssignment {
+  string id = 1;
+  string operation_id = 2;
+  // Syntactic address (e.g. SavePlan.git_scope), not inferred type resolution.
+  string target = 3;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_FIELD_INITIALIZER = 1;
+    KIND_ASSIGNMENT = 2;
+  }
+  Kind kind = 4;
+  string value_id = 5;
+  BehaviorSource source = 6;
+  BehaviorProvenance provenance = 7;
+}
+
+message BehaviorExpression {
+  string id = 1;
+  BehaviorSource source = 2;
+  // Existing length-framed non-comment token normalization; not an effects hash.
+  bytes normalized_hash = 3;
+  BehaviorConditional conditional = 4;
+  BehaviorProvenance provenance = 5;
+}
+
+message BehaviorConditional {
+  string predicate_id = 1;
+  // Source order. An unconditional expression has no synthetic branches.
+  repeated BehaviorBranch branches = 2;
+}
+
+message BehaviorBranch {
+  string id = 1;
+  enum Label {
+    LABEL_UNSPECIFIED = 0;
+    LABEL_TRUE = 1;
+    LABEL_FALSE = 2;
+  }
+  Label label = 2;
+  string result_id = 3;
+  BehaviorSource source = 4;
+  BehaviorProvenance provenance = 5;
+}
+
+message BehaviorByteSpan {
+  uint32 start_byte = 1;
+  uint32 end_byte = 2;
+}
+
+message BehaviorBinding {
+  string id = 1;
+  // The written occurrence remains an expression, even when resolved.
+  string occurrence_id = 2;
+  string name = 3;
+  optional string value_id = 4;
+  BehaviorSource declaration = 5;
+  // Half-open byte span in the declaration's exact revision/path/blob. The
+  // containing block's text is not repeated for every binding occurrence.
+  BehaviorByteSpan lexical_scope = 6;
+  BehaviorSupport support = 7;
+  repeated BehaviorLimitation limitations = 8;
+  BehaviorProvenance provenance = 9;
+}
+
+enum BehaviorCorrespondenceKind {
+  BEHAVIOR_CORRESPONDENCE_KIND_UNSPECIFIED = 0;
+  BEHAVIOR_CORRESPONDENCE_KIND_RETAINED = 1;
+  BEHAVIOR_CORRESPONDENCE_KIND_REPLACED = 2;
+  BEHAVIOR_CORRESPONDENCE_KIND_ADDED = 3;
+  BEHAVIOR_CORRESPONDENCE_KIND_REMOVED = 4;
+  BEHAVIOR_CORRESPONDENCE_KIND_UNMATCHED = 5;
+  BEHAVIOR_CORRESPONDENCE_KIND_AMBIGUOUS = 6;
+}
+
+enum BehaviorMatchReason {
+  BEHAVIOR_MATCH_REASON_UNSPECIFIED = 0;
+  BEHAVIOR_MATCH_REASON_SAME_TARGET_IN_MATCHED_SYMBOL = 1;
+  BEHAVIOR_MATCH_REASON_EXACT_NORMALIZED_EXPRESSION = 2;
+  BEHAVIOR_MATCH_REASON_RESOLVED_BINDING = 3;
+  BEHAVIOR_MATCH_REASON_SAME_BRANCH_LABEL = 4;
+}
+
+message BehaviorCorrespondence {
+  string id = 1;
+  // IDs refer to expressions/assignments in this record. A single old fact can
+  // participate in multiple correspondences. Ambiguous candidates are lists,
+  // never a guessed pairing. Empty side means added/removed.
+  repeated string base_ids = 2;
+  repeated string source_ids = 3;
+  BehaviorCorrespondenceKind kind = 4;
+  repeated BehaviorMatchReason reasons = 5;
+  BehaviorProvenance provenance = 6;
+}
+
+// A self-contained structural map. Typed containment (assignment.value_id,
+// conditional.predicate_id), selection (branches), binding and correspondence
+// are distinct. This version emits no inferred consequences or test approval;
+// resolved call/reference graph edges remain independent evidence and cannot
+// establish execution order or effects. All referenced IDs must occur here.
+message BehaviorChange {
+  RecordRef analysis = 1;
+  string id = 2;
+  RevisionRef base = 3;
+  RevisionRef source = 4;
+  string path = 5;
+  string symbol_address = 6;
+  BehaviorSupport support = 7;
+  repeated BehaviorLimitation limitations = 8;
+  BehaviorVersions versions = 9;
+  BehaviorDependencies dependencies = 10;
+  repeated BehaviorOperation operations = 11;
+  repeated BehaviorAssignment assignments = 12;
+  repeated BehaviorExpression expressions = 13;
+  repeated BehaviorBinding bindings = 14;
+  repeated BehaviorCorrespondence correspondences = 15;
+}
+
+message BehaviorAnalysisCoverage {
+  RecordRef analysis = 1;
+  RevisionRef base = 2;
+  RevisionRef source = 3;
+  repeated BehaviorScope analyzed = 4;
+  repeated BehaviorScope omitted = 5;
+  // False for a bounded prefix. Page/checkpoint describe delivery completeness;
+  // this field describes analysis of the requested pattern and scope.
+  bool selection_exhausted = 6;
+  BehaviorVersions versions = 7;
+}
+
+message BehaviorChangeRemoval {
+  RecordRef analysis = 1;
+  string change_id = 2;
+}

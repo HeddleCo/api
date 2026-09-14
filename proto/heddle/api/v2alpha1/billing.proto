@@ -1,0 +1,140 @@
+syntax = "proto3";
+package heddle.api.v2alpha1;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v2alpha1/common.proto";
+import "heddle/api/v2alpha1/stream.proto";
+
+// Provider IDs, API credentials and webhook secrets never appear in this
+// contract. Weft resolves the authenticated account and checks the credential's
+// effective delegated billing authority for every read and mutation.
+enum SubscriptionStatus {
+  SUBSCRIPTION_STATUS_UNSPECIFIED = 0;
+  SUBSCRIPTION_STATUS_NONE = 1;
+  SUBSCRIPTION_STATUS_TRIALING = 2;
+  SUBSCRIPTION_STATUS_ACTIVE = 3;
+  SUBSCRIPTION_STATUS_PAST_DUE = 4;
+  SUBSCRIPTION_STATUS_CANCELED = 5;
+  SUBSCRIPTION_STATUS_UNPAID = 6;
+  SUBSCRIPTION_STATUS_INCOMPLETE = 7;
+  SUBSCRIPTION_STATUS_INCOMPLETE_EXPIRED = 8;
+}
+message Money {
+  string currency = 1; // ISO 4217 currency code.
+  int64 amount_minor = 2; // Currency minor units, never floating point.
+}
+enum BillingInterval {
+  BILLING_INTERVAL_UNSPECIFIED = 0;
+  BILLING_INTERVAL_MONTH = 1;
+  BILLING_INTERVAL_YEAR = 2;
+}
+enum SeatPricingMode {
+  SEAT_PRICING_MODE_UNSPECIFIED = 0;
+  SEAT_PRICING_MODE_VOLUME = 1;
+  SEAT_PRICING_MODE_GRADUATED = 2;
+}
+message BillingSeatTier {
+  uint32 minimum_seats = 1;
+  optional uint32 maximum_seats = 2; // Inclusive; absent means unbounded.
+  Money unit_price = 3;
+}
+message BillingSeatPricing {
+  SeatPricingMode mode = 1;
+  repeated BillingSeatTier tiers = 2;
+}
+message BillingPlan {
+  string id = 1; // Stable tier/interval/currency key, never a provider product ID.
+  string name = 2;
+  string description = 3;
+  Money unit_price = 4;
+  BillingInterval interval = 5;
+  bool per_seat = 6;
+  optional uint32 minimum_seats = 7;
+  optional uint32 maximum_seats = 8;
+  // Published allowances, not the account's measured usage. Marketed GB use
+  // decimal units: one GB is 1,000,000,000 bytes. Absence is unknown.
+  optional uint64 storage_bytes = 9;
+  optional uint64 storage_base_bytes = 10;
+  optional uint64 storage_per_seat_bytes = 11;
+  // Price per decimal GB; preserve currency and integral minor units.
+  Money storage_overage_per_gb = 12;
+  // Full volume/graduated schedule. A headline per-seat price must never be
+  // multiplied across seats when the published tier schedule differs.
+  BillingSeatPricing seat_pricing = 13;
+  string tier = 14; // Heddle tier key, independent of interval and currency.
+}
+message BillingRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string plan = 3;
+  SubscriptionStatus status = 4;
+  google.protobuf.Timestamp current_period_end = 5;
+  optional bool cancel_at_period_end = 6; // Absent when the provider has not reported it.
+  optional uint32 seats = 7;
+  Money recurring_amount = 8;
+  repeated ActionAvailability actions = 9;
+  // Coverage/status belongs to the observation section. Missing provider data
+  // must not be represented as a free plan or canceled subscription.
+}
+message ObserveBillingRequest {
+  bool include_plans = 1;
+  ObserveOptions observe = 2;
+  // Explicit public-only query. Requires include_plans=true and emits only
+  // published plan records plus plans status/replacement, never account
+  // billing records or account section status. Select this mode before sending,
+  // never retry a denied account query with its credential removed.
+  // The default account query always requires an authenticated PoP credential.
+  bool plans_only = 3;
+}
+message BillingEvent {
+  StreamFrame frame = 1;
+  oneof payload {
+    BillingRecord billing = 2;
+    BillingPlan plan = 3;
+    SectionStatus status = 4;
+    SectionReplacement replace_section = 5;
+  }
+  // Sections: billing (single current record), plans (complete catalog).
+  // Changed catalogs replace the plans section; never infer disappearance
+  // from an interrupted observation. The shared budget bounds both sections.
+}
+message UpdateSubscriptionRequest {
+  string client_operation_id = 1;
+  bytes expected_version = 2;
+  optional string plan = 3;
+  optional uint32 seats = 4;
+  // At least one update is required. One durable operation applies the desired
+  // plan and seats; providers may require separate steps, so intermediate state
+  // is observable. The receipt identifies the operation to observe. Changes apply
+  // immediately and their prorated difference is carried to the next invoice;
+  // this call never requests an immediate proration charge. The provider
+  // calculates amounts. No client may derive an estimated charge from this.
+}
+message CancelSubscriptionRequest {
+  string client_operation_id = 1;
+  bytes expected_version = 2;
+  // Cancellation always takes effect at the current period end.
+}
+message ResumeSubscriptionRequest {
+  string client_operation_id = 1;
+  bytes expected_version = 2;
+}
+message CreateBillingPortalRequest {
+  string client_operation_id = 1;
+  // No client-supplied customer ID or redirect URL. The server configures the
+  // HTTPS return origin/path and resolves the caller's own billing customer.
+}
+message BeginCheckoutRequest {
+  string client_operation_id = 1;
+  string plan = 2;
+  optional uint32 seats = 3;
+  bytes expected_billing_version = 4;
+}
+message BillingRedirectResponse {
+  MutationReceipt receipt = 1;
+  // Short-lived provider session URL; validate HTTPS and the configured
+  // provider origin server-side. Never accept a browser-selected destination,
+  // include a long-lived credential, or publish this URL in observations.
+  string url = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}

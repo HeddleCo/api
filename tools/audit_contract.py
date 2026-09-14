@@ -57,7 +57,15 @@ def legacy_inventory(decoded: str) -> set[str]:
 
 
 def audit_new_descriptor(decoded: str) -> None:
-    proto_sources = "\n".join(path.read_text() for path in (ROOT / "proto").rglob("*.proto"))
+    # This is the frozen v1 migration audit. V2 has its own exhaustive compiled
+    # descriptor/behavior checks in tests/v2_descriptor_contract.rs. Do not let
+    # a new package alter v1's counts or satisfy its metadata coverage by proxy.
+    decoded = "\n".join(
+        "\n".join(block)
+        for block in blocks(decoded.splitlines(), "file {")
+        if f'  package: "{PACKAGE}"' in block
+    )
+    proto_sources = "\n".join(path.read_text() for path in (ROOT / "proto/heddle/api/v1alpha1").glob("*.proto"))
     service_count = len(re.findall(r"(?m)^service \w+", proto_sources))
     rpc_count = len(re.findall(r"(?m)^\s*rpc \w+", proto_sources))
     assert decoded.count(f"[{PACKAGE}.service_contract]") == service_count

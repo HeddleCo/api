@@ -45,6 +45,20 @@ fn public_resource_reads_require_proof_when_an_account_credential_is_supplied() 
         AuthorizationAccess::AuthenticatedPrincipal
     );
     assert_eq!(workspace.signing_tier, SigningTier::ProofOfPossession);
+
+    let list = heddle_api::v2::method_descriptor("/heddle.api.v2alpha1.SpoolService/ListSpools")
+        .expect("grant-reachable spool list");
+    assert_eq!(
+        list.authorization_access,
+        AuthorizationAccess::AuthenticatedPrincipal
+    );
+    assert_eq!(list.signing_tier, SigningTier::ProofOfPossession);
+    assert_eq!(
+        list.authorization.scope_source,
+        heddle_api::heddle::api::v1alpha1::AuthorizationScopeSource::CallerGrants
+    );
+    assert_eq!(list.effect, RpcEffect::ReadOnly);
+    assert_eq!(list.streaming, heddle_api::StreamingShape::Unary);
 }
 
 #[test]

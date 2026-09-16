@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package heddle.api.v2alpha1;
 
+import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha1/repository.proto";
 import "heddle/api/v2alpha1/activity.proto";
 import "heddle/api/v2alpha1/administration.proto";
@@ -171,6 +172,27 @@ message SpoolEvent {
     SpoolOverview child = 16;
     SourceTargetResolutionEvent source_target = 17;
   }
+}
+
+// Unary grant-reachable spool set. ObserveWorkspace streams the same inventory
+// as a live composed view; ObserveCatalog is public-only and is never widened
+// by account credentials.
+message ListSpoolsRequest {
+  // When true, return only content-bearing (repository/project) spools.
+  bool repos_only = 1;
+}
+
+message ListedSpool {
+  SpoolRef ref = 1;
+  repeated string path_segments = 2;
+  bool is_repo = 3;
+  google.protobuf.Timestamp last_activity_at = 4;
+  optional uint32 thread_count = 5;
+  string head_thread = 6;
+}
+
+message ListSpoolsResponse {
+  repeated ListedSpool spools = 1;
 }
 
 message WorkspacePages {

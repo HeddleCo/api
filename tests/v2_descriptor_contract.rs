@@ -260,6 +260,7 @@ fn device_deployment_covers_private_work_without_hosted_account_administration()
         "IdentityService/CompleteAuthentication",
         "IdentityService/CreateSignupInvitation",
         "IdentityService/BeginEmailVerification",
+        "IdentityService/SendEmail",
         "SpoolService/PutGrant",
         "SpoolService/CreateInvitation",
         "SpoolService/SetSupportAccess",

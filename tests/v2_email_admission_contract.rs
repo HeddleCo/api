@@ -98,3 +98,60 @@ fn email_possession_yields_typed_registration_admission_without_an_account_crede
     );
     assert!(route.client_operation_id_required);
 }
+
+#[test]
+fn transactional_send_email_is_distinct_from_signup_mailbox_proof() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract");
+    let request = pool
+        .get_message_by_name("heddle.api.v2alpha1.SendEmailRequest")
+        .expect("transactional send");
+    for field in [
+        "client_operation_id",
+        "to",
+        "from_name",
+        "from_email",
+        "reply_to",
+        "subject",
+        "html",
+        "text",
+        "headers",
+    ] {
+        assert!(
+            request.get_field_by_name(field).is_some(),
+            "SendEmailRequest needs {field}"
+        );
+    }
+    assert!(
+        request.get_field_by_name("invitation_code").is_none(),
+        "transactional send must not carry signup admission"
+    );
+    let response = pool
+        .get_message_by_name("heddle.api.v2alpha1.SendEmailResponse")
+        .expect("send receipt");
+    assert!(response.get_field_by_name("receipt").is_some());
+    assert_eq!(
+        response
+            .get_field_by_name("message_id")
+            .expect("provider message id")
+            .kind(),
+        Kind::String
+    );
+    let route =
+        heddle_api::v2::method_descriptor("/heddle.api.v2alpha1.IdentityService/SendEmail")
+            .expect("transactional delivery route");
+    assert_eq!(
+        route.authorization_access,
+        AuthorizationAccess::AuthenticatedPrincipal
+    );
+    assert_eq!(
+        route.signing_tier,
+        SigningTier::ProofOfPossession,
+        "browser and device callers prove possession; BeginEmailVerification stays mailer-bearer"
+    );
+    assert_eq!(route.authorization.role, AuthorizationRole::CallerBound);
+    assert_eq!(
+        route.authorization.scope_source,
+        AuthorizationScopeSource::CallerSubject
+    );
+    assert!(route.client_operation_id_required);
+}

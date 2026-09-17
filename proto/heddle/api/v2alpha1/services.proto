@@ -153,6 +153,7 @@ service SpoolService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
   rpc CreateSpool(CreateSpoolRequest) returns (SpoolMutationResponse) {

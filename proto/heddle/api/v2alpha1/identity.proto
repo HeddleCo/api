@@ -779,6 +779,9 @@ message SendEmailRequest {
   string html = 7;
   string text = 8;
   map<string, string> headers = 9;
+  // Audit tag for Tapestry admin templates (access-approved, password-reset,
+  // signup-invite). Empty for ad-hoc rendered bodies.
+  string template_slug = 10;
 }
 message SendEmailResponse {
   MutationReceipt receipt = 1;

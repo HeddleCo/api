@@ -115,6 +115,7 @@ fn transactional_send_email_is_distinct_from_signup_mailbox_proof() {
         "html",
         "text",
         "headers",
+        "template_slug",
     ] {
         assert!(
             request.get_field_by_name(field).is_some(),
@@ -145,8 +146,8 @@ fn transactional_send_email_is_distinct_from_signup_mailbox_proof() {
     );
     assert_eq!(
         route.signing_tier,
-        SigningTier::ProofOfPossession,
-        "browser and device callers prove possession; BeginEmailVerification stays mailer-bearer"
+        SigningTier::None,
+        "tapestry-signup-mailer is bearer-only; the mailer credential is the possession factor"
     );
     assert_eq!(route.authorization.role, AuthorizationRole::CallerBound);
     assert_eq!(

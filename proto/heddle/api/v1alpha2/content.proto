@@ -1,0 +1,281 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha2;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/common/repository.proto";
+import "heddle/api/common/types.proto";
+import "heddle/api/v1alpha2/collaboration.proto";
+import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/stream.proto";
+
+message TreeRead {
+  // Empty selects the root; otherwise a normalized repository-relative path.
+  string path = 1;
+  // Zero selects one level. Endpoints advertise bounded read budgets and reject
+  // a depth they cannot support; zero never requests an unbounded walk.
+  uint32 depth = 2;
+  // The token is bound to the exact revision, subtree and depth. A complete
+  // page may still have next_page; exhausted alone means the query has no more.
+  PageRequest page = 3;
+}
+
+message ContentFile {
+  // Exact native blob hash, 32 bytes. A symlink's blob stores its target path;
+  // browsing a tree never follows the link.
+  bytes object_hash = 1;
+  // Absent means unknown, distinct from a known empty file.
+  optional uint64 size = 2;
+  // Applies to file targets; false for symlinks.
+  bool executable = 3;
+}
+
+message ContentSpoolLink {
+  // Exact namespace/name identity embedded in the native source tree. This is
+  // not a hosted SpoolRef UUID or an authorization grant. ResolveResources can
+  // resolve it to a hosted resource when the caller wants to follow the edge.
+  string native_spool_id = 1;
+  heddle.api.common.StateId state = 2;
+}
+
+message ContentTreeEntry {
+  // Repository-root-relative path, including the requested subtree prefix.
+  string path = 1;
+  oneof target {
+    bytes tree_hash = 2;
+    ContentFile file = 3;
+    ContentFile symlink = 4;
+    heddle.api.common.GitObjectId gitlink = 5;
+    ContentSpoolLink spoollink = 6;
+  }
+  // Present only when the corresponding provenance has been published and
+  // authorized. Absence does not mean that the source has no history.
+  google.protobuf.Timestamp last_changed_at = 7;
+  heddle.api.common.StatePrincipal last_changed_by = 8;
+}
+
+message BlobRead {
+  oneof source {
+    string path = 1;
+    // Exact native blob content hash, 32 bytes. The endpoint MUST prove the
+    // object is reachable from ReadContentRequest.revision and authorize that
+    // revision before serving it. Possessing a hash confers no authority.
+    // This permits Heddle's lazy object hydration without resolving a path or
+    // downloading a revision pack merely to retrieve one missing blob.
+    bytes object_hash = 4;
+  }
+  uint64 offset = 2;
+  uint64 length = 3;
+}
+
+message DiffRead {
+  RevisionRef base = 1;
+  repeated string paths = 2;
+  PageRequest page = 3;
+  // Absent uses ReadContentRequest.thread. An explicit cross-Thread base is
+  // independently admitted under this Thread's audience and source policy.
+  ThreadRef base_thread = 4;
+}
+
+message ProvenanceRead {
+  string path = 1;
+  uint32 start_line = 2;
+  uint32 line_count = 3;
+}
+
+message ContentRead {
+  string selection_id = 1;
+  oneof selection {
+    TreeRead tree = 2;
+    BlobRead blob = 3;
+    DiffRead diff = 4;
+    ProvenanceRead provenance = 5;
+    StateRead state = 6;
+  }
+}
+
+// Exact immutable source summary. Authored sidecars (including risk signals,
+// conflict resolutions and semantic attachment attribution) are not source
+// objects: use audience-checked Thread, checkout and Analysis projections.
+// The selection emits one StateSummary followed by selection_complete.
+message StateRead {}
+
+message ReadContentRequest {
+  RevisionRef revision = 1;
+  repeated ContentRead selections = 2;
+  ReadBudget budget = 3;
+  // Required owning Thread. The revision must belong to this exact Thread;
+  // another Thread containing the same source object grants no authority here.
+  // Its Spool must match revision.spool.
+  ThreadRef thread = 4;
+  // Finite exact-revision read. Resume ranges/pages explicitly; no live follow.
+}
+
+message BlobChunk {
+  uint64 offset = 1;
+  bytes data = 2;
+  uint64 total_size = 3;
+  bytes object_hash = 4;
+  bool range_complete = 5;
+}
+
+message ContentEvent {
+  string selection_id = 1;
+  RevisionRef revision = 2;
+  oneof payload {
+    ContentTreeEntry tree_entry = 3;
+    BlobChunk blob = 4;
+    heddle.api.common.FileDiff diff = 5;
+    ProvenanceResult provenance = 6;
+    SectionStatus selection_complete = 7;
+    heddle.api.common.StateSummary state = 8;
+  }
+  // Each requested selection ends with selection_complete. Missing completion
+  // before FIN means interruption, not an empty file or exhausted collection.
+}
+
+message ReadArtifactRequest {
+  RecordRef artifact = 1;
+  uint64 offset = 2;
+  uint64 length = 3;
+  ReadBudget budget = 4;
+  // A retained raw artifact requires its own disclosure authorization. This
+  // does not export runtime secret values from the execution broker.
+}
+
+message ArtifactEvent {
+  RecordRef artifact = 1;
+  oneof payload {
+    BlobChunk chunk = 2;
+    SectionStatus complete = 3;
+  }
+}
+
+enum SearchDomain {
+  SEARCH_DOMAIN_UNSPECIFIED = 0;
+  SEARCH_DOMAIN_THREAD = 1;
+  SEARCH_DOMAIN_DISCUSSION = 2;
+  SEARCH_DOMAIN_CONTEXT = 3;
+  SEARCH_DOMAIN_SOURCE_CONTENT = 4;
+  SEARCH_DOMAIN_SOURCE_SYMBOL = 5;
+  SEARCH_DOMAIN_REVISION = 6;
+  SEARCH_DOMAIN_SPOOL = 7;
+  SEARCH_DOMAIN_PRINCIPAL = 8;
+  SEARCH_DOMAIN_AGENT = 9;
+  SEARCH_DOMAIN_ACTIVITY = 10;
+  SEARCH_DOMAIN_DISCUSSION_TURN = 11;
+}
+
+// How this match was established; score is only comparable within this query.
+enum SearchMatchKind {
+  SEARCH_MATCH_KIND_UNSPECIFIED = 0;
+  SEARCH_MATCH_KIND_EXACT = 1;
+  SEARCH_MATCH_KIND_PREFIX = 2;
+  SEARCH_MATCH_KIND_FUZZY = 3;
+  SEARCH_MATCH_KIND_FULLTEXT = 4;
+  SEARCH_MATCH_KIND_SEMANTIC = 5;
+  SEARCH_MATCH_KIND_HASH_EXACT = 6;
+  SEARCH_MATCH_KIND_HASH_PREFIX = 7;
+  SEARCH_MATCH_KIND_STRUCTURED = 8;
+}
+
+// Which accepted source revisions participate in content and symbol search.
+enum SearchSourceHistory {
+  SEARCH_SOURCE_HISTORY_UNSPECIFIED = 0;
+  // All concurrent source heads of each selected Thread. A withheld head does
+  // not fall back to an older visible revision.
+  SEARCH_SOURCE_HISTORY_CURRENT = 1;
+  SEARCH_SOURCE_HISTORY_RETAINED = 2;
+}
+
+message SearchRequest {
+  // Empty discovers authorized Spools, or uses the Spools of selected Threads.
+  repeated SpoolRef spools = 1;
+  // Literal search text. A structured annotation query can omit text; an empty
+  // unfiltered query is invalid. User text never supplies an authorization scope.
+  string text = 2;
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    MODE_LEXICAL = 1;
+    MODE_SEMANTIC = 2;
+    MODE_COMBINED = 3;
+  }
+  Mode mode = 3;
+  PageRequest page = 4;
+  ReadBudget budget = 5;
+  // Empty selects all supported domains, or CONTEXT when annotations is present.
+  // An explicit unsupported domain or mode is rejected, never silently ignored.
+  repeated SearchDomain domains = 6;
+  // Exact Thread identities, intersected with spools when both are supplied.
+  // Empty searches all authorized Threads in the selected Spools.
+  repeated ThreadRef threads = 7;
+  // The same typed predicates used by ObserveCollaboration. Presence selects
+  // context revisions only; selecting other domains with this filter is invalid.
+  // Predicates apply to each current revision, not a union of concurrent tags.
+  AnnotationQuery annotations = 8;
+  // Applies only to SOURCE_CONTENT and SOURCE_SYMBOL. Omission or UNSPECIFIED
+  // means CURRENT. An explicit scope requires at least one of those domains;
+  // other selected domains retain their own semantics (in particular, REVISION
+  // still resolves accepted historical identifiers).
+  // Scope, visibility and index readiness are evaluated before pagination;
+  // cursors are bound to this selection. Neither scope grants source access.
+  oneof source_scope {
+    SearchSourceHistory source_history = 9;
+    // Search within one exact revision, intersected with the selected Threads
+    // and Spools. Requires nonempty threads belonging to this revision's Spool;
+    // each result must originate from that Thread's accepted source history.
+    // An unknown, unaccepted or withheld revision yields no visible candidates.
+    RevisionRef source_revision = 10;
+  }
+}
+
+message SearchHit {
+  EntityRef subject = 1;
+  string summary = 2;
+  // Present for source content, symbol and revision hits. The exact revision,
+  // path, symbol and line bounds share one proof-bearing source location.
+  // Its Thread must equal thread below; all coordinates pass the live gate.
+  SourceLocation location = 3;
+  SearchDomain domain = 4;
+  double score = 5;
+  // Owning Thread lets clients navigate a record without another lookup. It
+  // conveys no additional authority over that Thread or its source revisions.
+  ThreadRef thread = 6;
+  // Exact current operation for context hits. Concurrent revisions remain
+  // separate hits even when subject is the same addressable context record.
+  bytes causal_id = 7;
+  SearchMatchKind match_kind = 8;
+  // Human-readable symbol spelling; the stable symbol identity is in location.
+  optional string symbol_name = 9;
+}
+
+// Per-domain readiness is independent of result count and hidden matches.
+// An unavailable index is not represented as an empty, complete result set.
+message SearchDomainStatus {
+  SearchDomain domain = 1;
+  Coverage coverage = 2;
+  repeated SearchRequest.Mode supported_modes = 3;
+}
+
+message SearchEvent {
+  EndpointRef source = 1;
+  // Exactly one domain_status for each selected supported domain precedes
+  // the hits. Its readiness considers authorized candidates only; hidden
+  // records never change coverage or pagination. A terminal complete uses
+  // section "search" and conservatively combines the domain coverage.
+  // PageInfo.exhausted describes visible candidate pagination, independently
+  // of whether a requested index is still pending or unavailable.
+  oneof payload {
+    SearchHit hit = 2;
+    SectionStatus complete = 3;
+    SearchDomainStatus domain_status = 4;
+  }
+}
+
+message ProvenanceResult {
+  string path = 1;
+  RevisionRef revision = 2;
+  Coverage coverage = 3;
+  repeated heddle.api.common.BlameLine lines = 4;
+  heddle.api.common.BlameSummary summary = 5;
+}

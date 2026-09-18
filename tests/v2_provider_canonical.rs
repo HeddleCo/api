@@ -1,4 +1,4 @@
-use heddle_api::heddle::api::v2alpha1::{
+use heddle_api::heddle::api::v1alpha2::{
     EndpointKind, EndpointRef, ObjectAddress, ProviderAssemblyRecord, ProviderExtent,
     ProviderInlineSource, ProviderOffer, ProviderOfferExtent, ProviderPackLocation,
     ProviderPhysicalRange, ProviderPlan, ProviderPlanChallenge, ProviderPlanRegistration,
@@ -286,7 +286,7 @@ fn fixture() -> ProviderPlan {
             revision: Some(RevisionRef {
                 spool: Some(spool),
                 revision: Some(revision_ref::Revision::State(
-                    heddle_api::heddle::api::v1alpha1::StateId { value: vec![2; 32] },
+                    heddle_api::heddle::api::common::StateId { value: vec![2; 32] },
                 )),
             }),
             issuer: Some(endpoint(EndpointKind::Weft, 2)),

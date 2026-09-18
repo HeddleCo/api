@@ -21,11 +21,11 @@ The adjacent primitives do not already provide this value:
 - `ReviewCheckAck` is signed, state-scoped evidence keyed by actor, check kind,
   and file or signal reference. `GetReviewProgress` starts from a state, not a
   thread
-  ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha1/state_review.proto#L260-L307)).
+  ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha2/state_review.proto#L260-L307)).
 - `ThreadApproval` is an endorsement of one source-to-target merge at a source
   head. Its `source_state` is used by the merge gate and its `expires_at` is
   policy data
-  ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha1/registry.proto#L832-L879)).
+  ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha2/registry.proto#L832-L879)).
 
 The cursor must identify a specific revision, not a count: it is the `from`
 endpoint for Tapestry's interdiff. A display ordinal may change after a rewrite,
@@ -46,7 +46,7 @@ semantics:
 
 1. The resource being tracked is a thread. The state is its cursor value.
    `ThreadSummary` already supplies the thread's base and current states
-   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha1/workflow.proto#L70-L117)).
+   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha2/workflow.proto#L70-L117)).
 2. A direct primary-key lookup answers “how far has reviewer R got on thread
    T?” It does not scan a row for every state or invent a secondary projection
    over check acknowledgements.
@@ -140,7 +140,7 @@ An operation-ceiling caveat must also permit `AdvanceThreadReviewCursor`.
 
 Any thread reader may read a named reviewer's cursor, consistent with the
 existing state-review progress read being repository-reader scoped
-([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha1/state_review.proto#L371-L387)).
+([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha2/state_review.proto#L371-L387)).
 
 ## Proposed proto
 
@@ -304,7 +304,7 @@ reviewed the fork as a unit. The original thread's cursor is unchanged.
 
 1. **Exact wire identity is inconsistent in the audited producer.** The API has
    distinct `StateId` and `ChangeId` messages
-   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha1/types.proto#L76-L90)),
+   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/common/types.proto#L76-L90)),
    but the pinned Weft adapter populates `StateSummary.state_id` from
    `state.change_id` and then repeats the same bytes in `change_id`
    ([producer](https://github.com/HeddleCo/weft/blob/abc2e28c852201f72492131d5ea4ff87bd0f3c05/crates/weft-hosted/src/server/hosted/canonical_repository.rs#L436-L480)).
@@ -316,10 +316,10 @@ reviewed the fork as a unit. The original thread's cursor is unchanged.
    approval can advance a cursor safely. If `StateId` must remain logical, the
    cursor needs an explicit immutable `revision_address` instead; the contract
    already uses such an address for native and Git-overlay refs
-   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha1/types.proto#L5-L11)).
+   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/common/types.proto#L5-L11)).
 2. **Thread rename identity is not specified.** The public workflow model keys
    a thread by `name` and exposes no immutable thread ID
-   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha1/workflow.proto#L70-L83)).
+   ([contract](https://github.com/HeddleCo/api/blob/8640e121bf951e1d37ce9145772da20c67cfc8ea/proto/heddle/api/v1alpha2/workflow.proto#L70-L83)).
    The Workflow owner must state either that names are immutable in v1 or that a
    rename transaction moves cursor rows. If rename must preserve identity
    across systems, an immutable thread ID is required before freezing the

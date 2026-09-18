@@ -5,7 +5,7 @@ use prost_reflect::{
     DescriptorPool, DynamicMessage, ExtensionDescriptor, Kind, ReflectMessage, Value,
 };
 
-const PACKAGE: &str = "heddle.api.v1alpha1";
+const PACKAGE: &str = "heddle.api.common";
 
 struct Method {
     path: String,
@@ -33,6 +33,7 @@ pub fn write(
     descriptor_path: &Path,
     output_path: &Path,
     package: &str,
+    complete_policy: bool,
 ) -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(descriptor_path)?;
     let pool = DescriptorPool::decode(bytes.as_slice())?;
@@ -125,8 +126,8 @@ pub fn write(
         }
     }
     methods.sort_by(|left, right| left.path.cmp(&right.path));
-    let mut generated = render(&methods, package == "heddle.api.v2alpha1");
-    if package == "heddle.api.v2alpha1" {
+    let mut generated = render(&methods, complete_policy);
+    if complete_policy {
         generated.push_str(
             "\n/// Typed operations derived from the protobuf method descriptors.\npub mod rpc {\n",
         );
@@ -324,7 +325,7 @@ fn render(methods: &[Method], complete_policy: bool) -> String {
          pub authorization_access: AuthorizationAccess,\n",
     );
     if complete_policy {
-        output.push_str("pub signing_identity: crate::heddle::api::v1alpha1::StableSigningIdentity,\npub authorization: AuthorizationPolicy,\n");
+        output.push_str("pub signing_identity: crate::heddle::api::common::StableSigningIdentity,\npub authorization: AuthorizationPolicy,\n");
     }
     output.push_str(
         "\
@@ -340,10 +341,10 @@ fn render(methods: &[Method], complete_policy: bool) -> String {
     for method in methods {
         let policy = if complete_policy {
             let targets = method.authorization_targets.iter().map(|(path, role)| format!(
-                "AuthorizationTarget {{ path: {path:?}, role: crate::heddle::api::v1alpha1::AuthorizationRole::{role} }}"
+                "AuthorizationTarget {{ path: {path:?}, role: crate::heddle::api::common::AuthorizationRole::{role} }}"
             )).collect::<Vec<_>>().join(", ");
             format!(
-                "signing_identity: crate::heddle::api::v1alpha1::StableSigningIdentity::{}, authorization: AuthorizationPolicy {{ role: crate::heddle::api::v1alpha1::AuthorizationRole::{}, scope_source: crate::heddle::api::v1alpha1::AuthorizationScopeSource::{}, existence: crate::heddle::api::v1alpha1::AuthorizationExistence::{}, targets: &[{}] }}, ",
+                "signing_identity: crate::heddle::api::common::StableSigningIdentity::{}, authorization: AuthorizationPolicy {{ role: crate::heddle::api::common::AuthorizationRole::{}, scope_source: crate::heddle::api::common::AuthorizationScopeSource::{}, existence: crate::heddle::api::common::AuthorizationExistence::{}, targets: &[{}] }}, ",
                 method.signing_identity,
                 method.authorization_role,
                 method.authorization_scope,

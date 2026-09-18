@@ -7,7 +7,7 @@ use prost_reflect::{DescriptorPool, Kind};
 fn passkey_sign_in_carries_browser_options_and_one_device_proof() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
     let proof = pool
-        .get_message_by_name("heddle.api.v2alpha1.PasskeyProof")
+        .get_message_by_name("heddle.api.v1alpha2.PasskeyProof")
         .expect("proof");
     assert_eq!(
         proof
@@ -17,7 +17,7 @@ fn passkey_sign_in_carries_browser_options_and_one_device_proof() {
         Kind::Bytes
     );
     let complete = pool
-        .get_message_by_name("heddle.api.v2alpha1.CompleteAuthenticationRequest")
+        .get_message_by_name("heddle.api.v1alpha2.CompleteAuthenticationRequest")
         .expect("completion");
     assert_eq!(
         complete
@@ -35,7 +35,7 @@ fn passkey_sign_in_carries_browser_options_and_one_device_proof() {
         "CallContext carries the exact request PoP"
     );
     let challenge = pool
-        .get_message_by_name("heddle.api.v2alpha1.AuthenticationChallenge")
+        .get_message_by_name("heddle.api.v1alpha2.AuthenticationChallenge")
         .expect("challenge");
     assert!(matches!(
         challenge
@@ -50,7 +50,7 @@ fn passkey_sign_in_carries_browser_options_and_one_device_proof() {
 fn onboarding_distinguishes_human_accounts_delegations_and_anonymous_continuity() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
     let identity = pool
-        .get_service_by_name("heddle.api.v2alpha1.IdentityService")
+        .get_service_by_name("heddle.api.v1alpha2.IdentityService")
         .expect("identity service");
     let provision = identity
         .methods()
@@ -117,7 +117,7 @@ fn onboarding_distinguishes_human_accounts_delegations_and_anonymous_continuity(
         "remove the conflated principal factory"
     );
     assert!(
-        pool.get_message_by_name("heddle.api.v2alpha1.CreatePrincipalRequest")
+        pool.get_message_by_name("heddle.api.v1alpha2.CreatePrincipalRequest")
             .is_none()
     );
 }
@@ -126,7 +126,7 @@ fn onboarding_distinguishes_human_accounts_delegations_and_anonymous_continuity(
 fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
     let principal = pool
-        .get_message_by_name("heddle.api.v2alpha1.PrincipalRecord")
+        .get_message_by_name("heddle.api.v1alpha2.PrincipalRecord")
         .expect("principal record");
     let tier = principal
         .get_field_by_name("rooting_tier")
@@ -149,7 +149,7 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
     );
 
     let response = pool
-        .get_message_by_name("heddle.api.v2alpha1.AuthenticationResponse")
+        .get_message_by_name("heddle.api.v1alpha2.AuthenticationResponse")
         .expect("authentication response");
     let credential = response
         .get_field_by_name("credential")
@@ -209,7 +209,7 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
     );
     for name in ["ProvisionAccountResponse", "DelegationCredentialResponse"] {
         let response = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("credential ceremony");
         assert_eq!(
             response
@@ -238,7 +238,7 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
     // Account observations must not become an alternate secret retrieval path.
     for name in ["PrincipalRecord", "SessionRecord", "DelegationRecord"] {
         let message = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("account record");
         assert!(message.get_field_by_name("biscuit").is_none());
         assert!(message.get_field_by_name("credential").is_none());
@@ -253,7 +253,7 @@ fn credential_ceremonies_have_exclusive_proofs_and_explicit_lifetimes() {
         "CompleteRegistrationRequest",
     ] {
         let message = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("existing completion entrypoint");
         let proof = message
             .oneofs()
@@ -274,7 +274,7 @@ fn credential_ceremonies_have_exclusive_proofs_and_explicit_lifetimes() {
     }
     for name in ["AuthenticationChallenge", "RegistrationChallenge"] {
         let message = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("challenge");
         assert_ne!(
             message.get_field_by_name("expires_at"),
@@ -285,7 +285,7 @@ fn credential_ceremonies_have_exclusive_proofs_and_explicit_lifetimes() {
         assert!(message.get_field_by_name("oauth_provider").is_some());
     }
     let proof = pool
-        .get_message_by_name("heddle.api.v2alpha1.OAuthProof")
+        .get_message_by_name("heddle.api.v1alpha2.OAuthProof")
         .expect("provider proof");
     let fields: Vec<_> = proof
         .oneofs()

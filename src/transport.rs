@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::heddle::api::v1alpha1::{
+use crate::heddle::api::common::{
     AuthorizationAccess, CallContext, DeploymentTarget, ErrorDetail, ErrorReason,
     HumanVerificationChallenge, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
     error_detail,

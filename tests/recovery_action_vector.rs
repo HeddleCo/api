@@ -1,4 +1,4 @@
-use heddle_api::{heddle::api::v2alpha1::RecordRef, v2::identity_management};
+use heddle_api::{heddle::api::v1alpha2::RecordRef, v2::identity_management};
 
 #[test]
 fn rust_recovery_action_vector_for_browser_parity() {

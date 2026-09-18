@@ -2,7 +2,7 @@
 //! canonical_record` with Ed25519. Every variable field is a big-endian u32
 //! length followed by bytes; integers are fixed-width big-endian. No protobuf
 //! serialization, JSON normalization, or transport envelope participates.
-use crate::heddle::api::v2alpha1 as api;
+use crate::heddle::api::v1alpha2 as api;
 
 pub const DELEGATION: &str = "heddle.delegation.v2";
 pub const ISSUE_AUTHORITY: &str = "heddle.delegation-issuance-authority.v2";

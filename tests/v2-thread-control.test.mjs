@@ -4,10 +4,10 @@ import { runInNewContext } from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create, fromBinary } from '@bufbuild/protobuf';
-import { ThreadAudiencePolicySchema, ThreadAudiencePolicy_Kind, ThreadRetentionPolicySchema, MaterialRetention_Mode, ThreadOverviewSchema, ThreadProperty, ThreadLifecycle, SharedFacet, ThreadIntentSchema, ThreadSharingPolicySchema, ReviewDecisionSchema, ReviewDecision_Kind, ReviewRecordSchema } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
-import { EndpointKind } from '../packages/typescript/dist/v2alpha1/stream_pb.js';
-import { signThreadControl, threadPropertyVersion, verifyThreadReviewRecord } from '../packages/typescript/dist/v2alpha1/thread-control.js';
-import { decode } from '../packages/typescript/dist/v2alpha1/_collaboration-msgpack.js';
+import { ThreadAudiencePolicySchema, ThreadAudiencePolicy_Kind, ThreadRetentionPolicySchema, MaterialRetention_Mode, ThreadOverviewSchema, ThreadProperty, ThreadLifecycle, SharedFacet, ThreadIntentSchema, ThreadSharingPolicySchema, ReviewDecisionSchema, ReviewDecision_Kind, ReviewRecordSchema } from '../packages/typescript/dist/v1alpha2/thread_pb.js';
+import { EndpointKind } from '../packages/typescript/dist/v1alpha2/stream_pb.js';
+import { signThreadControl, threadPropertyVersion, verifyThreadReviewRecord } from '../packages/typescript/dist/v1alpha2/thread-control.js';
+import { decode } from '../packages/typescript/dist/v1alpha2/_collaboration-msgpack.js';
 
 // Produced by Rust's repository metadata test, never by the JS encoder.
 const fixtures = JSON.parse(readFileSync(new URL('./fixtures/thread-control-v1-rust.json', import.meta.url), 'utf8'));

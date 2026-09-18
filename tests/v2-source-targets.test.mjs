@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
-import { SourceTargetResolutionKeySchema, SourceTargetResolutionEventSchema, SourceTargetResolution_Status as Status, CollaborationEventSchema } from '../packages/typescript/dist/v2alpha1/collaboration_pb.js';
-import { ThreadEventSchema, SpoolEventSchema } from '../packages/typescript/dist/v2alpha1/views_pb.js';
-import { StreamDataKind } from '../packages/typescript/dist/v2alpha1/stream_pb.js';
-import { sourceTargetResolutionKey, applySourceTargetResolution } from '../packages/typescript/dist/v2alpha1/source-targets.js';
+import { SourceTargetResolutionKeySchema, SourceTargetResolutionEventSchema, SourceTargetResolution_Status as Status, CollaborationEventSchema } from '../packages/typescript/dist/v1alpha2/collaboration_pb.js';
+import { ThreadEventSchema, SpoolEventSchema } from '../packages/typescript/dist/v1alpha2/views_pb.js';
+import { StreamDataKind } from '../packages/typescript/dist/v1alpha2/stream_pb.js';
+import { sourceTargetResolutionKey, applySourceTargetResolution } from '../packages/typescript/dist/v1alpha2/source-targets.js';
 
 const spool = { id: '00000000-0000-0000-0000-000000000001' };
 const thread = byte => ({ spool, id: { value: new Uint8Array(32).fill(byte) } });

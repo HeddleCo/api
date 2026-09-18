@@ -8,16 +8,16 @@ fn thread_replication_exposes_causal_frontiers_without_a_single_tip() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("descriptor");
     let rpc = ALL_METHODS
         .iter()
-        .find(|rpc| rpc.path == "/heddle.api.v2alpha1.SyncService/ReplicateThread")
+        .find(|rpc| rpc.path == "/heddle.api.v1alpha2.SyncService/ReplicateThread")
         .expect("live replication RPC");
     assert_eq!(rpc.streaming, StreamingShape::Bidirectional);
     assert!(
         !ALL_METHODS
             .iter()
-            .any(|rpc| rpc.path == "/heddle.api.v2alpha1.SyncService/Publish")
+            .any(|rpc| rpc.path == "/heddle.api.v1alpha2.SyncService/Publish")
     );
     let overview = pool
-        .get_message_by_name("heddle.api.v2alpha1.ThreadOverview")
+        .get_message_by_name("heddle.api.v1alpha2.ThreadOverview")
         .expect("Thread view");
     assert!(
         overview
@@ -28,7 +28,7 @@ fn thread_replication_exposes_causal_frontiers_without_a_single_tip() {
     assert!(overview.get_field_by_name("integrated_revision").is_some());
     assert!(overview.get_field_by_name("tip").is_none());
     let append = pool
-        .get_message_by_name("heddle.api.v2alpha1.AppendDiscussionRequest")
+        .get_message_by_name("heddle.api.v1alpha2.AppendDiscussionRequest")
         .expect("append");
     assert!(
         append
@@ -41,18 +41,18 @@ fn thread_replication_exposes_causal_frontiers_without_a_single_tip() {
 
 #[test]
 fn bulk_publication_has_a_thread_bound_upload_and_a_durable_availability_receipt() {
-    use heddle_api::heddle::api::v1alpha1::{AuthorizationRole, SigningTier};
+    use heddle_api::heddle::api::common::{AuthorizationRole, SigningTier};
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("descriptor");
     let rpc = ALL_METHODS
         .iter()
-        .find(|rpc| rpc.path == "/heddle.api.v2alpha1.SyncService/PublishContent")
+        .find(|rpc| rpc.path == "/heddle.api.v1alpha2.SyncService/PublishContent")
         .expect("source bytes need an upload path independent of causal metadata");
     assert_eq!(rpc.streaming, StreamingShape::Bidirectional);
     assert_eq!(rpc.authorization.role, AuthorizationRole::ResourceWriter);
     assert_eq!(rpc.signing_tier, SigningTier::StreamingProofOfPossession);
     assert!(rpc.client_operation_id_required);
     let open = pool
-        .get_message_by_name("heddle.api.v2alpha1.PublishContentOpen")
+        .get_message_by_name("heddle.api.v1alpha2.PublishContentOpen")
         .expect("publication opening");
     for field in [
         "thread",
@@ -89,6 +89,6 @@ fn bulk_publication_has_a_thread_bound_upload_and_a_durable_availability_receipt
             .as_message()
             .expect("receipt message")
             .full_name(),
-        "heddle.api.v2alpha1.PublicationReceipt"
+        "heddle.api.v1alpha2.PublicationReceipt"
     );
 }

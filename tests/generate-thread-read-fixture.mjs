@@ -3,8 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
-import { ReviewDecisionSchema, ReviewDecision_Kind, ThreadOverviewSchema, ThreadProperty } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
-import { signThreadControl } from '../packages/typescript/dist/v2alpha1/thread-control.js';
+import { ReviewDecisionSchema, ReviewDecision_Kind, ThreadOverviewSchema, ThreadProperty } from '../packages/typescript/dist/v1alpha2/thread_pb.js';
+import { signThreadControl } from '../packages/typescript/dist/v1alpha2/thread-control.js';
 
 const old = JSON.parse(readFileSync(new URL('./fixtures/thread-control-v1-rust.json', import.meta.url), 'utf8'))[4];
 const raw = old.control;

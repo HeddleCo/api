@@ -53,18 +53,18 @@ pub const fn normalize_page_size(requested: u32) -> u32 {
 pub mod heddle {
     /// Neutral public API contract.
     pub mod api {
-        /// Breaking pre-1.0 API generation.
-        pub mod v1alpha1 {
-            include!(concat!(env!("OUT_DIR"), "/heddle.api.v1alpha1.rs"));
+        /// Shared foundational types used by every versioned API package.
+        pub mod common {
+            include!(concat!(env!("OUT_DIR"), "/heddle.api.common.rs"));
         }
-        /// Candidate Thread-oriented contract; endpoint support is negotiated.
-        pub mod v2alpha1 {
-            include!(concat!(env!("OUT_DIR"), "/heddle.api.v2alpha1.rs"));
+        /// Frozen Thread-oriented contract; endpoint support is negotiated.
+        pub mod v1alpha2 {
+            include!(concat!(env!("OUT_DIR"), "/heddle.api.v1alpha2.rs"));
         }
     }
 }
 
-impl heddle::api::v1alpha1::ErrorReason {
+impl heddle::api::common::ErrorReason {
     /// Returns whether callers may retry without first correcting the request.
     pub fn retryable(&self) -> bool {
         matches!(
@@ -99,44 +99,44 @@ impl std::fmt::Display for InvalidIdentifierLength {
 
 impl std::error::Error for InvalidIdentifierLength {}
 
-impl heddle::api::v1alpha1::StateId {
+impl heddle::api::common::StateId {
     /// Constructs a physical state identifier from exactly 32 bytes.
     pub fn from_bytes(value: impl AsRef<[u8]>) -> Result<Self, InvalidIdentifierLength> {
         fixed_width("StateId", 32, value.as_ref()).map(|value| Self { value })
     }
 }
 
-impl heddle::api::v1alpha1::ChangeId {
+impl heddle::api::common::ChangeId {
     /// Constructs a rewrite-stable change identifier from exactly 16 bytes.
     pub fn from_bytes(value: impl AsRef<[u8]>) -> Result<Self, InvalidIdentifierLength> {
         fixed_width("ChangeId", 16, value.as_ref()).map(|value| Self { value })
     }
 }
 
-impl heddle::api::v1alpha1::OperationId {
+impl heddle::api::common::OperationId {
     /// Constructs a durable operation identifier from exactly 16 bytes.
     pub fn from_bytes(value: impl AsRef<[u8]>) -> Result<Self, InvalidIdentifierLength> {
         fixed_width("OperationId", 16, value.as_ref()).map(|value| Self { value })
     }
 }
 
-impl heddle::api::v1alpha1::OperationBatchId {
+impl heddle::api::common::OperationBatchId {
     /// Constructs a durable operation-batch identifier from exactly 16 bytes.
     pub fn from_bytes(value: impl AsRef<[u8]>) -> Result<Self, InvalidIdentifierLength> {
         fixed_width("OperationBatchId", 16, value.as_ref()).map(|value| Self { value })
     }
 }
 
-impl heddle::api::v1alpha1::GitObjectId {
+impl heddle::api::common::GitObjectId {
     /// Constructs and validates a Git object identifier for its hash algorithm.
     pub fn from_digest(
-        algorithm: heddle::api::v1alpha1::GitObjectAlgorithm,
+        algorithm: heddle::api::common::GitObjectAlgorithm,
         digest: impl AsRef<[u8]>,
     ) -> Result<Self, InvalidIdentifierLength> {
         let expected = match algorithm {
-            heddle::api::v1alpha1::GitObjectAlgorithm::Sha1 => 20,
-            heddle::api::v1alpha1::GitObjectAlgorithm::Sha256 => 32,
-            heddle::api::v1alpha1::GitObjectAlgorithm::Unspecified => 0,
+            heddle::api::common::GitObjectAlgorithm::Sha1 => 20,
+            heddle::api::common::GitObjectAlgorithm::Sha256 => 32,
+            heddle::api::common::GitObjectAlgorithm::Unspecified => 0,
         };
         fixed_width("GitObjectId", expected, digest.as_ref()).map(|digest| Self {
             algorithm: algorithm as i32,
@@ -162,7 +162,7 @@ fn fixed_width(
 
 #[cfg(test)]
 mod tests {
-    use super::heddle::api::v1alpha1::{
+    use super::heddle::api::common::{
         ChangeId, ErrorReason, GitObjectAlgorithm, GitObjectId, OperationBatchId, OperationId,
         StateId,
     };

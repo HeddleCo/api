@@ -1,37 +1,46 @@
 import { copyFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const root = join("build", "typescript", "heddle", "api", "v1alpha1");
-const modules = readdirSync(root)
-  .filter((name) => name.endsWith("_pb.ts"))
-  .sort();
-const lines = modules.map((name) => `export * from "./${name.replace(/\.ts$/, ".js")}";`);
-copyFileSync("packages/typescript/runtime/errors.ts", join(root, "errors.ts"));
-copyFileSync("packages/typescript/runtime/signing.ts", join(root, "signing.ts"));
-copyFileSync("packages/typescript/runtime/treadle.ts", join(root, "treadle.ts"));
-copyFileSync("packages/typescript/runtime/treadle-authoring.ts", join(root, "treadle-authoring.ts"));
-copyFileSync("packages/typescript/runtime/framing.ts", join(root, "framing.ts"));
-lines.push('export * from "./errors.js";');
-lines.push('export * from "./signing.js";');
-lines.push('export * from "./treadle.js";');
-lines.push('export * from "./treadle-authoring.js";');
-lines.push('export * from "./framing.js";');
-lines.push('export * from "./attachment-authorization.js";');
-writeFileSync(join(root, "index.ts"), `${lines.join("\n")}\n`);
-writeFileSync(
-  join(root, "shared.ts"),
-  ["contract_pb", "errors_pb", "types_pb"].map((name) => `export * from "./${name}.js";`).join("\n") +
-    '\nexport * from "./errors.js";\nexport * from "./signing.js";\n',
-);
+const apiRoot = join("build", "typescript", "heddle", "api");
+const commonRoot = join(apiRoot, "common");
+const v2Root = join(apiRoot, "v1alpha2");
 
-// Preserve every existing package/file entry point while compiling both wire
-// packages from their common root. These aliases are generated, not maintained
-// as a second hand-written list of v1 modules.
-const apiRoot = join(root, "..");
-for (const name of readdirSync(root).filter((name) => name.endsWith(".ts"))) {
-  writeFileSync(join(apiRoot, name), `export * from "./v1alpha1/${name.replace(/\.ts$/, ".js")}";\n`);
+function exportStar(dir, extra = []) {
+  const modules = readdirSync(dir)
+    .filter((name) => name.endsWith("_pb.ts"))
+    .sort();
+  const lines = modules.map((name) => `export * from "./${name.replace(/\.ts$/, ".js")}";`);
+  lines.push(...extra);
+  writeFileSync(join(dir, "index.ts"), `${lines.join("\n")}\n`);
 }
-const v2Root = join(apiRoot, "v2alpha1");
+
+copyFileSync("packages/typescript/runtime/errors.ts", join(commonRoot, "errors.ts"));
+copyFileSync("packages/typescript/runtime/signing.ts", join(commonRoot, "signing.ts"));
+copyFileSync("packages/typescript/runtime/treadle.ts", join(commonRoot, "treadle.ts"));
+copyFileSync("packages/typescript/runtime/treadle-authoring.ts", join(commonRoot, "treadle-authoring.ts"));
+copyFileSync("packages/typescript/runtime/framing.ts", join(commonRoot, "framing.ts"));
+writeFileSync(
+  join(commonRoot, "shared.ts"),
+  ["contract_pb", "errors_pb", "types_pb"]
+    .map((name) => `export * from "./${name}.js";`)
+    .join("\n") + '\nexport * from "./errors.js";\nexport * from "./signing.js";\n',
+);
+exportStar(commonRoot, [
+  'export * from "./errors.js";',
+  'export * from "./signing.js";',
+  'export * from "./treadle.js";',
+  'export * from "./treadle-authoring.js";',
+  'export * from "./framing.js";',
+  'export * from "./attachment-authorization.js";',
+]);
+
+for (const name of readdirSync(commonRoot).filter((name) => name.endsWith(".ts"))) {
+  writeFileSync(
+    join(apiRoot, name),
+    `export * from "./common/${name.replace(/\.ts$/, ".js")}";\n`,
+  );
+}
+
 copyFileSync("packages/typescript/runtime/v2-observation.ts", join(v2Root, "observation.ts"));
 copyFileSync("packages/typescript/runtime/v2-client.ts", join(v2Root, "client.ts"));
 copyFileSync("packages/typescript/runtime/v2-owner-certificates.ts", join(v2Root, "owner-certificates.ts"));
@@ -47,5 +56,10 @@ copyFileSync("packages/typescript/runtime/v2-initial-source.ts", join(v2Root, "i
 copyFileSync("packages/typescript/runtime/v2-collaboration.ts", join(v2Root, "collaboration.ts"));
 copyFileSync("packages/typescript/runtime/v2-source-targets.ts", join(v2Root, "source-targets.ts"));
 copyFileSync("packages/typescript/runtime/v2-msgpack.ts", join(v2Root, "_collaboration-msgpack.ts"));
-const v2Modules = readdirSync(v2Root).filter((name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_")).sort();
-writeFileSync(join(v2Root, "index.ts"), v2Modules.map((name) => `export * from "./${name.replace(/\.ts$/, ".js")}";`).join("\n") + "\n");
+const v2Modules = readdirSync(v2Root)
+  .filter((name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_"))
+  .sort();
+writeFileSync(
+  join(v2Root, "index.ts"),
+  v2Modules.map((name) => `export * from "./${name.replace(/\.ts$/, ".js")}";`).join("\n") + "\n",
+);

@@ -4,21 +4,18 @@ The public protobuf contract shared by Heddle, Weft, and Tapestry. This
 repository is the sole owner of schema source, compiled descriptors,
 compatibility policy, generation tooling, and Rust/TypeScript releases.
 
-The current wire package is `heddle.api.v1alpha1`. Twelve interfaces are marked
-`SHIPPED`; `AgentGatewayService` and `AgentService` are contract-first and
-explicitly `PLANNED` for the first release. `OperationService` ships the import
-lifecycle; its batch, list, remote-sync, and cancellation capabilities remain
-partial.
+The current wire packages are `heddle.api.common` (shared foundational types)
+and `heddle.api.v1alpha2` (the frozen Thread-oriented contract). Shared types
+such as `CallContext`, `CallFailure`, and `StateId` live in `heddle.api.common`;
+versioned services and messages live in `heddle.api.v1alpha2`.
 
-## Candidate alpha v2
+`heddle.api.v1alpha2` is the published Thread/workspace/spool contract: composed
+observations, typed local checkout actions, finite content streams, and shared
+checkpoint/recovery rules. Rust and TypeScript include transport adapters and
+observation lifecycle helpers. Endpoints advertise only implemented handlers.
 
-`heddle.api.v2alpha1` adds composed Thread/workspace/spool observations, typed
-local checkout actions, finite content streams, and shared checkpoint/recovery
-rules. Rust and TypeScript include transport adapters and observation lifecycle
-helpers. V2 uses native RPC requests and responses for a coordinated clean cutover.
-
-All v2 routes are PLANNED until consumer handlers exist. Read the
-[candidate streaming contract and integration gates](docs/alpha-v2/streams.md),
+Read the
+[streaming contract and integration gates](docs/alpha-v2/streams.md),
 [complete design](docs/alpha-v2/design.md), and
 [v1 review inventory](docs/alpha-v2/v1-disposition.csv).
 
@@ -26,8 +23,8 @@ All v2 routes are PLANNED until consumer handlers exist. Read the
 
 - `heddle-api` — transport-neutral Rust messages, deterministic method
   descriptors/router identities, hosted-call framing, and an additive
-  `reflection` feature. V1 remains transport-neutral; candidate v2 adds typed client adapters.
-  Neither package generates application servers.
+  `reflection` feature. Typed client adapters target `heddle.api.v1alpha2`.
+  The crate does not generate application servers.
 - `@heddleco/api` — ESM and TypeScript declarations, published to GitHub
   Packages at `npm.pkg.github.com`.
 

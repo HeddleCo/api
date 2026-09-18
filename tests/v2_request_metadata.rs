@@ -1,5 +1,5 @@
 use heddle_api::{
-    heddle::api::v2alpha1::RenameThreadRequest,
+    heddle::api::v1alpha2::RenameThreadRequest,
     v2::{client::Rpc, rpc::ThreadServiceRenameThread},
 };
 use prost::Message;

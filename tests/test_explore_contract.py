@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY_PROTO = ROOT / "proto/heddle/api/v1alpha1/registry.proto"
+REGISTRY_PROTO = ROOT / "proto/heddle/api/v1alpha2/registry.proto"
 
 
 def block_body(source: str, kind: str, name: str) -> str:

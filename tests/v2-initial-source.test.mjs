@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { create, toBinary, fromBinary } from "@bufbuild/protobuf";
-import { ImportSourceRequestSchema } from "../packages/typescript/dist/v2alpha1/integration_pb.js";
-import { syntheticInitialBase } from "../packages/typescript/dist/v2alpha1/initial-source.js";
+import { ImportSourceRequestSchema } from "../packages/typescript/dist/v1alpha2/integration_pb.js";
+import { syntheticInitialBase } from "../packages/typescript/dist/v1alpha2/initial-source.js";
 
 const vector = Object.fromEntries(readFileSync(new URL("fixtures/synthetic-initial-base-v2.txt", import.meta.url), "utf8").trim().split("\n").map(line => line.split("=")));
 test("browser import bootstrap preserves Rust's exact synthetic seed bytes and identity", () => {

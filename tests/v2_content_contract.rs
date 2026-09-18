@@ -7,7 +7,7 @@ use prost_reflect::DescriptorPool;
 fn content_tree_entries_preserve_typed_native_and_foreign_targets() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let event = pool
-        .get_message_by_name("heddle.api.v2alpha1.ContentEvent")
+        .get_message_by_name("heddle.api.v1alpha2.ContentEvent")
         .expect("content event");
     let entry = event
         .get_field_by_name("tree_entry")
@@ -18,7 +18,7 @@ fn content_tree_entries_preserve_typed_native_and_foreign_targets() {
         .clone();
     assert_eq!(
         entry.full_name(),
-        "heddle.api.v2alpha1.ContentTreeEntry",
+        "heddle.api.v1alpha2.ContentTreeEntry",
         "v2 must not squeeze a spool/revision pointer into a generic hash"
     );
     assert!(
@@ -48,7 +48,7 @@ fn content_tree_entries_preserve_typed_native_and_foreign_targets() {
             .as_message()
             .expect("anchored spool pointer")
             .full_name(),
-        "heddle.api.v2alpha1.ContentSpoolLink"
+        "heddle.api.v1alpha2.ContentSpoolLink"
     );
     let link = spool.kind().as_message().expect("spool link").clone();
     assert!(
@@ -82,7 +82,7 @@ fn content_tree_entries_preserve_typed_native_and_foreign_targets() {
 fn raw_state_reads_cannot_disclose_authored_sidecars() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let event = pool
-        .get_message_by_name("heddle.api.v2alpha1.ContentEvent")
+        .get_message_by_name("heddle.api.v1alpha2.ContentEvent")
         .expect("content event");
     assert!(
         event.get_field_by_name("attachment").is_none(),
@@ -91,7 +91,7 @@ fn raw_state_reads_cannot_disclose_authored_sidecars() {
     assert!(event.get_field_by_name("state").is_some());
     assert!(event.get_field_by_name("selection_complete").is_some());
     let state = pool
-        .get_message_by_name("heddle.api.v2alpha1.StateRead")
+        .get_message_by_name("heddle.api.v1alpha2.StateRead")
         .expect("state selection");
     assert_eq!(
         state.fields().count(),
@@ -99,11 +99,11 @@ fn raw_state_reads_cannot_disclose_authored_sidecars() {
         "State selection always returns its summary"
     );
     assert!(
-        pool.get_message_by_name("heddle.api.v2alpha1.StateAttachmentContent")
+        pool.get_message_by_name("heddle.api.v1alpha2.StateAttachmentContent")
             .is_none()
     );
     assert!(
-        pool.get_enum_by_name("heddle.api.v2alpha1.SourceAttachmentKind")
+        pool.get_enum_by_name("heddle.api.v1alpha2.SourceAttachmentKind")
             .is_none()
     );
 }
@@ -113,7 +113,7 @@ fn source_transfers_share_original_operation_and_authority_receipt_batches() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     for name in ["FetchServerFrame", "PublishContentClientFrame"] {
         let frame = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("source frame");
         let batch = frame
             .get_field_by_name("operations")
@@ -125,7 +125,7 @@ fn source_transfers_share_original_operation_and_authority_receipt_batches() {
                 .as_message()
                 .expect("batch message")
                 .full_name(),
-            "heddle.api.v2alpha1.ReplicationOperations"
+            "heddle.api.v1alpha2.ReplicationOperations"
         );
         assert!(
             frame.get_field_by_name("operation").is_none(),
@@ -133,7 +133,7 @@ fn source_transfers_share_original_operation_and_authority_receipt_batches() {
         );
     }
     let batch = pool
-        .get_message_by_name("heddle.api.v2alpha1.ReplicationOperations")
+        .get_message_by_name("heddle.api.v1alpha2.ReplicationOperations")
         .expect("shared batch");
     assert!(
         batch
@@ -153,7 +153,7 @@ fn source_transfers_share_original_operation_and_authority_receipt_batches() {
 fn provider_dial_routes_are_fetch_transport_hints_only() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let fetch = pool
-        .get_message_by_name("heddle.api.v2alpha1.FetchOpen")
+        .get_message_by_name("heddle.api.v1alpha2.FetchOpen")
         .expect("existing native Fetch opening");
     let routes = fetch
         .get_field_by_name("routes")
@@ -166,11 +166,11 @@ fn provider_dial_routes_are_fetch_transport_hints_only() {
             .as_message()
             .expect("typed provider route")
             .full_name(),
-        "heddle.api.v2alpha1.ProviderDialRoute"
+        "heddle.api.v1alpha2.ProviderDialRoute"
     );
     for plan in ["ProviderPlan", "ProviderOffer"] {
         let message = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{plan}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{plan}"))
             .expect("existing provider contract");
         assert!(
             message.get_field_by_name("routes").is_none(),
@@ -183,7 +183,7 @@ fn provider_dial_routes_are_fetch_transport_hints_only() {
 fn source_genesis_transfers_preserve_claim_conflicts_and_matched_admission() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let wrapper = pool
-        .get_message_by_name("heddle.api.v2alpha1.ThreadGenesisRecord")
+        .get_message_by_name("heddle.api.v1alpha2.ThreadGenesisRecord")
         .expect("original wrapper");
     for (name, number) in [("ownership_claims", 4), ("ownership_claim_admissions", 5)] {
         let field = wrapper
@@ -200,7 +200,7 @@ fn source_genesis_transfers_preserve_claim_conflicts_and_matched_admission() {
                 .as_message()
                 .expect("signed claim or admission")
                 .full_name(),
-            "heddle.api.v2alpha1.SignedRecord"
+            "heddle.api.v1alpha2.SignedRecord"
         );
     }
 }
@@ -209,7 +209,7 @@ fn source_genesis_transfers_preserve_claim_conflicts_and_matched_admission() {
 fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let hit = pool
-        .get_message_by_name("heddle.api.v2alpha1.SearchHit")
+        .get_message_by_name("heddle.api.v1alpha2.SearchHit")
         .expect("native search hit");
     let location = hit
         .get_field_by_name("location")
@@ -217,7 +217,7 @@ fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
         .kind();
     assert_eq!(
         location.as_message().expect("typed location").full_name(),
-        "heddle.api.v2alpha1.SourceLocation"
+        "heddle.api.v1alpha2.SourceLocation"
     );
     assert!(
         hit.get_field_by_name("path").is_none(),
@@ -238,7 +238,7 @@ fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
             .as_enum()
             .expect("typed domain")
             .full_name(),
-        "heddle.api.v2alpha1.SearchDomain"
+        "heddle.api.v1alpha2.SearchDomain"
     );
     assert_eq!(
         hit.get_field_by_name("match_kind")
@@ -247,10 +247,10 @@ fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
             .as_enum()
             .expect("typed match")
             .full_name(),
-        "heddle.api.v2alpha1.SearchMatchKind"
+        "heddle.api.v1alpha2.SearchMatchKind"
     );
     let entity = pool
-        .get_message_by_name("heddle.api.v2alpha1.EntityRef")
+        .get_message_by_name("heddle.api.v1alpha2.EntityRef")
         .expect("entity");
     assert_eq!(
         entity
@@ -260,7 +260,7 @@ fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
             .as_message()
             .expect("typed account")
             .full_name(),
-        "heddle.api.v2alpha1.PrincipalRef"
+        "heddle.api.v1alpha2.PrincipalRef"
     );
     let agent = entity
         .get_field_by_name("agent")
@@ -275,6 +275,6 @@ fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
             .as_message()
             .expect("account")
             .full_name(),
-        "heddle.api.v2alpha1.PrincipalRef"
+        "heddle.api.v1alpha2.PrincipalRef"
     );
 }

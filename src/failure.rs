@@ -1,6 +1,6 @@
 //! Terminal stream failures belong to the wire contract, independent of a host.
 
-use crate::heddle::api::v1alpha1::{
+use crate::heddle::api::common::{
     CallFailure, CursorFailure, ErrorDetail, ErrorReason, RetryAdvice, StreamFailure, error_detail,
 };
 
@@ -64,7 +64,7 @@ impl CallFailure {
 
 #[cfg(test)]
 mod tests {
-    use crate::heddle::api::v1alpha1::{
+    use crate::heddle::api::common::{
         CallFailure, CallFailureCode, CursorFailure, ErrorDetail, ErrorReason, PolicyDenial,
         RetryAdvice, error_detail,
     };

@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+package heddle.api.common;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/common/contract.proto";
+
+// Stable call outcome vocabulary independent of QUIC or any other concrete
+// transport implementation.
+enum CallFailureCode {
+  CALL_FAILURE_CODE_UNSPECIFIED = 0;
+  CALL_FAILURE_CODE_CANCELLED = 1;
+  CALL_FAILURE_CODE_UNKNOWN = 2;
+  CALL_FAILURE_CODE_INVALID_ARGUMENT = 3;
+  CALL_FAILURE_CODE_DEADLINE_EXCEEDED = 4;
+  CALL_FAILURE_CODE_NOT_FOUND = 5;
+  CALL_FAILURE_CODE_ALREADY_EXISTS = 6;
+  CALL_FAILURE_CODE_PERMISSION_DENIED = 7;
+  CALL_FAILURE_CODE_RESOURCE_EXHAUSTED = 8;
+  CALL_FAILURE_CODE_FAILED_PRECONDITION = 9;
+  CALL_FAILURE_CODE_ABORTED = 10;
+  CALL_FAILURE_CODE_OUT_OF_RANGE = 11;
+  CALL_FAILURE_CODE_UNIMPLEMENTED = 12;
+  CALL_FAILURE_CODE_INTERNAL = 13;
+  CALL_FAILURE_CODE_UNAVAILABLE = 14;
+  CALL_FAILURE_CODE_DATA_LOSS = 15;
+  CALL_FAILURE_CODE_UNAUTHENTICATED = 16;
+}
+
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+
+  // Authentication (1xx)
+  ERROR_REASON_CREDENTIAL_MISSING = 100;
+  ERROR_REASON_CREDENTIAL_EXPIRED = 101;
+  ERROR_REASON_CREDENTIAL_REVOKED = 102;
+  ERROR_REASON_PROOF_INVALID = 103;
+
+  // Authorization (2xx)
+  ERROR_REASON_SCOPE_MISSING = 200;
+  ERROR_REASON_ROLE_INSUFFICIENT = 201;
+  ERROR_REASON_POLICY_DENIED = 202;
+  ERROR_REASON_PLAN_LIMIT = 203;
+
+  // Existence (3xx)
+  ERROR_REASON_RESOURCE_NOT_FOUND = 300;
+  ERROR_REASON_RESOURCE_GONE = 301;
+
+  // Request validity (4xx)
+  ERROR_REASON_FIELD_INVALID = 400;
+  ERROR_REASON_FIELD_REQUIRED = 401;
+  ERROR_REASON_CHANGE_ID_AMBIGUOUS = 402;
+
+  // Preconditions & conflicts (5xx)
+  ERROR_REASON_LIFECYCLE_STATE = 500;
+  ERROR_REASON_OPERATION_ID_REUSED = 501;
+  ERROR_REASON_VERSION_CONFLICT = 502;
+  ERROR_REASON_ALREADY_EXISTS = 503;
+
+  // Flow control (6xx). RATE_LIMITED / QUOTA_EXCEEDED are retryable;
+  // CURSOR_INVALID is a client-fix (restart from a valid cursor), not retryable.
+  ERROR_REASON_RATE_LIMITED = 600;
+  ERROR_REASON_QUOTA_EXCEEDED = 601;
+  ERROR_REASON_CURSOR_INVALID = 602;
+
+  // Server (9xx)
+  ERROR_REASON_TRANSIENT = 900;
+  ERROR_REASON_INTERNAL = 901;
+  ERROR_REASON_UNIMPLEMENTED = 902;
+}
+
+message CallFailure {
+  CallFailureCode code = 1;
+  string message = 2;
+  reserved 3;
+  reserved "details";
+  ErrorDetail error = 4;
+}
+
+message RetryAdvice {
+  google.protobuf.Duration retry_after = 1;
+}
+
+message ConflictDetail {
+  string resource = 1;
+  string expected_version = 2;
+  string actual_version = 3;
+}
+
+message CursorFailure {
+  enum Reason {
+    REASON_UNSPECIFIED = 0;
+    REASON_STALE = 1;
+    REASON_EXPIRED = 2;
+  }
+  Reason reason = 1;
+  google.protobuf.Timestamp expired_at = 2;
+  string restart_cursor = 3;
+}
+
+message CapabilityRequirement {
+  repeated string capabilities = 1;
+}
+
+message PolicyDenial {
+  string policy_id = 1;
+  string rule = 2;
+  bool human_verification_can_override = 3;
+}
+
+// Lossless carrier for an `ErrorDetail.context` arm this client does not know.
+//
+// Wire contract: when a reader decodes an `ErrorDetail` whose `context` oneof
+// arm is not in its compiled vocabulary (a newer server added one), it MUST
+// re-encode that arm as `unknown` instead of collapsing it to prose:
+//
+// * `type_url` follows the Any convention,
+//  `type.googleapis.com/heddle.api.common.<MessageName>`.
+// * `value` is the encoded message bytes of the unrecognized arm, verbatim.
+//
+// A reader that DOES know the type decodes `value` and may re-emit the typed
+// arm toward newer consumers. This explicit escape hatch exists because
+// generated bindings (prost et al.) drop undeclared fields during decode;
+// without it, forward details are silently lost on the first hop. The field is
+// pass-through only: servers must never originate `unknown`, and clients must
+// never invent semantics for a type they do not recognize.
+message UnknownDetail {
+  // Any-style type URL naming the unrecognized context message.
+  string type_url = 1;
+  // Encoded bytes of the unrecognized context message.
+  bytes value = 2;
+}
+
+message AmbiguousChangeIdDetail {
+  // The ambiguous change-id prefix supplied by the caller.
+  string spec = 1;
+  // Canonical full change IDs matching the supplied prefix.
+  repeated string candidates = 2;
+}
+
+// Stable recovery categories for failures in the invite-gated signup flow.
+// This detail is carried only as ErrorDetail.context.signup; callers should
+// use this enum rather than matching CallFailure.message text. No email or
+// invite code is echoed because those values are secrets or personal data.
+// Invite lifecycle reasons must never be returned by ResolveSignupInvite,
+// whose anonymous response deliberately collapses failures to EXPIRED.
+message SignupFailure {
+  enum Reason {
+    SIGNUP_FAILURE_REASON_UNSPECIFIED = 0;
+    // No invite is assigned to the email proven by the verification token.
+    SIGNUP_FAILURE_REASON_INVITE_MISSING = 1;
+    // The matching invite was already consumed by a completed registration.
+    SIGNUP_FAILURE_REASON_INVITE_CLAIMED = 2;
+    // The matching invite was explicitly revoked before registration.
+    SIGNUP_FAILURE_REASON_INVITE_REVOKED = 3;
+    // The mailbox-verification challenge passed its expiry without use.
+    SIGNUP_FAILURE_REASON_VERIFICATION_TOKEN_EXPIRED = 4;
+    // The single-use mailbox-verification token was already redeemed.
+    SIGNUP_FAILURE_REASON_VERIFICATION_TOKEN_REPLAYED = 5;
+    // The only invite-code rejection ClaimSignupInvite may expose. Invalid
+    // (including malformed or unknown), consumed, reserved, revoked, and
+    // email-bound codes all use this one reason and the identical failure
+    // envelope documented on that RPC. No narrower invite lifecycle reason
+    // above may be returned by ClaimSignupInvite.
+    SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE = 6;
+  }
+
+  Reason reason = 1;
+}
+
+message ErrorDetail {
+  ErrorReason reason = 1;
+  // Canonical path/id the failure is about; empty if none.
+  string resource = 2;
+  // Request proto field path, for validation failures.
+  string field = 3;
+  oneof context {
+    RetryAdvice retry = 10;
+    ConflictDetail conflict = 11;
+    CursorFailure cursor = 12;
+    CapabilityRequirement capability = 13;
+    PolicyDenial policy = 14;
+    // A human-verification challenge the caller must satisfy (carried here now
+    // that CallFailure dropped the Any details channel).
+    HumanVerificationChallenge human_verification = 15;
+    AmbiguousChangeIdDetail ambiguous_change_id = 16;
+    SignupFailure signup = 17;
+    // A terminal streaming-RPC failure, so a mid-stream abort can carry its
+    // typed code and message inside the single structured channel. Resume
+    // hints (retry-after / restart cursor) stay on the top-level `retry` and
+    // `cursor` arms — they apply to the stream as a whole, not to the
+    // StreamFailure body, and every reader already understands those arms.
+    StreamFailure stream = 18;
+    // An `ErrorDetail.context` arm from a newer contract version, preserved
+    // losslessly for pass-through. See UnknownDetail for the round-trip
+    // contract. Field numbers 16 and 17 are consumed by the published release
+    // line; do not reuse them here.
+    UnknownDetail unknown = 19;
+  }
+}
+
+message StreamFailure {
+  CallFailureCode code = 1;
+  string message = 2;
+  reserved 3, 4;
+  reserved "retry", "cursor";
+  ErrorDetail error = 5;
+}

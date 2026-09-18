@@ -7,13 +7,13 @@ use prost_reflect::{DescriptorPool, Value};
 fn live_observations_and_replication_are_distinct_from_finite_resumable_transfers() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("descriptors");
     let option = pool
-        .get_extension_by_name("heddle.api.v1alpha1.rpc_contract")
+        .get_extension_by_name("heddle.api.common.rpc_contract")
         .expect("RPC contract");
     let mut live_count = 0;
     let mut finite_count = 0;
     for service in pool
         .services()
-        .filter(|service| service.package_name() == "heddle.api.v2alpha1")
+        .filter(|service| service.package_name() == "heddle.api.v1alpha2")
     {
         for method in service.methods() {
             let expected =

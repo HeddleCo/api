@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let proto_root = root.join("proto");
     let mut protos = Vec::new();
-    for package in ["v1alpha1", "v2alpha1"] {
+    for package in ["common", "v1alpha2"] {
         let package_root = proto_root.join("heddle/api").join(package);
         println!("cargo:rerun-if-changed={}", package_root.display());
         for entry in fs::read_dir(package_root)? {
@@ -60,26 +60,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "SubmitRecoveryProofResponse.outcome",
     ] {
         config.type_attribute(
-            format!(".heddle.api.v2alpha1.{oneof}"),
+            format!(".heddle.api.v1alpha2.{oneof}"),
             "#[allow(clippy::large_enum_variant)]",
         );
     }
     config
-        .boxed(".heddle.api.v1alpha1.PushClientFrame.frame.request")
-        .boxed(".heddle.api.v1alpha1.BootstrapOwnerRootRequest.approval.deferred_human")
-        .boxed(".heddle.api.v1alpha1.PullServerFrame.frame.state_attachment")
-        .boxed(".heddle.api.v1alpha1.ListDiscussionsResponse.frame.item")
         .file_descriptor_set_path(&descriptor)
         .compile_protos(&protos, &[proto_root])?;
     method_generation::write(
         &descriptor,
         &output.join("heddle_api_methods.rs"),
-        "heddle.api.v1alpha1",
+        "heddle.api.v1alpha2",
+        false,
     )?;
     method_generation::write(
         &descriptor,
         &output.join("heddle_api_v2_methods.rs"),
-        "heddle.api.v2alpha1",
+        "heddle.api.v1alpha2",
+        true,
     )?;
     attachment_generation::write(
         &descriptor,

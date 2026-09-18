@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-ATTENTION_PROTO = ROOT / "proto/heddle/api/v1alpha1/attention.proto"
+ATTENTION_PROTO = ROOT / "proto/heddle/api/v1alpha2/attention.proto"
 
 
 def block_body(source: str, kind: str, name: str) -> str:

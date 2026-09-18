@@ -3,9 +3,9 @@ use prost_reflect::{DescriptorPool, Kind};
 
 #[test]
 fn analysis_execution_only_reads_its_base() {
-    use heddle_api::heddle::api::v1alpha1::AuthorizationRole;
+    use heddle_api::heddle::api::common::AuthorizationRole;
     let method =
-        heddle_api::v2::method_descriptor("/heddle.api.v2alpha1.AnalysisService/StartAnalysis")
+        heddle_api::v2::method_descriptor("/heddle.api.v1alpha2.AnalysisService/StartAnalysis")
             .expect("analysis route");
     let targets: Vec<_> = method
         .authorization
@@ -27,7 +27,7 @@ fn analysis_execution_only_reads_its_base() {
 fn semantic_index_artifact_retains_its_usable_closure() {
     let pool = DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("contract");
     let artifact = pool
-        .get_message_by_name("heddle.api.v2alpha1.AnalysisArtifact")
+        .get_message_by_name("heddle.api.v1alpha2.AnalysisArtifact")
         .expect("artifact");
     let Kind::Message(index) = artifact
         .get_field_by_name("semantic_index")
@@ -38,7 +38,7 @@ fn semantic_index_artifact_retains_its_usable_closure() {
     };
     assert_eq!(
         index.full_name(),
-        "heddle.api.v2alpha1.SemanticIndexArtifact"
+        "heddle.api.v1alpha2.SemanticIndexArtifact"
     );
     for field in ["root_hash", "nodes", "parsed_files", "opaque_files"] {
         assert!(
@@ -58,7 +58,7 @@ fn analysis_inputs_preserve_exact_owning_threads() {
         "AnalysisArtifact",
     ] {
         let message = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("analysis message");
         for field in ["thread", "base_thread"] {
             let owner = message
@@ -67,7 +67,7 @@ fn analysis_inputs_preserve_exact_owning_threads() {
             let Kind::Message(owner) = owner.kind() else {
                 panic!("typed source ownership required")
             };
-            assert_eq!(owner.full_name(), "heddle.api.v2alpha1.ThreadRef");
+            assert_eq!(owner.full_name(), "heddle.api.v1alpha2.ThreadRef");
         }
     }
 }
@@ -76,7 +76,7 @@ fn analysis_inputs_preserve_exact_owning_threads() {
 fn retained_analysis_is_versioned_and_preserves_typed_results() {
     let pool = DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("contract");
     let artifact = pool
-        .get_message_by_name("heddle.api.v2alpha1.AnalysisArtifact")
+        .get_message_by_name("heddle.api.v1alpha2.AnalysisArtifact")
         .expect("typed analysis artifact");
     assert_eq!(
         artifact
@@ -86,22 +86,22 @@ fn retained_analysis_is_versioned_and_preserves_typed_results() {
         1
     );
     for (name, number, target, repeated) in [
-        ("source", 2, "heddle.api.v2alpha1.RevisionRef", false),
-        ("base", 3, "heddle.api.v2alpha1.RevisionRef", false),
-        ("analyses", 4, "heddle.api.v2alpha1.AnalysisRecord", true),
-        ("findings", 5, "heddle.api.v2alpha1.AnalysisFinding", true),
-        ("diffs", 6, "heddle.api.v1alpha1.FileDiff", true),
-        ("hot_spots", 7, "heddle.api.v1alpha1.SemanticHotSpot", true),
+        ("source", 2, "heddle.api.v1alpha2.RevisionRef", false),
+        ("base", 3, "heddle.api.v1alpha2.RevisionRef", false),
+        ("analyses", 4, "heddle.api.v1alpha2.AnalysisRecord", true),
+        ("findings", 5, "heddle.api.v1alpha2.AnalysisFinding", true),
+        ("diffs", 6, "heddle.api.common.FileDiff", true),
+        ("hot_spots", 7, "heddle.api.common.SemanticHotSpot", true),
         (
             "behavior_changes",
             8,
-            "heddle.api.v2alpha1.BehaviorChange",
+            "heddle.api.v1alpha2.BehaviorChange",
             true,
         ),
         (
             "behavior_coverage",
             9,
-            "heddle.api.v2alpha1.BehaviorAnalysisCoverage",
+            "heddle.api.v1alpha2.BehaviorAnalysisCoverage",
             true,
         ),
     ] {

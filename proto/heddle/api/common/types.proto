@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package heddle.api.common;
+
+message StateId {
+  // Immutable physical revision identity: the exact content-addressed state
+  // hash. `value` is exactly 32 bytes and is not a logical ChangeId. Rewrites
+  // that preserve a ChangeId still produce a different StateId.
+  bytes value = 1;
+}
+
+message ChangeId {
+  // Rewrite-stable logical change identity. `value` is exactly 16 bytes and
+  // may be shared by physically distinct revisions after amend or rebase.
+  bytes value = 1;
+}
+
+message GitObjectId {
+  GitObjectAlgorithm algorithm = 1;
+  bytes digest = 2;
+}
+
+message RepositoryRef {
+  oneof reference {
+    string hosted_id = 1;
+    string canonical_path = 2;
+  }
+}
+
+// Opaque 16-byte durable operation identity.
+message OperationId {
+  bytes value = 1;
+}
+
+// Opaque 16-byte identity for an atomically submitted operation batch.
+message OperationBatchId {
+  bytes value = 1;
+}
+
+enum GitObjectAlgorithm {
+  GIT_OBJECT_ALGORITHM_UNSPECIFIED = 0;
+  GIT_OBJECT_ALGORITHM_SHA1 = 1;
+  GIT_OBJECT_ALGORITHM_SHA256 = 2;
+}
+
+// State publication status. Captures whether a state is in-progress
+// (`DRAFT`) or pinned as the published shape of the work (`PUBLISHED`).
+// The failure/terminal statuses (`ABANDONED`/`ABORTED`/`SUPERSEDED`) are
+// author/gate-driven (weft#469) and orthogonal to reviewer verdicts —
+// `RecordVerdict` never sets them. `FAILED` is intentionally absent: it is
+// derivable from `verification.tests_failed > 0`.
+enum StateStatus {
+  STATE_STATUS_UNSPECIFIED = 0;
+  STATE_STATUS_DRAFT = 1;
+  STATE_STATUS_PUBLISHED = 2;
+  STATE_STATUS_ABANDONED = 3; // +weft#469: author gave up on the task
+  STATE_STATUS_ABORTED = 4; // +weft#469: hard merge-gate/policy killed it
+  STATE_STATUS_SUPERSEDED = 5; // +weft#469: replaced by a successor attempt
+}

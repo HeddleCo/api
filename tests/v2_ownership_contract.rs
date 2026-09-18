@@ -5,7 +5,7 @@ use prost_reflect::{DescriptorPool, Kind};
 
 fn field_type(pool: &DescriptorPool, message: &str, field: &str) -> String {
     let message = pool
-        .get_message_by_name(&format!("heddle.api.v2alpha1.{message}"))
+        .get_message_by_name(&format!("heddle.api.v1alpha2.{message}"))
         .expect("v2 request exists");
     let field = message
         .get_field_by_name(field)
@@ -20,20 +20,20 @@ fn field_type(pool: &DescriptorPool, message: &str, field: &str) -> String {
 fn root_bootstrap_targets_a_principal_without_requiring_a_spool() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
     let bootstrap = pool
-        .get_message_by_name("heddle.api.v2alpha1.BootstrapOwnershipRequest")
+        .get_message_by_name("heddle.api.v1alpha2.BootstrapOwnershipRequest")
         .expect("bootstrap request");
     assert!(bootstrap.get_field_by_name("spool").is_none());
     assert_eq!(
         field_type(&pool, "BootstrapOwnershipRequest", "owner"),
-        "heddle.api.v2alpha1.PrincipalRef"
+        "heddle.api.v1alpha2.PrincipalRef"
     );
     assert_eq!(
         field_type(&pool, "BootstrapOwnershipRequest", "root"),
-        "heddle.api.v2alpha1.SignedOwnerRoot"
+        "heddle.api.v1alpha2.SignedOwnerRoot"
     );
     assert_eq!(
         field_type(&pool, "BootstrapOwnershipRequest", "binding"),
-        "heddle.api.v2alpha1.OwnerKeyBinding"
+        "heddle.api.v1alpha2.OwnerKeyBinding"
     );
 }
 
@@ -41,7 +41,7 @@ fn root_bootstrap_targets_a_principal_without_requiring_a_spool() {
 fn owner_transitions_keep_distinct_rotation_recovery_and_policy_intent() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
     let request = pool
-        .get_message_by_name("heddle.api.v2alpha1.SubmitOwnerTransitionRequest")
+        .get_message_by_name("heddle.api.v1alpha2.SubmitOwnerTransitionRequest")
         .expect("transition request");
     assert!(request.get_field_by_name("spool").is_none());
     assert!(request.get_field_by_name("expected_version").is_none());
@@ -57,12 +57,12 @@ fn owner_transitions_keep_distinct_rotation_recovery_and_policy_intent() {
     for field in fields {
         assert_eq!(
             field_type(&pool, "SubmitOwnerTransitionRequest", &field),
-            "heddle.api.v2alpha1.SignedOwnerKeyTransition"
+            "heddle.api.v1alpha2.SignedOwnerKeyTransition"
         );
     }
     assert_eq!(
         field_type(&pool, "TransferOwnershipRequest", "transfer"),
-        "heddle.api.v2alpha1.ResourceOwnershipTransfer"
+        "heddle.api.v1alpha2.ResourceOwnershipTransfer"
     );
 }
 
@@ -71,14 +71,14 @@ fn owner_proposals_have_an_exact_versioned_complete_and_veto_lifecycle() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
     assert_eq!(
         field_type(&pool, "OwnerState", "pending_transitions"),
-        "heddle.api.v2alpha1.OwnerTransitionRecord"
+        "heddle.api.v1alpha2.OwnerTransitionRecord"
     );
     assert_eq!(
         field_type(&pool, "EntityRef", "owner_transition"),
-        "heddle.api.v2alpha1.RecordRef"
+        "heddle.api.v1alpha2.RecordRef"
     );
     let service = pool
-        .get_service_by_name("heddle.api.v2alpha1.OwnerAuthorizationService")
+        .get_service_by_name("heddle.api.v1alpha2.OwnerAuthorizationService")
         .expect("owner service");
     for name in ["CompleteOwnerTransition", "VetoOwnerTransition"] {
         let method = service

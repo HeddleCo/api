@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PROTO_ROOT = ROOT / "proto/heddle/api/v1alpha1"
+PROTO_ROOT = ROOT / "proto/heddle/api/v1alpha2"
 OWNER_AUTHORIZATION_PROTO = PROTO_ROOT / "owner_authorization.proto"
 OWNER_GOVERNANCE_PROTO = PROTO_ROOT / "owner_governance.proto"
 
@@ -490,7 +490,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             path.name
             for path in sorted(PROTO_ROOT.glob("*.proto"))
             if path != OWNER_AUTHORIZATION_PROTO
-            and "heddle/api/v1alpha1/owner_authorization.proto" in path.read_text()
+            and "heddle/api/v1alpha2/owner_authorization.proto" in path.read_text()
         }
         self.assertTrue(
             {"repo_sync.proto", "service.proto"}.issubset(importers)

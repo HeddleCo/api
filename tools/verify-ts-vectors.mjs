@@ -232,7 +232,7 @@ rejects("over-ceiling method path", () =>
 );
 // Method path not beginning with '/'.
 rejects("method without leading slash", () =>
-  encodeRequestFrame("heddle.api.v1alpha1.Foo/Bar", smallContext, new Uint8Array()),
+  encodeRequestFrame("heddle.api.v1alpha2.Foo/Bar", smallContext, new Uint8Array()),
 );
 // Empty method path.
 rejects("empty method path", () =>

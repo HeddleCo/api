@@ -10,7 +10,7 @@
       "old_rpc": "heddle.v1.AuthService/ApproveDeviceAuthorization",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/ApproveDeviceAuthorization"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/ApproveDeviceAuthorization"
     },
     {
       "old_rpc": "heddle.v1.AuthService/BeginRecovery",
@@ -21,14 +21,14 @@
       "old_rpc": "heddle.v1.AuthService/BeginWebAuthnAuthentication",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnAuthentication"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/BeginWebAuthnAuthentication"
     },
     {
       "old_rpc": "heddle.v1.AuthService/BeginWebAuthnRegistration",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
       "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/hosted/auth.rs",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/BeginWebAuthnRegistration"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/BeginWebAuthnRegistration"
     },
     {
       "old_rpc": "heddle.v1.AuthService/CompleteRecovery",
@@ -39,13 +39,13 @@
       "old_rpc": "heddle.v1.AuthService/CreateDeviceAuthorization",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/CreateDeviceAuthorization"
     },
     {
       "old_rpc": "heddle.v1.AuthService/CreateServiceAccount",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/CreateServiceAccount"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/CreateServiceAccount"
     },
     {
       "old_rpc": "heddle.v1.AuthService/DeclareHardwareKeyRecovery",
@@ -71,73 +71,73 @@
       "old_rpc": "heddle.v1.AuthService/ExchangeDeviceAuthorization",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/ExchangeDeviceAuthorization"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/ExchangeDeviceAuthorization"
     },
     {
       "old_rpc": "heddle.v1.AuthService/FinishWebAuthnAuthentication",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/FinishWebAuthnAuthentication"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/FinishWebAuthnAuthentication"
     },
     {
       "old_rpc": "heddle.v1.AuthService/GetInvitationSummary",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/GetInvitationSummary"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/GetInvitationSummary"
     },
     {
       "old_rpc": "heddle.v1.AuthService/IntrospectCredential",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/IntrospectCredential"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/IntrospectCredential"
     },
     {
       "old_rpc": "heddle.v1.AuthService/IssuePresenceToken",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/IssuePresenceToken"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/IssuePresenceToken"
     },
     {
       "old_rpc": "heddle.v1.AuthService/IssueServiceAccountCredential",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/IssueServiceAccountCredential"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/IssueServiceAccountCredential"
     },
     {
       "old_rpc": "heddle.v1.AuthService/LinkOAuthIdentity",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/LinkOAuthIdentity"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/LinkOAuthIdentity"
     },
     {
       "old_rpc": "heddle.v1.AuthService/ListScopeCapabilities",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/ListScopeCapabilities"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/ListScopeCapabilities"
     },
     {
       "old_rpc": "heddle.v1.AuthService/ListServiceAccounts",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/ListServiceAccounts"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/ListServiceAccounts"
     },
     {
       "old_rpc": "heddle.v1.AuthService/ListSessions",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/ListSessions"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/ListSessions"
     },
     {
       "old_rpc": "heddle.v1.AuthService/MintAnonBiscuit",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/MintAnonBiscuit"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/MintAnonBiscuit"
     },
     {
       "old_rpc": "heddle.v1.AuthService/MintBiscuit",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/MintBiscuit"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/MintBiscuit"
     },
     {
       "old_rpc": "heddle.v1.AuthService/RecordSubscription",
@@ -149,37 +149,37 @@
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
       "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/hosted/auth.rs",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/RegisterPublicKey"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/RegisterPublicKey"
     },
     {
       "old_rpc": "heddle.v1.AuthService/RevokeCredential",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/RevokeCredential"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/RevokeCredential"
     },
     {
       "old_rpc": "heddle.v1.AuthService/RevokeServiceAccount",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/RevokeServiceAccount"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/RevokeServiceAccount"
     },
     {
       "old_rpc": "heddle.v1.AuthService/RevokeSession",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/RevokeSession"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/RevokeSession"
     },
     {
       "old_rpc": "heddle.v1.AuthService/RotateCredential",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/RotateCredential"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/RotateCredential"
     },
     {
       "old_rpc": "heddle.v1.AuthService/StoreProviderToken",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/StoreProviderToken"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/StoreProviderToken"
     },
     {
       "old_rpc": "heddle.v1.AuthService/SubmitRecoveryProof",
@@ -190,7 +190,7 @@
       "old_rpc": "heddle.v1.AuthService/VerifySignupEmail",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/VerifySignupEmail"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/VerifySignupEmail"
     },
     {
       "old_rpc": "heddle.v1.AuthService/VetoRecovery",
@@ -201,121 +201,121 @@
       "old_rpc": "heddle.v1.AuthService/WaitForDeviceAuthorization",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/WaitForDeviceAuthorization"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/WaitForDeviceAuthorization"
     },
     {
       "old_rpc": "heddle.v1.AuthService/WhoAmI",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/WhoAmI"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/WhoAmI"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetBlame",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetBlame"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetBlame"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetBlob",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetBlob"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetBlob"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetCompare",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetCompare"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetCompare"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetContextHistory",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetContextHistory"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetContextHistory"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetDiff",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetDiff"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetDiff"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetRefs",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetRefs"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetRefs"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetSemanticHotSpots",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetSemanticHotSpots"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetSemanticHotSpots"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetState",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetState"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetState"
     },
     {
       "old_rpc": "heddle.v1.ContentService/GetTree",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/GetTree"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/GetTree"
     },
     {
       "old_rpc": "heddle.v1.ContentService/ListActions",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListActions"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/ListActions"
     },
     {
       "old_rpc": "heddle.v1.ContentService/ListContext",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListContext"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/ListContext"
     },
     {
       "old_rpc": "heddle.v1.ContentService/ListContextSuggestions",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListContextSuggestions"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/ListContextSuggestions"
     },
     {
       "old_rpc": "heddle.v1.ContentService/ListProvenanceSummaries",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListProvenanceSummaries"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/ListProvenanceSummaries"
     },
     {
       "old_rpc": "heddle.v1.ContentService/ListStates",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ListStates"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/ListStates"
     },
     {
       "old_rpc": "heddle.v1.ContentService/ReviseContext",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/ReviseContext"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/ReviseContext"
     },
     {
       "old_rpc": "heddle.v1.ContentService/SetContext",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/SetContext"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/SetContext"
     },
     {
       "old_rpc": "heddle.v1.ContentService/SupersedeContext",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/SupersedeContext"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/SupersedeContext"
     },
     {
       "old_rpc": "heddle.v1.DiscussionService/AppendTurn",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.CollaborationService/AppendTurn"
+      "new_rpc": "heddle.api.v1alpha2.CollaborationService/AppendTurn"
     },
     {
       "old_rpc": "heddle.v1.DiscussionService/GetDiscussion",
@@ -326,49 +326,49 @@
       "old_rpc": "heddle.v1.DiscussionService/ListByState",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.CollaborationService/ListByState"
+      "new_rpc": "heddle.api.v1alpha2.CollaborationService/ListByState"
     },
     {
       "old_rpc": "heddle.v1.DiscussionService/ListBySymbol",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.CollaborationService/ListBySymbol"
+      "new_rpc": "heddle.api.v1alpha2.CollaborationService/ListBySymbol"
     },
     {
       "old_rpc": "heddle.v1.DiscussionService/OpenDiscussion",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.CollaborationService/OpenDiscussion"
+      "new_rpc": "heddle.api.v1alpha2.CollaborationService/OpenDiscussion"
     },
     {
       "old_rpc": "heddle.v1.DiscussionService/ResolveDiscussion",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.CollaborationService/ResolveDiscussion"
+      "new_rpc": "heddle.api.v1alpha2.CollaborationService/ResolveDiscussion"
     },
     {
       "old_rpc": "heddle.v1.FeedService/GetFeedSnapshot",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.AttentionService/GetFeedSnapshot"
+      "new_rpc": "heddle.api.v1alpha2.AttentionService/GetFeedSnapshot"
     },
     {
       "old_rpc": "heddle.v1.FeedService/RecordInteraction",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/routes/app/feed/interaction.json/+server.ts",
-      "new_rpc": "heddle.api.v1alpha1.AttentionService/RecordInteraction"
+      "new_rpc": "heddle.api.v1alpha2.AttentionService/RecordInteraction"
     },
     {
       "old_rpc": "heddle.v1.FeedService/StreamFeed",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.AttentionService/StreamFeed"
+      "new_rpc": "heddle.api.v1alpha2.AttentionService/StreamFeed"
     },
     {
       "old_rpc": "heddle.v1.FeedService/UpdateFeedItem",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.AttentionService/UpdateFeedItem"
+      "new_rpc": "heddle.api.v1alpha2.AttentionService/UpdateFeedItem"
     },
     {
       "old_rpc": "heddle.v1.HookService/DeregisterHook",
@@ -404,122 +404,122 @@
       "old_rpc": "heddle.v1.HostedUserService/AddApprovalGroupMember",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/AddApprovalGroupMember"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/AddApprovalGroupMember"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/AddPolicyGroupRequirement",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/AddPolicyGroupRequirement"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/AddPolicyGroupRequirement"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ApproveThread",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ApproveThread"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/ApproveThread"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/AttachChild",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/AttachChild"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/AttachChild"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CheckMergeEligibility",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/CheckMergeEligibility"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/CheckMergeEligibility"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ClaimHandle",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
       "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/hosted/user.rs",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/ClaimHandle"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/ClaimHandle"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateApprovalGroup",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/CreateApprovalGroup"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/CreateApprovalGroup"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateGrant",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateGrant"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/CreateGrant"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateInvitation",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateInvitation"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/CreateInvitation"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateNamespace",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateNamespace"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/CreateNamespace"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateRepository",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/CreateRepository"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/CreateRepository"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/CreateThreadPolicy",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/CreateThreadPolicy"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/CreateThreadPolicy"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/DeleteApprovalGroup",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/DeleteApprovalGroup"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/DeleteApprovalGroup"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/DeleteBookmark",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteBookmark"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/DeleteBookmark"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/DeleteGrant",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteGrant"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/DeleteGrant"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/DeleteNamespace",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteNamespace"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/DeleteNamespace"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/DeleteRepository",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/DeleteRepository"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/DeleteRepository"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/DeleteThreadPolicy",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/DeleteThreadPolicy"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/DeleteThreadPolicy"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/DetachChild",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/DetachChild"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/DetachChild"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GetCurrentUserNamespace",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/GetCurrentUserNamespace"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/GetCurrentUserNamespace"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GetGovernanceHistory",
@@ -531,7 +531,7 @@
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
       "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/hosted/user.rs",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/GetHandleStatus"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/GetHandleStatus"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GetMembershipHistory",
@@ -542,13 +542,13 @@
       "old_rpc": "heddle.v1.HostedUserService/GetSpool",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/GetSpool"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/GetSpool"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/GrantSupportAccess",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/GrantSupportAccess"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/GrantSupportAccess"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListActors",
@@ -559,37 +559,37 @@
       "old_rpc": "heddle.v1.HostedUserService/ListApprovalGroups",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListApprovalGroups"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/ListApprovalGroups"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListBookmarks",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListBookmarks"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListBookmarks"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListChildren",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListChildren"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListChildren"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListGrants",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListGrants"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListGrants"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListInvitations",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListInvitations"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListInvitations"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListMembers",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListMembers"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListMembers"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListProofs",
@@ -600,50 +600,50 @@
       "old_rpc": "heddle.v1.HostedUserService/ListSpools",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListSpools"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListSpools"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListSupportAccessGrants",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListSupportAccessGrants"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListSupportAccessGrants"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListThreadApprovals",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadApprovals"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/ListThreadApprovals"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListThreadPolicies",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListThreadPolicies"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/ListThreadPolicies"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ListWorktrees",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ListWorktrees"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ListWorktrees"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RemoveApprovalGroupMember",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/RemoveApprovalGroupMember"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/RemoveApprovalGroupMember"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RemovePolicyGroupRequirement",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/RemovePolicyGroupRequirement"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/RemovePolicyGroupRequirement"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RequestHeldName",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
       "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/hosted/user.rs",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/RequestHeldName"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/RequestHeldName"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RequestProofChallenge",
@@ -654,49 +654,49 @@
       "old_rpc": "heddle.v1.HostedUserService/ResolveHandle",
       "classification": "renamed",
       "production_implementation": "HeddleCo/weft:crates/weft-server/src/server/hosted/user.rs",
-      "new_rpc": "heddle.api.v1alpha1.IdentityService/ResolveHandle"
+      "new_rpc": "heddle.api.v1alpha2.IdentityService/ResolveHandle"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ResolveMonorepo",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ResolveMonorepo"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ResolveMonorepo"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/ResolveSubjects",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/ResolveSubjects"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/ResolveSubjects"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RevokeApproval",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/RevokeApproval"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/RevokeApproval"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RevokeInvitation",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/RevokeInvitation"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/RevokeInvitation"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/RevokeSupportAccess",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/RevokeSupportAccess"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/RevokeSupportAccess"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/SetNamespaceVisibility",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/SetNamespaceVisibility"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/SetNamespaceVisibility"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/SetSpoolVisibility",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/SetSpoolVisibility"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/SetSpoolVisibility"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/SubmitProof",
@@ -707,43 +707,43 @@
       "old_rpc": "heddle.v1.HostedUserService/UpdateGrant",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateGrant"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/UpdateGrant"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/UpdateNamespace",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateNamespace"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/UpdateNamespace"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/UpdateRepository",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateRepository"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/UpdateRepository"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/UpdateSpoolSettings",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpdateSpoolSettings"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/UpdateSpoolSettings"
     },
     {
       "old_rpc": "heddle.v1.HostedUserService/UpsertBookmark",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.RegistryService/UpsertBookmark"
+      "new_rpc": "heddle.api.v1alpha2.RegistryService/UpsertBookmark"
     },
     {
       "old_rpc": "heddle.v1.ImportService/CreateImportJob",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.OperationService/SubmitOperation"
+      "new_rpc": "heddle.api.v1alpha2.OperationService/SubmitOperation"
     },
     {
       "old_rpc": "heddle.v1.ImportService/StreamImportProgress",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.OperationService/WatchOperations"
+      "new_rpc": "heddle.api.v1alpha2.OperationService/WatchOperations"
     },
     {
       "old_rpc": "heddle.v1.OperationLogQueryService/QueryOperations",
@@ -759,7 +759,7 @@
       "old_rpc": "heddle.v1.RepoEventService/SubscribeRepoEvents",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/routes/app/events/+server.ts",
-      "new_rpc": "heddle.api.v1alpha1.RepositoryService/SubscribeRepoEvents"
+      "new_rpc": "heddle.api.v1alpha2.RepositoryService/SubscribeRepoEvents"
     },
     {
       "old_rpc": "heddle.v1.RepoEventService/SubscribeRepoEventsMulti",
@@ -770,49 +770,49 @@
       "old_rpc": "heddle.v1.RepoSyncService/ListRefs",
       "classification": "renamed",
       "production_callsite": "HeddleCo/heddle:crates/client/src/hosted/sync.rs",
-      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/ListRefs"
+      "new_rpc": "heddle.api.v1alpha2.RepoSyncService/ListRefs"
     },
     {
       "old_rpc": "heddle.v1.RepoSyncService/Pull",
       "classification": "renamed",
       "production_callsite": "HeddleCo/heddle:crates/client/src/hosted/sync.rs",
-      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/Pull"
+      "new_rpc": "heddle.api.v1alpha2.RepoSyncService/Pull"
     },
     {
       "old_rpc": "heddle.v1.RepoSyncService/Push",
       "classification": "renamed",
       "production_callsite": "HeddleCo/heddle:crates/client/src/hosted/sync.rs",
-      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/Push"
+      "new_rpc": "heddle.api.v1alpha2.RepoSyncService/Push"
     },
     {
       "old_rpc": "heddle.v1.RepoSyncService/UpdateRef",
       "classification": "renamed",
       "production_callsite": "HeddleCo/heddle:crates/client/src/hosted/sync.rs",
-      "new_rpc": "heddle.api.v1alpha1.RepoSyncService/UpdateRef"
+      "new_rpc": "heddle.api.v1alpha2.RepoSyncService/UpdateRef"
     },
     {
       "old_rpc": "heddle.v1.ReviewService/GetReviewAnalysisResult",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/review-api.ts",
-      "new_rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisResult"
+      "new_rpc": "heddle.api.v1alpha2.PullRequestReviewService/GetReviewAnalysisResult"
     },
     {
       "old_rpc": "heddle.v1.ReviewService/GetReviewAnalysisStatus",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/review-api.ts",
-      "new_rpc": "heddle.api.v1alpha1.PullRequestReviewService/GetReviewAnalysisStatus"
+      "new_rpc": "heddle.api.v1alpha2.PullRequestReviewService/GetReviewAnalysisStatus"
     },
     {
       "old_rpc": "heddle.v1.ReviewService/StartReviewAnalysis",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/review-api.ts",
-      "new_rpc": "heddle.api.v1alpha1.PullRequestReviewService/StartReviewAnalysis"
+      "new_rpc": "heddle.api.v1alpha2.PullRequestReviewService/StartReviewAnalysis"
     },
     {
       "old_rpc": "heddle.v1.SearchService/Search",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.SearchService/Search"
+      "new_rpc": "heddle.api.v1alpha2.SearchService/Search"
     },
     {
       "old_rpc": "heddle.v1.SignalService/ComputeStateSignals",
@@ -833,7 +833,7 @@
       "old_rpc": "heddle.v1.StateReviewService/GetReviewPayload",
       "classification": "renamed",
       "production_callsite": "HeddleCo/heddle:crates/cli/src/cli/commands/review.rs",
-      "new_rpc": "heddle.api.v1alpha1.StateReviewService/GetReviewPayload"
+      "new_rpc": "heddle.api.v1alpha2.StateReviewService/GetReviewPayload"
     },
     {
       "old_rpc": "heddle.v1.StateReviewService/GetReviewProgress",
@@ -844,7 +844,7 @@
       "old_rpc": "heddle.v1.StateReviewService/ListSignatures",
       "classification": "renamed",
       "production_callsite": "HeddleCo/heddle:crates/cli/src/cli/commands/review.rs",
-      "new_rpc": "heddle.api.v1alpha1.StateReviewService/ListSignatures"
+      "new_rpc": "heddle.api.v1alpha2.StateReviewService/ListSignatures"
     },
     {
       "old_rpc": "heddle.v1.StateReviewService/RecordCheckAck",
@@ -860,7 +860,7 @@
       "old_rpc": "heddle.v1.StateReviewService/SignState",
       "classification": "renamed",
       "production_callsite": "HeddleCo/heddle:crates/cli/src/cli/commands/review.rs",
-      "new_rpc": "heddle.api.v1alpha1.StateReviewService/SignState"
+      "new_rpc": "heddle.api.v1alpha2.StateReviewService/SignState"
     },
     {
       "old_rpc": "heddle.v1.ThreadWorkflowService/CaptureThread",
@@ -881,13 +881,13 @@
       "old_rpc": "heddle.v1.ThreadWorkflowService/GetWorkspaceSummary",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/GetWorkspaceSummary"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/GetWorkspaceSummary"
     },
     {
       "old_rpc": "heddle.v1.ThreadWorkflowService/ListThreads",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/ListThreads"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/ListThreads"
     },
     {
       "old_rpc": "heddle.v1.ThreadWorkflowService/StartThread",
@@ -898,7 +898,7 @@
       "old_rpc": "heddle.v1.ThreadWorkflowService/StreamWorkspaceSummary",
       "classification": "renamed",
       "production_callsite": "HeddleCo/tapestry:src/lib/server/api.ts",
-      "new_rpc": "heddle.api.v1alpha1.WorkflowService/StreamWorkspaceSummary"
+      "new_rpc": "heddle.api.v1alpha2.WorkflowService/StreamWorkspaceSummary"
     },
     {
       "old_rpc": "heddle.v1.ThreadWorkflowService/WatchThreads",

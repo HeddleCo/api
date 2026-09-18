@@ -4,7 +4,7 @@
 
 use ed25519_dalek::{Signature, VerifyingKey};
 
-use crate::{heddle::api::v1alpha1::CallContext, v2::MethodDescriptor};
+use crate::{heddle::api::common::CallContext, v2::MethodDescriptor};
 
 pub const PROOF_WINDOW_MILLIS: u64 = 60_000;
 

@@ -1,5 +1,5 @@
 use ed25519_dalek::{Signer as _, SigningKey, Verifier as _};
-use heddle_api::{heddle::api::v2alpha1 as api, v2::identity_management::*};
+use heddle_api::{heddle::api::v1alpha2 as api, v2::identity_management::*};
 #[test]
 fn delegation_is_bounded_canonical_and_signature_binds_scope_and_key() {
     let value = DelegationStatement {

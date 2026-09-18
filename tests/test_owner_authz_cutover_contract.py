@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PROTO = ROOT / "proto/heddle/api/v1alpha1"
+PROTO = ROOT / "proto/heddle/api/v1alpha2"
 
 
 def block(source: str, kind: str, name: str) -> str:
@@ -171,7 +171,7 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
             },
         )
         self.assertIn(
-            'import public "heddle/api/v1alpha1/owner_authorization.proto";',
+            'import public "heddle/api/v1alpha2/owner_authorization.proto";',
             self.service,
         )
 

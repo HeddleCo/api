@@ -30,8 +30,8 @@ thread identity as prerequisites
 [unresolved identities at the time](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/docs/review-cursor.md#L303-L326)).
 API #70 has since defined `StateId` as the immutable 32-byte physical revision
 and added immutable `thread_id` fields while keeping thread names renameable
-([identity contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/types.proto#L80-L90),
-[thread contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/workflow.proto#L70-L130)).
+([identity contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/common/types.proto#L80-L90),
+[thread contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha2/workflow.proto#L70-L130)).
 Those identities are the basis of this design.
 
 ## What exists today
@@ -41,7 +41,7 @@ Those identities are the basis of this design.
 `ListActions` accepts the same state-addressed request as `GetState`. Its
 `ActionSummary` has a string ID, before/after states, description, timestamp,
 and untyped `operation_json`
-([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/repository.proto#L320-L332)).
+([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/common/repository.proto#L320-L332)).
 The hosted handler resolves a visible state and reads the action index for that
 state; the index is keyed by `(repo_id, to_state_id)`
 ([handler](https://github.com/HeddleCo/weft/blob/3c4f9c6d952104430fb168826627795d5b3d7944/crates/weft-hosted/src/server/hosted/canonical_repository.rs#L1360-L1420),
@@ -60,7 +60,7 @@ contract maintenance; it is not required to implement this ADR.
 
 The public contract is a server stream with string event types and a numeric
 `after_event_id`, not a bidirectionally pageable historical query
-([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/repository.proto#L641-L667)).
+([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/common/repository.proto#L641-L667)).
 The native dispatcher routes only identity wait and operation watch; every
 other server stream, including `SubscribeRepoEvents`, returns UNIMPLEMENTED
 ([dispatcher](https://github.com/HeddleCo/weft/blob/3c4f9c6d952104430fb168826627795d5b3d7944/crates/weft-hosted/src/native_dispatch.rs#L2247-L2269)).
@@ -79,7 +79,7 @@ make it the typed lifecycle authority.
 
 `OperationService` models queued/running/terminal work and currently has only
 import and remote-sync kinds
-([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/operation.proto#L11-L43)).
+([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha2/operation.proto#L11-L43)).
 The implementation states that operations are persisted in `import_jobs` and
 maps that table directly to API snapshots
 ([implementation](https://github.com/HeddleCo/weft/blob/3c4f9c6d952104430fb168826627795d5b3d7944/crates/weft-hosted/src/server/hosted/operation.rs#L1-L6),
@@ -157,8 +157,8 @@ or toggle it.
 
 `AgentService.ListAgentTimelineEvents` is a planned, run-keyed query over
 `CanonicalTimelineOperation`
-([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/agent.proto#L10-L54),
-[messages](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/agent.proto#L198-L214)).
+([contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha2/agent.proto#L10-L54),
+[messages](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha2/agent.proto#L198-L214)).
 Heddle defines agent timelines as adjacent metadata for tool calls, cursor
 movement, branches, and captures “without becoming source history states”
 ([architecture](https://github.com/HeddleCo/heddle/blob/84e4a3a52d3aa859cd3a4c4304921cee85402df0/CONTEXT.md#L163-L176)).
@@ -201,7 +201,7 @@ thread write, not as harmless personal metadata.
 
 An operation ID is the existing API `OperationId`, whose wire contract is an
 opaque 16-byte durable identity
-([current type](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/types.proto#L101-L119)).
+([current type](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/common/types.proto#L101-L119)).
 For lifecycle operations the server assigns a UUIDv7 when one logical mutation
 enters its commit transaction. One atomic mutation gets one operation ID even
 when it emits multiple local `OpRecord` details or affects multiple threads.
@@ -317,7 +317,7 @@ sequence boundary. Changing any filter while reusing a token returns
 `INVALID_ARGUMENT`. Appends cannot move or duplicate an existing page boundary.
 There is no fixed 50-row terminal window and no cursorless continuation like
 `GetFeedSnapshot`, whose current contract is capped at 50 with no pagination
-([feed contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/attention.proto#L27-L34)).
+([feed contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha2/attention.proto#L27-L34)).
 
 ### Relationship to `repo_events` and `feed_items`
 
@@ -467,7 +467,7 @@ thread mutation, then compare-and-swaps `(cursor_operation_id, version)`.
 
 `client_operation_id` follows the repository's existing retry pattern for
 proof-of-possession durable writes
-([example contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha1/state_review.proto#L407-L425)).
+([example contract](https://github.com/HeddleCo/api/blob/334170c9c9bca8b7f41b0b6329c20bb5c081eee9/proto/heddle/api/v1alpha2/state_review.proto#L407-L425)).
 The dedup key is `(repo_id, authenticated_subject, rpc_verb,
 client_operation_id)` and stores a request hash and resulting cursor-move
 operation ID. Reusing the key with a different request returns

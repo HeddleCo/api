@@ -9,10 +9,10 @@ from tools.build_contract import REPLACED_METHODS
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PROTO = ROOT / "proto/heddle/api/v1alpha1/identity.proto"
+PROTO = ROOT / "proto/heddle/api/v1alpha2/identity.proto"
 FIXTURE = ROOT / "tests/fixtures/handle-contract-v1.json"
 WIRE_FIXTURE = ROOT / "tests/fixtures/handle-wire-v1.json"
-PACKAGE = "heddle.api.v1alpha1"
+PACKAGE = "heddle.api.v1alpha2"
 
 
 def named_body(source: str, kind: str, name: str) -> str:
@@ -80,7 +80,7 @@ class SharedHandleContractTest(unittest.TestCase):
         cls.source = PROTO.read_text()
         cls.all_proto_sources = "\n".join(
             path.read_text()
-            for path in sorted((ROOT / "proto/heddle/api/v1alpha1").glob("*.proto"))
+            for path in sorted((ROOT / "proto/heddle/api/v1alpha2").glob("*.proto"))
         )
         cls.fixture = json.loads(FIXTURE.read_text())
         cls.wire_fixture = json.loads(WIRE_FIXTURE.read_text())

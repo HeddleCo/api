@@ -7,7 +7,7 @@ fn public_handle_resolution_never_exposes_stable_subject_or_hold_owner_identity(
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     for name in ["HandleResolution", "PublicHandleRecord"] {
         let record = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("public handle view");
         for field in [
             "principal_id",
@@ -23,7 +23,7 @@ fn public_handle_resolution_never_exposes_stable_subject_or_hold_owner_identity(
         }
     }
     let resolution = pool
-        .get_message_by_name("heddle.api.v2alpha1.HandleResolution")
+        .get_message_by_name("heddle.api.v1alpha2.HandleResolution")
         .expect("resolution");
     for field in ["public_handle", "held_for_verified_owner", "tombstoned"] {
         assert!(resolution.get_field_by_name(field).is_some());
@@ -34,7 +34,7 @@ fn public_handle_resolution_never_exposes_stable_subject_or_hold_owner_identity(
 fn held_name_requests_return_the_authoritative_deadline_and_claims_return_canonical_metadata() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     let service = pool
-        .get_service_by_name("heddle.api.v2alpha1.IdentityService")
+        .get_service_by_name("heddle.api.v1alpha2.IdentityService")
         .expect("identity service");
     let held = service
         .methods()

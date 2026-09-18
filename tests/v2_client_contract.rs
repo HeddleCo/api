@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use heddle_api::heddle::api::v2alpha1::{
+use heddle_api::heddle::api::v1alpha2::{
     ObserveThreadsRequest, StartThreadRequest, ThreadListEvent, ThreadMutationResponse,
     ThreadOverview, thread_list_event,
 };
@@ -67,7 +67,7 @@ fn adapter_extracts_operation_identity_from_v2_descriptor() {
 
 #[test]
 fn blob_source_is_exclusive_and_preserves_an_exact_hash() {
-    use heddle_api::heddle::api::v2alpha1::{BlobRead, blob_read};
+    use heddle_api::heddle::api::v1alpha2::{BlobRead, blob_read};
     let request = BlobRead {
         source: Some(blob_read::Source::ObjectHash(vec![7; 32])),
         offset: 11,
@@ -166,12 +166,12 @@ fn typed_mutation_preserves_operation_identity_and_response() {
     let trace = transport.calls.clone();
     let client = Client::new(
         transport,
-        ["/heddle.api.v2alpha1.ThreadService/StartThread".into()],
+        ["/heddle.api.v1alpha2.ThreadService/StartThread".into()],
     );
     let response = completed(
         client.call::<rpc::ThreadServiceStartThread>(&StartThreadRequest {
             client_operation_id: "original-op".into(),
-            thread_genesis: Some(heddle_api::heddle::api::v2alpha1::SignedRecord {
+            thread_genesis: Some(heddle_api::heddle::api::v1alpha2::SignedRecord {
                 format: "heddle-thread-genesis-v1".into(),
                 canonical_record: vec![1, 2, 3],
                 ..Default::default()
@@ -200,7 +200,7 @@ fn unknown_handler_and_missing_operation_id_never_reach_transport() {
     ));
     let supported = Client::new(
         transport,
-        ["/heddle.api.v2alpha1.ThreadService/StartThread".into()],
+        ["/heddle.api.v1alpha2.ThreadService/StartThread".into()],
     );
     assert!(matches!(
         completed(supported.call::<rpc::ThreadServiceStartThread>(&StartThreadRequest::default())),
@@ -215,7 +215,7 @@ fn dropping_a_live_observation_cancels_only_its_stream() {
     let cancelled = transport.cancelled.clone();
     let client = Client::new(
         transport,
-        ["/heddle.api.v2alpha1.ThreadService/ObserveThreads".into()],
+        ["/heddle.api.v1alpha2.ThreadService/ObserveThreads".into()],
     );
     let mut events = completed(
         client.observe::<rpc::ThreadServiceObserveThreads>(&ObserveThreadsRequest::default()),
@@ -233,7 +233,7 @@ fn explicit_cancellation_ends_a_live_observation_without_draining_it() {
     let cancelled = transport.cancelled.clone();
     let client = Client::new(
         transport,
-        ["/heddle.api.v2alpha1.ThreadService/ObserveThreads".into()],
+        ["/heddle.api.v1alpha2.ThreadService/ObserveThreads".into()],
     );
     let mut events = completed(
         client.observe::<rpc::ThreadServiceObserveThreads>(&ObserveThreadsRequest::default()),
@@ -251,7 +251,7 @@ fn explicit_cancellation_ends_a_live_observation_without_draining_it() {
 
 #[test]
 fn failed_reducer_leaves_the_last_resumable_checkpoint() {
-    use heddle_api::heddle::api::v2alpha1::{
+    use heddle_api::heddle::api::v1alpha2::{
         StreamCheckpoint, StreamFrame, StreamOpen, stream_frame,
     };
     use heddle_api::v2::{ObservationApplyError, ObservationState};

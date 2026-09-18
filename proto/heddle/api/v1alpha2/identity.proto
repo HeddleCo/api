@@ -765,31 +765,6 @@ message CompleteEmailVerificationResponse {
   VerifiedEmailReservation reservation = 2;
 }
 
-// Already-rendered transactional mail. Templates and copy stay with the
-// caller; Weft owns last-mile delivery. This is not signup mailbox proof —
-// BeginEmailVerification remains the only admission ceremony that issues a
-// delivery_proof.
-message SendEmailRequest {
-  string client_operation_id = 1;
-  string to = 2;
-  string from_name = 3;
-  string from_email = 4;
-  string reply_to = 5;
-  string subject = 6;
-  string html = 7;
-  string text = 8;
-  map<string, string> headers = 9;
-  // Audit tag for Tapestry admin templates (access-approved, password-reset,
-  // signup-invite). Empty for ad-hoc rendered bodies.
-  string template_slug = 10;
-}
-message SendEmailResponse {
-  MutationReceipt receipt = 1;
-  // Provider-assigned message id when delivery was accepted. Empty when the
-  // endpoint queued the send without a provider receipt.
-  string message_id = 2;
-}
-
 // Invite-gated creation of an unclaimed human account. The independent root
 // slot stays empty. The agent proves its own key over this exact request using
 // principal:device-key:<lowercase-hex-agent-public-key>; a human bearer cannot

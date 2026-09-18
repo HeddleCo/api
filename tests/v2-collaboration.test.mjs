@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
 import { SourceAnchorSchema, AnnotationTagSchema, SourceTargetReferenceSchema } from '../packages/typescript/dist/v1alpha2/collaboration_pb.js';
-import { Audience } from '../packages/typescript/dist/v1alpha2/administration_pb.js';
+import { Audience } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import { SignedRecordSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import { signDiscussion, signContext, verifyCollaboration, sourceTargetReference, collaborationVisibility, textAnnotationTag } from '../packages/typescript/dist/v1alpha2/collaboration.js';
 import { encode, decode } from '../packages/typescript/dist/v1alpha2/_collaboration-msgpack.js';

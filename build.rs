@@ -57,6 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "IdentityEvent.payload",
         "CatalogEvent.payload",
         "WorkspaceEvent.payload",
+        "SpoolEvent.payload",
         "SubmitRecoveryProofResponse.outcome",
     ] {
         config.type_attribute(

@@ -102,6 +102,17 @@ message SpoolOverview {
   // Current canonical address; clients need not fetch ancestors to display or
   // select this Spool. UUIDs remain the identity for mutations and references.
   repeated string path_segments = 12;
+  // Signed-policy CAS head. Member-gated like owner_genesis: not public on
+  // public spools. Unset = no tip yet, OR the caller is not a member.
+  // Construction hint only; not authority. Weft MUST serve the complete chain
+  // on SPOOL_SECTION_SIGNED_POLICY (a page is not a license to omit
+  // predecessors of the tip).
+  SignedPolicyHead signed_policy_head = 13;
+  // Hint of the current spool owner's OwnerState.version. A client MUST NOT
+  // copy this into a SignedPolicyBody without independently verifying it
+  // equals the OwnerState.version pinned via verify_current_owner.
+  bytes signed_policy_owner_state_hash = 14;
+  uint64 signed_policy_ownership_transfer_sequence = 15;
 }
 
 // Committed overview and independently verifiable owner history seed the
@@ -126,6 +137,10 @@ enum SpoolSection {
   SPOOL_SECTION_OPERATIONS = 8;
   SPOOL_SECTION_CHILDREN = 9;
   SPOOL_SECTION_SUPPORT_ACCESS = 10;
+  // Complete signed-policy chain, sequence order. Member-gated like
+  // owner_genesis; not public on public spools. Replaces v1
+  // GetOwnerGovernanceHead without a new RPC.
+  SPOOL_SECTION_SIGNED_POLICY = 11;
 }
 
 message SpoolPages {
@@ -148,6 +163,8 @@ message ObserveSpoolRequest {
   ObserveOptions observe = 5;
   // Each requested administration section is independently authorized and
   // paginated. SectionStatus distinguishes not requested from unavailable.
+  // SPOOL_SECTION_SIGNED_POLICY is member-gated (not public on public spools)
+  // and MUST return the complete chain in sequence order.
 }
 
 message SpoolEvent {
@@ -170,6 +187,9 @@ message SpoolEvent {
     // Paged child summary, separate from the observed root spool.
     SpoolOverview child = 16;
     SourceTargetResolutionEvent source_target = 17;
+    // One signed-policy record. The signed-policy section lists them in
+    // sequence order (complete chain). Member-gated.
+    SignedSpoolPolicyRecord signed_policy = 18;
   }
 }
 

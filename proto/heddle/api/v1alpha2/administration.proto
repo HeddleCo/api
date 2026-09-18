@@ -35,29 +35,53 @@ message ResolveResourcesResponse {
   repeated ResourceResolution results = 1;
 }
 
-enum Audience {
-  AUDIENCE_UNSPECIFIED = 0;
-  AUDIENCE_PRIVATE = 1;
-  AUDIENCE_MEMBERS = 2;
-  AUDIENCE_PUBLIC = 3;
-}
 enum ResourceRole {
   RESOURCE_ROLE_UNSPECIFIED = 0;
   RESOURCE_ROLE_READER = 1;
   RESOURCE_ROLE_WRITER = 2;
   RESOURCE_ROLE_ADMINISTRATOR = 3;
 }
+
+// Delegated HOLD-verdict lifecycle on SpoolSettings. Not
+// abandoned_thread_retention. v1 VersionedHoldLifecycle was chain-inherited
+// and offline-citable; moving HOLD here drops that citation. UNSPECIFIED
+// inherits; the built-in root default is EXPLICIT_SUPERSESSION.
+enum HoldLifecycle {
+  HOLD_LIFECYCLE_UNSPECIFIED = 0;
+  HOLD_LIFECYCLE_EXPLICIT_SUPERSESSION = 1;
+  HOLD_LIFECYCLE_AUTO_CLEAR_ON_RESUBMIT = 2;
+}
+
 // Fresh bootstrap permits child creation and has no implicit approval mandate.
 // Explicit review policies still apply. A revision supplies the complete record;
 // its settings participate in the observed review policy version.
+//
+// Mutation is SpoolService.ReviseSpool under delegated
+// AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR. An owner signature is not a
+// prerequisite; independent of signed-policy expected_head CAS.
+// audience / default_state_audience MUST NOT exceed the standing inherited
+// owner-signed max_audience (min over this spool's tip and every ancestor's
+// tip; absent tip or absent field contributes nothing; present UNSPECIFIED
+// fails closed). Tightening does not recall already-cloned public bytes.
+//
+// Intentionally absent versus v1: write_policy (never enforced),
+// bootstrap_kind / bootstrap_source / bootstrap_sync_direction /
+// initial_tooling (create-time), sync_behavior (thread-domain). Format 1
+// has no signed forbid_child_creation.
 message SpoolSettings {
+  // Bounded by the standing inherited max_audience ceiling.
   Audience audience = 1;
+  // Must be <= audience. Also bounded by the inherited ceiling.
   Audience default_state_audience = 2;
   string description = 3;
+  // Delegated. Lossy versus v1 DISABLED / MAINTAINERS / DEVELOPERS. The
+  // inherited max_audience ceiling, not this flag, is what stops a PUBLIC
+  // child from disclosing a locked PRIVATE ancestor.
   bool allow_child_creation = 4;
   bool require_review_to_land = 5;
   google.protobuf.Duration abandoned_thread_retention = 6;
   RecordRef default_review_policy = 7;
+  HoldLifecycle hold_lifecycle = 8;
   // Opaque compare-and-swap version belongs to the containing spool record.
 }
 message SpoolMount {
@@ -80,6 +104,9 @@ message GrantRecord {
   bytes version = 2;
   string principal_id = 3;
   ResourceRole role = 4;
+  // Ancestor grants admit AUDIENCE_MEMBERS on a descendant only when this
+  // bit is true. false does not admit a child. Invitation redemption MUST
+  // preserve an existing bit on conflict (it does not silently set true).
   bool include_descendants = 5;
   google.protobuf.Timestamp expires_at = 6;
   // Optional display projection, as on MemberRecord. When present, id equals
@@ -97,6 +124,8 @@ message InvitationRecord {
   bool revoked = 6;
   bool redeemed = 7;
   // Redemption secrets are returned only by CreateInvitation, never observations.
+  // This record has no include_descendants field. Redeeming MUST preserve an
+  // existing GrantRecord.include_descendants bit on conflict.
 }
 message ApprovalGroupRecord {
   RecordRef ref = 1;
@@ -142,10 +171,15 @@ message SupportAccessRecord {
   ResourceRole role = 4;
   google.protobuf.Timestamp expires_at = 5;
   bool revoked = 6;
+  // Unrevoked support-access on this spool or on an ancestor that reaches
+  // this spool is admitted to AUDIENCE_MEMBERS. Not a GrantRecord/MemberRecord
+  // on the wire; writes go through SetSupportAccess, not PutGrant.
 }
 message CreateSpoolRequest {
   string client_operation_id = 1;
   // Existing parent; omit only for an authorized top-level creation.
+  // Child audience is bounded by effective_max_audience(parent), including
+  // grandparents. The child does not copy the parent's signed-policy record.
   SpoolRef parent = 2;
   // One address segment. The stable new spool UUID comes only from genesis.
   string slug = 3;
@@ -167,6 +201,11 @@ message CreateSpoolRequest {
 }
 // Compare and replace display name and complete settings atomically. The stable
 // UUID, parent, and immutable owner genesis are unchanged.
+// Owner signature is not a prerequisite. The mere existence of a signed-policy
+// tip does not block this RPC (independent CAS from expected_head).
+// settings.audience / default_state_audience are bounded by the standing
+// inherited max_audience (this spool and ancestors). Exceeding it is
+// PERMISSION_DENIED.
 message ReviseSpoolRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
@@ -180,6 +219,9 @@ message ReviseSpoolRequest {
 }
 // Move a personal-root child to the account's root-level address at its current
 // slug. UUID, genesis, descendants, and direct grants survive.
+// Bound by the destination ancestry's effective max_audience: refuse promotion
+// that would place a too-wide child under a tighter destination. Birth-parent
+// lock does not follow the promoted spool.
 message PromoteSpoolRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
@@ -300,4 +342,22 @@ message ListedSpool {
 }
 message ListSpoolsResponse {
   repeated ListedSpool spools = 1;
+}
+
+// Owner-signed spool policy submit. Not a prerequisite of ReviseSpool.
+// request.spool MUST equal record.body.spool_uuid; mismatch fails closed.
+// Proposed max_audience, if present and specified, MUST be <= the ancestors'
+// effective ceiling (min over ancestors only). Retry by client_operation_id.
+// The biscuit RESOURCE_OWNER role is necessary but not sufficient: the
+// verifier checks the owner signature against the server-derived current
+// owner OwnerState. Receipt binds SignedPolicyHead (Decision 8).
+message SubmitSignedPolicyRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  SignedSpoolPolicyRecord record = 3;
+}
+message SubmitSignedPolicyResponse {
+  MutationReceipt receipt = 1;
+  // Accepted CAS head after this submit. Unset is not a successful apply.
+  SignedPolicyHead signed_policy_head = 2;
 }

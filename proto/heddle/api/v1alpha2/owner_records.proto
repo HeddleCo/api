@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package heddle.api.v1alpha2;
 
+import "heddle/api/v1alpha2/common.proto";
+
 // Portable ownership evidence. These typed containers retain the independent
 // canonical signature domains, field ordering and durable format versions.
 // RPC package names are not signed. Only PURGE uses owner capabilities;
@@ -531,4 +533,153 @@ message ResourceTransferAuditRecord {
   int64 committed_at_unix_seconds = 2;
   bytes previous_audit_record_hash = 3;
   bytes audit_record_hash = 4;
+}
+
+// ── 7. Owner-signed spool policy ────────────────────────────────────────────
+//
+// Narrow owner-gated device capability: grow-only heddle-key-v1 revocations
+// and an enforced max_audience ceiling. NOT a wrap of SpoolSettings. NOT
+// common.SignedRecord. There is no min_write_role / SignedWriteFloor and no
+// forbid_child_creation in format 1. Do not fork OwnerRoot, RecoveryPolicy,
+// or the keyring.
+//
+// These protobuf messages are transport containers, not signed encodings.
+// Signatures MUST NOT cover a protobuf serialization (Decision 3(a)).
+// Canonical encoding inherits L17–27 of this file and the nested/optional
+// rules:
+//
+//   - Nested messages flatten in field-number order.
+//   - Enums encode as u32 big-endian.
+//   - optional fields take an explicit presence byte (0x00 = absent, stop;
+//     0x01 = present, then the field body). Absent max_audience and
+//     AUDIENCE_UNSPECIFIED are different byte strings; LWW treats them
+//     differently. Do not encode presence as "zero enum means unset."
+//   - revoked_key_ids: u32 count, then each 32-byte id length-prefixed,
+//     sorted bytewise, unique. Wrong width fails closed.
+//   - merge_parent_state_hashes: u32 count which MUST be 0 in format 1.
+//     Non-empty fails closed.
+//   - merge_policies sorted by UTF-8 setting_key.
+//   - owner_id and owner_state_hash are raw 32-byte fields, matching
+//     OwnerCapability.owner_id / OwnerRoot.owner_id.
+//   - ownership_transfer_sequence is u64 big-endian.
+//   - policy_state_hash = SHA-256("heddle-spool-signed-policy-v2" ||
+//     canonical fields 1–10).
+//   - Signature covers SHA-256("heddle-spool-signed-policy-signature-v2" ||
+//     canonical fields 1–11).
+//   - signer_key_id MUST equal owner_key_id of the authority key resolved
+//     for (owner_id, owner_state_hash). Never a RecoveryGuardian key,
+//     including RecoveryGuardianKind::Weft.
+//   - Do not reuse heddle-owner-governance-state-v1 /
+//     heddle-owner-governance-signature-v1.
+//   - format_version is exactly 1 while the domain strings say -v2. Do not
+//     "fix" one to match the other.
+//
+// Verifier-owned merge table (unknown / missing / duplicate keys fail
+// closed):
+//   revoked_key_ids → GROW_ONLY_SET_UNION
+//   max_audience    → LAST_WRITER_WINS
+// A successor cannot subtract a revoked key id. Empty revoked_key_ids at
+// genesis is valid. Absent max_audience at genesis is valid (no own
+// contribution). forbid_child_creation is not reserved; adding it is a
+// format bump.
+//
+// revoked_key_ids namespace is AuthorizationSignature.signer_key_id =
+// SHA-256("heddle-key-v1" || algorithm || public_key). It is not owner-root
+// / owner-authority retirement. A record whose set contains the id of the
+// key resolved for its own owner_state_hash, or of any key in that owner's
+// accepted transition history, is rejected on the introducing record (F7).
+// Hosted content writes (PublishContent / ReplicateThread / hosted land)
+// whose PoP AuthorizationSignature.signer_key_id is in the accepted tip's
+// union MUST be refused. Those RPCs use the same heddle-key-v1 namespace.
+// Weft MUST NOT refuse ReviseSpool / grants because a device key is listed.
+//
+// Transfer-aware key resolution. Body.owner_state_hash is OwnerState.version
+// of body.owner_id. Hosted SubmitSignedPolicy derives the authority key from
+// the spool's current owner OwnerState unconditionally (never a request key,
+// never owner_user_id.is_some() as a skip). Offline: verify_clone_keyring +
+// verify_current_owner. Parties at k >= 1 are resolved by
+// (handoff.destination_owner_uuid, handoff.destination_owner_key_state_hash)
+// via owner_for — not root.account_uuid. When k == k_max, bind the current
+// owner's account history with verify_current_owner. A record with
+// k < k_max is accepted only if a later record in the same served chain has
+// k == k_max and hash-chains to it (N2). Account OwnerHistory alone is not
+// the resolver.
+//
+// Ceiling enforcement is standing and inherited, not a birth bound: effective
+// max_audience is min over this spool's tip and every ancestor's tip. Absence
+// of a tip, or a tip with max_audience absent, means that spool contributes
+// nothing (it is not a license for descendants to ignore ancestors). Present
+// UNSPECIFIED fails closed. SubmitSignedPolicy on a child that would store a
+// looser max_audience than the ancestors' min is rejected.
+//
+// Weft never constructs or signs this record.
+
+enum SignedPolicyMergeSemantics {
+  SIGNED_POLICY_MERGE_SEMANTICS_UNSPECIFIED = 0;
+  SIGNED_POLICY_MERGE_SEMANTICS_LAST_WRITER_WINS = 1;
+  SIGNED_POLICY_MERGE_SEMANTICS_GROW_ONLY_SET_UNION = 2;
+}
+
+message SignedPolicyMergeRule {
+  // Canonical field name on SignedSpoolPolicy ("revoked_key_ids",
+  // "max_audience").
+  string setting_key = 1;
+  SignedPolicyMergeSemantics semantics = 2;
+}
+
+// CAS predecessor. Independent of ReviseSpool.expected_version.
+// Zero hash + sequence 0 = genesis.
+message SignedPolicyHead {
+  // 32 bytes; genesis is 32 zero bytes.
+  bytes state_hash = 1;
+  // Genesis is 0.
+  uint64 sequence = 2;
+}
+
+// Offline-verifiable, owner-gated payload. NOT a copy of SpoolSettings.
+// Substantive content: grow-only revocations + max_audience ceiling.
+message SignedSpoolPolicy {
+  // Grow-only. Verifier key "revoked_key_ids".
+  // Each entry is a 32-byte heddle-key-v1 signer_key_id
+  // (SHA-256("heddle-key-v1" || algorithm || public_key)).
+  // Sorted unique. Empty is valid.
+  repeated bytes revoked_key_ids = 1;
+  // Optional max existence/history audience. LWW.
+  // proto3 optional: canonical encoding uses an explicit presence byte.
+  // Absence = no own contribution to the inherited min.
+  // Present UNSPECIFIED fails closed.
+  // Discriminant order is restrictiveness: PRIVATE < MEMBERS < PUBLIC.
+  // Tightening PUBLIC → PRIVATE does not un-disclose bytes already cloned
+  // while the spool (or a descendant) was public. Tightening an ancestor's
+  // ceiling likewise does not recall already-public descendants.
+  optional Audience max_audience = 2;
+}
+
+message SignedPolicyBody {
+  // Exactly 1 (domains say -v2).
+  uint32 format_version = 1;
+  // 16 raw bytes.
+  bytes spool_uuid = 2;
+  SignedPolicyHead expected_head = 3;
+  // expected_head.sequence + 1.
+  uint64 sequence = 4;
+  // Format 1: MUST be empty.
+  repeated bytes merge_parent_state_hashes = 5;
+  SignedSpoolPolicy policy = 6;
+  repeated SignedPolicyMergeRule merge_policies = 7;
+  // 32 bytes; OwnerCapability.owner_id / OwnerRoot.owner_id.
+  bytes owner_id = 8;
+  // OwnerState.version of owner_id; 32 bytes.
+  bytes owner_state_hash = 9;
+  // Spool's accepted transfer_sequence at signing; 0 = genesis owner.
+  uint64 ownership_transfer_sequence = 10;
+  // SHA-256(state domain || canonical 1–10).
+  bytes policy_state_hash = 11;
+}
+
+message SignedSpoolPolicyRecord {
+  SignedPolicyBody body = 1;
+  // Authority key of (body.owner_id, body.owner_state_hash) signs.
+  // Weft never signs.
+  AuthorizationSignature owner_signature = 2;
 }

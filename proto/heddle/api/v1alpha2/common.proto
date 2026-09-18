@@ -31,6 +31,32 @@ message SpoolRef {
   string id = 1;
 }
 
+// Existence/history audience for a spool. Numeric tags match v1 Visibility
+// (PRIVATE=1, INTERNAL/MEMBERS=2, PUBLIC=3). Do not add AUDIENCE_INTERNAL.
+//
+// AUDIENCE_MEMBERS — principals who hold a GrantRecord or MemberRecord on
+// this spool, or a GrantRecord on an ancestor with include_descendants=true
+// that reaches this spool (unexpired), or an unrevoked native_support_access
+// row on this spool or on such an ancestor. It is not "any signed-in Heddle
+// user" and is not keyed on parent kind. CreateSpool / ReviseSpool do not
+// reject MEMBERS by parent kind. An ancestor grant with
+// include_descendants=false does not admit a child. Persistence may store
+// the token "internal"; a later rename to "members" is not a widening.
+//
+// Coherence: default_state_audience <= audience. No PRIVATE-existence +
+// MEMBERS-history carve-out. PUBLIC history requires PUBLIC existence.
+// Discriminant order is restrictiveness: PRIVATE < MEMBERS < PUBLIC.
+//
+// An owner-signed max_audience ceiling cannot widen this table; it only
+// stops delegated writes from moving this spool or a descendant to a wider
+// cell. See SignedSpoolPolicy.max_audience.
+enum Audience {
+  AUDIENCE_UNSPECIFIED = 0;
+  AUDIENCE_PRIVATE = 1;
+  AUDIENCE_MEMBERS = 2;
+  AUDIENCE_PUBLIC = 3;
+}
+
 // Observed address of a stable Spool identity. Renames change the address,
 // never the UUID. An address is presentation/routing metadata, not authority.
 message SpoolAddress {

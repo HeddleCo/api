@@ -65,6 +65,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "#[allow(clippy::large_enum_variant)]",
         );
     }
+    config.type_attribute(
+        ".heddle.api.common.GitLaneTransfer.body",
+        "#[allow(clippy::large_enum_variant)]",
+    );
+    config.type_attribute(
+        ".heddle.api.v1alpha2.PresenceEvent.event",
+        "#[allow(clippy::large_enum_variant)]",
+    );
     config
         .file_descriptor_set_path(&descriptor)
         .compile_protos(&protos, &[proto_root])?;

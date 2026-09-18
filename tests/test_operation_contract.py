@@ -4,8 +4,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-OPERATION_PROTO = ROOT / "proto/heddle/api/v1alpha1/operation.proto"
-TYPES_PROTO = ROOT / "proto/heddle/api/v1alpha1/types.proto"
+OPERATION_PROTO = ROOT / "proto/heddle/api/v1alpha2/operation.proto"
+TYPES_PROTO = ROOT / "proto/heddle/api/common/types.proto"
 
 
 def message_body(source: str, name: str) -> str:
@@ -144,7 +144,7 @@ class SharedOperationContractTest(unittest.TestCase):
         self.assertRegex(result, r"\bRemoteSyncOperationResult\s+remote_sync\s*=")
 
         proto_sources = "\n".join(
-            path.read_text() for path in (ROOT / "proto/heddle/api/v1alpha1").glob("*.proto")
+            path.read_text() for path in (ROOT / "proto/heddle/api/v1alpha2").glob("*.proto")
         )
         for removed in (
             "CreateImportJob",

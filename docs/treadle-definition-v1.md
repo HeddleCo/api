@@ -1,6 +1,6 @@
 # Treadle definition format v1
 
-`heddle.api.v1alpha1.TreadleDefinition` is the language-neutral contract between
+`heddle.api.common.TreadleDefinition` is the language-neutral contract between
 treadle authoring SDKs and native runners. The canonical protobuf bytes—not a
 TOML, JSON, or TypeScript representation—are content-addressed with BLAKE3 and
 bound by signatures/verdicts.

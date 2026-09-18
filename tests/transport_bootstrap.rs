@@ -1,5 +1,5 @@
 use heddle_api::{
-    heddle::api::v1alpha1::{DescriptorKeyRotation, EndpointDescriptor, RelayAdmissionClaims},
+    heddle::api::common::{DescriptorKeyRotation, EndpointDescriptor, RelayAdmissionClaims},
     signing::{endpoint_descriptor_bytes, relay_admission_bytes},
 };
 

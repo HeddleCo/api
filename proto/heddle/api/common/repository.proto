@@ -1,0 +1,314 @@
+syntax = "proto3";
+
+package heddle.api.common;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/common/types.proto";
+
+message DiffSpan {
+  uint32 start = 1; // byte offset into content
+  uint32 end = 2; // byte offset (exclusive)
+  bool changed = 3; // true = this span was added/removed
+}
+
+// Diff line vocabulary emitted by the repository diff model.
+enum DiffLineKind {
+  DIFF_LINE_KIND_UNSPECIFIED = 0;
+  DIFF_LINE_KIND_CONTEXT = 1;
+  DIFF_LINE_KIND_ADDED = 2;
+  DIFF_LINE_KIND_REMOVED = 3;
+}
+
+// File delta vocabulary emitted by the repository diff model.
+enum FileDiffKind {
+  FILE_DIFF_KIND_UNSPECIFIED = 0;
+  FILE_DIFF_KIND_ADDED = 1;
+  FILE_DIFF_KIND_MODIFIED = 2;
+  FILE_DIFF_KIND_DELETED = 3;
+  // Producer emits "renamed" (heddle core/src/diff/mod.rs). Must be
+  // representable, not folded into MODIFIED.
+  FILE_DIFF_KIND_RENAMED = 4;
+}
+
+// Semantic change classification emitted by the repository diff analyzer.
+// UNCLASSIFIED is the legacy "modified" fallback when no finer result exists.
+enum ChangeClassification {
+  CHANGE_CLASSIFICATION_UNSPECIFIED = 0;
+  CHANGE_CLASSIFICATION_LOGIC = 1;
+  CHANGE_CLASSIFICATION_WHITESPACE_ONLY = 2;
+  CHANGE_CLASSIFICATION_IMPORTS_ONLY = 3;
+  CHANGE_CLASSIFICATION_COMMENTS_ONLY = 4;
+  CHANGE_CLASSIFICATION_FORMATTING_ONLY = 5;
+  CHANGE_CLASSIFICATION_MIXED = 6;
+  CHANGE_CLASSIFICATION_UNCLASSIFIED = 7;
+}
+
+// Review importance emitted by the repository diff analyzer.
+enum ChangeImportance {
+  CHANGE_IMPORTANCE_UNSPECIFIED = 0;
+  CHANGE_IMPORTANCE_NOISE = 1;
+  CHANGE_IMPORTANCE_LOW = 2;
+  CHANGE_IMPORTANCE_MEDIUM = 3;
+  CHANGE_IMPORTANCE_HIGH = 4;
+}
+
+// Per-symbol delta vocabulary emitted by the merkle semantic index.
+enum SymbolChangeKind {
+  SYMBOL_CHANGE_KIND_UNSPECIFIED = 0;
+  SYMBOL_CHANGE_KIND_ADDED = 1;
+  SYMBOL_CHANGE_KIND_REMOVED = 2;
+  SYMBOL_CHANGE_KIND_LOGIC = 3;
+  SYMBOL_CHANGE_KIND_COSMETIC = 4;
+}
+
+// Symbol kinds emitted by the repository semantic index (api#32).
+enum SymbolKind {
+  SYMBOL_KIND_UNSPECIFIED = 0;
+  SYMBOL_KIND_FUNCTION = 1;
+  SYMBOL_KIND_TYPE = 2;
+  SYMBOL_KIND_ENUM = 3;
+  SYMBOL_KIND_TRAIT = 4;
+  SYMBOL_KIND_CLASS = 5;
+  SYMBOL_KIND_INTERFACE = 6;
+  SYMBOL_KIND_TYPE_ALIAS = 7;
+  SYMBOL_KIND_CONST = 8;
+  SYMBOL_KIND_MODULE = 9;
+  SYMBOL_KIND_OTHER = 10;
+}
+
+message DiffLine {
+  DiffLineKind kind = 1;
+  string content = 2;
+  repeated DiffSpan word_changes = 3;
+  optional string moved_counterpart_path = 4;
+  optional uint32 moved_counterpart_line = 5;
+}
+
+// One changed symbol, derived from the content-addressed merkle semantic index
+// (heddle#1067). Parse-free and reformat-stable: `change` distinguishes a logic
+// change from a cosmetic one by comparing the symbol's semantic_hash across states,
+// so pure reformatting reads as "cosmetic" rather than "logic". Empty for files
+// with no attached semantic index (see FileDiff.semantic_index_backed).
+message SymbolChange {
+  // Fully-qualified address, "Container::name" (e.g. "Parser::parse_array").
+  string anchor = 1;
+  // Leaf symbol name (e.g. "parse_array").
+  string name = 2;
+  // Container path (e.g. "Parser"); empty for a top-level symbol.
+  string container = 3;
+  // Closed symbol kind emitted by the repository semantic index (api#32).
+  SymbolKind kind = 4;
+  // How the symbol changed, from the merkle semantic index.
+  SymbolChangeKind change = 5;
+  // semantic_hash before the change (hex); empty when change == "added".
+  string old_semantic_hash = 6;
+  // semantic_hash after the change (hex); empty when change == "removed".
+  string new_semantic_hash = 7;
+}
+
+message DiffHunk {
+  uint32 old_start = 1;
+  uint32 old_lines = 2;
+  uint32 new_start = 3;
+  uint32 new_lines = 4;
+  repeated DiffLine lines = 5;
+  // Display anchor of the symbol covering this hunk (e.g. "Parser::parse_array").
+  // Empty when the hunk maps to no indexed symbol (or the file is not index-backed).
+  string symbol_context = 6;
+  // Classification of the covering symbol's change for this hunk.
+  // UNSPECIFIED means unknown or not index-backed.
+  SymbolChangeKind symbol_change = 7;
+}
+
+message FileDiff {
+  string path = 1;
+  FileDiffKind kind = 2;
+  repeated DiffHunk hunks = 3;
+  // Semantic classification of the modification.
+  // Merkle-index-derived when semantic_index_backed is true, else the legacy parse heuristic.
+  ChangeClassification classification = 4;
+  // Review importance from the repository diff analyzer.
+  ChangeImportance importance = 5;
+  // Per-symbol deltas from the semantic index; empty when the file has no attached index.
+  repeated SymbolChange symbol_changes = 6;
+  // True when classification and symbol_changes came from the merkle semantic index;
+  // false when they fell back to the legacy parse heuristic (or are unknown). Lets a
+  // client show semantic badges only when real index data backs them.
+  bool semantic_index_backed = 7;
+}
+
+message SemanticHotSpot {
+  // "file" or "function".
+  string key_kind = 1;
+  string path = 2;
+  // Empty unless `key_kind == "function"`.
+  string function = 3;
+  uint32 event_count = 4;
+  uint32 state_count = 5;
+  string first_seen = 6;
+  string last_seen = 7;
+  // Histogram of event kinds (e.g. {"signature_changed": 3,
+  // "function_extracted": 2}). Sums to `event_count`.
+  map<string, uint32> by_kind = 8;
+  // Histogram of actors (e.g. {"alice <a@x>": 4}). Empty unless the
+  // request set `include_actors = true`.
+  map<string, uint32> by_actor = 9;
+}
+
+message StatePrincipal {
+  string name = 1;
+  string email = 2;
+}
+
+message StateAgent {
+  string provider = 1;
+  string model = 2;
+}
+
+message StateVerification {
+  uint32 tests_passed = 1;
+  uint32 tests_failed = 2;
+  optional float coverage_pct = 3;
+  optional float coverage_delta = 4;
+  uint32 lint_warnings = 5;
+}
+
+message StateSummary {
+  StateId state_id = 1;
+  repeated bytes parents = 2;
+  string intent = 3;
+  google.protobuf.Timestamp created_at = 4;
+  StatePrincipal principal = 5;
+  optional StateAgent agent = 6;
+  optional float confidence = 7;
+  StateStatus status = 8;
+  optional StateVerification verification = 9;
+  ChangeId change_id = 10;
+  // The agent run that produced this state, linking StateAgent attribution to run logs.
+  optional string agent_run_id = 11;
+}
+
+message BlameOrigin {
+  StateId state_id = 1;
+  string author = 2;
+  string timestamp = 3;
+  string principal_name = 4;
+  string principal_email = 5;
+  string agent_provider = 6;
+  string agent_model = 7;
+}
+
+message BlameLine {
+  uint32 line_number = 1;
+  string content = 2;
+  StateId state_id = 3;
+  string author = 4;
+  string timestamp = 5;
+  repeated BlameOrigin origins = 6;
+  bool carried = 7;
+}
+
+message BlameSummary {
+  uint32 total_lines = 1;
+  uint32 distinct_origin_count = 2;
+  uint32 multi_origin_line_count = 3;
+  uint32 carried_line_count = 4;
+}
+
+// Per-file discriminant from v1 ListProvenanceSummaries. v2 ProvenanceResult
+// uses Coverage for completeness; this status is still emitted by weft's
+// compare-cache / provenance summary path.
+enum ProvenanceFileStatus {
+  PROVENANCE_FILE_STATUS_UNSPECIFIED = 0;
+  PROVENANCE_FILE_STATUS_AVAILABLE = 1;
+  PROVENANCE_FILE_STATUS_PROVENANCE_ABSENT = 2;
+  PROVENANCE_FILE_STATUS_BINARY = 3;
+  PROVENANCE_FILE_STATUS_FILE_NOT_FOUND = 4;
+  PROVENANCE_FILE_STATUS_ERROR = 5;
+  PROVENANCE_FILE_STATUS_PENDING = 6;
+}
+
+// Typed projection of RepoEvent.event_type. `event_type` (a free-form string)
+// stays authoritative on the wire; `kind` is the enum any consumer can switch
+// on. UNSPECIFIED means the producer emitted an event_type this enum does not
+// yet name — read event_type in that case. Additive: new kinds append at the
+// next free number.
+enum RepoEventKind {
+  REPO_EVENT_KIND_UNSPECIFIED = 0;
+  // A discussion turn appended on a thread, carried on the live plane so
+  // clients render new turns without polling. Pairs with state_review.proto
+  // DiscussionTurn.turn_seq / turn_id.
+  REPO_EVENT_KIND_DISCUSSION_TURN = 1;
+}
+
+message RepoEvent {
+  int64 event_id = 1;
+  string repo_id = 2;
+  string event_type = 3;
+  string thread = 4;
+  string ref_name = 5;
+  bool is_thread = 6;
+  StateId old_state = 7;
+  StateId new_state = 8;
+  string actor_subject = 9;
+  // Deepest delegation label recorded by an agent attenuation block. Empty for
+  // an undelegated root credential; actor_subject remains the root subject.
+  string actor_agent_id = 14;
+  string payload_json = 10;
+  google.protobuf.Timestamp created_at = 11;
+  // Visible path of repo_id, for multi-repo client routing.
+  RepositoryRef repo_path = 12;
+  // Present exactly when this is a thread event; paired with `thread`.
+  string thread_id = 13;
+  // Typed projection of event_type; UNSPECIFIED when this producer's event_type
+  // is not yet named by RepoEventKind. Never overrides event_type.
+  RepoEventKind kind = 15;
+}
+
+// Git overlay lane. Live v1 object-wire types used by weft git_lane on
+// push/pull. Distinct from PackExtent.KIND_GIT_PACK (generic pack extents).
+// Restored with original field numbers and enum values.
+enum GitRefKind {
+  GIT_REF_KIND_UNSPECIFIED = 0;
+  GIT_REF_KIND_BRANCH = 1;
+  GIT_REF_KIND_TAG = 2;
+  GIT_REF_KIND_NOTE = 3;
+  GIT_REF_KIND_OTHER = 4;
+}
+
+message GitPackTransfer {
+  string transfer_id = 1;
+  uint64 offset = 2;
+  uint32 chunk_index = 3;
+  bool is_final_chunk = 4;
+  uint64 pack_size = 5;
+  bytes pack_chunk = 6;
+  bytes pack_id = 7;
+}
+
+message GitRefUpdateTransfer {
+  string name = 1;
+  GitRefKind kind = 2;
+  GitObjectId target_oid = 3;
+  GitObjectId peeled_oid = 4;
+  bool expected_missing = 5;
+  GitObjectId expected_target_oid = 6;
+  GitCheckpointTransfer checkpoint = 7;
+}
+
+message GitCheckpointTransfer {
+  StateId heddle_state_id = 1;
+  GitObjectId git_commit_oid = 2;
+  string thread = 3;
+  string metadata_json = 4;
+  // Stable identity paired with the renameable thread ref.
+  string thread_id = 5;
+}
+
+message GitLaneTransfer {
+  oneof body {
+    GitPackTransfer pack = 1;
+    GitRefUpdateTransfer ref_update = 2;
+    GitCheckpointTransfer checkpoint = 3;
+  }
+}

@@ -3,7 +3,7 @@
 use bytes::{BufMut, BytesMut};
 use prost::Message;
 
-use crate::heddle::api::v1alpha1::{CallContext, CallFailure};
+use crate::heddle::api::common::{CallContext, CallFailure};
 
 /// Largest fully-qualified method path accepted by the hosted-call protocol.
 pub const MAX_METHOD_PATH: usize = 1024;

@@ -9,7 +9,7 @@ use ed25519_dalek::{Signature, VerifyingKey};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::heddle::api::v1alpha1::{EndpointDescriptor, SignedEndpointDescriptor};
+use crate::heddle::api::common::{EndpointDescriptor, SignedEndpointDescriptor};
 use crate::signing::{canonical_with_domain, endpoint_descriptor_bytes};
 
 /// Document version for [`EndpointDescriptorSetDocument`].

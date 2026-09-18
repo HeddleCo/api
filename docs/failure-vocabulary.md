@@ -2,7 +2,7 @@
 
 The hosted failure surface is one structured channel: a failed call carries
 `CallFailure { code, message, error }`, and `CallFailure.error` is a single
-[`ErrorDetail`](../proto/heddle/api/v1alpha1/errors.proto) whose `context` oneof
+[`ErrorDetail`](../proto/heddle/api/common/errors.proto) whose `context` oneof
 names what kind of failure it is and what to do about it. The authoritative
 shapes live in `errors.proto`; this page records the semantics consumers must
 agree on, especially for details a reader does not recognize.
@@ -54,7 +54,7 @@ they did not compile in:
   arm is outside its compiled vocabulary MUST re-emit it as
   `context = unknown(UnknownDetail { type_url, value })`:
   * `type_url` follows the Any convention,
-    `type.googleapis.com/heddle.api.v1alpha1.<MessageName>`.
+    `type.googleapis.com/heddle.api.v1alpha2.<MessageName>`.
   * `value` is the unrecognized message's encoded bytes, verbatim — not the
     whole enclosing `ErrorDetail`.
 

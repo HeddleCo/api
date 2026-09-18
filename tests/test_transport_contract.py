@@ -4,8 +4,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-CONTRACT = ROOT / "proto/heddle/api/v1alpha1/contract.proto"
-ERRORS = ROOT / "proto/heddle/api/v1alpha1/errors.proto"
+CONTRACT = ROOT / "proto/heddle/api/common/contract.proto"
+ERRORS = ROOT / "proto/heddle/api/common/errors.proto"
 
 
 class TransportContractTest(unittest.TestCase):

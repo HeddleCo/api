@@ -1,0 +1,363 @@
+syntax = "proto3";
+package heddle.api.v1alpha2;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/owner_records.proto";
+import "heddle/api/v1alpha2/stream.proto";
+
+// Account names and paths resolve to stable resources once. They never become
+// authorization roots or replace the stable IDs in subsequent commands.
+message ResourceSelector {
+  oneof selector {
+    EntityRef resource = 1;
+    string spool_address = 2;
+    ThreadNameSelector thread_name = 3;
+    string principal_handle = 4;
+  }
+}
+message ThreadNameSelector {
+  SpoolRef spool = 1;
+  string name = 2;
+}
+message ResolveResourcesRequest {
+  repeated ResourceSelector selectors = 1;
+  ReadBudget budget = 2;
+}
+message ResourceResolution {
+  uint32 selection_index = 1;
+  EntityRef resource = 2;
+  string principal_id = 3;
+  Coverage coverage = 4;
+}
+message ResolveResourcesResponse {
+  repeated ResourceResolution results = 1;
+}
+
+enum ResourceRole {
+  RESOURCE_ROLE_UNSPECIFIED = 0;
+  RESOURCE_ROLE_READER = 1;
+  RESOURCE_ROLE_WRITER = 2;
+  RESOURCE_ROLE_ADMINISTRATOR = 3;
+}
+
+// Delegated HOLD-verdict lifecycle on SpoolSettings. Not
+// abandoned_thread_retention. v1 VersionedHoldLifecycle was chain-inherited
+// and offline-citable; moving HOLD here drops that citation. UNSPECIFIED
+// inherits; the built-in root default is EXPLICIT_SUPERSESSION.
+enum HoldLifecycle {
+  HOLD_LIFECYCLE_UNSPECIFIED = 0;
+  HOLD_LIFECYCLE_EXPLICIT_SUPERSESSION = 1;
+  HOLD_LIFECYCLE_AUTO_CLEAR_ON_RESUBMIT = 2;
+}
+
+// Fresh bootstrap permits child creation and has no implicit approval mandate.
+// Explicit review policies still apply. A revision supplies the complete record;
+// its settings participate in the observed review policy version.
+//
+// Mutation is SpoolService.ReviseSpool under delegated
+// AUTHORIZATION_ROLE_RESOURCE_ADMINISTRATOR. An owner signature is not a
+// prerequisite; independent of signed-policy expected_head CAS.
+// audience / default_state_audience MUST NOT exceed the standing inherited
+// owner-signed max_audience (min over this spool's tip and every ancestor's
+// tip; absent tip or absent field contributes nothing; present UNSPECIFIED
+// fails closed). Tightening does not recall already-cloned public bytes.
+//
+// Intentionally absent versus v1: write_policy (never enforced),
+// bootstrap_kind / bootstrap_source / bootstrap_sync_direction /
+// initial_tooling (create-time), sync_behavior (thread-domain). Format 1
+// has no signed forbid_child_creation.
+message SpoolSettings {
+  // Bounded by the standing inherited max_audience ceiling.
+  Audience audience = 1;
+  // Must be <= audience. Also bounded by the inherited ceiling.
+  Audience default_state_audience = 2;
+  string description = 3;
+  // Delegated. Lossy versus v1 DISABLED / MAINTAINERS / DEVELOPERS. The
+  // inherited max_audience ceiling, not this flag, is what stops a PUBLIC
+  // child from disclosing a locked PRIVATE ancestor.
+  bool allow_child_creation = 4;
+  bool require_review_to_land = 5;
+  google.protobuf.Duration abandoned_thread_retention = 6;
+  RecordRef default_review_policy = 7;
+  HoldLifecycle hold_lifecycle = 8;
+  // Opaque compare-and-swap version belongs to the containing spool record.
+}
+message SpoolMount {
+  RecordRef ref = 1;
+  SpoolRef parent = 2;
+  SpoolRef child = 3;
+  string name = 4;
+  bytes version = 5;
+}
+message MemberRecord {
+  RecordRef ref = 1;
+  string principal_id = 2;
+  ResourceRole role = 3;
+  bytes version = 4;
+  // When present, id must equal principal_id; absent means display unavailable.
+  PublicPrincipalSummary principal = 5;
+}
+message GrantRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string principal_id = 3;
+  ResourceRole role = 4;
+  // Ancestor grants admit AUDIENCE_MEMBERS on a descendant only when this
+  // bit is true. false does not admit a child. Invitation redemption MUST
+  // preserve an existing bit on conflict (it does not silently set true).
+  bool include_descendants = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  // Optional display projection, as on MemberRecord. When present, id equals
+  // principal_id. Authorization always uses principal_id and the grant itself;
+  // a handle or display name is never an authority assertion.
+  PublicPrincipalSummary principal = 7;
+  // Ordinary grants never imply owner purge authority.
+}
+message InvitationRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string recipient = 3;
+  ResourceRole role = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  bool revoked = 6;
+  bool redeemed = 7;
+  // Redemption secrets are returned only by CreateInvitation, never observations.
+  // This record has no include_descendants field. Redeeming MUST preserve an
+  // existing GrantRecord.include_descendants bit on conflict.
+}
+message ApprovalGroupRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string name = 3;
+  string description = 4;
+  repeated string principal_ids = 5;
+}
+message GroupRequirement {
+  RecordRef group = 1;
+  uint32 minimum_approvals = 2;
+}
+message ReviewPolicyRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string name = 3;
+  repeated ThreadRef targets = 4;
+  repeated string target_name_patterns = 5;
+  uint32 required_approvals = 6;
+  ResourceRole minimum_role = 7;
+  repeated string required_paths = 8;
+  bool forbid_author_approval = 9;
+  bool stale_on_revision_change = 10;
+  google.protobuf.Duration approval_ttl = 11;
+  repeated GroupRequirement groups = 12;
+  repeated string required_checks = 13;
+}
+message BookmarkRecord {
+  BookmarkRef ref = 1;
+  bytes version = 2;
+  string label = 3;
+  // False is a retained tombstone with its own CAS version.
+  bool bookmarked = 4;
+}
+message BookmarkMutationResponse {
+  MutationReceipt receipt = 1;
+  BookmarkRecord bookmark = 2;
+}
+message SupportAccessRecord {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string support_principal_id = 3;
+  ResourceRole role = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  bool revoked = 6;
+  // Unrevoked support-access on this spool or on an ancestor that reaches
+  // this spool is admitted to AUDIENCE_MEMBERS. Not a GrantRecord/MemberRecord
+  // on the wire; writes go through SetSupportAccess, not PutGrant.
+}
+message CreateSpoolRequest {
+  string client_operation_id = 1;
+  // Existing parent; omit only for an authorized top-level creation.
+  // Child audience is bounded by effective_max_audience(parent), including
+  // grandparents. The child does not copy the parent's signed-policy record.
+  SpoolRef parent = 2;
+  // One address segment. The stable new spool UUID comes only from genesis.
+  string slug = 3;
+  SpoolSettings settings = 4;
+  oneof ownership {
+    // Signed by the account's current owner authority. Admission verifies the
+    // account's root and accepted rotation history and compares its current key
+    // atomically with creation. Historical membership alone cannot create a
+    // new spool. Retry the original signed genesis and operation ID.
+    SignedSpoolOwnerGenesis owner_genesis = 5;
+    // Explicit creation through this account's existing server-held authority.
+    // The client supplies a fresh UUIDv7. Only an active server-rooted account
+    // with configured per-user custody can use this branch; it never establishes
+    // a root or falls back to the deployment key. The response contains the same
+    // portable signed genesis and owner history as client-signed creation.
+    SpoolRef custodial_spool = 7;
+  }
+  optional string display_name = 6;
+}
+// Compare and replace display name and complete settings atomically. The stable
+// UUID, parent, and immutable owner genesis are unchanged.
+// Owner signature is not a prerequisite. The mere existence of a signed-policy
+// tip does not block this RPC (independent CAS from expected_head).
+// settings.audience / default_state_audience are bounded by the standing
+// inherited max_audience (this spool and ancestors). Exceeding it is
+// PERMISSION_DENIED.
+message ReviseSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+  string name = 4;
+  SpoolSettings settings = 5;
+  // Optional new single address segment. Omission retains the current slug.
+  // Rename updates descendant addresses in the same transaction and preserves
+  // UUID-based references, grants and ownership. Empty is invalid when present.
+  optional string slug = 6;
+}
+// Move a personal-root child to the account's root-level address at its current
+// slug. UUID, genesis, descendants, and direct grants survive.
+// Bound by the destination ancestry's effective max_audience: refuse promotion
+// that would place a too-wide child under a tighter destination. Birth-parent
+// lock does not follow the promoted spool.
+message PromoteSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+}
+message DeleteSpoolRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  bytes expected_version = 3;
+}
+message SetSpoolMountRequest {
+  string client_operation_id = 1;
+  SpoolMount mount = 2;
+  bytes expected_version = 3;
+}
+message RemoveSpoolMountRequest {
+  string client_operation_id = 1;
+  SpoolMount mount = 2;
+  bytes expected_version = 3;
+}
+message PutGrantRequest {
+  string client_operation_id = 1;
+  GrantRecord grant = 2;
+  bytes expected_version = 3;
+}
+message RevokeGrantRequest {
+  string client_operation_id = 1;
+  RecordRef grant = 2;
+  bytes expected_version = 3;
+}
+message CreateInvitationRequest {
+  string client_operation_id = 1;
+  InvitationRecord invitation = 2;
+}
+message CreateInvitationResponse {
+  MutationReceipt receipt = 1;
+  InvitationRecord invitation = 2;
+  bytes redemption_secret = 3;
+}
+// Public capability preview. The invitation ID alone reveals nothing; the
+// redemption secret is passed in the request body and never placed in a URL
+// path or query. No recipient email or inviter identity is disclosed.
+message ResolveInvitationRequest {
+  RecordRef invitation = 1;
+  bytes redemption_secret = 2;
+}
+message InvitationResolution {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_AVAILABLE = 1;
+    STATUS_REDEEMED = 2;
+    STATUS_UNAVAILABLE = 3;
+  }
+  Status status = 1;
+  SpoolAddress spool = 2;
+  string spool_name = 3;
+  ResourceRole role = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+message RedeemInvitationRequest {
+  string client_operation_id = 1;
+  RecordRef invitation = 2;
+  bytes redemption_secret = 3;
+}
+message RevokeInvitationRequest {
+  string client_operation_id = 1;
+  RecordRef invitation = 2;
+  bytes expected_version = 3;
+}
+message PutReviewPolicyRequest {
+  string client_operation_id = 1;
+  ReviewPolicyRecord policy = 2;
+  bytes expected_version = 3;
+}
+message DeleteReviewPolicyRequest {
+  string client_operation_id = 1;
+  RecordRef policy = 2;
+  bytes expected_version = 3;
+}
+message PutApprovalGroupRequest {
+  string client_operation_id = 1;
+  ApprovalGroupRecord group = 2;
+  bytes expected_version = 3;
+}
+message DeleteApprovalGroupRequest {
+  string client_operation_id = 1;
+  RecordRef group = 2;
+  bytes expected_version = 3;
+}
+message SetBookmarkRequest {
+  string client_operation_id = 1;
+  BookmarkRef bookmark = 2;
+  bool bookmarked = 3;
+  // Empty means no bookmark has ever existed; tombstones retain a version.
+  bytes expected_version = 4;
+  string label = 5;
+}
+message SetSupportAccessRequest {
+  string client_operation_id = 1;
+  SupportAccessRecord access = 2;
+  bytes expected_version = 3;
+}
+
+// Grant-reachable unary Spool listing for whoami and admin surfaces.
+// ObserveWorkspace remains the live composed workspace view; this RPC is the
+// bounded one-shot catalog of Spools reachable through the caller's grants.
+// `repos_only` keeps content-bearing (repository/project) rows.
+message ListSpoolsRequest {
+  bool repos_only = 1;
+}
+message ListedSpool {
+  SpoolRef ref = 1;
+  repeated string path_segments = 2;
+  bool is_repo = 3;
+  google.protobuf.Timestamp last_activity_at = 4;
+  optional uint32 thread_count = 5;
+  string head_thread = 6;
+}
+message ListSpoolsResponse {
+  repeated ListedSpool spools = 1;
+}
+
+// Owner-signed spool policy submit. Not a prerequisite of ReviseSpool.
+// request.spool MUST equal record.body.spool_uuid; mismatch fails closed.
+// Proposed max_audience, if present and specified, MUST be <= the ancestors'
+// effective ceiling (min over ancestors only). Retry by client_operation_id.
+// The biscuit RESOURCE_OWNER role is necessary but not sufficient: the
+// verifier checks the owner signature against the server-derived current
+// owner OwnerState. Receipt binds SignedPolicyHead (Decision 8).
+message SubmitSignedPolicyRequest {
+  string client_operation_id = 1;
+  SpoolRef spool = 2;
+  SignedSpoolPolicyRecord record = 3;
+}
+message SubmitSignedPolicyResponse {
+  MutationReceipt receipt = 1;
+  // Accepted CAS head after this submit. Unset is not a successful apply.
+  SignedPolicyHead signed_policy_head = 2;
+}

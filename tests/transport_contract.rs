@@ -9,25 +9,13 @@ use heddle_api::framing::{
     encode_stream_message_into, encode_stream_raw_body, encode_stream_raw_body_into,
     encode_success_response, encode_success_response_into,
 };
-use heddle_api::heddle::api::v1alpha1::{
-    AuthorizationAccess, CallContext, CallFailure, CallFailureCode, ClaimNextDropCodeRequest,
-    ClaimSignupInviteRequest, CreateAgentAccountRequest, CreateSpoolRequest, ErrorDetail,
-    ErrorReason, GetContextHistoryPageEnd, GetContextHistoryRequest, GetContextHistoryResponse,
-    HumanVerification, HumanVerificationChallenge, ListContextPageEnd, ListContextRequest,
-    ListContextResponse, ListDiscussionsByStateRequest, ListDiscussionsPageEnd,
-    ListDiscussionsResponse, ListRefsPageEnd, ListRefsRequest, ListRefsResponse,
-    ListThreadsPageEnd, ListThreadsRequest, ListThreadsResponse, PolicyDenial,
-    PromoteAgentAccountRequest, ProviderPlanResponse, ProviderPullCapabilityContext,
-    ProviderReadRequest, PullReady, PushRequest, RefEntry, RemainingDropCodesRequest, RemoteLink,
-    RemoteLinkAuthMode, RemoteLinkStatus, RemoteSyncDirection, RequestProof, RetryBehavior,
-    RpcEffect, ServiceMaturity, SetRemoteLinkRequest, SigningTier, SpoolSettings, StateId,
-    ThreadOrder, TraceContext, Visibility, error_detail, get_context_history_response,
-    list_context_response, list_discussions_response, list_refs_response, list_threads_response,
-    set_remote_link_request, thread_state,
+use heddle_api::heddle::api::common::{
+    CallContext, CallFailure, CallFailureCode, ErrorDetail, ErrorReason, HumanVerification,
+    HumanVerificationChallenge, PolicyDenial, RequestProof, RetryBehavior, RpcEffect, SigningTier,
+    TraceContext, error_detail,
 };
-use heddle_api::{
-    ALL_METHODS, HOSTED_ALPN_V1, MAX_PAGE_SIZE, PROVIDER_ALPN_V1, StreamingShape, method_descriptor,
-};
+use heddle_api::heddle::api::v1alpha2::CreateSpoolRequest;
+use heddle_api::{HOSTED_ALPN_V1, StreamingShape, method_descriptor};
 use prost::Message;
 use serde::Deserialize;
 
@@ -142,405 +130,24 @@ fn request_prelude_can_be_routed_before_a_bidi_stream_finishes() {
         bearer_capability: b"token".to_vec(),
         ..Default::default()
     };
-    let prelude = encode_request_prelude("/heddle.api.v1alpha1.RepoSyncService/Pull", &context)
+    let prelude = encode_request_prelude("/heddle.api.v1alpha2.SyncService/Fetch", &context)
         .expect("request prelude");
     assert!(decode_request_prelude(&prelude[..5]).unwrap().is_none());
     let (decoded, consumed) = decode_request_prelude(&prelude)
         .unwrap()
         .expect("complete prelude");
     assert_eq!(consumed, prelude.len());
-    assert_eq!(decoded.method, "/heddle.api.v1alpha1.RepoSyncService/Pull");
+    assert_eq!(decoded.method, "/heddle.api.v1alpha2.SyncService/Fetch");
     assert_eq!(decoded.context, context);
 }
 
 #[test]
-fn provider_contract_separates_opening_negotiation_exact_plan_consent_and_opaque_read() {
-    assert_eq!(PROVIDER_ALPN_V1, b"heddle-provider/1");
-
-    let opening = ProviderPullCapabilityContext {
-        version: 1,
-        client_endpoint_id: "11".repeat(32),
-        plan_nonce: vec![7; 16],
-    };
-    let opening =
-        ProviderPullCapabilityContext::decode(opening.encode_to_vec().as_slice()).unwrap();
-    assert_eq!(opening.plan_nonce, vec![7; 16]);
-
-    let consent = ProviderPlanResponse {
-        version: 1,
-        plan_nonce: opening.plan_nonce,
-        grant_batch_digest: vec![9; 32],
-        signature: vec![3; 64],
-        accepted: true,
-    };
-    let consent = ProviderPlanResponse::decode(consent.encode_to_vec().as_slice()).unwrap();
-    assert_eq!(consent.grant_batch_digest, vec![9; 32]);
-
-    let read = ProviderReadRequest {
-        version: 1,
-        opaque_ticket: "opaque-one-use-ticket".to_string(),
-    };
-    let read = ProviderReadRequest::decode(read.encode_to_vec().as_slice()).unwrap();
-    assert_eq!(read.opaque_ticket, "opaque-one-use-ticket");
-}
-
-#[test]
-fn generated_descriptor_preserves_the_list_refs_contract() {
-    let descriptor = method_descriptor("/heddle.api.v1alpha1.RepoSyncService/ListRefs")
-        .expect("ListRefs descriptor");
-
-    assert_eq!(HOSTED_ALPN_V1, b"heddle-api/1");
-    assert_eq!(descriptor.input, "heddle.api.v1alpha1.ListRefsRequest");
-    assert_eq!(descriptor.output, "heddle.api.v1alpha1.ListRefsResponse");
-    assert_eq!(descriptor.streaming, StreamingShape::ServerStreaming);
-    assert!(descriptor.allows_zero_rtt());
-    assert_eq!(
-        descriptor.authorization_access,
-        AuthorizationAccess::AuthenticatedPrincipal
-    );
-    assert_eq!(
-        method_descriptor("/heddle.api.v1alpha1.IdentityService/CreateDeviceAuthorization")
-            .expect("public device authorization descriptor")
-            .authorization_access,
-        AuthorizationAccess::Public
-    );
-    // 0.22.0 added the six planned NotificationService methods (177 -> 183).
-    // 0.27.0 added IdentityService.RevokeDevice (183 -> 184, weft#2047 C5).
-    // 0.28.0 adds first-class PullReady.refs / head_thread; method count unchanged.
-    assert_eq!(ALL_METHODS.len(), 185);
-    let by_thread_ref =
-        method_descriptor("/heddle.api.v1alpha1.CollaborationService/ListByThreadRef")
-            .expect("ListByThreadRef descriptor");
-    assert_eq!(
-        by_thread_ref.input,
-        "heddle.api.v1alpha1.ListByThreadRefRequest"
-    );
-    assert_eq!(
-        by_thread_ref.output,
-        "heddle.api.v1alpha1.ListByThreadRefResponse"
-    );
-    assert_eq!(by_thread_ref.streaming, StreamingShape::Unary);
-    for method in [
-        "BootstrapOwnerRoot",
-        "RotateOwnerKey",
-        "RecoverOwnerKey",
-        "ChangeOwnerRecoveryPolicy",
-        "GetCurrentOwnerKeyring",
-        "BeginAgentOwnerClaim",
-        "ClaimAgentOwner",
-        "SubmitOwnerAuthorization",
-        "TransferResourceOwnership",
-    ] {
-        assert!(
-            method_descriptor(&format!(
-                "/heddle.api.v1alpha1.OwnerAuthorizationService/{method}"
-            ))
-            .is_some(),
-            "owner authorization method is unreachable: {method}"
-        );
-    }
-    for path in [
-        "/heddle.api.v1alpha1.RepositoryService/ListContext",
-        "/heddle.api.v1alpha1.RepositoryService/GetContextHistory",
-        "/heddle.api.v1alpha1.CollaborationService/ListByState",
-        "/heddle.api.v1alpha1.WorkflowService/ListThreads",
-    ] {
-        assert_eq!(
-            method_descriptor(path).expect("list descriptor").streaming,
-            StreamingShape::ServerStreaming
-        );
-    }
-    for method in [
-        "ClaimHandle",
-        "GetHandleStatus",
-        "RequestHeldName",
-        "ResolveHandle",
-    ] {
-        assert_eq!(
-            method_descriptor(&format!("/heddle.api.v1alpha1.IdentityService/{method}"))
-                .expect("handle method descriptor")
-                .maturity,
-            ServiceMaturity::Shipped
-        );
-    }
-    assert!(
-        ALL_METHODS
-            .windows(2)
-            .all(|pair| pair[0].path < pair[1].path)
-    );
-    assert_eq!(
-        method_descriptor("/heddle.api.v1alpha1.IdentityService/WaitForDeviceAuthorization")
-            .expect("WaitForDeviceAuthorization descriptor")
-            .streaming,
-        StreamingShape::ServerStreaming
-    );
-    for path in [
-        "/heddle.api.v1alpha1.RepoSyncService/Push",
-        "/heddle.api.v1alpha1.RepoSyncService/Pull",
-    ] {
-        assert_eq!(
-            method_descriptor(path).expect("sync descriptor").streaming,
-            StreamingShape::Bidirectional
-        );
-    }
-}
-
-#[test]
-fn pull_ready_carries_one_page_of_list_refs_entries() {
-    let ready = PullReady {
-        refs: vec![RefEntry {
-            name: "main".into(),
-            is_thread: true,
-            revision_address: "heddle:0123".into(),
-            thread_id: "thread-main".into(),
-            ..Default::default()
-        }],
-        head_thread: "main".into(),
-        owner_authorization_protocol_version: 2,
-        ..Default::default()
-    };
-    let decoded = PullReady::decode(ready.encode_to_vec().as_slice()).unwrap();
-    assert_eq!(decoded.refs.len(), 1);
-    assert!(decoded.refs.len() as u32 <= MAX_PAGE_SIZE);
-    assert_eq!(decoded.refs[0].name, "main");
-    assert_eq!(decoded.refs[0].thread_id, "thread-main");
-    assert_eq!(decoded.head_thread, "main");
-    assert_eq!(decoded.owner_authorization_protocol_version, 2);
-    let unset = PullReady::default();
-    assert!(unset.refs.is_empty());
-    assert!(unset.head_thread.is_empty());
-}
-
-#[test]
-fn generated_descriptor_carries_github_installation_registration_contract() {
-    let method =
-        method_descriptor("/heddle.api.v1alpha1.IdentityService/RegisterGitHubInstallation")
-            .expect("GitHub installation registration descriptor");
-
-    assert_eq!(
-        method.input,
-        "heddle.api.v1alpha1.RegisterGitHubInstallationRequest"
-    );
-    assert_eq!(
-        method.output,
-        "heddle.api.v1alpha1.RegisterGitHubInstallationResponse"
-    );
-    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
-    assert_eq!(
-        method.authorization_access,
-        AuthorizationAccess::AuthenticatedPrincipal
-    );
-    assert_eq!(method.effect, RpcEffect::DurableWrite);
-    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
-    assert!(method.client_operation_id_required);
-    assert_eq!(method.client_operation_id_field_number, Some(2));
-    assert_eq!(method.maturity, ServiceMaturity::Planned);
-}
-
-#[test]
-fn generated_remote_link_contract_separates_configured_and_honored_directions() {
-    let request = SetRemoteLinkRequest {
-        spool_id: "0198f00d-0000-7000-8000-000000000001".into(),
-        source: Some(set_remote_link_request::Source::PublicUrl(
-            heddle_api::heddle::api::v1alpha1::PublicUrlImportSource {
-                url: "https://example.com/acme/widgets.git".into(),
-            },
-        )),
-        direction: RemoteSyncDirection::Bidirectional as i32,
-        sync_interval: Some(prost_types::Duration {
-            seconds: 3600,
-            nanos: 0,
-        }),
-        enabled: true,
-        client_operation_id: "set-link-1".into(),
-    };
-    let request = SetRemoteLinkRequest::decode(request.encode_to_vec().as_slice())
-        .expect("decode SetRemoteLinkRequest");
-    assert_eq!(request.direction(), RemoteSyncDirection::Bidirectional);
-
-    let link = RemoteLink {
-        spool_id: request.spool_id,
-        source_url: "https://example.com/acme/widgets.git".into(),
-        direction: RemoteSyncDirection::Bidirectional as i32,
-        sync_interval: request.sync_interval,
-        auth_mode: RemoteLinkAuthMode::None as i32,
-        enabled: true,
-        status: RemoteLinkStatus::Idle as i32,
-        honored_directions: vec![RemoteSyncDirection::FetchFromRemote as i32],
-        ..Default::default()
-    };
-    let link = RemoteLink::decode(link.encode_to_vec().as_slice()).expect("decode RemoteLink");
-    assert_eq!(link.direction(), RemoteSyncDirection::Bidirectional);
-    assert_eq!(
-        link.honored_directions,
-        vec![RemoteSyncDirection::FetchFromRemote as i32]
-    );
-
-    let set_method = method_descriptor("/heddle.api.v1alpha1.OperationService/SetRemoteLink")
-        .expect("SetRemoteLink descriptor");
-    assert_eq!(set_method.effect, RpcEffect::DurableWrite);
-    assert_eq!(set_method.retry_behavior, RetryBehavior::ClientOperationId);
-    assert_eq!(set_method.signing_tier, SigningTier::ProofOfPossession);
-    assert!(set_method.client_operation_id_required);
-    assert_eq!(set_method.client_operation_id_field_number, Some(8));
-    assert_eq!(set_method.maturity, ServiceMaturity::Planned);
-
-    let get_method = method_descriptor("/heddle.api.v1alpha1.OperationService/GetRemoteLink")
-        .expect("GetRemoteLink descriptor");
-    assert_eq!(get_method.effect, RpcEffect::ReadOnly);
-    assert_eq!(get_method.retry_behavior, RetryBehavior::Safe);
-    assert!(get_method.allows_zero_rtt());
-    assert_eq!(get_method.maturity, ServiceMaturity::Planned);
-}
-
-#[test]
-fn hosted_list_streams_carry_cursors_and_terminal_page_frames() {
-    let requests = [
-        {
-            let request = ListRefsRequest {
-                page_size: 25,
-                page_token: "refs-cursor".into(),
-                ..Default::default()
-            };
-            (request.page_token, request.page_size)
-        },
-        {
-            let request = ListContextRequest {
-                page_size: 25,
-                page_token: "context-cursor".into(),
-                ..Default::default()
-            };
-            (request.page_token, request.page_size)
-        },
-        {
-            let request = GetContextHistoryRequest {
-                page_size: 25,
-                page_token: "history-cursor".into(),
-                ..Default::default()
-            };
-            (request.page_token, request.page_size)
-        },
-        {
-            let request = ListDiscussionsByStateRequest {
-                page_size: 25,
-                page_token: "discussion-cursor".into(),
-                ..Default::default()
-            };
-            (request.page_token, request.page_size)
-        },
-        {
-            let request = ListThreadsRequest {
-                page_size: 25,
-                page_token: "thread-cursor".into(),
-                states: vec![
-                    thread_state::Kind::ThreadStateActive as i32,
-                    thread_state::Kind::ThreadStateBlocked as i32,
-                ],
-                query: "api".into(),
-                order: ThreadOrder::LastActivityDesc as i32,
-                ..Default::default()
-            };
-            assert_eq!(request.states.len(), 2);
-            assert_eq!(request.query, "api");
-            assert_eq!(request.order, ThreadOrder::LastActivityDesc as i32);
-            (request.page_token, request.page_size)
-        },
-    ];
-    assert!(
-        requests
-            .iter()
-            .all(|(page_token, page_size)| !page_token.is_empty() && *page_size == 25)
-    );
-
-    let refs = ListRefsResponse {
-        frame: Some(list_refs_response::Frame::PageEnd(ListRefsPageEnd {
-            next_page_token: "next-refs".into(),
-            ..Default::default()
-        })),
-    };
-    let context = ListContextResponse {
-        frame: Some(list_context_response::Frame::PageEnd(ListContextPageEnd {
-            next_page_token: "next-context".into(),
-            summary: Some(Default::default()),
-        })),
-        states: Vec::new(),
-    };
-    let history = GetContextHistoryResponse {
-        frame: Some(get_context_history_response::Frame::PageEnd(
-            GetContextHistoryPageEnd {
-                next_page_token: "next-history".into(),
-                ..Default::default()
-            },
-        )),
-    };
-    let discussions = ListDiscussionsResponse {
-        frame: Some(list_discussions_response::Frame::PageEnd(
-            ListDiscussionsPageEnd {
-                next_page_token: String::new(),
-            },
-        )),
-    };
-    let threads = ListThreadsResponse {
-        frame: Some(list_threads_response::Frame::PageEnd(ListThreadsPageEnd {
-            next_page_token: "next-threads".into(),
-            total_count: Some(400_000),
-        })),
-    };
-
-    assert!(matches!(
-        refs.frame,
-        Some(list_refs_response::Frame::PageEnd(_))
-    ));
-    assert!(matches!(
-        context.frame,
-        Some(list_context_response::Frame::PageEnd(ListContextPageEnd {
-            summary: Some(_),
-            ..
-        }))
-    ));
-    assert!(matches!(
-        history.frame,
-        Some(get_context_history_response::Frame::PageEnd(_))
-    ));
-    assert!(matches!(
-        discussions.frame,
-        Some(list_discussions_response::Frame::PageEnd(
-            ListDiscussionsPageEnd { ref next_page_token }
-        )) if next_page_token.is_empty()
-    ));
-    assert!(matches!(
-        threads.frame,
-        Some(list_threads_response::Frame::PageEnd(
-            ListThreadsPageEnd {
-                ref next_page_token,
-                total_count: Some(400_000)
-            }
-        )) if next_page_token == "next-threads"
-    ));
-}
-
-#[test]
-fn push_request_carries_an_explicit_remote_head_precondition() {
-    let expected = StateId { value: vec![7; 32] };
-    let encoded = PushRequest {
-        expected_remote_head: Some(expected.clone()),
-        expected_remote_head_missing: false,
-        ..Default::default()
-    }
-    .encode_to_vec();
-    let decoded = PushRequest::decode(encoded.as_slice()).expect("push request");
-
-    assert_eq!(decoded.expected_remote_head, Some(expected));
-    assert!(!decoded.expected_remote_head_missing);
-}
-
-#[test]
 fn generated_descriptor_extracts_client_operation_id_without_route_specific_code() {
-    let method = method_descriptor("/heddle.api.v1alpha1.RegistryService/CreateSpool")
+    let method = method_descriptor("/heddle.api.v1alpha2.SpoolService/CreateSpool")
         .expect("create spool descriptor");
     assert!(method.client_operation_id_required);
     assert!(method.client_operation_id_field_number.is_some());
-    let request = heddle_api::heddle::api::v1alpha1::CreateSpoolRequest {
+    let request = CreateSpoolRequest {
         client_operation_id: "operation-123".to_string(),
         ..Default::default()
     }
@@ -552,209 +159,10 @@ fn generated_descriptor_extracts_client_operation_id_without_route_specific_code
 }
 
 #[test]
-fn generated_descriptor_carries_create_agent_account_contract() {
-    let method = method_descriptor("/heddle.api.v1alpha1.IdentityService/CreateAgentAccount")
-        .expect("create-agent-account descriptor");
-
-    assert_eq!(
-        method.input,
-        "heddle.api.v1alpha1.CreateAgentAccountRequest"
-    );
-    assert_eq!(
-        method.output,
-        "heddle.api.v1alpha1.CreateAgentAccountResponse"
-    );
-    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
-    assert_eq!(method.authorization_access, AuthorizationAccess::Public);
-    assert_eq!(method.effect, RpcEffect::DurableWrite);
-    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
-    assert!(method.client_operation_id_required);
-    assert_eq!(method.client_operation_id_field_number, Some(3));
-    assert_eq!(method.maturity, ServiceMaturity::Planned);
-
-    let request = CreateAgentAccountRequest {
-        invite_code: "invite-code".to_string(),
-        agent_public_key: vec![7; 32],
-        client_operation_id: "create-agent-operation-123".to_string(),
-    }
-    .encode_to_vec();
-    assert_eq!(
-        method.client_operation_id(&request).expect("valid request"),
-        Some("create-agent-operation-123")
-    );
-}
-
-#[test]
-fn generated_descriptor_carries_promote_agent_account_contract() {
-    let method = method_descriptor("/heddle.api.v1alpha1.IdentityService/PromoteAgentAccount")
-        .expect("promote-agent-account descriptor");
-
-    assert_eq!(
-        method.input,
-        "heddle.api.v1alpha1.PromoteAgentAccountRequest"
-    );
-    assert_eq!(
-        method.output,
-        "heddle.api.v1alpha1.PromoteAgentAccountResponse"
-    );
-    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
-    assert_eq!(method.authorization_access, AuthorizationAccess::Public);
-    assert_eq!(method.effect, RpcEffect::DurableWrite);
-    assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
-    assert!(method.client_operation_id_required);
-    assert_eq!(method.client_operation_id_field_number, Some(9));
-    assert_eq!(method.maturity, ServiceMaturity::Planned);
-
-    let request = PromoteAgentAccountRequest {
-        account_id: "account-1".to_string(),
-        handle: "luke".to_string(),
-        credential_id: "cred-1".to_string(),
-        client_operation_id: "promote-operation-123".to_string(),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    assert_eq!(
-        method.client_operation_id(&request).expect("valid request"),
-        Some("promote-operation-123")
-    );
-}
-
-#[test]
-fn generated_descriptor_carries_code_claim_contract() {
-    let method = method_descriptor("/heddle.api.v1alpha1.IdentityService/ClaimSignupInvite")
-        .expect("code-claim signup descriptor");
-
-    assert_eq!(method.input, "heddle.api.v1alpha1.ClaimSignupInviteRequest");
-    assert_eq!(
-        method.output,
-        "heddle.api.v1alpha1.ClaimSignupInviteResponse"
-    );
-    assert_eq!(method.signing_tier, SigningTier::None);
-    assert_eq!(method.authorization_access, AuthorizationAccess::Public);
-    assert_eq!(method.effect, RpcEffect::DurableWrite);
-    assert_eq!(method.retry_behavior, RetryBehavior::Never);
-    assert!(!method.client_operation_id_required);
-    assert_eq!(method.client_operation_id_field_number, None);
-    assert_eq!(method.maturity, ServiceMaturity::Planned);
-
-    let request = ClaimSignupInviteRequest {
-        invite_code: "invite-code".to_string(),
-    }
-    .encode_to_vec();
-    assert_eq!(
-        method.client_operation_id(&request).expect("valid request"),
-        None
-    );
-}
-
-#[test]
-fn generated_descriptor_carries_invite_drop_contracts() {
-    let claim = method_descriptor("/heddle.api.v1alpha1.IdentityService/ClaimNextDropCode")
-        .expect("drop-claim descriptor");
-    assert_eq!(claim.input, "heddle.api.v1alpha1.ClaimNextDropCodeRequest");
-    assert_eq!(
-        claim.output,
-        "heddle.api.v1alpha1.ClaimNextDropCodeResponse"
-    );
-    assert_eq!(claim.signing_tier, SigningTier::None);
-    assert_eq!(claim.authorization_access, AuthorizationAccess::Public);
-    assert_eq!(claim.effect, RpcEffect::TransientWrite);
-    assert_eq!(claim.retry_behavior, RetryBehavior::Never);
-    assert!(!claim.client_operation_id_required);
-    assert_eq!(claim.client_operation_id_field_number, None);
-    assert_eq!(claim.maturity, ServiceMaturity::Shipped);
-
-    let request = ClaimNextDropCodeRequest {
-        drop_slug: "launch".to_string(),
-        src: Some("x".to_string()),
-    };
-    let request = ClaimNextDropCodeRequest::decode(request.encode_to_vec().as_slice())
-        .expect("drop-claim request");
-    assert_eq!(request.src.as_deref(), Some("x"));
-
-    let remaining = method_descriptor("/heddle.api.v1alpha1.IdentityService/RemainingDropCodes")
-        .expect("remaining-drop-codes descriptor");
-    assert_eq!(
-        remaining.input,
-        "heddle.api.v1alpha1.RemainingDropCodesRequest"
-    );
-    assert_eq!(
-        remaining.output,
-        "heddle.api.v1alpha1.RemainingDropCodesResponse"
-    );
-    assert_eq!(remaining.signing_tier, SigningTier::None);
-    assert_eq!(remaining.authorization_access, AuthorizationAccess::Public);
-    assert_eq!(remaining.effect, RpcEffect::ReadOnly);
-    assert_eq!(remaining.retry_behavior, RetryBehavior::Safe);
-    assert!(remaining.allows_zero_rtt());
-
-    let request = RemainingDropCodesRequest {
-        drop_slug: "launch".to_string(),
-    };
-    assert_eq!(
-        RemainingDropCodesRequest::decode(request.encode_to_vec().as_slice())
-            .expect("remaining-drop-codes request")
-            .drop_slug,
-        "launch"
-    );
-}
-
-#[test]
-fn generated_create_spool_carries_state_visibility_settings() {
-    let request = CreateSpoolRequest {
-        settings: Some(SpoolSettings {
-            state_visibility: Visibility::Public as i32,
-            ..Default::default()
-        }),
-        ..Default::default()
-    };
-    let request = CreateSpoolRequest::decode(request.encode_to_vec().as_slice())
-        .expect("create-spool request");
-    assert_eq!(
-        request
-            .settings
-            .expect("create-time settings")
-            .state_visibility,
-        Visibility::Public as i32
-    );
-}
-
-#[test]
-fn unified_visibility_numbering_is_restrictiveness_order() {
-    assert_eq!(Visibility::Unspecified as i32, 0);
-    assert_eq!(Visibility::Private as i32, 1);
-    assert_eq!(Visibility::Internal as i32, 2);
-    assert_eq!(Visibility::Public as i32, 3);
-    // The retired collision: SpoolStateVisibility::Public == 1 ==
-    // SpoolVisibility::Private. Wire value 1 is PRIVATE on both fields now,
-    // so a numeric 1 can never mean PUBLIC.
-    assert_ne!(Visibility::Public as i32, 1);
-}
-
-#[test]
-fn destructive_shipped_methods_match_weft_human_verification_policy() {
-    for method in [
-        "/heddle.api.v1alpha1.RegistryService/DeleteGrant",
-        "/heddle.api.v1alpha1.RegistryService/DeleteSpool",
-        "/heddle.api.v1alpha1.RegistryService/GrantSupportAccess",
-        "/heddle.api.v1alpha1.RegistryService/RevokeSupportAccess",
-        "/heddle.api.v1alpha1.RegistryService/UpdateGrant",
-        "/heddle.api.v1alpha1.WorkflowService/RevokeApproval",
-    ] {
-        assert_eq!(
-            method_descriptor(method)
-                .expect("shipped destructive method")
-                .signing_tier,
-            SigningTier::HumanVerification,
-            "{method} must preserve Weft's production human-verification gate"
-        );
-    }
-}
-
-#[test]
 fn call_context_carries_transport_neutral_auth_and_trace_fields() {
     let context = CallContext {
         bearer_capability: b"opaque-biscuit".to_vec(),
+        bearer_authority_proof: b"portable-owner-authority".to_vec(),
         bearer_grant_envelope: b"opaque-grant-envelope".to_vec(),
         request_proof: Some(RequestProof {
             algorithm: "ed25519".to_string(),
@@ -777,6 +185,9 @@ fn call_context_carries_transport_neutral_auth_and_trace_fields() {
         ..Default::default()
     };
 
+    let context =
+        CallContext::decode(context.encode_to_vec().as_slice()).expect("context round trip");
+    assert_eq!(context.bearer_authority_proof, b"portable-owner-authority");
     assert_eq!(context.bearer_capability, b"opaque-biscuit");
     assert_eq!(context.bearer_grant_envelope, b"opaque-grant-envelope");
     assert_eq!(
@@ -786,23 +197,6 @@ fn call_context_carries_transport_neutral_auth_and_trace_fields() {
             .signing_identity,
         "principal:alice"
     );
-}
-
-#[test]
-fn service_account_issuance_proof_is_request_data_not_transport_metadata() {
-    let request = heddle_api::heddle::api::v1alpha1::IssueServiceAccountCredentialRequest {
-        service_account_id: "sa-1".to_string(),
-        client_operation_id: "operation-1".to_string(),
-        proof_timestamp_seconds: 1_700_000_000,
-        proof_signature: vec![7; 64],
-        ..Default::default()
-    };
-    let decoded = heddle_api::heddle::api::v1alpha1::IssueServiceAccountCredentialRequest::decode(
-        request.encode_to_vec().as_slice(),
-    )
-    .expect("issuance request round trip");
-    assert_eq!(decoded.proof_timestamp_seconds, 1_700_000_000);
-    assert_eq!(decoded.proof_signature, vec![7; 64]);
 }
 
 #[test]
@@ -881,34 +275,14 @@ fn hosted_call_framing_and_failure_match_the_cross_product_fixture() {
 
 #[test]
 fn promotion_is_routed_as_a_pop_signed_durable_write() {
-    use heddle_api::heddle::api::v1alpha1::{PromoteSpoolRequest, PromoteSpoolResponse};
-    let method = method_descriptor("/heddle.api.v1alpha1.RegistryService/PromoteSpool")
+    let method = method_descriptor("/heddle.api.v1alpha2.SpoolService/PromoteSpool")
         .expect("promotion route generated from canonical service");
     assert_eq!(
         method.route,
-        heddle_api::MethodRoute::RegistryServicePromoteSpool
+        heddle_api::MethodRoute::SpoolServicePromoteSpool
     );
     assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
     assert_eq!(method.effect, RpcEffect::DurableWrite);
     assert_eq!(method.retry_behavior, RetryBehavior::ClientOperationId);
-    let request = PromoteSpoolRequest {
-        full_path: "spool/alice/acme".into(),
-        client_operation_id: "promote-1".into(),
-    };
-    assert_eq!(
-        PromoteSpoolRequest::decode(request.encode_to_vec().as_slice()).expect("decode promotion"),
-        request
-    );
-    let response = PromoteSpoolResponse {
-        spool: Some(heddle_api::heddle::api::v1alpha1::HostedSpool {
-            full_path: "spool/acme".into(),
-            kind: "spool".into(),
-            is_repo: true,
-            ..Default::default()
-        }),
-    };
-    assert_eq!(
-        PromoteSpoolResponse::decode(response.encode_to_vec().as_slice()).expect("decode result"),
-        response
-    );
+    assert_eq!(method.streaming, StreamingShape::Unary);
 }

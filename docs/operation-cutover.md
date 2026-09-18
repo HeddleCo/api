@@ -6,7 +6,7 @@
 Weft's durable import worker. Atomic batches, listing, remote synchronization,
 and cancellation are partial and return `UNIMPLEMENTED`. The authoritative
 service and lifecycle shapes are in
-[`operation.proto`](../proto/heddle/api/v1alpha1/operation.proto).
+[`operation.proto`](../proto/heddle/api/v1alpha2/operation.proto).
 
 The cutover replaces import-specific lifecycle messages; it does not preserve
 an alias or a second status model. The legacy migration manifest maps

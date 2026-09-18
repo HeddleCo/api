@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package heddle.api.common;
+
+import "google/protobuf/descriptor.proto";
+
+// Generated consumers classify every attachment kind before accepting its
+// transfer. Attachments are ordinary spool writes and require both the
+// transport's spool-write authority and the existing per-author authorship,
+// schema, provenance, integrity, ownership, and predecessor validation. A new
+// enum value without a non-UNSPECIFIED option fails Rust and TypeScript
+// generation, preventing an attachment lane from bypassing write authorization.
+enum StateAttachmentAuthorizationClassification {
+  STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_UNSPECIFIED = 0;
+  STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE = 1;
+}
+
+extend google.protobuf.EnumValueOptions {
+  StateAttachmentAuthorizationClassification state_attachment_authorization_classification = 50004;
+}
+
+enum StateAttachmentKind {
+  STATE_ATTACHMENT_KIND_UNSPECIFIED = 0;
+  STATE_ATTACHMENT_KIND_CONTEXT = 1 [(heddle.api.common.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_RISK_SIGNALS = 2 [(heddle.api.common.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_REVIEW_SIGNATURES = 3 [(heddle.api.common.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_DISCUSSIONS = 4 [(heddle.api.common.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_STRUCTURED_CONFLICTS = 5 [(heddle.api.common.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_SEMANTIC_INDEX = 6 [(heddle.api.common.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+  STATE_ATTACHMENT_KIND_SIGNATURE = 7 [(heddle.api.common.state_attachment_authorization_classification) = STATE_ATTACHMENT_AUTHORIZATION_CLASSIFICATION_SPOOL_WRITE];
+}

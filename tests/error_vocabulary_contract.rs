@@ -4,7 +4,7 @@
 //! keep the hosted failure surface able to express everything a client mirror
 //! needs — terminal stream failures and lossless unknown-detail pass-through.
 
-use heddle_api::heddle::api::v1alpha1::{
+use heddle_api::heddle::api::common::{
     CallFailure, CallFailureCode, CursorFailure, ErrorDetail, ErrorReason, RetryAdvice,
     StreamFailure, UnknownDetail, cursor_failure, error_detail,
 };
@@ -102,7 +102,7 @@ fn unknown_context_round_trips_losslessly() {
     };
 
     let unknown = UnknownDetail {
-        type_url: "type.googleapis.com/heddle.api.v1alpha1.StreamFailure".to_string(),
+        type_url: "type.googleapis.com/heddle.api.common.StreamFailure".to_string(),
         value: future_arm.encode_to_vec(),
     };
     let failure = CallFailure {
@@ -126,7 +126,7 @@ fn unknown_context_round_trips_losslessly() {
     };
     assert_eq!(
         preserved.type_url,
-        "type.googleapis.com/heddle.api.v1alpha1.StreamFailure"
+        "type.googleapis.com/heddle.api.common.StreamFailure"
     );
     // The opaque bytes decode back into the original typed message.
     let recovered =
@@ -141,7 +141,7 @@ fn unknown_payload_bytes_are_verbatim() {
         resource: String::new(),
         field: String::new(),
         context: Some(error_detail::Context::Unknown(UnknownDetail {
-            type_url: "type.googleapis.com/heddle.api.v1alpha1.FutureDetail".to_string(),
+            type_url: "type.googleapis.com/heddle.api.common.FutureDetail".to_string(),
             value: vec![0x08, 0x96, 0x01], // field 1 varint 150 — arbitrary bytes
         })),
     };

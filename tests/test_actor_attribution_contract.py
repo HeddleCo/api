@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REPOSITORY_PROTO = ROOT / "proto/heddle/api/v1alpha1/repository.proto"
+REPOSITORY_PROTO = ROOT / "proto/heddle/api/common/repository.proto"
 
 
 def message_body(source: str, name: str) -> str:

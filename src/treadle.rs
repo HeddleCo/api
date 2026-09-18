@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use prost::Message;
 use thiserror::Error;
 
-use crate::heddle::api::v1alpha1::{
+use crate::heddle::api::common::{
     TreadleCheck, TreadleCheckClass, TreadleDefinition, TreadleDeterminismClass, TreadleEnvEntry,
     TreadleJob, TreadleNetworkAccess, TreadleSecretTier, TreadleServiceContainer, TreadleTrigger,
     TreadleTriggerKind, treadle_env_entry,

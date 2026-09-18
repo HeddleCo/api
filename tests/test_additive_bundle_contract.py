@@ -4,14 +4,14 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-COLLABORATION = (ROOT / "proto/heddle/api/v1alpha1/collaboration.proto").read_text()
-IDENTITY = (ROOT / "proto/heddle/api/v1alpha1/identity.proto").read_text()
-REGISTRY = (ROOT / "proto/heddle/api/v1alpha1/registry.proto").read_text()
-REPOSITORY = (ROOT / "proto/heddle/api/v1alpha1/repository.proto").read_text()
-STATE_REVIEW = (ROOT / "proto/heddle/api/v1alpha1/state_review.proto").read_text()
-CONTRACT = (ROOT / "proto/heddle/api/v1alpha1/contract.proto").read_text()
-ATTENTION = (ROOT / "proto/heddle/api/v1alpha1/attention.proto").read_text()
-NOTIFICATION = (ROOT / "proto/heddle/api/v1alpha1/notification.proto").read_text()
+COLLABORATION = (ROOT / "proto/heddle/api/v1alpha2/collaboration.proto").read_text()
+IDENTITY = (ROOT / "proto/heddle/api/v1alpha2/identity.proto").read_text()
+REGISTRY = (ROOT / "proto/heddle/api/v1alpha2/registry.proto").read_text()
+REPOSITORY = (ROOT / "proto/heddle/api/common/repository.proto").read_text()
+STATE_REVIEW = (ROOT / "proto/heddle/api/v1alpha2/state_review.proto").read_text()
+CONTRACT = (ROOT / "proto/heddle/api/common/contract.proto").read_text()
+ATTENTION = (ROOT / "proto/heddle/api/v1alpha2/attention.proto").read_text()
+NOTIFICATION = (ROOT / "proto/heddle/api/v1alpha2/notification.proto").read_text()
 
 
 def body(source: str, kind: str, name: str) -> str:

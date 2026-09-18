@@ -4,8 +4,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-IDENTITY = (ROOT / "proto/heddle/api/v1alpha1/identity.proto").read_text()
-ERRORS = (ROOT / "proto/heddle/api/v1alpha1/errors.proto").read_text()
+IDENTITY = (ROOT / "proto/heddle/api/v1alpha2/identity.proto").read_text()
+ERRORS = (ROOT / "proto/heddle/api/common/errors.proto").read_text()
 
 
 def body(source: str, kind: str, name: str) -> str:

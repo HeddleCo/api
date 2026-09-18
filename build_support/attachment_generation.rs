@@ -3,9 +3,9 @@ use std::{error::Error, fs, path::Path};
 
 use prost_reflect::{DescriptorPool, Kind, Value};
 
-const KIND_ENUM: &str = "heddle.api.v1alpha1.StateAttachmentKind";
-const CLASS_ENUM: &str = "heddle.api.v1alpha1.StateAttachmentAuthorizationClassification";
-const CLASS_OPTION: &str = "heddle.api.v1alpha1.state_attachment_authorization_classification";
+const KIND_ENUM: &str = "heddle.api.common.StateAttachmentKind";
+const CLASS_ENUM: &str = "heddle.api.common.StateAttachmentAuthorizationClassification";
+const CLASS_OPTION: &str = "heddle.api.common.state_attachment_authorization_classification";
 
 pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(descriptor_path)?;
@@ -63,21 +63,21 @@ pub fn write(descriptor_path: &Path, output_path: &Path) -> Result<(), Box<dyn E
     let mut output = String::from(
         "/// Generated exhaustive authorization classification for every current state attachment kind.\n\
          pub const STATE_ATTACHMENT_AUTHORIZATION_CONFORMANCE: &[(\n\
-             heddle::api::v1alpha1::StateAttachmentKind,\n\
-             heddle::api::v1alpha1::StateAttachmentAuthorizationClassification,\n\
+             heddle::api::common::StateAttachmentKind,\n\
+             heddle::api::common::StateAttachmentAuthorizationClassification,\n\
          )] = &[\n",
     );
     for (kind, class) in rows {
         output.push_str(&format!(
-            "    (heddle::api::v1alpha1::StateAttachmentKind::{kind}, heddle::api::v1alpha1::StateAttachmentAuthorizationClassification::{class}),\n"
+            "    (heddle::api::common::StateAttachmentKind::{kind}, heddle::api::common::StateAttachmentAuthorizationClassification::{class}),\n"
         ));
     }
     output.push_str(
         "];\n\n\
          /// Returns the generated fail-closed classification for a known attachment kind.\n\
          pub fn state_attachment_authorization_classification(\n\
-             kind: heddle::api::v1alpha1::StateAttachmentKind,\n\
-         ) -> Option<heddle::api::v1alpha1::StateAttachmentAuthorizationClassification> {\n\
+             kind: heddle::api::common::StateAttachmentKind,\n\
+         ) -> Option<heddle::api::common::StateAttachmentAuthorizationClassification> {\n\
              STATE_ATTACHMENT_AUTHORIZATION_CONFORMANCE\n\
                  .iter()\n\
                  .find_map(|(candidate, classification)| (*candidate == kind).then_some(*classification))\n\

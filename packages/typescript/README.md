@@ -1,6 +1,6 @@
 # @heddleco/api
 
-Generated ESM types for `heddle.api.v1alpha1`. Install from GitHub Packages and
+Generated ESM types for `heddle.api.v1alpha2`. Install from GitHub Packages and
 exact-pin `0.x` releases.
 
 Configure `@heddleco:registry=https://npm.pkg.github.com` and authenticate with
@@ -40,3 +40,14 @@ defaults to `{cwd}/.heddle`. Missing default export fails closed. Compact
 local-run examples: `packages/typescript/examples/local-host.mjs` (`sh`) and
 `packages/typescript/examples/fast-lane-host.mjs` (`rust.fmt` + `rust.test`,
 host platform, rust-pack `cachePaths: ["target"]`).
+
+The candidate `@heddleco/api/v2` export provides generated v2 messages/services,
+`createServiceClient`, `describeTools`, and `ObservationState`. Unary methods
+return typed promises; Observe and finite content methods return typed async
+iterables; Publish/Fetch accept async iterable requests. `/v2/client` and
+`/v2/observation` are also separate entry points. `/framing` includes bounded,
+pull-based stream decoding alongside the existing unary codec. An application
+transport still supplies Iroh connections, credentials, signing and cancellation.
+All v2 routes are PLANNED; use the authenticated endpoint's implemented-method
+list when constructing a client. See the repository's `docs/alpha-v2/streams.md`
+for checkpoint, privacy, migration and consumer integration requirements.

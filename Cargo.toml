@@ -1,13 +1,13 @@
 [package]
 name = "heddle-api"
-version = "0.30.0"
+version = "0.31.0-alpha.1"
 edition = "2024"
 authors = ["HeddleCo"]
 license = "Apache-2.0"
 repository = "https://github.com/HeddleCo/api"
 description = "Generated transport-neutral Rust types for the Heddle public API"
 build = "build.rs"
-include = ["/build.rs", "/build_support/**", "/docs/treadle-definition-v1.md", "/src/**", "/proto/**", "/tests/fixtures/**", "/Cargo.toml", "/README.md", "/LICENSE"]
+include = ["/build.rs", "/build_support/**", "/docs/treadle-definition-v1.md", "/docs/alpha-v2/**", "/src/**", "/proto/**", "/tests/fixtures/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [features]
 default = []

@@ -10,9 +10,9 @@
 // Response frame: outcome:u8 (0 = success, 1 = failure) | body
 //                 (a failure body is a CallFailure protobuf envelope)
 //
-// Only the unary request/response frames are modelled here; that is the shape
-// the ADR-0049 browser claim transport uses (see heddle's claim_protocol.rs,
-// which frames with encode_request_frame + decode_response_frame).
+// Unary and length-delimited streaming frames share Rust's exact tags and
+// ceilings. Raw extent bodies are exposed by the low-level stream decoder;
+// protobuf-only observers use decodeMessageStream for bounded, pull-based reads.
 
 import { fromBinary, toBinary } from "@bufbuild/protobuf";
 import { CallContextSchema, type CallContext } from "./contract_pb.js";
@@ -24,6 +24,7 @@ export const MAX_METHOD_PATH = 1024;
 export const MAX_CALL_CONTEXT = 64 * 1024;
 /** Largest protobuf control body carried in a FIN-delimited frame. */
 export const MAX_CONTROL_BODY = 8 * 1024 * 1024;
+export const MAX_RAW_BODY = 64n * 1024n * 1024n * 1024n;
 
 const RESPONSE_SUCCESS = 0;
 const RESPONSE_FAILURE = 1;
@@ -201,5 +202,124 @@ function decodeCallFailure(bytes: Uint8Array): CallFailure {
     return fromBinary(CallFailureSchema, bytes);
   } catch (cause) {
     throw new FrameError(`invalid hosted-call protobuf: ${String(cause)}`);
+  }
+}
+
+export type StreamFrame =
+  | { readonly kind: "message"; readonly body: Uint8Array }
+  | { readonly kind: "failure"; readonly failure: CallFailure }
+  | { readonly kind: "rawBody"; readonly length: bigint };
+
+function validateFrameLimit(limit: number): void {
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_CONTROL_BODY) {
+    throw new FrameError("frame limit must be a positive integer within the protocol ceiling");
+  }
+}
+
+export function encodeStreamMessage(body: Uint8Array, maxFrameBytes = MAX_CONTROL_BODY): Uint8Array {
+  validateFrameLimit(maxFrameBytes);
+  if (body.length > maxFrameBytes) throw new FrameError("stream message exceeds negotiated frame limit");
+  const frame = new Uint8Array(5 + body.length);
+  new DataView(frame.buffer).setUint32(1, body.length, false);
+  frame.set(body, 5);
+  return frame;
+}
+
+export function encodeStreamFailure(failure: CallFailure, maxFrameBytes = MAX_CONTROL_BODY): Uint8Array {
+  const frame = encodeStreamMessage(toBinary(CallFailureSchema, failure), maxFrameBytes);
+  frame[0] = 1;
+  return frame;
+}
+
+export function encodeStreamRawBodyHeader(length: bigint): Uint8Array {
+  if (length < 0n || length > MAX_RAW_BODY) throw new FrameError("raw body exceeds protocol ceiling");
+  const frame = new Uint8Array(9);
+  frame[0] = 2;
+  new DataView(frame.buffer).setBigUint64(1, length, false);
+  return frame;
+}
+
+/** Inspect a frame without copying its body. Undefined means more bytes are
+ * needed. A rawBody result consumes only its header; the caller must stream
+ * exactly length raw bytes before decoding another frame.
+ */
+export function decodeStreamFrame(bytes: Uint8Array, maxFrameBytes = MAX_CONTROL_BODY):
+  { frame: StreamFrame; consumed: number } | undefined {
+  validateFrameLimit(maxFrameBytes);
+  if (bytes.length === 0) return undefined;
+  const tag = bytes[0];
+  if (tag > 2) throw new FrameError("unknown stream frame tag");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (tag === 2) {
+    if (bytes.length < 9) return undefined;
+    const length = view.getBigUint64(1, false);
+    if (length > MAX_RAW_BODY) throw new FrameError("raw body exceeds protocol ceiling");
+    return { frame: { kind: "rawBody", length }, consumed: 9 };
+  }
+  if (bytes.length < 5) return undefined;
+  const length = view.getUint32(1, false);
+  if (length > maxFrameBytes) throw new FrameError("stream message exceeds negotiated frame limit");
+  if (bytes.length < 5 + length) return undefined;
+  const body = bytes.subarray(5, 5 + length);
+  const frame: StreamFrame = tag === 0 ? { kind: "message", body }
+    : { kind: "failure", failure: decodeCallFailure(body) };
+  return { frame, consumed: 5 + length };
+}
+
+/** The single existing typed failure channel, represented as a JS exception. */
+export class RpcCallError extends Error {
+  constructor(readonly failure: CallFailure) {
+    super(failure.message);
+    this.name = "RpcCallError";
+  }
+}
+
+/** Pull-based protobuf stream reader. Validates declared size before allocating
+ * the body, retains at most one incoming chunk plus one bounded message, and
+ * returns the source iterator when canceled. No read-ahead task or unbounded queue.
+ * Raw extents require the low-level decoder and an extent-aware transport.
+ */
+export async function* decodeMessageStream(
+  chunks: AsyncIterable<Uint8Array>, maxFrameBytes = MAX_CONTROL_BODY,
+): AsyncGenerator<Uint8Array> {
+  validateFrameLimit(maxFrameBytes);
+  const input = chunks[Symbol.asyncIterator]();
+  let chunk = new Uint8Array();
+  let offset = 0;
+  async function read(size: number, allowFin: boolean): Promise<Uint8Array | undefined> {
+    const result = new Uint8Array(size);
+    let filled = 0;
+    while (filled < size) {
+      if (offset === chunk.length) {
+        const next = await input.next();
+        if (next.done) {
+          if (allowFin && filled === 0) return undefined;
+          throw new FrameError("stream ended inside a frame");
+        }
+        chunk = next.value;
+        offset = 0;
+        continue;
+      }
+      const count = Math.min(size - filled, chunk.length - offset);
+      result.set(chunk.subarray(offset, offset + count), filled);
+      offset += count;
+      filled += count;
+    }
+    return result;
+  }
+  try {
+    for (;;) {
+      const header = await read(5, true);
+      if (header === undefined) return;
+      if (header[0] > 1) throw new FrameError("protobuf observation received a non-protobuf frame");
+      const length = new DataView(header.buffer).getUint32(1, false);
+      if (length > maxFrameBytes) throw new FrameError("stream message exceeds negotiated frame limit");
+      const body = await read(length, false);
+      if (body === undefined) throw new FrameError("missing stream body");
+      if (header[0] === 1) throw new RpcCallError(decodeCallFailure(body));
+      yield body;
+    }
+  } finally {
+    await input.return?.();
   }
 }

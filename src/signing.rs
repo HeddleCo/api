@@ -2,7 +2,7 @@
 
 use sha2::{Digest, Sha256};
 
-use crate::heddle::api::v1alpha1::{EndpointDescriptor, RelayAdmissionClaims};
+use crate::heddle::api::common::{EndpointDescriptor, RelayAdmissionClaims};
 use prost::Message;
 
 /// Domain for the WebAuthn assertion that binds both client-minted session

@@ -8,7 +8,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -19,7 +19,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -30,7 +30,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -41,7 +41,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -52,7 +52,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -63,7 +63,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -74,7 +74,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -85,7 +85,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -96,7 +96,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -107,7 +107,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentService",
@@ -118,7 +118,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent.proto"
+    "file": "proto/heddle/api/v1alpha2/agent.proto"
   },
   {
     "service": "AgentGatewayService",
@@ -129,7 +129,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/agent_gateway.proto"
+    "file": "proto/heddle/api/v1alpha2/agent_gateway.proto"
   },
   {
     "service": "AttentionService",
@@ -140,7 +140,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/attention.proto"
+    "file": "proto/heddle/api/v1alpha2/attention.proto"
   },
   {
     "service": "AttentionService",
@@ -151,7 +151,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/attention.proto"
+    "file": "proto/heddle/api/v1alpha2/attention.proto"
   },
   {
     "service": "AttentionService",
@@ -162,7 +162,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/attention.proto"
+    "file": "proto/heddle/api/v1alpha2/attention.proto"
   },
   {
     "service": "AttentionService",
@@ -173,7 +173,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/attention.proto"
+    "file": "proto/heddle/api/v1alpha2/attention.proto"
   },
   {
     "service": "AttestationService",
@@ -184,7 +184,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/attestation.proto"
+    "file": "proto/heddle/api/v1alpha2/attestation.proto"
   },
   {
     "service": "AttestationService",
@@ -195,7 +195,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/attestation.proto"
+    "file": "proto/heddle/api/v1alpha2/attestation.proto"
   },
   {
     "service": "CollaborationService",
@@ -207,7 +207,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "CollaborationService",
@@ -219,7 +219,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "CollaborationService",
@@ -231,7 +231,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "CollaborationService",
@@ -243,7 +243,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "CollaborationService",
@@ -255,7 +255,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "CollaborationService",
@@ -267,7 +267,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "CollaborationService",
@@ -279,7 +279,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "CollaborationService",
@@ -291,7 +291,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/collaboration.proto"
+    "file": "proto/heddle/api/v1alpha2/collaboration.proto"
   },
   {
     "service": "IdentityService",
@@ -302,7 +302,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -313,7 +313,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -324,7 +324,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -335,7 +335,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -346,7 +346,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -357,7 +357,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -368,7 +368,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -379,7 +379,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -390,7 +390,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -401,7 +401,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -412,7 +412,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -423,7 +423,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -434,7 +434,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -445,7 +445,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -456,7 +456,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -467,7 +467,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -478,7 +478,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -489,7 +489,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -500,7 +500,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -511,7 +511,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -522,7 +522,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -533,7 +533,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -544,7 +544,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -555,7 +555,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -566,7 +566,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -577,7 +577,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -588,7 +588,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -599,7 +599,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -610,7 +610,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -621,7 +621,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -632,7 +632,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -643,7 +643,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -654,7 +654,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -665,7 +665,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -676,7 +676,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -687,7 +687,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -698,7 +698,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -709,7 +709,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -720,7 +720,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -731,7 +731,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -742,7 +742,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -753,7 +753,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -764,7 +764,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -775,7 +775,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -786,7 +786,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -797,7 +797,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -808,7 +808,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "IdentityService",
@@ -819,7 +819,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/identity.proto"
+    "file": "proto/heddle/api/v1alpha2/identity.proto"
   },
   {
     "service": "NotificationService",
@@ -830,7 +830,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/notification.proto"
+    "file": "proto/heddle/api/v1alpha2/notification.proto"
   },
   {
     "service": "NotificationService",
@@ -841,7 +841,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/notification.proto"
+    "file": "proto/heddle/api/v1alpha2/notification.proto"
   },
   {
     "service": "NotificationService",
@@ -852,7 +852,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/notification.proto"
+    "file": "proto/heddle/api/v1alpha2/notification.proto"
   },
   {
     "service": "NotificationService",
@@ -863,7 +863,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/notification.proto"
+    "file": "proto/heddle/api/v1alpha2/notification.proto"
   },
   {
     "service": "NotificationService",
@@ -874,7 +874,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/notification.proto"
+    "file": "proto/heddle/api/v1alpha2/notification.proto"
   },
   {
     "service": "NotificationService",
@@ -885,7 +885,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/notification.proto"
+    "file": "proto/heddle/api/v1alpha2/notification.proto"
   },
   {
     "service": "OperationService",
@@ -896,7 +896,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -907,7 +907,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -918,7 +918,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -929,7 +929,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -940,7 +940,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -951,7 +951,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -962,7 +962,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -973,7 +973,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -984,7 +984,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OperationService",
@@ -995,7 +995,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/operation.proto"
+    "file": "proto/heddle/api/v1alpha2/operation.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1006,7 +1006,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1017,7 +1017,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1028,7 +1028,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1039,7 +1039,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1050,7 +1050,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1061,7 +1061,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1072,7 +1072,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1083,7 +1083,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "OwnerAuthorizationService",
@@ -1094,7 +1094,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/owner_authorization.proto"
+    "file": "proto/heddle/api/v1alpha2/owner_authorization.proto"
   },
   {
     "service": "PullRequestReviewService",
@@ -1105,7 +1105,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/pull_request_review.proto"
+    "file": "proto/heddle/api/v1alpha2/pull_request_review.proto"
   },
   {
     "service": "PullRequestReviewService",
@@ -1116,7 +1116,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/pull_request_review.proto"
+    "file": "proto/heddle/api/v1alpha2/pull_request_review.proto"
   },
   {
     "service": "PullRequestReviewService",
@@ -1127,7 +1127,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/pull_request_review.proto"
+    "file": "proto/heddle/api/v1alpha2/pull_request_review.proto"
   },
   {
     "service": "RegistryService",
@@ -1138,7 +1138,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1149,7 +1149,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1160,7 +1160,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1171,7 +1171,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1182,7 +1182,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1193,7 +1193,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1204,7 +1204,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1215,7 +1215,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1226,7 +1226,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1237,7 +1237,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1248,7 +1248,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1259,7 +1259,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1270,7 +1270,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1281,7 +1281,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1292,7 +1292,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1303,7 +1303,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1314,7 +1314,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1325,7 +1325,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1336,7 +1336,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1347,7 +1347,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1358,7 +1358,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1369,7 +1369,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1380,7 +1380,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1391,7 +1391,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1402,7 +1402,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1413,7 +1413,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1424,7 +1424,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1435,7 +1435,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1446,7 +1446,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1457,7 +1457,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RegistryService",
@@ -1468,7 +1468,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/registry.proto"
+    "file": "proto/heddle/api/v1alpha2/registry.proto"
   },
   {
     "service": "RepoSyncService",
@@ -1479,7 +1479,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+    "file": "proto/heddle/api/common/attachments.proto"
   },
   {
     "service": "RepoSyncService",
@@ -1490,7 +1490,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+    "file": "proto/heddle/api/common/attachments.proto"
   },
   {
     "service": "RepoSyncService",
@@ -1501,7 +1501,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+    "file": "proto/heddle/api/common/attachments.proto"
   },
   {
     "service": "RepoSyncService",
@@ -1512,7 +1512,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repo_sync.proto"
+    "file": "proto/heddle/api/common/attachments.proto"
   },
   {
     "service": "RepositoryService",
@@ -1523,7 +1523,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1534,7 +1534,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1545,7 +1545,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1556,7 +1556,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1567,7 +1567,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1578,7 +1578,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1589,7 +1589,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1600,7 +1600,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1611,7 +1611,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1622,7 +1622,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1633,7 +1633,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1644,7 +1644,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1655,7 +1655,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1666,7 +1666,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1677,7 +1677,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1688,7 +1688,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1699,7 +1699,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1710,7 +1710,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1721,7 +1721,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "RepositoryService",
@@ -1732,7 +1732,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/repository.proto"
+    "file": "proto/heddle/api/common/repository.proto"
   },
   {
     "service": "SearchService",
@@ -1743,7 +1743,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/search.proto"
+    "file": "proto/heddle/api/v1alpha2/search.proto"
   },
   {
     "service": "StateReviewService",
@@ -1755,7 +1755,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+    "file": "proto/heddle/api/v1alpha2/state_review.proto"
   },
   {
     "service": "StateReviewService",
@@ -1767,7 +1767,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+    "file": "proto/heddle/api/v1alpha2/state_review.proto"
   },
   {
     "service": "StateReviewService",
@@ -1779,7 +1779,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+    "file": "proto/heddle/api/v1alpha2/state_review.proto"
   },
   {
     "service": "StateReviewService",
@@ -1791,7 +1791,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+    "file": "proto/heddle/api/v1alpha2/state_review.proto"
   },
   {
     "service": "StateReviewService",
@@ -1803,7 +1803,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+    "file": "proto/heddle/api/v1alpha2/state_review.proto"
   },
   {
     "service": "StateReviewService",
@@ -1815,7 +1815,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+    "file": "proto/heddle/api/v1alpha2/state_review.proto"
   },
   {
     "service": "StateReviewService",
@@ -1827,7 +1827,7 @@
       "WEFT",
       "HEDDLE_DAEMON"
     ],
-    "file": "proto/heddle/api/v1alpha1/state_review.proto"
+    "file": "proto/heddle/api/v1alpha2/state_review.proto"
   },
   {
     "service": "WorkflowService",
@@ -1838,7 +1838,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1849,7 +1849,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1860,7 +1860,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1871,7 +1871,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1882,7 +1882,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1893,7 +1893,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1904,7 +1904,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1915,7 +1915,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1926,7 +1926,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1937,7 +1937,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1948,7 +1948,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1959,7 +1959,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1970,7 +1970,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1981,7 +1981,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -1992,7 +1992,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -2003,7 +2003,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -2014,7 +2014,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -2025,7 +2025,7 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   },
   {
     "service": "WorkflowService",
@@ -2036,6 +2036,6 @@
     "targets": [
       "WEFT"
     ],
-    "file": "proto/heddle/api/v1alpha1/workflow.proto"
+    "file": "proto/heddle/api/v1alpha2/workflow.proto"
   }
 ]

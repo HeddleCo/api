@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
-import { ThreadOverviewSchema } from '../packages/typescript/dist/v2alpha1/thread_pb.js';
-import { signThreadOwnershipAcceptance } from '../packages/typescript/dist/v2alpha1/thread-ownership.js';
+import { ThreadOverviewSchema } from '../packages/typescript/dist/v1alpha2/thread_pb.js';
+import { signThreadOwnershipAcceptance } from '../packages/typescript/dist/v1alpha2/thread-ownership.js';
 
 const key = seed => createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.alloc(32, seed)]), format: 'der', type: 'pkcs8' });
 const publicKey = seed => new Uint8Array(createPublicKey(key(seed)).export({ format: 'der', type: 'spki' }).subarray(-32));

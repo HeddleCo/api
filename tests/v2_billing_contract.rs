@@ -1,7 +1,7 @@
 #![cfg(feature = "reflection")]
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v1alpha1::{
+    heddle::api::common::{
         AuthorizationAccess, AuthorizationRole, AuthorizationScopeSource, SigningTier,
     },
 };
@@ -11,7 +11,7 @@ use prost_reflect::DescriptorPool;
 fn billing_targets_the_authenticated_account_with_effective_delegated_authority() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     let service = pool
-        .get_service_by_name("heddle.api.v2alpha1.BillingService")
+        .get_service_by_name("heddle.api.v1alpha2.BillingService")
         .expect("billing service");
     let methods: Vec<_> = service.methods().collect();
     assert_eq!(methods.len(), 6);
@@ -59,7 +59,7 @@ fn billing_targets_the_authenticated_account_with_effective_delegated_authority(
 fn identity_composes_billing_and_current_credential_metadata_without_issuing_a_secret() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     let request = pool
-        .get_message_by_name("heddle.api.v2alpha1.ObserveIdentityRequest")
+        .get_message_by_name("heddle.api.v1alpha2.ObserveIdentityRequest")
         .expect("identity query");
     assert!(
         request
@@ -68,13 +68,13 @@ fn identity_composes_billing_and_current_credential_metadata_without_issuing_a_s
     );
     assert!(request.get_field_by_name("include_billing").is_some());
     let event = pool
-        .get_message_by_name("heddle.api.v2alpha1.IdentityEvent")
+        .get_message_by_name("heddle.api.v1alpha2.IdentityEvent")
         .expect("identity event");
     assert!(event.get_field_by_name("current_credential").is_some());
     assert!(event.get_field_by_name("billing").is_some());
     for name in ["CurrentCredentialRecord", "BillingRecord"] {
         let record = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("typed projection");
         assert!(record.get_field_by_name("version").is_some());
         assert!(record.get_field_by_name("actions").is_some());
@@ -90,7 +90,7 @@ fn identity_composes_billing_and_current_credential_metadata_without_issuing_a_s
 fn financial_amounts_and_optional_seats_preserve_absence_and_integer_units() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     let money = pool
-        .get_message_by_name("heddle.api.v2alpha1.Money")
+        .get_message_by_name("heddle.api.v1alpha2.Money")
         .expect("money");
     assert_eq!(
         money
@@ -100,7 +100,7 @@ fn financial_amounts_and_optional_seats_preserve_absence_and_integer_units() {
         prost_reflect::Kind::Int64
     );
     let update = pool
-        .get_message_by_name("heddle.api.v2alpha1.UpdateSubscriptionRequest")
+        .get_message_by_name("heddle.api.v1alpha2.UpdateSubscriptionRequest")
         .expect("atomic subscription update");
     assert!(
         update
@@ -121,7 +121,7 @@ fn financial_amounts_and_optional_seats_preserve_absence_and_integer_units() {
 fn current_credential_carries_the_original_session_independently_of_collection_pages() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     let credential = pool
-        .get_message_by_name("heddle.api.v2alpha1.CurrentCredentialRecord")
+        .get_message_by_name("heddle.api.v1alpha2.CurrentCredentialRecord")
         .expect("current credential");
     let session = credential
         .get_field_by_name("session")
@@ -131,7 +131,7 @@ fn current_credential_carries_the_original_session_independently_of_collection_p
     assert_eq!(
         session.kind(),
         prost_reflect::Kind::Message(
-            pool.get_message_by_name("heddle.api.v2alpha1.SessionRecord")
+            pool.get_message_by_name("heddle.api.v1alpha2.SessionRecord")
                 .expect("original versioned session")
         )
     );
@@ -141,7 +141,7 @@ fn current_credential_carries_the_original_session_independently_of_collection_p
 fn observed_device_has_original_registry_identity_and_version() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     let device = pool
-        .get_message_by_name("heddle.api.v2alpha1.DeviceIdentity")
+        .get_message_by_name("heddle.api.v1alpha2.DeviceIdentity")
         .expect("device observation");
     assert_eq!(
         device
@@ -163,7 +163,7 @@ fn observed_device_has_original_registry_identity_and_version() {
 fn device_revocation_consumes_the_observed_registry_identity_and_version() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid contract");
     let request = pool
-        .get_message_by_name("heddle.api.v2alpha1.RevokeDeviceRequest")
+        .get_message_by_name("heddle.api.v1alpha2.RevokeDeviceRequest")
         .expect("device revocation");
     assert_eq!(
         request
@@ -171,7 +171,7 @@ fn device_revocation_consumes_the_observed_registry_identity_and_version() {
             .expect("device identity")
             .kind(),
         prost_reflect::Kind::Message(
-            pool.get_message_by_name("heddle.api.v2alpha1.RecordRef")
+            pool.get_message_by_name("heddle.api.v1alpha2.RecordRef")
                 .expect("registry ref")
         )
     );
@@ -192,7 +192,7 @@ fn device_revocation_consumes_the_observed_registry_identity_and_version() {
 fn public_plan_preserves_tiered_pricing_and_unknown_storage() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract");
     let plan = pool
-        .get_message_by_name("heddle.api.v2alpha1.BillingPlan")
+        .get_message_by_name("heddle.api.v1alpha2.BillingPlan")
         .expect("plan");
     for name in [
         "storage_bytes",
@@ -206,7 +206,7 @@ fn public_plan_preserves_tiered_pricing_and_unknown_storage() {
         assert!(field.supports_presence(), "unknown storage is not zero");
     }
     let pricing = pool
-        .get_message_by_name("heddle.api.v2alpha1.BillingSeatPricing")
+        .get_message_by_name("heddle.api.v1alpha2.BillingSeatPricing")
         .expect("full seat schedule");
     assert!(
         pricing

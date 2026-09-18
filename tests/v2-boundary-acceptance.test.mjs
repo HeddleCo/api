@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { create, fromBinary, toBinary, fromJson, toJson } from '@bufbuild/protobuf';
-import { ReplicationOperationsSchema, ThreadGenesisRecordSchema } from '../packages/typescript/dist/v2alpha1/sync_pb.js';
+import { ReplicationOperationsSchema, ThreadGenesisRecordSchema } from '../packages/typescript/dist/v1alpha2/sync_pb.js';
 const evidence = { format: 'heddle-original-boundary-acceptance-v1', canonicalRecord: new Uint8Array([0, 255, 19, 72]), signatures: [{ publicKey: new Uint8Array(32).fill(7), signature: new Uint8Array(64).fill(9) }] };
 for (const [name, schema, original] of [
   ['operation batch', ReplicationOperationsSchema, { operations: [{ ...evidence, format: 'unchanged-original' }], authorityAdmissions: [{ ...evidence, format: 'unchanged-receipt' }] }],

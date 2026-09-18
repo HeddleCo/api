@@ -7,8 +7,8 @@ import {
   decodeStreamFrame, decodeMessageStream, FrameError, RpcCallError,
 } from "../packages/typescript/dist/framing.js";
 import { CallFailureSchema } from "../packages/typescript/dist/errors_pb.js";
-import { StreamFrameSchema, StreamDataKind } from "../packages/typescript/dist/v2alpha1/stream_pb.js";
-import { ObservationState, StreamProtocolError } from "../packages/typescript/dist/v2alpha1/observation.js";
+import { StreamFrameSchema, StreamDataKind } from "../packages/typescript/dist/v1alpha2/stream_pb.js";
+import { ObservationState, StreamProtocolError } from "../packages/typescript/dist/v1alpha2/observation.js";
 
 const bytes = (text) => new TextEncoder().encode(text);
 const frame = (sequence, kind, value = {}) => create(StreamFrameSchema, { sequence: BigInt(sequence), body: { case: kind, value } });

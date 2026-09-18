@@ -1,4 +1,4 @@
-use heddle_api::heddle::api::v2alpha1 as api;
+use heddle_api::heddle::api::v1alpha2 as api;
 use prost::Message;
 #[test]
 fn integration_records_have_distinct_typed_identities() {

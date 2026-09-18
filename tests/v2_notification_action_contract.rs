@@ -1,8 +1,8 @@
-use heddle_api::heddle::api::v1alpha1::{AuthorizationAccess, SigningTier, StableSigningIdentity};
+use heddle_api::heddle::api::common::{AuthorizationAccess, SigningTier, StableSigningIdentity};
 #[test]
 fn unsubscribe_capability_works_without_account_sign_in() {
     let route = heddle_api::v2::method_descriptor(
-        "/heddle.api.v2alpha1.NotificationService/UnsubscribeNotifications",
+        "/heddle.api.v1alpha2.NotificationService/UnsubscribeNotifications",
     )
     .expect("unsubscribe route");
     assert_eq!(route.authorization_access, AuthorizationAccess::Public);

@@ -1,0 +1,497 @@
+syntax = "proto3";
+package heddle.api.v1alpha2;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/common/errors.proto";
+import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/owner_records.proto";
+import "heddle/api/v1alpha2/owner_views.proto";
+import "heddle/api/v1alpha2/stream.proto";
+import "heddle/api/v1alpha2/thread.proto";
+
+// These are native v2 transfers, not envelopes carrying v1 Push/Pull requests.
+// A signed opening binds exact v2 scope, operation, policy, inventory and resume
+// context. Packs and indexes travel as bounded protobuf chunks under flow control.
+message ObjectAddress {
+  string algorithm = 1;
+  bytes digest = 2;
+}
+message TransferCheckpoint {
+  bytes transfer_id = 1;
+  bytes plan_digest = 2;
+  bytes resume_token = 3;
+  uint64 committed_bytes = 4;
+}
+message TransferObject {
+  ObjectAddress address = 1;
+  string kind = 2;
+  SharedFacet facet = 3;
+  uint64 size = 4;
+  Coverage availability = 5;
+}
+message TransferSelection {
+  repeated SharedFacet facets = 1;
+  repeated RevisionRef exclude_revisions = 2;
+  uint32 depth = 3;
+  bool allow_partial = 4;
+}
+message FetchOpen {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2;
+  TransferSelection selection = 3;
+  TransferCheckpoint checkpoint = 4;
+  reserved 5;
+  enum Delivery {
+    DELIVERY_UNSPECIFIED = 0; // Defaults to direct transfer.
+    DELIVERY_DIRECT = 1;
+    DELIVERY_PROVIDER_PREFERRED = 2;
+  }
+  Delivery delivery = 6;
+  // Transport hints only. The connected peer identity remains authoritative.
+  repeated ProviderDialRoute routes = 7;
+}
+message PackExtent {
+  ObjectAddress pack = 1;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_NATIVE_PACK = 1;
+    KIND_NATIVE_INDEX = 2;
+    KIND_GIT_PACK = 3;
+    KIND_GIT_INDEX = 4;
+  }
+  Kind kind = 2;
+  uint64 offset = 3;
+  uint64 length = 4;
+  ObjectAddress extent_digest = 5;
+  // Admission verifies extent and whole-object hashes and closure.
+  // Receiving an extent alone is not acceptance.
+}
+message PackChunk {
+  PackExtent extent = 1;
+  bytes data = 2;
+}
+
+message TransferSidecar {
+  RevisionRef revision = 1;
+  ObjectAddress address = 2;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_REDACTION = 1;
+    KIND_VISIBILITY = 2;
+    KIND_ATTACHMENT = 3;
+    KIND_PURGE = 4;
+  }
+  Kind kind = 3;
+  string record_format = 4;
+  bytes canonical_record = 5;
+  repeated SignedRecord owner_authorization = 6;
+  // PURGE requires the independently verified owner authorization chain and
+  // exact operation signature. Ordinary write cannot satisfy that requirement.
+}
+message TransferReady {
+  EndpointRef endpoint = 1;
+  ThreadRef thread = 2;
+  RevisionRef current = 3;
+  bytes current_version = 4;
+  SignedSpoolOwnerGenesis owner_genesis = 5;
+  repeated TransferObject have = 6;
+  repeated TransferObject need = 7;
+  TransferCheckpoint checkpoint = 8;
+  ReadBudget budget = 9;
+  bool full_closure_available = 10;
+  repeated TransferObject missing = 11;
+  repeated ThreadOverview advertised_threads = 12;
+  PageInfo page = 13;
+  // Exact whole artifacts selected for this download, in transmission order.
+  // Chunk offsets/lengths must stay inside these independently hashed extents.
+  repeated PackExtent packs = 14;
+  // Clone verifies owner history and installs the original Thread genesis
+  // before materializing source. Neither identity is minted by the receiver.
+  OwnerState ownership = 15;
+  ThreadGenesisRecord thread_genesis = 16;
+}
+message ProviderExtent {
+  EndpointRef provider = 1;
+  ProviderReadTicket ticket = 2;
+  ProviderPhysicalRange range = 3;
+}
+// A physical R2 range exactly tiled by independently hashed encoded records.
+// record_set_commitment is a metadata commitment over pack identity, offset,
+// length and ordered encoded record digests; it is not a hash of range bytes.
+message ProviderPhysicalRange {
+  bytes pack_id = 1;
+  string object_etag = 2;
+  uint64 offset = 3;
+  uint64 length = 4;
+  bytes record_set_commitment = 5;
+}
+// The provider verifies this typed ticket against the published canonical
+// extent set and the attenuated caller capability. A ticket alone grants no
+// access; the opening's native request proof binds the bearer key, the
+// authenticated Iroh client peer matches client, and the receiver's endpoint
+// matches provider. Root rotation and expiry are independently checked.
+message ProviderReadTicket {
+  bytes attenuated_capability = 1;
+  bytes extent_set_digest = 2;
+  SpoolRef spool = 3;
+  SharedFacet facet = 4;
+  string audience = 5;
+  bytes content_root = 6;
+  bytes pack_id = 7;
+  string object_etag = 8;
+  uint64 offset = 9;
+  uint64 length = 10;
+  EndpointRef provider = 11;
+  EndpointRef client = 12;
+  bytes assembly_digest = 13;
+  google.protobuf.Timestamp expires_at = 14;
+  bytes record_set_commitment = 15;
+}
+// One record in output-pack order. Provider bytes must occupy an exact tiled
+// physical range; inline bytes arrive as bounded ProviderInlineChunk frames.
+// In either case the client verifies the encoded bytes and decoded object.
+message ProviderAssemblyRecord {
+  TransferObject object = 1;
+  uint64 encoded_length = 2;
+  ObjectAddress encoded_digest = 3;
+  uint64 output_offset = 4;
+  oneof source {
+    ProviderRangeSource provider = 5;
+    ProviderInlineSource inline = 6;
+  }
+}
+message ProviderRangeSource {
+  uint32 extent_index = 1;
+  // Offset relative to that ProviderPhysicalRange, starting at zero.
+  uint64 source_offset = 2;
+}
+message ProviderInlineSource {}
+message ProviderInlineChunk {
+  bytes assembly_digest = 1;
+  uint32 record_index = 2;
+  uint64 offset = 3;
+  bytes data = 4;
+}
+// An unsigned challenge carried over an already authenticated Fetch stream.
+// Only the client's exact-plan consent is signed. Both digests and the
+// selected Thread/revision bind all tickets and virtual-pack placement.
+message ProviderPlanChallenge {
+  bytes nonce = 1;
+  ThreadRef thread = 2;
+  RevisionRef revision = 3;
+  EndpointRef issuer = 4;
+  EndpointRef client = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  bytes extent_set_digest = 7;
+  bytes assembly_digest = 8;
+}
+// Authenticated transport hints only. The connected Iroh peer must still
+// match provider.public_key; a URL is never a source of authority.
+message ProviderDialRoute {
+  EndpointRef provider = 1;
+  oneof address {
+    string relay_url = 2;
+    string websocket_url = 3;
+  }
+}
+message ProviderPlan {
+  bytes extent_set_digest = 1;
+  repeated ProviderExtent extents = 2;
+  ProviderPlanChallenge challenge = 3;
+  bytes assembly_digest = 4;
+  // Canonical LMPK v4 header: 16 bytes, including the exact record count.
+  bytes pack_header = 5;
+  // Must equal 16 + sum(encoded record lengths) + the final 32-byte
+  // BLAKE3(header || ordered encoded record bytes) trailer.
+  uint64 output_pack_length = 6;
+  repeated ProviderAssemblyRecord records = 7;
+}
+// Capability-free candidate layout. It is not a serving grant. The client
+// consents to its exact challenge before the issuer publishes ticket-bearing
+// ProviderPlan; both phases use the same canonical layout commitments.
+message ProviderOfferExtent {
+  EndpointRef provider = 1;
+  ProviderPhysicalRange range = 2;
+  SpoolRef spool = 3;
+  SharedFacet facet = 4;
+  string audience = 5;
+  bytes content_root = 6;
+}
+message ProviderOffer {
+  bytes extent_set_digest = 1;
+  repeated ProviderOfferExtent extents = 2;
+  ProviderPlanChallenge challenge = 3;
+  bytes assembly_digest = 4;
+  bytes pack_header = 5;
+  uint64 output_pack_length = 6;
+  repeated ProviderAssemblyRecord records = 7;
+}
+message ProviderConsent {
+  bytes extent_set_digest = 1;
+  SignedRecord exact_plan_consent = 2;
+  bytes assembly_digest = 3;
+}
+message ProviderResult {
+  bytes extent_set_digest = 1;
+  bytes assembly_digest = 2;
+  // Ordered metadata commitments for ranges actually verified by the client.
+  // This report never authorizes source publication or claims server truth.
+  repeated bytes verified_range_commitments = 3;
+  ObjectAddress assembled_pack = 4;
+}
+message PublicationReceipt {
+  string client_operation_id = 1;
+  EndpointRef destination = 2;
+  ThreadRef thread = 3;
+  RevisionRef revision = 4;
+  bytes sharing_policy_version = 5;
+  ObjectAddress accepted_inventory = 6;
+  oneof outcome {
+    Applied accepted = 7;
+    heddle.api.common.CallFailure rejected = 8;
+  }
+}
+message FetchClientFrame {
+  oneof body {
+    FetchOpen open = 1;
+    ProviderConsent consent = 2;
+    ProviderResult provider_result = 3;
+    TransferCheckpoint checkpoint = 4;
+  }
+}
+message FetchComplete {
+  RevisionRef revision = 1;
+  TransferCheckpoint checkpoint = 2;
+  Coverage closure = 3;
+  repeated TransferObject missing = 4;
+}
+message FetchServerFrame {
+  oneof body {
+    TransferReady ready = 1;
+    PackChunk pack = 2;
+    TransferSidecar sidecar = 3;
+    ProviderPlan provider_plan = 4;
+    FetchComplete complete = 5;
+    // Original signed causal operations for the selected facets. A receiver
+    // admits these to the same replica as live sync; projections are not proofs.
+    // Bounded originals and matched retained authority receipts use exactly
+    // the live-replication batch shape; a receipt is not current disclosure permission.
+    ReplicationOperations operations = 6;
+    // Original creator-signed genesis for a required cross-Thread source
+    // dependency. Target access never grants access to this dependency.
+    ThreadGenesisRecord thread_genesis = 7;
+    ProviderInlineChunk provider_inline = 8;
+    ProviderOffer provider_offer = 9;
+  }
+}
+// Bulk content availability for an already admitted Thread capture. Metadata
+// replication owns causal heads; uploading bytes cannot select or replace one.
+// The opening PoP binds the exact Thread/revision, policy, complete pack/index
+// addresses and lengths, operation identity, and any resume checkpoint.
+message PublishContentOpen {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2;
+  bytes sharing_policy_version = 3;
+  // Complete pack/index objects: offset is zero and length is the whole object.
+  // The server validates hashes and the exact authorized source closure before
+  // installation. Extra context, forensic objects, or history are not admitted
+  // merely because they were included in a source pack.
+  repeated PackExtent packs = 4;
+  TransferCheckpoint checkpoint = 5;
+  // Bound by the opening proof and checked against the authenticated transport.
+  // A proof for one receiver cannot be forwarded to publish at another.
+  EndpointRef source = 6;
+  EndpointRef destination = 7;
+}
+message PublishContentFinish {
+  // Names the server's current committed transfer plan, not a caller assertion
+  // that bytes or closure were accepted. A FIN alone never publishes content.
+  TransferCheckpoint checkpoint = 1;
+}
+message PublishContentClientFrame {
+  // Required and unchanged on every frame; the opening proof covers this value.
+  string client_operation_id = 1;
+  oneof body {
+    PublishContentOpen open = 2;
+    PackChunk pack = 3;
+    TransferSidecar sidecar = 4;
+    PublishContentFinish finish = 5;
+    // Original signed source causal dependencies, symmetric with Fetch. Stage
+    // within the transfer budget; receiving a record does not admit its source.
+    // Finish verifies original authority, each Thread audience and complete
+    // causal/source closure before atomically publishing source availability.
+    // Bounded originals and matched retained authority receipts use exactly
+    // the live-replication batch shape; a receipt is not current disclosure permission.
+    ReplicationOperations operations = 6;
+    // Original genesis and independently verifiable creator/admission proof for
+    // the selected Thread or a required source dependency. A courier cannot
+    // replace the creator, enroll an account or implicitly claim local ownership.
+    ThreadGenesisRecord thread_genesis = 7;
+  }
+}
+message PublishContentServerFrame {
+  oneof body {
+    TransferReady ready = 1;
+    TransferCheckpoint checkpoint = 2;
+    // Accepted only after complete authorized closure is durably installed.
+    // Observers may then treat this exact hosted revision as source-available.
+    PublicationReceipt receipt = 3;
+  }
+}
+
+message ReadProviderExtentRequest {
+  ProviderReadTicket ticket = 1;
+  bytes extent_set_digest = 2;
+  ProviderPhysicalRange range = 3;
+  reserved 4;
+}
+message ProviderRangeChunk {
+  // Offset within the single ticket-bound physical range.
+  uint64 offset = 1;
+  bytes data = 2;
+}
+message ProviderExtentEvent {
+  oneof body {
+    ProviderPhysicalRange ready = 1;
+    ProviderRangeChunk chunk = 3;
+    TransferCheckpoint complete = 2;
+  }
+}
+
+// A causal frontier is portable within its exact Thread/facet/format. It is
+// never an Observe cursor or a bulk-transfer checkpoint. Heads are paged using
+// the negotiated max_items; repeated Have frames contribute to the same round.
+message CausalFrontier {
+  SharedFacet facet = 1;
+  repeated bytes heads = 2;
+}
+// Carries original ownership proof with the immutable creator-signed identity.
+// The receiver independently verifies it; transport credentials never select
+// the owning account or enroll an otherwise-untrusted account root.
+message ThreadGenesisRecord {
+  SignedRecord genesis = 1;
+  bytes creator_authority = 2;
+  // Original account authority admitted by an independently pinned hosted executor.
+  // Does not authorize current disclosure or enroll the original account locally.
+  SignedRecord admission = 3;
+  // Exact co-signed claims, including those retained as resolved history.
+  // Unresolved conflicting claims fail closed; a transport must never select a
+  // winner or rewrite immutable genesis. Claims and their resolutions share the
+  // metadata/frame budgets below; large histories require bounded sync batches.
+  repeated SignedRecord ownership_claims = 4;
+  // Optional independently trusted first-admission testimony matched by claim
+  // identity. Original acceptance expiry does not invalidate retained admission.
+  repeated SignedRecord ownership_claim_admissions = 5;
+  // Exact heddle-original-boundary-acceptance-v1 signatures needed by this
+  // genesis/claim bundle. Fresh acceptance binds the complete streamed-original
+  // manifest and publication intent; verify the accepting authority now. It does
+  // not assert historical validity of expired/revoked original authority or
+  // change original attribution. On relay, require independently pinned,
+  // versioned admission testimony explicitly referencing the acceptance digest;
+  // acceptance alone cannot authorize another destination or a manifest subset.
+  // At most 128 distinct acceptances per transfer, each canonical record <=96KiB,
+  // within the existing metadata/frame budgets (16MiB transfer, 256KiB frame).
+  // Deduplicate identical evidence across wrappers/batches; reject conflicting
+  // or unreferenced evidence. No executor/root trust is enrolled from this field.
+  repeated SignedRecord boundary_acceptances = 6;
+  // Original local-owner/recipient co-signed ownership resolutions in causal
+  // order. Retain losing claims as evidence. Duplicate records are idempotent;
+  // a settled claim replay cannot reopen the same conflict. Admission verifies
+  // exact Thread, Spool, conflict set and observed source frontier.
+  repeated SignedRecord ownership_resolutions = 7;
+  // Independently trusted first-admission testimony for the matching resolution
+  // identities. Current authorization governs a new admission; retained exact
+  // history is not invalidated merely by the accepting credential's expiry.
+  repeated SignedRecord ownership_resolution_admissions = 8;
+}
+
+message ReplicationOpen {
+  ThreadRef thread = 1;
+  repeated SharedFacet facets = 2;
+  bytes sharing_policy_version = 3;
+  // Original creator-signed genesis for first publication. The receiver must
+  // authorize the destination spool and verify canonical bytes, creator proof,
+  // and exact Thread/spool identity before durably installing it and emitting
+  // Ready. Reconnects may include it again; it cannot replace another genesis.
+  ThreadGenesisRecord thread_genesis = 4;
+  ReadBudget budget = 5;
+  repeated string record_formats = 6;
+  // Fresh session binding; the request PoP covers this exact opening.
+  bytes session_nonce = 7;
+  // The opening PoP binds both Iroh identities; replay on another peer or
+  // destination cannot open a stream under the captured credential.
+  EndpointRef source = 8;
+  EndpointRef destination = 9;
+}
+message ReplicationReady {
+  EndpointRef endpoint = 1;
+  ThreadRef thread = 2;
+  repeated SharedFacet facets = 3;
+  bytes sharing_policy_version = 4;
+  ReadBudget budget = 5;
+  repeated string record_formats = 6;
+}
+message ReplicationHave {
+  repeated CausalFrontier frontiers = 1;
+}
+message ReplicationNeed {
+  // Content-addressed canonical Thread operation IDs, exactly 32 bytes each.
+  repeated bytes operation_ids = 1;
+}
+message ReplicationOperations {
+  // Each canonical record binds Thread, facet and causal parents. Peers verify
+  // the format, ID, authorization and dependency scope before admitting it.
+  repeated SignedRecord operations = 1;
+  // Optional original-author admission statements, signed by an independently
+  // pinned hosted executor. The explicit canonical format defines the admission
+  // basis; adding evidence never reinterprets an older receipt. Each binds
+  // one operation ID above, its immutable Spool genesis, Thread, original actor,
+  // publisher and authority digest. Reject duplicate or unmatched sidecars.
+  // Preserve the original operation signature. A receipt proves first durable
+  // authority admission, including pending causal work; it is not causal
+  // acceptance, current permission, approval or landing eligibility. Receivers
+  // retain the exact statement atomically with the original pending bytes and
+  // never infer executor trust from an incoming statement or courier identity.
+  repeated SignedRecord authority_admissions = 2;
+  // Same acceptance evidence and transfer-wide limits as ThreadGenesisRecord.
+  // Fresh publication verifies the exact complete original manifest, intent and
+  // current accepting capability; retained relay requires a matched explicitly
+  // acceptance-based admission receipt from an independently trusted executor.
+  // Preserve the original author and bytes; this is separate present-tense
+  // acceptance, never a fabricated historical authorization timestamp. Evidence
+  // contributes to the existing batch byte budget; operations remains nonempty.
+  repeated SignedRecord boundary_acceptances = 3;
+}
+message ReplicationRejection {
+  bytes operation_id = 1;
+  heddle.api.common.CallFailure failure = 2;
+}
+message ReplicationReceipt {
+  // Accepted means durably stored with accepted causal closure. A record merely
+  // received with missing parents is pending, and must not advance this frontier.
+  repeated bytes accepted_operation_ids = 1;
+  repeated bytes pending_operation_ids = 2;
+  repeated ReplicationRejection rejected = 3;
+  repeated CausalFrontier accepted_frontiers = 4;
+  // Metadata admission is distinct from source/object availability.
+  repeated TransferObject missing_objects = 5;
+  bytes sharing_policy_version = 6;
+}
+message ReplicateThreadRequest {
+  oneof body {
+    ReplicationOpen open = 1;
+    ReplicationHave have = 2;
+    ReplicationNeed need = 3;
+    ReplicationOperations operations = 4;
+    ReplicationReceipt receipt = 5;
+  }
+}
+message ReplicateThreadResponse {
+  oneof body {
+    ReplicationReady ready = 1;
+    ReplicationHave have = 2;
+    ReplicationNeed need = 3;
+    ReplicationOperations operations = 4;
+    ReplicationReceipt receipt = 5;
+  }
+}

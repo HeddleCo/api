@@ -2,7 +2,7 @@
 
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v1alpha1::{
+    heddle::api::common::{
         AuthorizationAccess, AuthorizationRole, AuthorizationScopeSource, SigningTier,
     },
 };
@@ -12,7 +12,7 @@ use prost_reflect::{DescriptorPool, Kind};
 fn email_delivery_proof_is_issued_only_to_the_authenticated_signup_mailer() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract");
     let request = pool
-        .get_message_by_name("heddle.api.v2alpha1.BeginEmailVerificationRequest")
+        .get_message_by_name("heddle.api.v1alpha2.BeginEmailVerificationRequest")
         .expect("email begin");
     assert_eq!(
         request
@@ -33,7 +33,7 @@ fn email_delivery_proof_is_issued_only_to_the_authenticated_signup_mailer() {
         "a bare resource reference cannot authorize email binding"
     );
     let challenge = pool
-        .get_message_by_name("heddle.api.v2alpha1.EmailVerificationChallenge")
+        .get_message_by_name("heddle.api.v1alpha2.EmailVerificationChallenge")
         .expect("delivery challenge");
     assert_eq!(
         challenge
@@ -43,7 +43,7 @@ fn email_delivery_proof_is_issued_only_to_the_authenticated_signup_mailer() {
         Kind::Bytes
     );
     let route = heddle_api::v2::method_descriptor(
-        "/heddle.api.v2alpha1.IdentityService/BeginEmailVerification",
+        "/heddle.api.v1alpha2.IdentityService/BeginEmailVerification",
     )
     .expect("delivery route");
     assert_eq!(
@@ -62,14 +62,14 @@ fn email_delivery_proof_is_issued_only_to_the_authenticated_signup_mailer() {
 fn email_possession_yields_typed_registration_admission_without_an_account_credential() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract");
     let service = pool
-        .get_service_by_name("heddle.api.v2alpha1.IdentityService")
+        .get_service_by_name("heddle.api.v1alpha2.IdentityService")
         .expect("identity");
     let method = service
         .methods()
         .find(|m| m.name() == "CompleteEmailVerification")
         .expect("completion");
     let reservation = pool
-        .get_message_by_name("heddle.api.v2alpha1.VerifiedEmailReservation")
+        .get_message_by_name("heddle.api.v1alpha2.VerifiedEmailReservation")
         .expect("email admission");
     assert_eq!(
         method
@@ -86,7 +86,7 @@ fn email_possession_yields_typed_registration_admission_without_an_account_crede
         );
     }
     let route = heddle_api::v2::method_descriptor(
-        "/heddle.api.v2alpha1.IdentityService/CompleteEmailVerification",
+        "/heddle.api.v1alpha2.IdentityService/CompleteEmailVerification",
     )
     .expect("proof redemption");
     assert_eq!(route.authorization_access, AuthorizationAccess::Public);

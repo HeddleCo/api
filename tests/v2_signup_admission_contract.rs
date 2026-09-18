@@ -1,7 +1,7 @@
 #![cfg(feature = "reflection")]
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v1alpha1::{
+    heddle::api::common::{
         AuthorizationAccess, AuthorizationRole, AuthorizationScopeSource, SigningTier,
     },
 };
@@ -11,7 +11,7 @@ use prost_reflect::{DescriptorPool, Kind};
 fn invite_redemption_yields_registration_admission_without_a_discovery_call_or_device_root() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract");
     let service = pool
-        .get_service_by_name("heddle.api.v2alpha1.IdentityService")
+        .get_service_by_name("heddle.api.v1alpha2.IdentityService")
         .expect("identity");
     let method = service
         .methods()
@@ -34,7 +34,7 @@ fn invite_redemption_yields_registration_admission_without_a_discovery_call_or_d
         Kind::Bytes
     );
     let reservation = pool
-        .get_message_by_name("heddle.api.v2alpha1.SignupReservation")
+        .get_message_by_name("heddle.api.v1alpha2.SignupReservation")
         .expect("typed reservation");
     assert_eq!(
         method
@@ -47,7 +47,7 @@ fn invite_redemption_yields_registration_admission_without_a_discovery_call_or_d
     assert!(reservation.get_field_by_name("ref").is_some());
     assert!(reservation.get_field_by_name("expires_at").is_some());
     let route = heddle_api::v2::method_descriptor(
-        "/heddle.api.v2alpha1.IdentityService/RedeemSignupInvitation",
+        "/heddle.api.v1alpha2.IdentityService/RedeemSignupInvitation",
     )
     .expect("route");
     assert_eq!(route.authorization_access, AuthorizationAccess::Public);
@@ -64,7 +64,7 @@ fn invite_redemption_yields_registration_admission_without_a_discovery_call_or_d
 fn invite_page_resolution_carries_typed_availability_and_inviter_context() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract");
     let response = pool
-        .get_message_by_name("heddle.api.v2alpha1.SignupInvitationResolution")
+        .get_message_by_name("heddle.api.v1alpha2.SignupInvitationResolution")
         .expect("resolution");
     for field in [
         "status",

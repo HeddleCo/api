@@ -7,16 +7,16 @@ use prost_reflect::DescriptorPool;
 fn thread_creation_and_replication_preserve_the_same_signed_genesis() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled contract");
     let start = pool
-        .get_message_by_name("heddle.api.v2alpha1.StartThreadRequest")
+        .get_message_by_name("heddle.api.v1alpha2.StartThreadRequest")
         .expect("Thread creation");
     let open = pool
-        .get_message_by_name("heddle.api.v2alpha1.ReplicationOpen")
+        .get_message_by_name("heddle.api.v1alpha2.ReplicationOpen")
         .expect("Thread replication");
     let creation = start
         .get_field_by_name("thread_genesis")
         .expect("creation retains the original creator signature");
     let carrier = pool
-        .get_message_by_name("heddle.api.v2alpha1.ThreadGenesisRecord")
+        .get_message_by_name("heddle.api.v1alpha2.ThreadGenesisRecord")
         .expect("portable original ownership proof carrier");
     assert_eq!(
         creation.kind(),

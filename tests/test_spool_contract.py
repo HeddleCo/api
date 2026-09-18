@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY = (ROOT / "proto/heddle/api/v1alpha1/registry.proto").read_text()
+REGISTRY = (ROOT / "proto/heddle/api/v1alpha2/registry.proto").read_text()
 
 
 def body(name: str) -> str:

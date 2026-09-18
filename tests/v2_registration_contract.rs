@@ -7,7 +7,7 @@ use prost_reflect::{DescriptorPool, Kind};
 fn registration_carries_admission_device_binding_and_original_owner_proofs() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled contract");
     let message = |name: &str| {
-        pool.get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+        pool.get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("registration message")
     };
     let begin = message("BeginRegistrationRequest");
@@ -30,7 +30,7 @@ fn registration_carries_admission_device_binding_and_original_owner_proofs() {
         ["invitation_reservation", "verified_email"]
     );
     let service = pool
-        .get_service_by_name("heddle.api.v2alpha1.IdentityService")
+        .get_service_by_name("heddle.api.v1alpha2.IdentityService")
         .expect("identity service");
     assert_eq!(
         service

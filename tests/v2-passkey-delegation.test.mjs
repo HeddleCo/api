@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createPrivateKey, createPublicKey, sign, createHash } from 'node:crypto';
 import { clone, fromBinary } from '@bufbuild/protobuf';
-import { SignedMintRootAttachmentSchema } from '../packages/typescript/dist/v2alpha1/owner_records_pb.js';
+import { SignedMintRootAttachmentSchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
 import { canonicalPasskeyAuthority, passkeyAuthoritySigningDigest, mintRootAttachmentSigningDigest,
-  signPasskeyAuthority, verifyMintRootAttachment } from '../packages/typescript/dist/v2alpha1/owner-certificates.js';
+  signPasskeyAuthority, verifyMintRootAttachment } from '../packages/typescript/dist/v1alpha2/owner-certificates.js';
 
 const vectors = JSON.parse(readFileSync(new URL('./fixtures/passkey-mint-delegation-v1-rust.json', import.meta.url), 'utf8'));
 const key = seed => createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.alloc(32, seed)]), format: 'der', type: 'pkcs8' });

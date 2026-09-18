@@ -1,6 +1,6 @@
 # Candidate v2 streams and client integration
 
-`heddle.api.v2alpha1` is a clean alpha cutover contract. Consumers switch to its
+`heddle.api.v1alpha2` is a clean alpha cutover contract. Consumers switch to its
 native routes together; no v2 route forwards a legacy RPC request or response.
 It implements generated types, typed clients, shared framing, and observation
 lifecycle validation. Every v2 service is **PLANNED**: this repository does not
@@ -245,7 +245,7 @@ automatically. Typed failures continue using v1 CallFailure/ErrorDetail.
 
 ## Companion clients
 
-Rust exposes messages at `heddle_api::heddle::api::v2alpha1`, the separate catalog
+Rust exposes messages at `heddle_api::heddle::api::v1alpha2`, the separate catalog
 at `heddle_api::v2::ALL_METHODS`, and typed markers at `heddle_api::v2::rpc`.
 `v2::client::Client` supports typed unary/observe/duplex methods over caller-owned
 `RpcTransport`. Native adapter futures are Send; no executor, socket, signer or

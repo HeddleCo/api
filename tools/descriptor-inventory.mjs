@@ -10,7 +10,7 @@ import {
 } from "@bufbuild/protobuf";
 import { FileDescriptorSetSchema } from "@bufbuild/protobuf/wkt";
 
-const PACKAGE = "heddle.api.v1alpha1";
+const PACKAGE = "heddle.api.v1alpha2";
 const CAPABILITY_LABELS = new Map([
   ["RUN_HISTORY_DETAILS", "run history/details"],
   ["STATE_COMPARISON", "state comparison"],

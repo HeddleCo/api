@@ -6,7 +6,7 @@ use prost_reflect::DescriptorPool;
 fn bookmark_versions_have_a_caller_private_identity_and_return_tombstones() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled contract");
     let reference = pool
-        .get_message_by_name("heddle.api.v2alpha1.BookmarkRef")
+        .get_message_by_name("heddle.api.v1alpha2.BookmarkRef")
         .expect("private bookmark identity");
     assert_eq!(
         reference
@@ -16,7 +16,7 @@ fn bookmark_versions_have_a_caller_private_identity_and_return_tombstones() {
             .as_message()
             .expect("principal ref")
             .full_name(),
-        "heddle.api.v2alpha1.PrincipalRef"
+        "heddle.api.v1alpha2.PrincipalRef"
     );
     let targets: Vec<_> = reference
         .oneofs()
@@ -27,7 +27,7 @@ fn bookmark_versions_have_a_caller_private_identity_and_return_tombstones() {
         .collect();
     assert_eq!(targets, ["spool", "thread"]);
     let entity = pool
-        .get_message_by_name("heddle.api.v2alpha1.EntityRef")
+        .get_message_by_name("heddle.api.v1alpha2.EntityRef")
         .expect("entity");
     assert_eq!(
         entity
@@ -40,14 +40,14 @@ fn bookmark_versions_have_a_caller_private_identity_and_return_tombstones() {
         reference.full_name()
     );
     let method = pool
-        .get_service_by_name("heddle.api.v2alpha1.WorkspaceService")
+        .get_service_by_name("heddle.api.v1alpha2.WorkspaceService")
         .expect("workspace")
         .methods()
         .find(|m| m.name() == "SetBookmark")
         .expect("mutation");
     assert_eq!(
         method.output().full_name(),
-        "heddle.api.v2alpha1.BookmarkMutationResponse"
+        "heddle.api.v1alpha2.BookmarkMutationResponse"
     );
     let record = method
         .output()
@@ -73,7 +73,7 @@ fn exact_resource_pages_can_distinguish_unavailable_absent_and_tombstoned_bookma
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled contract");
     for name in ["ThreadOverview", "SpoolOverview"] {
         let overview = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("overview");
         let bookmark = overview
             .get_field_by_name("current_bookmark")
@@ -88,7 +88,7 @@ fn exact_resource_pages_can_distinguish_unavailable_absent_and_tombstoned_bookma
                 .as_message()
                 .expect("bookmark record")
                 .full_name(),
-            "heddle.api.v2alpha1.BookmarkRecord"
+            "heddle.api.v1alpha2.BookmarkRecord"
         );
         assert!(
             overview.get_field_by_name("version").is_some(),

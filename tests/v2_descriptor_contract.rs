@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use heddle_api::heddle::api::v1alpha1::{RpcEffect, ServiceMaturity};
+use heddle_api::heddle::api::common::{RpcEffect, ServiceMaturity};
 use heddle_api::v2::ALL_METHODS;
 use heddle_api::{FILE_DESCRIPTOR_SET, StreamingShape};
 use prost_reflect::{DescriptorPool, DynamicMessage, Kind, MessageDescriptor, Value};
@@ -34,16 +34,16 @@ fn option_message(value: &Value) -> &DynamicMessage {
 fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let service_contract = pool
-        .get_extension_by_name("heddle.api.v1alpha1.service_contract")
+        .get_extension_by_name("heddle.api.common.service_contract")
         .expect("service contract");
     let rpc_contract = pool
-        .get_extension_by_name("heddle.api.v1alpha1.rpc_contract")
+        .get_extension_by_name("heddle.api.common.rpc_contract")
         .expect("RPC contract");
     let mut declared = BTreeSet::new();
     let mut services = BTreeSet::new();
     for service in pool
         .services()
-        .filter(|service| service.package_name() == "heddle.api.v2alpha1")
+        .filter(|service| service.package_name() == "heddle.api.v1alpha2")
     {
         assert!(
             service.options().has_extension(&service_contract),
@@ -56,12 +56,12 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
             assert!(declared.insert(path.clone()), "duplicate {path}");
             assert_eq!(
                 method.input().package_name(),
-                "heddle.api.v2alpha1",
+                "heddle.api.v1alpha2",
                 "{path}: legacy request bridge"
             );
             assert_eq!(
                 method.output().package_name(),
-                "heddle.api.v2alpha1",
+                "heddle.api.v1alpha2",
                 "{path}: legacy response bridge"
             );
             let options = method.options();
@@ -218,7 +218,7 @@ fn observations_are_streamed_and_candidates_are_never_advertised_as_shipped() {
             let Kind::Message(frame) = frame.kind() else {
                 panic!("typed stream frame");
             };
-            assert_eq!(frame.full_name(), "heddle.api.v2alpha1.StreamFrame");
+            assert_eq!(frame.full_name(), "heddle.api.v1alpha2.StreamFrame");
             assert!(response.oneofs().any(|oneof| oneof.name() == "payload"));
         }
         if method.client_operation_id_required {
@@ -234,7 +234,7 @@ fn observations_are_streamed_and_candidates_are_never_advertised_as_shipped() {
 
 #[test]
 fn hosted_landing_and_checkout_landing_have_distinct_endpoint_owners() {
-    use heddle_api::heddle::api::v1alpha1::DeploymentTarget;
+    use heddle_api::heddle::api::common::DeploymentTarget;
     for (name, expected) in [
         ("ThreadService/LandThread", DeploymentTarget::Weft),
         ("ThreadService/LandStack", DeploymentTarget::Weft),
@@ -243,7 +243,7 @@ fn hosted_landing_and_checkout_landing_have_distinct_endpoint_owners() {
             DeploymentTarget::HeddleDaemon,
         ),
     ] {
-        let path = format!("/heddle.api.v2alpha1.{name}");
+        let path = format!("/heddle.api.v1alpha2.{name}");
         let method = ALL_METHODS
             .iter()
             .find(|method| method.path == path)
@@ -254,7 +254,7 @@ fn hosted_landing_and_checkout_landing_have_distinct_endpoint_owners() {
 
 #[test]
 fn device_deployment_covers_private_work_without_hosted_account_administration() {
-    use heddle_api::heddle::api::v1alpha1::DeploymentTarget::{HeddleDaemon, Provider, Weft};
+    use heddle_api::heddle::api::common::DeploymentTarget::{HeddleDaemon, Provider, Weft};
     for name in [
         "IdentityService/BeginRegistration",
         "IdentityService/CompleteAuthentication",
@@ -265,7 +265,7 @@ fn device_deployment_covers_private_work_without_hosted_account_administration()
         "SpoolService/SetSupportAccess",
         "WorkspaceService/ObserveCatalog",
     ] {
-        let path = format!("/heddle.api.v2alpha1.{name}");
+        let path = format!("/heddle.api.v1alpha2.{name}");
         let method = ALL_METHODS
             .iter()
             .find(|method| method.path == path)
@@ -274,12 +274,12 @@ fn device_deployment_covers_private_work_without_hosted_account_administration()
     }
     let provider_read = ALL_METHODS
         .iter()
-        .find(|method| method.path == "/heddle.api.v2alpha1.SyncService/ReadProviderExtent")
+        .find(|method| method.path == "/heddle.api.v1alpha2.SyncService/ReadProviderExtent")
         .expect("native provider extent route");
     assert_eq!(provider_read.deployment_targets, &[Provider]);
     assert_eq!(
         provider_read.signing_tier,
-        heddle_api::heddle::api::v1alpha1::SigningTier::ProofOfPossession,
+        heddle_api::heddle::api::common::SigningTier::ProofOfPossession,
     );
     for name in [
         "IdentityService/ObserveIdentity",
@@ -294,7 +294,7 @@ fn device_deployment_covers_private_work_without_hosted_account_administration()
         "ContentService/ReadArtifact",
         "SyncService/ReplicateThread",
     ] {
-        let path = format!("/heddle.api.v2alpha1.{name}");
+        let path = format!("/heddle.api.v1alpha2.{name}");
         let method = ALL_METHODS
             .iter()
             .find(|method| method.path == path)

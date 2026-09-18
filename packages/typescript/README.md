@@ -1,6 +1,6 @@
 # @heddleco/api
 
-Generated ESM types for `heddle.api.v1alpha1`. Install from GitHub Packages and
+Generated ESM types for `heddle.api.v1alpha2`. Install from GitHub Packages and
 exact-pin `0.x` releases.
 
 Configure `@heddleco:registry=https://npm.pkg.github.com` and authenticate with

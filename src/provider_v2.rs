@@ -1,7 +1,7 @@
 //! Canonical native provider-plan consent and exact assembly commitments.
 //! Protobuf is a transport container; these bytes are the portable proof.
 
-use crate::heddle::api::v2alpha1::{
+use crate::heddle::api::v1alpha2::{
     Coverage, EndpointKind, ProviderAssemblyRecord, ProviderExtent, ProviderOffer,
     ProviderPhysicalRange, ProviderPlan, ProviderPlanChallenge, ProviderPlanRegistration,
     ProviderReadTicket, RevisionRef, SharedFacet, ThreadRef, provider_assembly_record,
@@ -54,7 +54,7 @@ fn canonical_uuid(value: &str) -> bool {
 }
 
 fn endpoint_key(
-    value: &Option<crate::heddle::api::v2alpha1::EndpointRef>,
+    value: &Option<crate::heddle::api::v1alpha2::EndpointRef>,
     kind: EndpointKind,
 ) -> Result<&[u8], ProviderCanonicalError> {
     let endpoint = value

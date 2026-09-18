@@ -1,7 +1,7 @@
 #![cfg(feature = "reflection")]
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v1alpha1::{AuthorizationAccess, RpcEffect, SigningTier},
+    heddle::api::common::{AuthorizationAccess, RpcEffect, SigningTier},
 };
 use prost_reflect::DescriptorPool;
 
@@ -19,7 +19,7 @@ fn public_resource_reads_require_proof_when_an_account_credential_is_supplied() 
         "CollaborationService/ObserveCollaboration",
         "SearchService/Search",
     ] {
-        let path = format!("/heddle.api.v2alpha1.{suffix}");
+        let path = format!("/heddle.api.v1alpha2.{suffix}");
         let method = heddle_api::v2::method_descriptor(&path).expect("public resource method");
         assert_eq!(
             method.signing_tier,
@@ -38,7 +38,7 @@ fn public_resource_reads_require_proof_when_an_account_credential_is_supplied() 
         );
     }
     let workspace =
-        heddle_api::v2::method_descriptor("/heddle.api.v2alpha1.WorkspaceService/ObserveWorkspace")
+        heddle_api::v2::method_descriptor("/heddle.api.v1alpha2.WorkspaceService/ObserveWorkspace")
             .expect("account workspace");
     assert_eq!(
         workspace.authorization_access,
@@ -51,7 +51,7 @@ fn public_resource_reads_require_proof_when_an_account_credential_is_supplied() 
 fn public_catalog_has_no_account_or_private_collections() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("valid descriptor");
     let event = pool
-        .get_message_by_name("heddle.api.v2alpha1.CatalogEvent")
+        .get_message_by_name("heddle.api.v1alpha2.CatalogEvent")
         .expect("catalog event");
     assert_eq!(
         event
@@ -61,7 +61,7 @@ fn public_catalog_has_no_account_or_private_collections() {
         ["frame", "spool", "status", "removal", "replace_section"]
     );
     let request = pool
-        .get_message_by_name("heddle.api.v2alpha1.ObserveCatalogRequest")
+        .get_message_by_name("heddle.api.v1alpha2.ObserveCatalogRequest")
         .expect("catalog query");
     assert_eq!(
         request
@@ -75,12 +75,12 @@ fn public_catalog_has_no_account_or_private_collections() {
 #[test]
 fn account_device_enrollment_requires_parent_possession_at_initiation() {
     let begin =
-        heddle_api::v2::method_descriptor("/heddle.api.v2alpha1.IdentityService/BeginRegistration")
+        heddle_api::v2::method_descriptor("/heddle.api.v1alpha2.IdentityService/BeginRegistration")
             .expect("registration route");
     assert_eq!(begin.signing_tier, SigningTier::ProofIfAuthenticated);
     assert_eq!(begin.authorization_access, AuthorizationAccess::Public);
     let complete = heddle_api::v2::method_descriptor(
-        "/heddle.api.v2alpha1.IdentityService/CompleteRegistration",
+        "/heddle.api.v1alpha2.IdentityService/CompleteRegistration",
     )
     .expect("completion route");
     assert_eq!(complete.signing_tier, SigningTier::ProofOfPossession);

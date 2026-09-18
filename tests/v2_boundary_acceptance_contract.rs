@@ -3,7 +3,7 @@
 
 use heddle_api::{
     FILE_DESCRIPTOR_SET,
-    heddle::api::v2alpha1::{
+    heddle::api::v1alpha2::{
         RecordSignature, ReplicationOperations, SignedRecord, ThreadGenesisRecord,
     },
 };
@@ -26,7 +26,7 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("descriptor");
     for (name, number) in [("ReplicationOperations", 3), ("ThreadGenesisRecord", 6)] {
         let descriptor = pool
-            .get_message_by_name(&format!("heddle.api.v2alpha1.{name}"))
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
             .expect("carrier");
         let field = descriptor
             .get_field_by_name("boundary_acceptances")
@@ -39,7 +39,7 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
                 .as_message()
                 .expect("signed evidence")
                 .full_name(),
-            "heddle.api.v2alpha1.SignedRecord"
+            "heddle.api.v1alpha2.SignedRecord"
         );
     }
     let batch = ReplicationOperations {
@@ -55,7 +55,7 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
     };
     let bytes = batch.encode_to_vec();
     let dynamic = DynamicMessage::decode(
-        pool.get_message_by_name("heddle.api.v2alpha1.ReplicationOperations")
+        pool.get_message_by_name("heddle.api.v1alpha2.ReplicationOperations")
             .expect("batch"),
         bytes.as_slice(),
     )
@@ -77,7 +77,7 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
     };
     let bytes = wrapper.encode_to_vec();
     let dynamic = DynamicMessage::decode(
-        pool.get_message_by_name("heddle.api.v2alpha1.ThreadGenesisRecord")
+        pool.get_message_by_name("heddle.api.v1alpha2.ThreadGenesisRecord")
             .expect("wrapper"),
         bytes.as_slice(),
     )

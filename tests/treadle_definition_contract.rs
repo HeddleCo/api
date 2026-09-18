@@ -1,5 +1,5 @@
 use heddle_api::{
-    heddle::api::v1alpha1::{
+    heddle::api::common::{
         TreadleArgv, TreadleCheck, TreadleCheckClass, TreadleDefinition, TreadleDeterminismClass,
         TreadleEnvEntry, TreadleIsolationHints, TreadleJob, TreadleMatrixValue,
         TreadleNetworkAccess, TreadlePlatform, TreadleRetry, TreadleSecretRef, TreadleSecretTier,

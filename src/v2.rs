@@ -2,11 +2,11 @@
 pub mod client;
 pub mod identity_management;
 use crate::StreamingShape;
-use crate::heddle::api::v1alpha1::{
+use crate::heddle::api::common::{
     AuthorizationAccess, AuthorizationExistence, AuthorizationRole, AuthorizationScopeSource,
     CallContext, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
 };
-use crate::heddle::api::v2alpha1::{StreamDataKind, StreamFrame, stream_frame};
+use crate::heddle::api::v1alpha2::{StreamDataKind, StreamFrame, stream_frame};
 
 include!(concat!(env!("OUT_DIR"), "/heddle_api_v2_methods.rs"));
 

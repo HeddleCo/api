@@ -1,7 +1,7 @@
-import { createServiceClient, type RpcTransport } from "../packages/typescript/dist/v2alpha1/client.js";
-import { SearchService, ThreadService } from "../packages/typescript/dist/v2alpha1/services_pb.js";
-import { SearchSourceHistory } from "../packages/typescript/dist/v2alpha1/content_pb.js";
-import type { ThreadListEvent, ThreadMutationResponse } from "../packages/typescript/dist/v2alpha1/thread_pb.js";
+import { createServiceClient, type RpcTransport } from "../packages/typescript/dist/v1alpha2/client.js";
+import { SearchService, ThreadService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
+import { SearchSourceHistory } from "../packages/typescript/dist/v1alpha2/content_pb.js";
+import type { ThreadListEvent, ThreadMutationResponse } from "../packages/typescript/dist/v1alpha2/thread_pb.js";
 
 declare const transport: RpcTransport;
 const client = createServiceClient(ThreadService, transport, new Set<string>());

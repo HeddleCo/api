@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-ATTESTATION_PROTO = ROOT / "proto/heddle/api/v1alpha1/attestation.proto"
+ATTESTATION_PROTO = ROOT / "proto/heddle/api/v1alpha2/attestation.proto"
 
 
 def message_body(source: str, name: str) -> str:

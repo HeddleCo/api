@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { EndpointKind } from '../packages/typescript/dist/v2alpha1/stream_pb.js';
+import { EndpointKind } from '../packages/typescript/dist/v1alpha2/stream_pb.js';
 import { blake3 } from '@noble/hashes/blake3.js';
-import { providerRecordSetCommitment, providerExtentSetDigest, providerAssemblyDigest, providerConsentSigningBytes, validateProviderPlan, providerOfferAsPlan, validateProviderOffer, validatePlanForOffer, validateProviderRegistration } from '../packages/typescript/dist/v2alpha1/provider.js';
+import { providerRecordSetCommitment, providerExtentSetDigest, providerAssemblyDigest, providerConsentSigningBytes, validateProviderPlan, providerOfferAsPlan, validateProviderOffer, validatePlanForOffer, validateProviderRegistration } from '../packages/typescript/dist/v1alpha2/provider.js';
 
 const filled = (byte, length = 32) => new Uint8Array(length).fill(byte);
 const hex = value => Buffer.from(value).toString('hex');

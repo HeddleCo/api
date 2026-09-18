@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { createServiceClient, describeTools, ContractClientError } from "../packages/typescript/dist/v2alpha1/client.js";
-import { ThreadService, SyncService } from "../packages/typescript/dist/v2alpha1/services_pb.js";
-import { StartThreadRequestSchema, ThreadMutationResponseSchema, ThreadListEventSchema } from "../packages/typescript/dist/v2alpha1/thread_pb.js";
-import { ReplicateThreadResponseSchema } from "../packages/typescript/dist/v2alpha1/sync_pb.js";
+import { createServiceClient, describeTools, ContractClientError } from "../packages/typescript/dist/v1alpha2/client.js";
+import { ThreadService, SyncService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
+import { StartThreadRequestSchema, ThreadMutationResponseSchema, ThreadListEventSchema } from "../packages/typescript/dist/v1alpha2/thread_pb.js";
+import { ReplicateThreadResponseSchema } from "../packages/typescript/dist/v1alpha2/sync_pb.js";
 
-const startPath = "/heddle.api.v2alpha1.ThreadService/StartThread";
-const observePath = "/heddle.api.v2alpha1.ThreadService/ObserveThreads";
+const startPath = "/heddle.api.v1alpha2.ThreadService/StartThread";
+const observePath = "/heddle.api.v1alpha2.ThreadService/ObserveThreads";
 
 test("typed client transmits the original operation ID and returns the resulting Thread", async () => {
   let calls = 0;
@@ -91,7 +91,7 @@ test("bidirectional transfer pulls client frames as the endpoint consumes them",
       }
     },
   };
-  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v2alpha1.SyncService/ReplicateThread"]));
+  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v1alpha2.SyncService/ReplicateThread"]));
   for await (const _ of client.replicateThread(source())) break;
   assert.equal(produced, 1);
   assert.equal(sourceClosed, true);
@@ -102,13 +102,13 @@ test("agent tool selection requires both task selection and endpoint implementat
   assert.equal(tools.length, 1);
   assert.equal(tools[0].path, observePath);
   assert.equal(tools[0].streaming, "server_streaming");
-  assert.equal(tools[0].input.typeName, "heddle.api.v2alpha1.ObserveThreadsRequest");
+  assert.equal(tools[0].input.typeName, "heddle.api.v1alpha2.ObserveThreadsRequest");
   assert.ok(tools[0].contract.retryBehavior > 0);
   assert.deepEqual(describeTools([ThreadService], new Set(), new Set([startPath])), []);
 });
 
 test("agent tools distinguish live subscriptions from finite resumable uploads", () => {
-  const paths = new Set([observePath, "/heddle.api.v2alpha1.SyncService/ReplicateThread", "/heddle.api.v2alpha1.SyncService/PublishContent"]);
+  const paths = new Set([observePath, "/heddle.api.v1alpha2.SyncService/ReplicateThread", "/heddle.api.v1alpha2.SyncService/PublishContent"]);
   const tools = describeTools([ThreadService, SyncService], paths, paths);
   assert.equal(tools.length, 3);
   for (const tool of tools) {

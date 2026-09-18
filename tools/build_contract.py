@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 
-PACKAGE = "heddle.api.v1alpha1"
+PACKAGE = "heddle.api.v1alpha2"
 
 EXTRA_TYPES = r'''
 message StateId {
@@ -620,18 +620,18 @@ def main() -> None:
     method_sources["workflow.proto"].update(hosted_methods)
 
     base_imports = [
-        "heddle/api/v1alpha1/contract.proto",
-        "heddle/api/v1alpha1/types.proto",
+        "heddle/api/common/contract.proto",
+        "heddle/api/common/types.proto",
         "google/protobuf/duration.proto",
         "google/protobuf/timestamp.proto",
     ]
     extra_imports = {
         "collaboration.proto": [
-            "heddle/api/v1alpha1/repository.proto",
-            "heddle/api/v1alpha1/state_review.proto",
+            "heddle/api/common/repository.proto",
+            "heddle/api/v1alpha2/state_review.proto",
         ],
-        "repo_sync.proto": ["heddle/api/v1alpha1/workflow.proto"],
-        "workflow.proto": ["heddle/api/v1alpha1/registry.proto"],
+        "repo_sync.proto": ["heddle/api/v1alpha2/workflow.proto"],
+        "workflow.proto": ["heddle/api/v1alpha2/registry.proto"],
     }
     durable_requests: set[str] = set()
     manifest: list[dict[str, str]] = []

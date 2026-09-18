@@ -2,7 +2,7 @@ import {
   create, fromBinary, getOption, toBinary,
   type DescMethod, type DescService, type MessageInitShape, type MessageShape,
 } from "@bufbuild/protobuf";
-import { rpc_contract } from "../v1alpha1/contract_pb.js";
+import { rpc_contract } from "../common/contract_pb.js";
 
 export interface CallOptions {
   signal?: AbortSignal;

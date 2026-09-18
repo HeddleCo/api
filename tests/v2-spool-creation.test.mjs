@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { create } from '@bufbuild/protobuf';
 import { createPrivateKey, sign } from 'node:crypto';
-import { AuthorizationKeyAlgorithm, OwnerHistorySchema, SignedOwnerRootSchema, SpoolCreationStatementSchema } from '../packages/typescript/dist/v2alpha1/owner_records_pb.js';
-import { canonicalSpoolCreation, signDelegatedSpoolCreation, spoolCreationSigningDigest, spoolGenesisDigest } from '../packages/typescript/dist/v2alpha1/spool-creation.js';
+import { AuthorizationKeyAlgorithm, OwnerHistorySchema, SignedOwnerRootSchema, SpoolCreationStatementSchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
+import { canonicalSpoolCreation, signDelegatedSpoolCreation, spoolCreationSigningDigest, spoolGenesisDigest } from '../packages/typescript/dist/v1alpha2/spool-creation.js';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/spool-creation-v1-rust.json', import.meta.url), 'utf8'));
 const hex = value => new Uint8Array(Buffer.from(value, 'hex'));

@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
-import { StartThreadRequestSchema } from "../packages/typescript/dist/v2alpha1/thread_pb.js";
-import { canonicalThreadGenesis, signThreadGenesis, threadGenesisId } from "../packages/typescript/dist/v2alpha1/thread-genesis.js";
+import { StartThreadRequestSchema } from "../packages/typescript/dist/v1alpha2/thread_pb.js";
+import { canonicalThreadGenesis, signThreadGenesis, threadGenesisId } from "../packages/typescript/dist/v1alpha2/thread-genesis.js";
 
 // Shared verbatim with heddle-thread-api/tests/fixtures/thread-genesis-v1.txt.
 // Rust constructs the canonical record; browser clients may relay its exact bytes.

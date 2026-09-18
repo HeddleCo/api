@@ -1,5 +1,5 @@
 //! Behavioral conformance for the shared v2 observation protocol.
-use heddle_api::heddle::api::v2alpha1::{
+use heddle_api::heddle::api::v1alpha2::{
     StreamCheckpoint, StreamComplete, StreamData, StreamDataKind, StreamFrame, StreamOpen,
     stream_frame,
 };
@@ -10,7 +10,7 @@ fn shared_stream_wire_vectors_match_rust_codec() {
     use heddle_api::framing::{
         decode_stream_frame, encode_stream_failure, encode_stream_message, encode_stream_raw_body,
     };
-    use heddle_api::heddle::api::v1alpha1::CallFailure;
+    use heddle_api::heddle::api::common::CallFailure;
     let vectors: Vec<serde_json::Value> =
         serde_json::from_str(include_str!("fixtures/v2-stream-wire.json"))
             .expect("shared fixtures");

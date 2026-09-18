@@ -1,6 +1,6 @@
 use ed25519_dalek::{Signer, SigningKey};
 use heddle_api::{
-    heddle::api::v1alpha1::{CallContext, RequestProof},
+    heddle::api::common::{CallContext, RequestProof},
     request_proof::{RequestProofError, verify_native_request_proof},
     v2::method_descriptor,
 };
@@ -8,10 +8,10 @@ use prost::Message;
 
 #[test]
 fn provider_request_proof_binds_exact_method_body_key_and_time() {
-    let method = method_descriptor("/heddle.api.v2alpha1.SyncService/ReadProviderExtent")
+    let method = method_descriptor("/heddle.api.v1alpha2.SyncService/ReadProviderExtent")
         .expect("provider method");
     let body =
-        heddle_api::heddle::api::v2alpha1::ReadProviderExtentRequest::default().encode_to_vec();
+        heddle_api::heddle::api::v1alpha2::ReadProviderExtentRequest::default().encode_to_vec();
     let key = SigningKey::from_bytes(&[17; 32]);
     let public = key.verifying_key().to_bytes();
     let identity = format!("principal:device-key:{}", hex::encode(public));

@@ -3,7 +3,7 @@ import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
 import { AnnotationSourceReferenceSchema, SourceTargetReferenceSchema, AnnotationTagSchema, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference, type SourceAnchor } from "./collaboration_pb.js";
 import type { EntityRef } from "./common_pb.js";
-import { Audience } from "./administration_pb.js";
+import { Audience } from "./common_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
 
 const FORMAT = "heddle-thread-operation-v1";

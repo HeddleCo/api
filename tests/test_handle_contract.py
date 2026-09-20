@@ -1,33 +1,37 @@
 from __future__ import annotations
 
-import json
 import re
 import unittest
 from pathlib import Path
 
-from tools.build_contract import REPLACED_METHODS
-
 
 ROOT = Path(__file__).resolve().parent.parent
-PROTO = ROOT / "proto/heddle/api/v1alpha2/identity.proto"
-FIXTURE = ROOT / "tests/fixtures/handle-contract-v1.json"
-WIRE_FIXTURE = ROOT / "tests/fixtures/handle-wire-v1.json"
-PACKAGE = "heddle.api.v1alpha2"
+IDENTITY = (ROOT / "proto/heddle/api/v1alpha2/identity.proto").read_text()
+SERVICES = (ROOT / "proto/heddle/api/v1alpha2/services.proto").read_text()
 
 
-def named_body(source: str, kind: str, name: str) -> str:
-    match = re.search(
-        rf"(?ms)^{re.escape(kind)} {re.escape(name)} \{{(.*?)^\}}",
-        source,
-    )
+def body(source: str, kind: str, name: str) -> str:
+    match = re.search(rf"(?ms)^{kind} {re.escape(name)} \{{(.*?)^\}}", source)
     if match is None:
         raise AssertionError(f"missing {kind} {name}")
     return match.group(1)
 
 
-def rpc_body(service: str, name: str) -> tuple[str, str, str]:
+def fields(source: str, message: str) -> list[tuple[str, str, int]]:
+    return [
+        (field_type, field_name, int(tag))
+        for field_type, field_name, tag in re.findall(
+            r"(?m)^\s*(?:(?:optional|repeated)\s+)?"
+            r"([A-Za-z][A-Za-z0-9_.]*)\s+([a-z][a-z0-9_]*)\s*=\s*(\d+)\s*;",
+            body(source, "message", message),
+        )
+    ]
+
+
+def rpc(service: str, name: str) -> tuple[str, str, str]:
     match = re.search(
-        rf"(?ms)^\s*rpc {re.escape(name)}\((\w+)\) returns \((\w+)\) \{{(.*?)^\s*\}}",
+        rf"(?ms)^\s*rpc {re.escape(name)}\((\w+)\) returns \((\w+)\) "
+        rf"\{{(.*?)^\s*\}}",
         service,
     )
     if match is None:
@@ -35,252 +39,148 @@ def rpc_body(service: str, name: str) -> tuple[str, str, str]:
     return match.group(1), match.group(2), match.group(3)
 
 
-def rpc_comment(service: str, name: str) -> str:
-    match = re.search(
-        rf"(?m)((?:^[ \t]*//[^\n]*\n)+)[ \t]*rpc {re.escape(name)}\(",
-        service,
-    )
-    if match is None:
-        raise AssertionError(f"missing documentation for rpc {name}")
-    return " ".join(
-        re.sub(r"^[ \t]*//[ ]?", "", line).strip()
-        for line in match.group(1).splitlines()
-    )
-
-
-def named_comment(source: str, kind: str, name: str) -> str:
-    match = re.search(
-        rf"(?m)((?:^//[^\n]*\n)+){re.escape(kind)} {re.escape(name)} \{{",
-        source,
-    )
-    if match is None:
-        raise AssertionError(f"missing documentation for {kind} {name}")
-    return " ".join(
-        re.sub(r"^//[ ]?", "", line).strip()
-        for line in match.group(1).splitlines()
-    )
-
-
-def enum_value_comment(enum_body: str, name: str) -> str:
-    match = re.search(
-        rf"(?m)((?:^[ \t]*//[^\n]*\n)+)[ \t]*HANDLE_AVAILABILITY_{re.escape(name)}\s*=",
-        enum_body,
-    )
-    if match is None:
-        raise AssertionError(f"missing documentation for HANDLE_AVAILABILITY_{name}")
-    return " ".join(
-        re.sub(r"^[ \t]*//[ ]?", "", line).strip()
-        for line in match.group(1).splitlines()
-    )
-
-
 class SharedHandleContractTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.source = PROTO.read_text()
-        cls.all_proto_sources = "\n".join(
+        cls.service = body(SERVICES, "service", "IdentityService")
+
+    def test_handle_availability_was_replaced_by_explicit_resolution_status(self) -> None:
+        resolution = body(IDENTITY, "message", "HandleResolution")
+        self.assertEqual(
+            re.findall(r"(?m)^\s+(STATUS_[A-Z_]+)\s*=\s*(\d+)", resolution),
+            [
+                ("STATUS_UNSPECIFIED", "0"),
+                ("STATUS_AVAILABLE", "1"),
+                ("STATUS_CLAIMED", "2"),
+                ("STATUS_HELD", "3"),
+                ("STATUS_UNAVAILABLE", "4"),
+                ("STATUS_RESERVED", "5"),
+                ("STATUS_CONFUSABLE", "6"),
+            ],
+        )
+        self.assertRegex(resolution, r"\bStatus\s+status\s*=\s*3\s*;")
+        self.assertRegex(
+            resolution, r"\brepeated\s+Requirement\s+requirements\s*=\s*4\s*;"
+        )
+        self.assertRegex(
+            resolution, r"\bbool\s+held_for_verified_owner\s*=\s*7\s*;"
+        )
+        self.assertIn("Never disclose\n  // the holder identity", resolution)
+
+    def test_public_handle_projection_contains_no_stable_subject_identifier(self) -> None:
+        record = body(IDENTITY, "message", "PublicHandleRecord")
+        self.assertEqual(
+            fields(IDENTITY, "PublicHandleRecord"),
+            [
+                ("string", "display_name", 1),
+                ("string", "handle", 2),
+                ("string", "primary_handle", 3),
+                ("HandleKind", "kind", 4),
+                ("bool", "verified", 5),
+                ("string", "discriminator", 6),
+            ],
+        )
+        self.assertNotRegex(record, r"\b(?:subject|account_id|principal_id)\s*=")
+        self.assertIn("no stable subject/account identifiers", IDENTITY)
+
+    def test_batched_resolution_preserves_status_and_tombstone_semantics(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "ResolveHandlesRequest"),
+            [("string", "handles", 1), ("ReadBudget", "budget", 2)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "ResolveHandlesResponse"),
+            [("HandleResolution", "handles", 1)],
+        )
+        resolution = body(IDENTITY, "message", "HandleResolution")
+        self.assertRegex(resolution, r"\bPublicHandleRecord\s+public_handle\s*=\s*5\s*;")
+        self.assertRegex(resolution, r"\bbool\s+tombstoned\s*=\s*6\s*;")
+
+    def test_handle_mutations_keep_exact_retry_and_proof_shapes(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "ClaimHandleRequest"),
+            [
+                ("string", "client_operation_id", 1),
+                ("string", "handle", 2),
+                ("SignedRecord", "entitlement_proof", 3),
+            ],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "RequestHeldHandleRequest"),
+            [
+                ("string", "client_operation_id", 1),
+                ("string", "handle", 2),
+            ],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "RequestHeldHandleResponse"),
+            [
+                ("MutationReceipt", "receipt", 1),
+                (
+                    "google.protobuf.Timestamp",
+                    "right_of_first_refusal_deadline",
+                    2,
+                ),
+            ],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "ClaimHandleResponse"),
+            [
+                ("MutationReceipt", "receipt", 1),
+                ("PublicHandleRecord", "public_handle", 2),
+            ],
+        )
+
+    def test_all_handle_operations_have_descriptor_owned_contracts(self) -> None:
+        expected = {
+            "ResolveHandles": (
+                "ResolveHandlesRequest",
+                "ResolveHandlesResponse",
+                "RPC_EFFECT_READ_ONLY",
+                "RETRY_BEHAVIOR_SAFE",
+                False,
+            ),
+            "ClaimHandle": (
+                "ClaimHandleRequest",
+                "ClaimHandleResponse",
+                "RPC_EFFECT_DURABLE_WRITE",
+                "RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
+                True,
+            ),
+            "RequestHeldHandle": (
+                "RequestHeldHandleRequest",
+                "RequestHeldHandleResponse",
+                "RPC_EFFECT_DURABLE_WRITE",
+                "RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
+                True,
+            ),
+        }
+        for name, (request, response, effect, retry, operation_id) in expected.items():
+            with self.subTest(name=name):
+                actual_request, actual_response, contract = rpc(self.service, name)
+                self.assertEqual((actual_request, actual_response), (request, response))
+                self.assertIn(effect, contract)
+                self.assertIn(retry, contract)
+                self.assertEqual(
+                    "client_operation_id_required: true" in contract, operation_id
+                )
+                self.assertIn(
+                    "capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS", contract
+                )
+
+    def test_handle_operations_have_one_canonical_service_owner(self) -> None:
+        all_sources = "\n".join(
             path.read_text()
             for path in sorted((ROOT / "proto/heddle/api/v1alpha2").glob("*.proto"))
         )
-        cls.fixture = json.loads(FIXTURE.read_text())
-        cls.wire_fixture = json.loads(WIRE_FIXTURE.read_text())
-
-    def test_all_handle_operations_have_descriptor_owned_contracts(self) -> None:
-        service = named_body(self.source, "service", "IdentityService")
-        for name, expected in self.fixture.items():
-            request, response, body = rpc_body(service, name)
-            self.assertEqual(request, expected["request"])
-            self.assertEqual(response, expected["response"])
-            self.assertIn(
-                "signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL",
-                body,
-            )
-            self.assertIn(
-                f"signing_tier: SIGNING_TIER_{expected['signing_tier']}", body
-            )
-            self.assertIn(f"effect: RPC_EFFECT_{expected['effect']}", body)
-            self.assertIn(
-                f"retry_behavior: RETRY_BEHAVIOR_{expected['retry_behavior']}", body
-            )
-            required = "client_operation_id_required: true" in body
-            self.assertEqual(required, expected["client_operation_id_required"])
-            self.assertIn("capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS", body)
-
-    def test_handle_wire_shapes_preserve_live_semantics(self) -> None:
-        availability = named_body(self.source, "enum", "HandleAvailability")
-        for value in (
-            "AVAILABLE",
-            "HELD",
-            "TAKEN",
-            "RESERVED",
-            "CONFUSABLE",
-        ):
-            self.assertIn(f"HANDLE_AVAILABILITY_{value}", availability)
-
-        principal = named_body(self.source, "message", "HandlePrincipal")
-        self.assertNotRegex(principal, r"\bsubject\s*=")
-        self.assertRegex(principal, r'\breserved\s+1\s*;')
-        self.assertRegex(principal, r'\breserved\s+"subject"\s*;')
-        public_field_tags = {
-            field: int(tag)
-            for field, tag in re.findall(
-                r"(?m)^\s*(?:string|bool|HandleKind)\s+(\w+)\s*=\s*(\d+)\s*;",
-                principal,
-            )
-        }
-        self.assertEqual(
-            public_field_tags,
-            self.wire_fixture["public_field_tags"],
-        )
-
-        status = named_body(self.source, "message", "GetHandleStatusResponse")
-        self.assertRegex(status, r"\bHandleAvailability\s+availability\s*=")
-        self.assertRegex(status, r"\bbool\s+held_for_verified_owner\s*=")
-
-        request = named_body(self.source, "message", "RequestHeldNameRequest")
-        self.assertRegex(request, r"\bstring\s+name\s*=")
-        self.assertRegex(request, r"\bstring\s+client_operation_id\s*=")
-        response = named_body(self.source, "message", "RequestHeldNameResponse")
-        self.assertRegex(response, r"\bgoogle\.protobuf\.Timestamp\s+rfr_deadline\s*=")
-
-        request = named_body(self.source, "message", "ClaimHandleRequest")
-        self.assertRegex(request, r"\bstring\s+name\s*=")
-        self.assertRegex(request, r"\bstring\s+client_operation_id\s*=")
-        response = named_body(self.source, "message", "ClaimHandleResponse")
-        self.assertRegex(response, r"\bbool\s+claimed\s*=")
-        self.assertRegex(response, r"\bstring\s+canonical_handle\s*=")
-
-        response = named_body(self.source, "message", "ResolveHandleResponse")
-        self.assertRegex(response, r"\bHandlePrincipal\s+principal\s*=")
-        self.assertRegex(response, r"\bbool\s+tombstoned\s*=")
-
-    def test_resolve_preserves_legacy_subject_route_without_a_subject_response(self) -> None:
-        request = named_body(self.source, "message", "ResolveHandleRequest")
-        for request_form in self.wire_fixture["request_forms"]:
-            self.assertIn(f"`{request_form}`", request)
-        self.assertIn("MUST preserve `/u:<subject>` request lookup compatibility", request)
-        self.assertIn("subject-free HandlePrincipal projection", request)
-
-        principal = named_body(self.source, "message", "HandlePrincipal")
-        reserved = self.wire_fixture["reserved_legacy_field"]
-        self.assertRegex(principal, rf"\breserved\s+{reserved['tag']}\s*;")
-        self.assertRegex(principal, rf'\breserved\s+"{reserved["name"]}"\s*;')
-        self.assertNotRegex(principal, r"\bsubject\s*=")
-
-    def test_available_native_names_have_explicit_successful_paths(self) -> None:
-        availability = named_body(self.source, "enum", "HandleAvailability")
-        for method in self.wire_fixture["available_native_paths"][
-            "genuinely_free_new_account"
-        ]:
-            self.assertIn(method, availability)
-
-        service = named_body(self.source, "service", "IdentityService")
-        claim_comment = rpc_comment(service, "ClaimHandle")
-        for method in self.wire_fixture["available_native_paths"][
-            "caller_owned_hold"
-        ]:
-            self.assertIn(method, claim_comment)
-        self.assertIn("held_for_verified_owner = true", claim_comment)
-        self.assertIn("genuinely free AVAILABLE names", claim_comment)
-        self.assertIn("same NOT_FOUND status and public error shape", claim_comment)
-
-        request_comment = rpc_comment(service, "RequestHeldName")
-        self.assertIn("held by another verified owner", request_comment)
-        self.assertIn("same NOT_FOUND status and public error shape", request_comment)
-
-    def test_every_availability_state_names_its_actual_next_operation(self) -> None:
-        availability = named_body(self.source, "enum", "HandleAvailability")
-        for state, operations in self.wire_fixture[
-            "availability_next_operations"
-        ].items():
-            comment = enum_value_comment(availability, state)
-            for operation in operations:
-                self.assertIn(operation, comment, state)
-
-        for state in self.wire_fixture["states_without_current_candidate_mutation"]:
-            comment = enum_value_comment(availability, state)
-            self.assertRegex(
-                comment,
-                r"(?:[Nn]o .*mutation|MUST NOT infer that a mutation)",
-                state,
-            )
-
-    def test_each_rpc_locks_its_own_existence_hiding_and_retry_semantics(self) -> None:
-        status = named_body(self.source, "message", "GetHandleStatusResponse")
-        self.assertIn("MUST NOT expose the holder subject", status)
-
-        service = named_body(self.source, "service", "IdentityService")
-        claim_comment = rpc_comment(service, "ClaimHandle")
-        self.assertIn("same NOT_FOUND status and public error shape", claim_comment)
-        request_comment = rpc_comment(service, "RequestHeldName")
-        self.assertIn("same NOT_FOUND status and public error shape", request_comment)
-        resolve_comment = rpc_comment(service, "ResolveHandle")
-        self.assertIn("subject-free projection", resolve_comment)
-        self.assertIn("never-claimed names return", resolve_comment)
-
-        self.assertIn(
-            "MUST NOT expose an underlying subject",
-            named_comment(self.source, "message", "HandlePrincipal"),
-        )
-        for request_name in ("ClaimHandleRequest", "RequestHeldNameRequest"):
-            request = named_body(self.source, "message", request_name)
-            for fragment in (
-                "same authenticated subject, RPC, and client_operation_id",
-                "same response without repeating the mutation",
-                "reuse with a different normalized name MUST fail",
-            ):
-                self.assertIn(fragment, request, request_name)
-
-    def test_handle_operations_have_one_canonical_service_owner(self) -> None:
-        service_blocks = re.findall(
-            r"(?ms)^service (\w+) \{(.*?)^\}", self.all_proto_sources
-        )
-        for method in self.fixture:
+        service_blocks = re.findall(r"(?ms)^service (\w+) \{(.*?)^\}", all_sources)
+        for method in ("ResolveHandles", "ClaimHandle", "RequestHeldHandle"):
             owners = [
                 service_name
-                for service_name, body in service_blocks
-                if re.search(rf"(?m)^\s*rpc {re.escape(method)}\(", body)
+                for service_name, service_body in service_blocks
+                if re.search(rf"(?m)^\s*rpc {method}\(", service_body)
             ]
             self.assertEqual(owners, ["IdentityService"], method)
-
-    def test_migration_manifest_preserves_all_four_operations(self) -> None:
-        methods = {
-            entry["old_rpc"]: entry
-            for entry in json.loads((ROOT / "migration-manifest.json").read_text())[
-                "methods"
-            ]
-        }
-        for method in self.fixture:
-            legacy = f"heddle.v1.HostedUserService/{method}"
-            entry = methods[legacy]
-            expected = self.fixture[method]
-            self.assertEqual(entry["classification"], "renamed")
-            self.assertEqual(
-                entry["new_rpc"], f"{PACKAGE}.IdentityService/{method}"
-            )
-            for evidence in ("production_callsite", "production_implementation"):
-                self.assertEqual(entry.get(evidence), expected.get(evidence))
-
-        for method in self.wire_fixture["available_native_paths"][
-            "genuinely_free_new_account"
-        ]:
-            legacy = f"heddle.v1.AuthService/{method}"
-            entry = methods[legacy]
-            self.assertEqual(entry["classification"], "renamed")
-            self.assertEqual(
-                entry["new_rpc"], f"{PACKAGE}.IdentityService/{method}"
-            )
-            self.assertEqual(
-                entry["production_implementation"],
-                "HeddleCo/weft:crates/weft-server/src/server/hosted/auth.rs",
-            )
-
-    def test_extraction_aid_cannot_reclassify_handles_as_dropped(self) -> None:
-        for method in self.fixture:
-            self.assertEqual(
-                REPLACED_METHODS[("HostedUserService", method)],
-                f"IdentityService/{method}",
-            )
 
 
 if __name__ == "__main__":

@@ -4,60 +4,39 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY_PROTO = ROOT / "proto/heddle/api/v1alpha2/registry.proto"
+VIEWS = (ROOT / "proto/heddle/api/v1alpha2/views.proto").read_text()
+SERVICES = (ROOT / "proto/heddle/api/v1alpha2/services.proto").read_text()
 
 
-def block_body(source: str, kind: str, name: str) -> str:
-    match = re.search(
-        rf"(?ms)^{re.escape(kind)} {re.escape(name)} \{{(.*?)^\}}", source
-    )
+def body(source: str, kind: str, name: str) -> str:
+    match = re.search(rf"(?ms)^{kind} {re.escape(name)} \{{(.*?)^\}}", source)
     if match is None:
         raise AssertionError(f"missing {kind} {name}")
     return match.group(1)
 
 
 class ExploreContractTest(unittest.TestCase):
-    def test_bulk_rpc_exposes_inputs_without_server_scoring_policy(self) -> None:
-        source = REGISTRY_PROTO.read_text()
-        metadata = block_body(source, "message", "ExploreMetadata")
-        service = block_body(source, "service", "RegistryService")
+    def test_public_catalog_exposes_inputs_without_server_scoring_policy(self) -> None:
+        request = body(VIEWS, "message", "ObserveCatalogRequest")
+        self.assertRegex(request, r"\bstring\s+query\s*=\s*1\s*;")
+        self.assertRegex(request, r"\bPageRequest\s+spools\s*=\s*2\s*;")
+        self.assertRegex(request, r"\bObserveOptions\s+observe\s*=\s*3\s*;")
 
-        for field in (
-            "continuity",
-            "verification",
-            "collaboration",
-            "thread",
-            "clarity",
-            "burst_factor",
-            "active_day_count",
-            "latest_state_at",
-            "oldest_state_at",
-            "craft",
-        ):
-            self.assertRegex(metadata, rf"\b{field}\s*=")
-        self.assertNotRegex(metadata, r"\b(?:recency|score|lane)\s*=")
-        craft = block_body(source, "message", "RepoCraftMetrics")
-        for field in (
-            "schema_version",
-            "cognitive_complexity",
-            "function_length",
-            "nesting_depth",
-            "file_size_bytes",
-            "duplication_ratio",
-            "duplicate_subtree_count",
-        ):
-            self.assertRegex(craft, rf"\b{field}\s*=")
-        self.assertRegex(
-            service,
-            r"rpc ListExploreMetadata\(ListExploreMetadataRequest\) "
-            r"returns \(ListExploreMetadataResponse\)",
-        )
-        rpc = re.search(
-            r"(?ms)rpc ListExploreMetadata\(.*?\n  \}", service
-        )
+        spool = body(VIEWS, "message", "SpoolOverview")
+        for field in ("ref", "name", "audience", "settings", "slug", "path_segments"):
+            self.assertRegex(spool, rf"\b{field}\s*=")
+        self.assertNotRegex(spool, r"\b(?:recency|score|lane)\s*=")
+
+        event = body(VIEWS, "message", "CatalogEvent")
+        self.assertRegex(event, r"\bSpoolOverview\s+spool\s*=\s*2\s*;")
+        self.assertRegex(event, r"\bSectionStatus\s+status\s*=\s*3\s*;")
+
+        service = body(SERVICES, "service", "WorkspaceService")
+        rpc = re.search(r"(?ms)rpc ObserveCatalog\(.*?^  \}", service)
         self.assertIsNotNone(rpc)
-        self.assertIn("AUTHORIZATION_ACCESS_PUBLIC", rpc.group(0))
         self.assertIn("RPC_EFFECT_READ_ONLY", rpc.group(0))
+        self.assertIn("AUTHORIZATION_ACCESS_PUBLIC", rpc.group(0))
+        self.assertIn("RETRY_BEHAVIOR_RESUMABLE_STREAM", rpc.group(0))
 
 
 if __name__ == "__main__":

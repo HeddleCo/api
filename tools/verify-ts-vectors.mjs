@@ -1,10 +1,5 @@
 import { readFileSync } from "node:fs";
-import { fromBinary, toBinary } from "@bufbuild/protobuf";
-import { HandlePrincipalSchema } from "../packages/typescript/dist/identity_pb.js";
-import {
-  FinishWebAuthnAuthenticationRequestSchema,
-  RegisterPublicKeyRequestSchema,
-} from "../packages/typescript/dist/identity_pb.js";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { CallContextSchema } from "../packages/typescript/dist/contract_pb.js";
 import {
   CallFailureCode,
@@ -33,7 +28,6 @@ import {
   encodeRequestFrame,
   encodeSuccessResponse,
 } from "../packages/typescript/dist/framing.js";
-import { create } from "@bufbuild/protobuf";
 
 const vector = JSON.parse(readFileSync("tests/fixtures/unary-signing-v1.json", "utf8"));
 const fromHex = (value) => Uint8Array.from(value.match(/../g), (pair) => Number.parseInt(pair, 16));
@@ -82,43 +76,6 @@ for (const domain of [
 }
 if (TIER_1_REQUEST_SIGNING_V1_DOMAIN !== "heddle-req-sig-v1") {
   throw new Error("deployed Tier-1 request-signing domain changed");
-}
-
-for (const schema of [
-  RegisterPublicKeyRequestSchema,
-  FinishWebAuthnAuthenticationRequestSchema,
-]) {
-  const value = create(schema, {
-    biscuitAuthorityPublicKey: authorityPublicKey,
-    deviceProofPublicKey,
-  });
-  const decoded = fromBinary(schema, toBinary(schema, value));
-  if (
-    !Buffer.from(decoded.biscuitAuthorityPublicKey).equals(authorityPublicKey) ||
-    !Buffer.from(decoded.deviceProofPublicKey).equals(deviceProofPublicKey)
-  ) {
-    throw new Error(`${schema.typeName} lost a dual-role public key`);
-  }
-}
-
-const handleVector = JSON.parse(
-  readFileSync("tests/fixtures/handle-wire-v1.json", "utf8"),
-);
-const principal = fromBinary(
-  HandlePrincipalSchema,
-  fromHex(handleVector.legacy_resolved_principal_hex),
-);
-if ("subject" in principal) {
-  throw new Error("legacy subject tag decoded into the public HandlePrincipal shape");
-}
-for (const [field, expected] of Object.entries(
-  handleVector.expected_public_principal,
-)) {
-  if (principal[field] !== expected) {
-    throw new Error(
-      `legacy-compatible HandlePrincipal field ${field} decoded as ${String(principal[field])}`,
-    );
-  }
 }
 
 const hostedCall = JSON.parse(

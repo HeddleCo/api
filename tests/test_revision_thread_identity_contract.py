@@ -4,196 +4,99 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PROTO = ROOT / "proto" / "heddle" / "api" / "v1alpha1"
+COMMON_TYPES = (ROOT / "proto/heddle/api/common/types.proto").read_text()
+COMMON = (ROOT / "proto/heddle/api/v1alpha2/common.proto").read_text()
+THREAD = (ROOT / "proto/heddle/api/v1alpha2/thread.proto").read_text()
+SYNC = (ROOT / "proto/heddle/api/v1alpha2/sync.proto").read_text()
 
 
-def message_body(source: str, name: str) -> str:
-    match = re.search(rf"(?ms)^message {re.escape(name)} \{{(.*?)^\}}", source)
+def body(source: str, kind: str, name: str) -> str:
+    match = re.search(rf"(?ms)^{kind} {re.escape(name)} \{{(.*?)^\}}", source)
     if match is None:
-        raise AssertionError(f"missing message {name}")
+        raise AssertionError(f"missing {kind} {name}")
     return match.group(1)
 
 
+def field_names(source: str, message: str) -> list[str]:
+    return [
+        name
+        for name in re.findall(
+            r"(?m)^\s*(?:(?:optional|repeated)\s+)?"
+            r"[A-Za-z][A-Za-z0-9_.]*\s+([a-z][a-z0-9_]*)\s*=\s*\d+",
+            body(source, "message", message),
+        )
+    ]
+
+
 class RevisionAndThreadIdentityContractTest(unittest.TestCase):
-    def test_thread_list_item_is_a_slim_status_and_identity_projection(self) -> None:
-        source = (PROTO / "workflow.proto").read_text()
-        item = message_body(source, "ThreadListItem")
-        fields = {
-            name
-            for name in re.findall(
-                r"(?m)^\s*(?:optional\s+)?[.\w]+\s+(\w+)\s*=\s*\d+\s*;",
-                item,
-            )
-        }
-
-        self.assertEqual(
-            fields,
-            {
-                "thread_id",
-                "name",
-                "thread_state",
-                "last_activity_at",
-                "target_thread_id",
-                "thread_health",
-                "task",
-                "base_state",
-                "parent_thread",
-            },
-        )
-        # loadTasksView consumer fields; keep thread_health (do not drop).
-        for required in (
-            "task",
-            "base_state",
-            "parent_thread",
-            "thread_health",
-        ):
-            self.assertIn(required, fields)
-        # Explicit exclusions: unread and/or frame-size regressions.
-        for excluded in ("freshness", "current_state", "changed_paths"):
-            self.assertNotIn(excluded, fields)
-        # Hosted-empty annotation must stay so the next slim does not re-pick.
-        self.assertRegex(
-            item,
-            r"(?is)hosted-empty today.*thread_health|thread_health.*hosted-empty today",
-        )
-        # Types align with ThreadSummary for 1:1 mapper projection.
-        self.assertRegex(item, r"optional\s+string\s+task\s*=\s*7\s*;")
-        self.assertRegex(item, r"optional\s+StateId\s+base_state\s*=\s*8\s*;")
-        self.assertRegex(item, r"optional\s+string\s+parent_thread\s*=\s*9\s*;")
-
     def test_state_id_is_physical_and_distinct_from_change_id(self) -> None:
-        source = (PROTO / "types.proto").read_text()
-        state_id = message_body(source, "StateId").lower()
-        change_id = message_body(source, "ChangeId").lower()
-
+        state_id = body(COMMON_TYPES, "message", "StateId").lower()
+        change_id = body(COMMON_TYPES, "message", "ChangeId").lower()
         self.assertIn("immutable physical revision identity", state_id)
         self.assertIn("exactly 32 bytes", state_id)
         self.assertIn("not a logical changeid", state_id)
         self.assertIn("rewrite-stable logical change identity", change_id)
         self.assertIn("exactly 16 bytes", change_id)
 
-        all_proto = "\n".join(path.read_text() for path in PROTO.glob("*.proto"))
-        self.assertNotIn("16-byte ChangeIds", all_proto)
-        self.assertNotIn("package-wide wire convention", all_proto)
+    def test_thread_identity_is_one_typed_spool_scoped_reference(self) -> None:
+        self.assertEqual(field_names(COMMON, "ThreadId"), ["value"])
+        self.assertEqual(field_names(COMMON, "ThreadRef"), ["spool", "id"])
+        thread_ref = body(COMMON, "message", "ThreadRef")
+        self.assertRegex(thread_ref, r"\bSpoolRef\s+spool\s*=\s*1\s*;")
+        self.assertRegex(thread_ref, r"\bThreadId\s+id\s*=\s*2\s*;")
+        revision = body(COMMON, "message", "RevisionRef")
+        self.assertRegex(revision, r"\bSpoolRef\s+spool\s*=\s*1\s*;")
+        self.assertRegex(
+            revision, r"\bheddle\.api\.common\.StateId\s+state\s*=\s*2\s*;"
+        )
+        self.assertRegex(revision, r"\bstring\s+git_commit_oid\s*=\s*3\s*;")
 
-    def test_thread_entities_and_scoped_requests_pair_ids_with_refs(self) -> None:
-        expected_fields = {
-            "agent.proto": {
-                "ListAgentRunsRequest": ("thread_ref", "thread_id"),
-                "AgentRun": ("thread_ref", "thread_id"),
-            },
-            "attention.proto": {
-                "FeedItemAction": ("thread", "thread_id"),
-            },
-            "collaboration.proto": {
-                "OpenDiscussionRequest": ("thread_ref", "thread_id"),
-                "Discussion": ("thread_ref", "thread_id"),
-            },
-            "registry.proto": {
-                "WorktreeSummary": ("thread", "thread_id"),
-                "ActorSummary": ("thread", "thread_id"),
-                "ThreadApproval": (
-                    "source_thread",
-                    "source_thread_id",
-                    "target_thread",
-                    "target_thread_id",
-                ),
-                "ApproveThreadRequest": (
-                    "source_thread",
-                    "source_thread_id",
-                    "target_thread",
-                    "target_thread_id",
-                ),
-                "ListThreadApprovalsRequest": (
-                    "source_thread",
-                    "source_thread_id",
-                    "target_thread",
-                    "target_thread_id",
-                ),
-                "CheckMergeEligibilityRequest": (
-                    "source_thread",
-                    "source_thread_id",
-                    "target_thread",
-                    "target_thread_id",
-                ),
-            },
-            "repo_sync.proto": {
-                "ListRefsPageEnd": ("head_thread", "head_thread_id"),
-                "UpdateRefRequest": ("name", "thread_id"),
-                "UpdateRefResponse": ("thread_id",),
-                "PushRequest": ("target_thread", "target_thread_id"),
-                "PushComplete": ("target_thread_id",),
-                "GitCheckpointTransfer": ("thread", "thread_id"),
-                "PullRequest": ("remote_thread", "remote_thread_id"),
-                "PullReady": ("head_thread",),
-            },
-            "repository.proto": {
-                "SubscribeRepoEventsRequest": ("thread", "thread_id"),
-                "RepoEvent": ("thread", "thread_id"),
-            },
-            "search.proto": {
-                "ThreadHit": ("thread_id", "thread_ref"),
-            },
-            "types.proto": {
-                "RefEntry": ("name", "thread_id"),
-            },
-            "workflow.proto": {
-                "ThreadSummary": (
-                    "name",
-                    "thread_id",
-                    "target_thread",
-                    "target_thread_id",
-                    "parent_thread",
-                    "parent_thread_id",
-                    "child_threads",
-                    "child_thread_ids",
-                    "superseded_by",
-                    "superseded_by_thread_id",
-                    "supersedes",
-                    "supersedes_thread_ids",
-                ),
-                "ThreadMetadata": (
-                    "name",
-                    "thread_id",
-                    "target_thread",
-                    "target_thread_id",
-                    "parent_thread",
-                    "parent_thread_id",
-                ),
-                "GetThreadRequest": ("name", "thread_id"),
-                "WorkspaceSummary": ("current_thread", "current_thread_id"),
-            },
+    def test_thread_list_projection_keeps_identity_status_and_decision_context(self) -> None:
+        overview = body(THREAD, "message", "ThreadOverview")
+        required = {
+            "ref",
+            "name",
+            "version",
+            "intent",
+            "source_heads",
+            "base",
+            "lifecycle",
+            "readiness",
+            "requirements",
+            "relationships",
+            "updated_at",
+            "ownership",
+            "source_frontier",
         }
+        self.assertTrue(required.issubset(field_names(THREAD, "ThreadOverview")))
+        self.assertRegex(overview, r"\bThreadRef\s+ref\s*=\s*1\s*;")
+        self.assertRegex(overview, r"\brepeated\s+RevisionRef\s+source_heads\s*=\s*5\s*;")
+        event = body(THREAD, "message", "ThreadListEvent")
+        self.assertRegex(event, r"\bThreadOverview\s+thread\s*=\s*2\s*;")
 
-        for filename, messages in expected_fields.items():
-            source = (PROTO / filename).read_text()
-            for message, fields in messages.items():
-                with self.subTest(message=message):
-                    body = message_body(source, message)
-                    for field in fields:
-                        self.assertRegex(body, rf"\b{re.escape(field)}\s*=")
+    def test_thread_queries_use_refs_instead_of_parallel_name_and_id_pairs(self) -> None:
+        query = body(THREAD, "message", "ThreadQuery")
+        self.assertRegex(query, r"\bThreadRef\s+parent\s*=\s*6\s*;")
+        self.assertNotRegex(query, r"\bparent_thread_id\s*=")
+        start = body(THREAD, "message", "StartThreadRequest")
+        self.assertRegex(start, r"\bSpoolRef\s+spool\s*=\s*2\s*;")
+        self.assertRegex(start, r"\bSignedRecord\s+thread_genesis\s*=\s*3\s*;")
+        self.assertIn("derives\n  // the Thread ID", start)
 
-    def test_policy_patterns_and_local_pull_destinations_remain_refs(self) -> None:
-        registry = (PROTO / "registry.proto").read_text()
-        sync = (PROTO / "repo_sync.proto").read_text()
-
-        self.assertNotIn("target_thread_pattern_id", registry)
-        self.assertNotIn("local_thread_id", message_body(sync, "PullRequest"))
-
-    def test_pull_ready_advertises_one_page_of_list_refs_entries(self) -> None:
-        sync = (PROTO / "repo_sync.proto").read_text()
-        types = (PROTO / "types.proto").read_text()
-        ready = message_body(sync, "PullReady")
-        list_refs = message_body(sync, "ListRefsResponse")
-
-        self.assertRegex(ready, r"repeated\s+RefEntry\s+refs\s*=\s*11\s*;")
-        self.assertRegex(ready, r"string\s+head_thread\s*=\s*12\s*;")
-        self.assertRegex(list_refs, r"RefEntry\s+item\s*=\s*3\s*;")
-        self.assertIn("message RefEntry {", types)
-        self.assertNotRegex(sync, r"(?m)^message (PullRefs|PullRefEntry|HeddlePullRefs)\b")
-        self.assertIn("MAX_PAGE_SIZE", ready)
-        self.assertIn("Empty means unset", ready)
-        self.assertIn("heddle-pull-refs-v1", ready)
+    def test_replication_handshake_preserves_exact_thread_identity(self) -> None:
+        opened = body(SYNC, "message", "ReplicationOpen")
+        ready = body(SYNC, "message", "ReplicationReady")
+        transfer = body(SYNC, "message", "TransferReady")
+        self.assertRegex(opened, r"\bThreadRef\s+thread\s*=\s*1\s*;")
+        self.assertRegex(
+            opened, r"\bThreadGenesisRecord\s+thread_genesis\s*=\s*4\s*;"
+        )
+        self.assertRegex(ready, r"\bThreadRef\s+thread\s*=\s*2\s*;")
+        self.assertRegex(transfer, r"\bThreadRef\s+thread\s*=\s*2\s*;")
+        self.assertRegex(transfer, r"\bRevisionRef\s+current\s*=\s*3\s*;")
+        self.assertRegex(
+            transfer, r"\bThreadGenesisRecord\s+thread_genesis\s*=\s*16\s*;"
+        )
 
 
 if __name__ == "__main__":

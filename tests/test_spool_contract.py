@@ -4,128 +4,124 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTRY = (ROOT / "proto/heddle/api/v1alpha2/registry.proto").read_text()
+COMMON = (ROOT / "proto/heddle/api/v1alpha2/common.proto").read_text()
+ADMINISTRATION = (ROOT / "proto/heddle/api/v1alpha2/administration.proto").read_text()
+VIEWS = (ROOT / "proto/heddle/api/v1alpha2/views.proto").read_text()
+SERVICES = (ROOT / "proto/heddle/api/v1alpha2/services.proto").read_text()
 
 
-def body(name: str) -> str:
-    match = re.search(rf"(?ms)^message {name} \{{(.*?)^\}}", REGISTRY)
+def body(source: str, kind: str, name: str) -> str:
+    match = re.search(rf"(?ms)^{kind} {re.escape(name)} \{{(.*?)^\}}", source)
     if match is None:
-        raise AssertionError(f"missing message {name}")
+        raise AssertionError(f"missing {kind} {name}")
     return match.group(1)
 
 
-def fields(name: str) -> list[tuple[str, str, int]]:
+def fields(source: str, message: str) -> list[tuple[str, str, int]]:
     return [
-        (field_type, field_name, int(number))
-        for field_type, field_name, number in re.findall(
-            r"(?m)^\s*(?:optional\s+)?"
+        (field_type, field_name, int(tag))
+        for field_type, field_name, tag in re.findall(
+            r"(?m)^\s*(?:optional\s+|repeated\s+)?"
             r"([A-Za-z][A-Za-z0-9_.]*)\s+([a-z][a-z0-9_]*)\s*=\s*(\d+)\s*;",
-            body(name),
+            body(source, "message", message),
         )
     ]
 
 
 class SpoolContractTest(unittest.TestCase):
-    def test_flat_spool_promotion_contract(self) -> None:
-        self.assertEqual(fields("PromoteSpoolRequest"), [
-            ("string", "full_path", 1),
-            ("string", "client_operation_id", 2),
-        ])
-        self.assertEqual(fields("PromoteSpoolResponse"), [("HostedSpool", "spool", 1)])
-        self.assertIn("rpc PromoteSpool(PromoteSpoolRequest) returns (PromoteSpoolResponse)", REGISTRY)
-        self.assertIn("NAMESPACE_KIND_SPOOL = 4", REGISTRY)
-        self.assertNotIn("NAMESPACE_KIND_ORG =", REGISTRY)
-
-    def test_state_visibility_rename_preserves_wire_tag(self) -> None:
-        settings = body("SpoolSettings")
-        self.assertIn('reserved "default_state_visibility";', settings)
-        self.assertIn(
-            ("Visibility", "state_visibility", 2),
-            fields("SpoolSettings"),
-        )
-        self.assertIn(("Visibility", "visibility", 1), fields("SpoolSettings"))
-        self.assertNotRegex(settings, r"\bSpoolStateVisibility default_state_visibility\b")
-        self.assertNotRegex(settings, r"\benum SpoolVisibility\b")
-        self.assertNotRegex(settings, r"\benum SpoolStateVisibility\b")
-        self.assertIn("Spool-level baseline for state visibility", settings)
-
-    def test_spool_summary_carries_thread_listing_fields(self) -> None:
+    def test_flat_spool_promotion_uses_stable_spool_identity(self) -> None:
         self.assertEqual(
-            fields("SpoolSummary"),
+            fields(ADMINISTRATION, "PromoteSpoolRequest"),
             [
-                ("string", "spool_id", 1),
-                ("string", "full_path", 2),
-                ("string", "kind", 3),
-                ("bool", "is_repo", 4),
-                ("google.protobuf.Timestamp", "last_activity_at", 5),
-                ("uint32", "thread_count", 6),
-                ("string", "head_thread", 7),
+                ("string", "client_operation_id", 1),
+                ("SpoolRef", "spool", 2),
+                ("bytes", "expected_version", 3),
             ],
         )
-        summary = body("SpoolSummary")
-        self.assertIn("is_thread = true", summary)
-        self.assertIn("GetRefs", summary)
-        self.assertIn("default thread", summary)
+        service = body(SERVICES, "service", "SpoolService")
+        self.assertIn(
+            "rpc PromoteSpool(PromoteSpoolRequest) returns (SpoolMutationResponse)",
+            service,
+        )
+        rpc = re.search(r"(?ms)rpc PromoteSpool\(.*?^  \}", service)
+        self.assertIsNotNone(rpc)
+        self.assertIn("RPC_EFFECT_DURABLE_WRITE", rpc.group(0))
+        self.assertIn("client_operation_id_required: true", rpc.group(0))
 
-    def test_create_spool_carries_complete_settings(self) -> None:
+    def test_spool_settings_use_one_audience_vocabulary(self) -> None:
         self.assertEqual(
-            fields("CreateSpoolRequest"),
+            fields(ADMINISTRATION, "SpoolSettings"),
             [
-                ("string", "parent_path", 1),
-                ("string", "slug", 2),
+                ("Audience", "audience", 1),
+                ("Audience", "default_state_audience", 2),
+                ("string", "description", 3),
+                ("bool", "allow_child_creation", 4),
+                ("bool", "require_review_to_land", 5),
+                ("google.protobuf.Duration", "abandoned_thread_retention", 6),
+                ("RecordRef", "default_review_policy", 7),
+                ("HoldLifecycle", "hold_lifecycle", 8),
+            ],
+        )
+        audience = body(COMMON, "enum", "Audience")
+        self.assertEqual(
+            re.findall(r"(?m)^\s*(AUDIENCE_[A-Z_]+)\s*=\s*(\d+)", audience),
+            [
+                ("AUDIENCE_UNSPECIFIED", "0"),
+                ("AUDIENCE_PRIVATE", "1"),
+                ("AUDIENCE_MEMBERS", "2"),
+                ("AUDIENCE_PUBLIC", "3"),
+            ],
+        )
+        self.assertNotRegex(ADMINISTRATION, r"(?m)^enum (?:Spool)?Visibility \{")
+
+    def test_spool_listing_carries_thread_summary_fields(self) -> None:
+        self.assertEqual(
+            fields(ADMINISTRATION, "ListedSpool"),
+            [
+                ("SpoolRef", "ref", 1),
+                ("string", "path_segments", 2),
                 ("bool", "is_repo", 3),
-                ("string", "display_name", 4),
-                ("Visibility", "visibility", 5),
-                ("string", "client_operation_id", 6),
-                ("SpoolSettings", "settings", 7),
-                ("SignedSpoolOwnerGenesis", "owner_genesis", 8),
-            ],
-        )
-        request = body("CreateSpoolRequest")
-        self.assertIn("Complete create-time settings", request)
-        self.assertIn("state-visibility", request)
-        self.assertIn("rather than silently", request)
-        self.assertIn("UUIDv7", request)
-        self.assertIn(("SignedSpoolOwnerGenesis", "owner_genesis", 10), fields("HostedSpool"))
-
-    def test_live_spool_projections_carry_owner_genesis(self) -> None:
-        self.assertIn(
-            ("SignedSpoolOwnerGenesis", "owner_genesis", 9),
-            fields("HostedNamespace"),
-        )
-        self.assertIn(
-            ("SignedSpoolOwnerGenesis", "owner_genesis", 7),
-            fields("HostedRepository"),
-        )
-
-    def test_unified_visibility_numbering(self) -> None:
-        visibility = re.search(r"(?ms)^enum Visibility \{(.*?)^\}", REGISTRY)
-        if visibility is None:
-            raise AssertionError("missing Visibility enum")
-        body = visibility.group(1)
-        self.assertIn("VISIBILITY_UNSPECIFIED = 0", body)
-        self.assertIn("VISIBILITY_PRIVATE = 1", body)
-        self.assertIn("VISIBILITY_INTERNAL = 2", body)
-        self.assertIn("VISIBILITY_PUBLIC = 3", body)
-        self.assertNotRegex(REGISTRY, r"(?m)^enum SpoolVisibility \{")
-        self.assertNotRegex(REGISTRY, r"(?m)^enum SpoolStateVisibility \{")
-        self.assertEqual(
-            fields("SetSpoolVisibilityRequest"),
-            [
-                ("string", "full_path", 1),
-                ("Visibility", "visibility", 2),
-                ("string", "client_operation_id", 3),
+                ("google.protobuf.Timestamp", "last_activity_at", 4),
+                ("uint32", "thread_count", 5),
+                ("string", "head_thread", 6),
             ],
         )
         self.assertEqual(
-            fields("SetNamespaceVisibilityRequest"),
+            fields(ADMINISTRATION, "ListSpoolsResponse"),
+            [("ListedSpool", "spools", 1)],
+        )
+
+    def test_create_spool_carries_complete_settings_and_ownership(self) -> None:
+        self.assertEqual(
+            fields(ADMINISTRATION, "CreateSpoolRequest"),
             [
-                ("string", "full_path", 1),
-                ("Visibility", "visibility", 2),
-                ("string", "client_operation_id", 3),
+                ("string", "client_operation_id", 1),
+                ("SpoolRef", "parent", 2),
+                ("string", "slug", 3),
+                ("SpoolSettings", "settings", 4),
+                ("SignedSpoolOwnerGenesis", "owner_genesis", 5),
+                ("SpoolRef", "custodial_spool", 7),
+                ("string", "display_name", 6),
             ],
         )
-        self.assertIn(("Visibility", "visibility", 8), fields("HostedNamespace"))
+        request = body(ADMINISTRATION, "message", "CreateSpoolRequest")
+        self.assertIn("stable new spool UUID comes only from genesis", request)
+        self.assertIn("Retry the original signed genesis and operation ID", request)
+        self.assertIn("never establishes\n    // a root", request)
+
+    def test_live_spool_projection_carries_owner_genesis_and_canonical_path(self) -> None:
+        overview = fields(VIEWS, "SpoolOverview")
+        self.assertIn(("SignedSpoolOwnerGenesis", "owner_genesis", 10), overview)
+        self.assertIn(("string", "path_segments", 12), overview)
+        response = fields(VIEWS, "SpoolMutationResponse")
+        self.assertEqual(
+            response,
+            [
+                ("MutationReceipt", "receipt", 1),
+                ("SpoolOverview", "spool", 2),
+                ("OwnerState", "ownership", 3),
+            ],
+        )
 
 
 if __name__ == "__main__":

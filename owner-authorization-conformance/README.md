@@ -2,14 +2,13 @@
 
 ## Cutover A1 transport corpus
 
-`node tools/verify-owner-authz-cutover.mjs` runs the additive A1 corpus against
-the generated `heddle-api` Rust types and `@heddleco/api` TypeScript types. It
-checks the canonical sidecar-operation fixture, round trips every new carrier,
-proves old Rust pull/token shapes ignore the new fields while retaining known
-fields, and compares both languages on signer mismatch, payload swapping,
-wrong-spool, transition-fork, rogue UUID binding, incomplete transfer, and
-direct/attenuated purge, visibility, and metadata-supersession cases. The
-repository-wide `tools/verify.sh` invokes it after both generated targets build.
+`node tools/verify-owner-authz-cutover.mjs` runs the retained purge and owner
+authorization fixture against the generated `@heddleco/api` v2 TypeScript
+types. It checks canonical signing bytes and Ed25519 signatures, round trips
+the current owner records and transfer carriers, and checks signer mismatch,
+payload swapping, wrong-spool, transition-fork, incomplete transfer, and
+direct/attenuated purge cases. The repository-wide `tools/verify.sh` invokes it
+after the Rust and TypeScript targets build and pass their own tests.
 
 The pinned Heddle/Tapestry verifier corpus below remains the historical
 capability-chain gate. It is repinned to the published shared verifier in A2,

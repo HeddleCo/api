@@ -36,8 +36,10 @@ fn submit_signed_policy_is_owner_gated_weft_write() {
 
 #[test]
 fn signed_policy_record_preserves_max_audience_presence() {
-    let mut present = SignedSpoolPolicy::default();
-    present.max_audience = Some(Audience::Private.into());
+    let present = SignedSpoolPolicy {
+        max_audience: Some(Audience::Private.into()),
+        ..Default::default()
+    };
     let encoded = present.encode_to_vec();
     let decoded = SignedSpoolPolicy::decode(encoded.as_slice()).expect("present");
     assert_eq!(decoded.max_audience, Some(Audience::Private.into()));

@@ -5,11 +5,11 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 IDENTITY = (ROOT / "proto/heddle/api/v1alpha2/identity.proto").read_text()
-ERRORS = (ROOT / "proto/heddle/api/common/errors.proto").read_text()
+SERVICES = (ROOT / "proto/heddle/api/v1alpha2/services.proto").read_text()
 
 
 def body(source: str, kind: str, name: str) -> str:
-    match = re.search(rf"(?ms)^{kind} {name} \{{(.*?)^\}}", source)
+    match = re.search(rf"(?ms)^{kind} {re.escape(name)} \{{(.*?)^\}}", source)
     if match is None:
         raise AssertionError(f"missing {kind} {name}")
     return match.group(1)
@@ -27,10 +27,11 @@ def fields(source: str, message: str) -> list[tuple[str, int]]:
 
 
 def rpc(name: str) -> tuple[str, str, str]:
+    service = body(SERVICES, "service", "IdentityService")
     match = re.search(
-        rf"(?ms)^  rpc {name}\((\w+)\) returns \((\w+)\) "
-        rf"\{{(.*?)^  \}}",
-        body(IDENTITY, "service", "IdentityService"),
+        rf"(?ms)^\s*rpc {re.escape(name)}\((\w+)\) returns \((\w+)\) "
+        rf"\{{(.*?)^\s*\}}",
+        service,
     )
     if match is None:
         raise AssertionError(f"missing rpc {name}")
@@ -38,425 +39,165 @@ def rpc(name: str) -> tuple[str, str, str]:
 
 
 class SignupContractTest(unittest.TestCase):
-    def test_public_drop_claim_and_count_contracts(self) -> None:
+    def test_signup_invitation_creation_returns_secret_separately(self) -> None:
         self.assertEqual(
-            fields(IDENTITY, "ClaimNextDropCodeRequest"),
-            [("drop_slug", 1), ("src", 2)],
-        )
-        self.assertIn(
-            "optional string src = 2",
-            body(IDENTITY, "message", "ClaimNextDropCodeRequest"),
+            fields(IDENTITY, "CreateSignupInvitationRequest"),
+            [("client_operation_id", 1), ("invitation", 2)],
         )
         self.assertEqual(
-            fields(IDENTITY, "ClaimNextDropCodeResponse"),
-            [("code", 1), ("held_until", 2)],
+            fields(IDENTITY, "CreateSignupInvitationResponse"),
+            [("receipt", 1), ("invitation", 2), ("redemption_secret", 3)],
         )
-        self.assertEqual(
-            fields(IDENTITY, "RemainingDropCodesRequest"),
-            [("drop_slug", 1)],
-        )
-        self.assertEqual(
-            fields(IDENTITY, "RemainingDropCodesResponse"),
-            [("count", 1)],
-        )
+        invitation = body(IDENTITY, "message", "SignupInvitation")
+        self.assertNotRegex(invitation, r"\b(?:redemption_secret|invitation_secret)\s*=")
+        _, _, contract = rpc("CreateSignupInvitation")
+        self.assertIn("RPC_EFFECT_DURABLE_WRITE", contract)
+        self.assertIn("client_operation_id_required: true", contract)
+        self.assertIn("AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL", contract)
 
-        request_type, response_type, contract = rpc("ClaimNextDropCode")
-        self.assertEqual(request_type, "ClaimNextDropCodeRequest")
-        self.assertEqual(response_type, "ClaimNextDropCodeResponse")
+    def test_redemption_is_public_idempotent_and_existence_hidden(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "RedeemSignupInvitationRequest"),
+            [("client_operation_id", 1), ("redemption_secret", 2)],
+        )
+        self.assertEqual(
+            fields(IDENTITY, "RedeemSignupInvitationResponse"),
+            [("receipt", 1), ("reservation", 2)],
+        )
+        reservation = body(IDENTITY, "message", "SignupReservation")
+        self.assertRegex(reservation, r"\bRecordRef\s+ref\s*=\s*1\s*;")
+        self.assertRegex(
+            reservation,
+            r"\bgoogle\.protobuf\.Timestamp\s+expires_at\s*=\s*2\s*;",
+        )
+        _, _, contract = rpc("RedeemSignupInvitation")
         for required in (
-            "signing_tier: SIGNING_TIER_NONE",
-            "effect: RPC_EFFECT_TRANSIENT_WRITE",
-            "retry_behavior: RETRY_BEHAVIOR_NEVER",
-            "client_operation_id_required: false",
-            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
-            "authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND",
-            "authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT",
-            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
-        ):
-            self.assertIn(required, contract)
-
-        request_type, response_type, contract = rpc("RemainingDropCodes")
-        self.assertEqual(request_type, "RemainingDropCodesRequest")
-        self.assertEqual(response_type, "RemainingDropCodesResponse")
-        for required in (
-            "signing_tier: SIGNING_TIER_NONE",
-            "effect: RPC_EFFECT_READ_ONLY",
-            "retry_behavior: RETRY_BEHAVIOR_SAFE",
-            "client_operation_id_required: false",
-            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
-            "authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND",
-            "authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT",
-            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
-        ):
-            self.assertIn(required, contract)
-
-        service = body(IDENTITY, "service", "IdentityService")
-        self.assertIn("hosted Iroh ALPN", service)
-        self.assertIn("caller's Biscuit", service)
-        self.assertIn("subject-scoped anti-abuse budget", service)
-        self.assertIn("missing or revoked drop is", service)
-
-    def test_mailbox_token_is_confined_to_service_account_issuance(self) -> None:
-        self.assertEqual(
-            fields(IDENTITY, "IssueSignupEmailChallengeRequest"),
-            [("username", 1), ("recipient_email", 2), ("client_operation_id", 3)],
-        )
-        self.assertEqual(
-            fields(IDENTITY, "IssueSignupEmailChallengeResponse"),
-            [("status", 1), ("expires_at", 2), ("verification_token", 3)],
-        )
-        acceptance = body(
-            IDENTITY, "enum", "SignupEmailChallengeAcceptanceStatus"
-        )
-        self.assertIn("ACCEPTANCE_STATUS_ACCEPTED = 1", acceptance)
-        self.assertNotRegex(acceptance, r"(REJECTED|MISSING|NOT_FOUND)")
-
-        request, response, contract = rpc("IssueSignupEmailChallenge")
-        self.assertEqual(request, "IssueSignupEmailChallengeRequest")
-        self.assertEqual(response, "IssueSignupEmailChallengeResponse")
-        for required in (
-            "maturity: SERVICE_MATURITY_PLANNED",
-            "signing_tier: SIGNING_TIER_NONE",
+            "SIGNING_TIER_NONE",
+            "RPC_EFFECT_DURABLE_WRITE",
+            "RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
             "client_operation_id_required: true",
-            "authorization_access: "
-            "AUTHORIZATION_ACCESS_AUTHENTICATED_SERVICE_ACCOUNT",
-        ):
-            self.assertIn(required, contract)
-        owners = re.findall(
-            r"(?m)^  rpc (\w+)\([^)]*\) returns "
-            r"\(IssueSignupEmailChallengeResponse\)",
-            body(IDENTITY, "service", "IdentityService"),
-        )
-        self.assertEqual(owners, ["IssueSignupEmailChallenge"])
-
-    def test_verification_and_binding_use_server_verified_email(self) -> None:
-        self.assertEqual(
-            fields(IDENTITY, "VerifySignupEmailResponse"),
-            [
-                ("recipient_email", 2),
-                ("bound_handle", 3),
-                ("verified_email_id", 4),
-                ("verified_email_expires_at", 5),
-            ],
-        )
-        verification = body(
-            IDENTITY, "message", "VerifySignupEmailResponse"
-        )
-        for required in (
-            "Server-canonicalized address",
-            "unused, non-revoked invite",
-            '"Invite found for <email>"',
-            "never copied from a request field",
-            "Single-use verified-email id",
-            "in-body device-binding proof, NOT a",
-            "Absolute expiry of the single-use verified-email id",
-        ):
-            self.assertIn(required, verification)
-        self.assertIn('reserved 1;', verification)
-        self.assertIn('reserved "bootstrap_token";', verification)
-
-        self.assertEqual(
-            fields(IDENTITY, "BindSignupInviteEmailRequest"),
-            [
-                ("invite_code", 1),
-                ("recipient_email", 2),
-                ("client_operation_id", 3),
-            ],
-        )
-        binding = body(
-            IDENTITY, "message", "BindSignupInviteEmailRequest"
-        )
-        self.assertIn("signup_bootstrap_email fact", binding)
-        self.assertIn("does not\n  // prove control", binding)
-        _, _, contract = rpc("BindSignupInviteEmail")
-        for required in (
-            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
-            "client_operation_id_required: true",
-            'path: "recipient_email"',
+            "AUTHORIZATION_ACCESS_PUBLIC",
+            "AUTHORIZATION_EXISTENCE_HIDE",
         ):
             self.assertIn(required, contract)
 
-    def test_anonymous_resolution_has_no_missing_code_shape(self) -> None:
-        status = body(IDENTITY, "enum", "SignupInviteResolutionStatus")
-        for value in ("VALID = 1", "CONSUMED = 2", "EXPIRED = 3"):
-            self.assertIn(value, status)
-        self.assertNotRegex(status, r"(MISSING|INVALID|NOT_FOUND|REVOKED)")
-        response = body(
-            IDENTITY, "message", "ResolveSignupInviteResponse"
-        )
+    def test_resolution_collapses_invalid_states_without_identity_oracle(self) -> None:
+        resolution = body(IDENTITY, "message", "SignupInvitationResolution")
         self.assertEqual(
-            fields(IDENTITY, "ResolveSignupInviteResponse"),
+            re.findall(r"(?m)^\s+(STATUS_[A-Z_]+)\s*=\s*(\d+)", resolution),
             [
-                ("status", 1),
-                ("inviter_display_handle", 2),
-                ("inviter_member_ordinal", 3),
-                ("recipient_email", 4),
+                ("STATUS_UNSPECIFIED", "0"),
+                ("STATUS_AVAILABLE", "1"),
+                ("STATUS_IN_USE", "2"),
+                ("STATUS_UNAVAILABLE", "3"),
             ],
         )
-        self.assertNotRegex(response, r"\b(bool\s+exists|bool\s+found)\b")
-        self.assertIn("invalid and expired serialize alike", response)
-        self.assertIn("no inviter subject, email", response)
-        _, _, contract = rpc("ResolveSignupInvite")
-        self.assertIn(
-            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC", contract
-        )
-        self.assertIn(
-            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE", contract
-        )
-        service_prefix = IDENTITY[: IDENTITY.index("rpc ResolveSignupInvite")]
-        self.assertIn("Anonymous, per-IP-rate-limited lookup", service_prefix[-800:])
-        self.assertIn("same per-IP budget", service_prefix[-800:])
-
-    def test_code_claim_is_non_retryable_and_existence_hidden(self) -> None:
+        self.assertNotRegex(resolution, r"STATUS_(?:MISSING|REVOKED|EXPIRED)")
+        self.assertNotRegex(resolution, r"\b(?:subject|account_id)\s*=")
         self.assertEqual(
-            fields(IDENTITY, "ClaimSignupInviteRequest"),
-            [("invite_code", 1)],
+            fields(IDENTITY, "ResolveSignupInvitationRequest"),
+            [("redemption_secret", 1)],
         )
-        request = body(IDENTITY, "message", "ClaimSignupInviteRequest")
-        self.assertIn("Same high-entropy opaque invite code", request)
-        self.assertIn("Possession is the only authorization", request)
+        _, _, contract = rpc("ResolveSignupInvitation")
+        self.assertIn("RPC_EFFECT_READ_ONLY", contract)
+        self.assertIn("RETRY_BEHAVIOR_SAFE", contract)
+        self.assertIn("AUTHORIZATION_ACCESS_PUBLIC", contract)
 
-        self.assertNotIn("SignupBootstrapMethod", IDENTITY)
+    def test_email_verification_keeps_delivery_secret_out_of_browser_result(self) -> None:
         self.assertEqual(
-            fields(IDENTITY, "ClaimSignupInviteResponse"),
+            fields(IDENTITY, "BeginEmailVerificationRequest"),
             [
-                ("reservation_id", 4),
-                ("reservation_expires_at", 6),
+                ("client_operation_id", 1),
+                ("email", 2),
+                ("invitation_code", 3),
+                ("handle", 4),
             ],
         )
-        response = body(IDENTITY, "message", "ClaimSignupInviteResponse")
-        for reservation in (
-            "reserved 1;",
-            'reserved "bootstrap_token";',
-            "reserved 2;",
-            'reserved "expires_at";',
-            "reserved 3;",
-            'reserved "allowed_methods";',
-            "reserved 5;",
-            'reserved "session_id";',
-        ):
-            self.assertIn(reservation, response)
-        self.assertIn("Single-use invite-reservation id", response)
-        self.assertIn("in-body device-binding proof, NOT a", response)
-        self.assertIn("Reservation TTL clock the client shows and handles", response)
-
-        request_type, response_type, contract = rpc("ClaimSignupInvite")
-        self.assertEqual(request_type, "ClaimSignupInviteRequest")
-        self.assertEqual(response_type, "ClaimSignupInviteResponse")
-        for required in (
-            "maturity: SERVICE_MATURITY_PLANNED",
-            "signing_tier: SIGNING_TIER_NONE",
-            "effect: RPC_EFFECT_DURABLE_WRITE",
-            "retry_behavior: RETRY_BEHAVIOR_NEVER",
-            "client_operation_id_required: false",
-            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
-            "authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND",
-            "authorization_scope_source: "
-            "AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE",
-            'path: "invite_code"',
-            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
-        ):
-            self.assertIn(required, contract)
-
-        service_prefix = IDENTITY[: IDENTITY.index("rpc ClaimSignupInvite")]
-        public_contract = service_prefix[-1800:]
-        for hidden_state in (
-            "malformed or unknown",
-            "consumed",
-            "reserved",
-            "revoked",
-            "email-bound",
-        ):
-            self.assertIn(hidden_state, public_contract)
-        for failure_shape in (
-            "CALL_FAILURE_CODE_NOT_FOUND",
-            "ERROR_REASON_RESOURCE_NOT_FOUND",
-            "empty ErrorDetail.resource and .field",
-            "SIGNUP_FAILURE_REASON_INVITE_UNAVAILABLE",
-            "processing\n  // path/timing envelope must also be the same",
-        ):
-            self.assertIn(failure_shape, public_contract)
-
-    def test_begin_registration_carries_adoption_pre_consent(self) -> None:
+        challenge = body(IDENTITY, "message", "EmailVerificationChallenge")
+        self.assertRegex(challenge, r"\bbytes\s+delivery_proof\s*=\s*4\s*;")
+        self.assertIn("Never\n  // return this field in a browser", challenge)
         self.assertEqual(
-            fields(IDENTITY, "BeginWebAuthnRegistrationRequest"),
-            [
-                ("username", 1),
-                ("display_name", 2),
-                ("account_id", 3),
-                ("agent_node_id", 4),
-                ("pre_consent_signature", 5),
-                ("nonce", 6),
-                ("authorization_hash", 7),
-                ("expires_at_millis", 8),
-                ("reservation_id", 9),
-                ("verified_email_id", 10),
-            ],
+            fields(IDENTITY, "CompleteEmailVerificationRequest"),
+            [("client_operation_id", 1), ("challenge", 2), ("proof", 3)],
         )
-        request = body(IDENTITY, "message", "BeginWebAuthnRegistrationRequest")
-        self.assertIn("pre-consent", request)
-        self.assertIn("does not bind", request)
-        self.assertIn("credentialId", request)
-        self.assertIn("Hex SHA-256 of the claim secret", request)
-        self.assertIn("trailing counted fields", request)
-        self.assertIn("both must travel together", request)
-        self.assertIn("Empty on non-adoption and on old clients", request)
-        self.assertIn("Zero on non-adoption and on old clients", request)
-        self.assertIn(
-            "the lowercase hex SHA-256 of the claim secret (64 hex chars)",
-            request,
+        response = body(IDENTITY, "message", "CompleteEmailVerificationResponse")
+        self.assertRegex(
+            response, r"\bVerifiedEmailReservation\s+reservation\s*=\s*2\s*;"
         )
-        self.assertIn("Do not send uppercase or raw 32-byte digest", request)
-        self.assertIn("On the wire this stays proto `int64`", request)
-        self.assertIn(
-            "exactly 8 big-endian two's-complement bytes of that i64 "
-            "(`i64::to_be_bytes`)",
-            request,
-        )
-        self.assertIn("Not decimal text, not protobuf varint", request)
-        self.assertIn("Empty hash + 0 is old-client v1", request)
-        self.assertIn("Single-use invite-reservation id", request)
-        self.assertIn("Single-use verified-email id", request)
-        self.assertEqual(request.count("in-body device-binding proof, NOT a"), 2)
+        _, _, begin = rpc("BeginEmailVerification")
+        self.assertIn("AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL", begin)
+        _, _, complete = rpc("CompleteEmailVerification")
+        self.assertIn("AUTHORIZATION_ACCESS_PUBLIC", complete)
 
-    def test_bootstrap_exempt_signup_routes_are_unsigned_and_public(self) -> None:
-        for name in (
-            "ClaimSignupInvite",
-            "BeginWebAuthnRegistration",
-            "RegisterPublicKey",
-            "VerifySignupEmail",
-        ):
-            _, _, contract = rpc(name)
-            self.assertIn("signing_tier: SIGNING_TIER_NONE", contract)
-            self.assertIn(
-                "authorization_access: AUTHORIZATION_ACCESS_PUBLIC", contract
-            )
-
-    def test_create_agent_account_is_invite_gated_pet_name_path(self) -> None:
+    def test_registration_accepts_only_typed_invite_and_email_reservations(self) -> None:
         self.assertEqual(
-            fields(IDENTITY, "CreateAgentAccountRequest"),
+            fields(IDENTITY, "BeginRegistrationRequest"),
             [
-                ("invite_code", 1),
-                ("agent_public_key", 2),
-                ("client_operation_id", 3),
-            ],
-        )
-        self.assertEqual(
-            fields(IDENTITY, "CreateAgentAccountResponse"),
-            [
-                ("account_id", 1),
-                ("pet_name", 2),
-                ("agent_capability", 3),
-                ("web_origin", 5),
-            ],
-        )
-        response = body(IDENTITY, "message", "CreateAgentAccountResponse")
-        self.assertIn("globally-unique pet name", response)
-        self.assertIn("no handle", response)
-        self.assertIn("SERVER_WEB_ORIGIN", response)
-        self.assertIn("{web_origin}/claim/{node_id}.{secret}", response)
-        self.assertIn("self-hosting", response)
-
-        request_type, response_type, contract = rpc("CreateAgentAccount")
-        self.assertEqual(request_type, "CreateAgentAccountRequest")
-        self.assertEqual(response_type, "CreateAgentAccountResponse")
-        for required in (
-            "maturity: SERVICE_MATURITY_PLANNED",
-            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
-            "effect: RPC_EFFECT_DURABLE_WRITE",
-            "retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
-            "client_operation_id_required: true",
-            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
-            'path: "invite_code"',
-            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
-        ):
-            self.assertIn(required, contract)
-
-    def test_promote_agent_account_is_one_call_promote_consent(self) -> None:
-        self.assertEqual(
-            fields(IDENTITY, "PromoteAgentAccountRequest"),
-            [
-                ("account_id", 1),
+                ("caller_public_key", 1),
                 ("handle", 2),
-                ("credential_id", 3),
-                ("challenge_id", 4),
-                ("client_data_json", 5),
-                ("attestation_object", 6),
-                ("agent_node_id", 7),
-                ("promote_consent_signature", 8),
-                ("client_operation_id", 9),
-                ("authorization_hash", 10),
-                ("expires_at_millis", 11),
+                ("display_name", 3),
+                ("invitation_reservation", 4),
+                ("verified_email", 5),
+                ("method", 6),
+                ("oauth_provider", 7),
             ],
         )
-        request = body(IDENTITY, "message", "PromoteAgentAccountRequest")
-        self.assertIn("credentialId", request)
-        self.assertIn("just-created passkey", request)
-        self.assertIn("anti-replay binding", IDENTITY)
-        self.assertIn("Hex SHA-256 of the claim secret", request)
-        self.assertIn("trailing counted fields", request)
-        self.assertIn("both must travel together", request)
-        self.assertIn("Empty on non-adoption and on old clients", request)
-        self.assertIn("Zero on non-adoption and on old clients", request)
-        self.assertIn(
-            "the lowercase hex SHA-256 of the claim secret (64 hex chars)",
-            request,
-        )
-        self.assertIn("Do not send uppercase or raw 32-byte digest", request)
-        self.assertIn("On the wire this stays proto `int64`", request)
-        self.assertIn(
-            "exactly 8 big-endian two's-complement bytes of that i64 "
-            "(`i64::to_be_bytes`)",
-            request,
-        )
-        self.assertIn("Not decimal text, not protobuf varint", request)
-        self.assertIn("Empty hash + 0 is old-client v1", request)
-        self.assertEqual(
-            fields(IDENTITY, "PromoteAgentAccountResponse"),
-            [
-                ("session", 1),
-                ("canonical_handle", 2),
-                ("account_id", 3),
-            ],
-        )
-
-        request_type, response_type, contract = rpc("PromoteAgentAccount")
-        self.assertEqual(request_type, "PromoteAgentAccountRequest")
-        self.assertEqual(response_type, "PromoteAgentAccountResponse")
+        complete = fields(IDENTITY, "CompleteRegistrationRequest")
         for required in (
-            "maturity: SERVICE_MATURITY_PLANNED",
-            "signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION",
-            "effect: RPC_EFFECT_DURABLE_WRITE",
-            "retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID",
-            "client_operation_id_required: true",
-            "authorization_access: AUTHORIZATION_ACCESS_PUBLIC",
-            'path: "account_id"',
-            "authorization_existence: AUTHORIZATION_EXISTENCE_HIDE",
+            ("client_operation_id", 1),
+            ("challenge", 2),
+            ("caller_public_key", 4),
+            ("device_binding", 5),
+            ("establish_owner", 7),
+            ("claim_owner", 8),
+            ("mint_root_attachment", 9),
+            ("passkey_authority", 12),
         ):
-            self.assertIn(required, contract)
+            self.assertIn(required, complete)
 
-    def test_signup_failures_use_error_detail_context(self) -> None:
-        signup = body(ERRORS, "message", "SignupFailure")
-        expected = {
-            "INVITE_MISSING": 1,
-            "INVITE_CLAIMED": 2,
-            "INVITE_REVOKED": 3,
-            "VERIFICATION_TOKEN_EXPIRED": 4,
-            "VERIFICATION_TOKEN_REPLAYED": 5,
-            "INVITE_UNAVAILABLE": 6,
-        }
-        for reason, tag in expected.items():
-            self.assertIn(f"SIGNUP_FAILURE_REASON_{reason} = {tag}", signup)
-        self.assertIn(
-            "SignupFailure signup = 17",
-            body(ERRORS, "message", "ErrorDetail"),
+    def test_agent_account_provisioning_is_invite_and_key_bound(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "ProvisionAccountRequest"),
+            [
+                ("client_operation_id", 1),
+                ("invitation_secret", 2),
+                ("agent_public_key", 3),
+            ],
         )
-        self.assertIn("must never be returned by ResolveSignupInvite", ERRORS)
-        self.assertIn(
-            "No narrower invite lifecycle reason\n"
-            "    // above may be returned by ClaimSignupInvite",
-            ERRORS,
+        self.assertEqual(
+            fields(IDENTITY, "ProvisionAccountResponse"),
+            [
+                ("receipt", 1),
+                ("principal", 2),
+                ("credential", 3),
+                ("claim_web_origin", 4),
+                ("ownership", 5),
+            ],
         )
+        request = body(IDENTITY, "message", "ProvisionAccountRequest")
+        self.assertIn("agent proves its own key", IDENTITY)
+        self.assertIn("Reusing an operation ID with different bytes is rejected", IDENTITY)
+        _, _, contract = rpc("ProvisionAccount")
+        self.assertIn("SIGNING_TIER_PROOF_OF_POSSESSION", contract)
+        self.assertIn("AUTHORIZATION_ACCESS_PUBLIC", contract)
+        self.assertIn("AUTHORIZATION_EXISTENCE_HIDE", contract)
+        self.assertIn("client_operation_id_required: true", contract)
+
+    def test_retired_promotion_is_replaced_by_root_attachment_registration(self) -> None:
+        self.assertNotRegex(IDENTITY, r"(?m)^message PromoteAgentAccountRequest \{")
+        self.assertEqual(
+            fields(IDENTITY, "RegisterRootAttachmentRequest"),
+            [
+                ("client_operation_id", 1),
+                ("attachment", 2),
+                ("subject_possession", 3),
+                ("label", 4),
+            ],
+        )
+        _, _, contract = rpc("RegisterRootAttachment")
+        self.assertIn("SIGNING_TIER_PROOF_OF_POSSESSION", contract)
+        self.assertIn("RPC_EFFECT_DURABLE_WRITE", contract)
+        self.assertIn("AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL", contract)
 
 
 if __name__ == "__main__":

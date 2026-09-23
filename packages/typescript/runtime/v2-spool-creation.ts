@@ -1,8 +1,9 @@
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { AuthorizationKeyAlgorithm, AuthorizationVerificationKeySchema, OwnerHistorySchema, SignedMintRootAttachmentSchema, SpoolOwnerGenesisSchema, SignedSpoolOwnerGenesisSchema, SpoolCreationStatementSchema,
+import { AuthorizationKeyAlgorithm, AuthorizationVerificationKeySchema, OwnerHistorySchema, SignedMintRootAttachmentSchema, SignedOwnerMintRootAttachmentSchema, SpoolOwnerGenesisSchema, SignedSpoolOwnerGenesisSchema, SpoolCreationStatementSchema,
   type AuthorizationVerificationKey, type SpoolOwnerGenesis, type SpoolCreationStatement,
-  type SignedSpoolOwnerGenesis, type SignedMintRootAttachment, type OwnerHistory } from "./owner_records_pb.js";
+  type SignedSpoolOwnerGenesis, type SignedMintRootAttachment, type SignedOwnerMintRootAttachment,
+  type SpoolCreationProof, type OwnerHistory } from "./owner_records_pb.js";
 
 const utf8 = new TextEncoder();
 function join(...parts: Uint8Array[]): Uint8Array { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let offset = 0; for (const part of parts) { out.set(part, offset); offset += part.length; } return out; }
@@ -30,7 +31,8 @@ export interface DelegatedSpoolCreationInput {
   ownerPublicKey: Uint8Array; creatorPublicKey: Uint8Array; parentSpoolUuid?: Uint8Array;
   parentPathSegments?: string[]; name: string; createdAtUnixSeconds: bigint;
   /** Already sealed Biscuit, narrowed to the exact creation request digest. */
-  sealedBiscuit: Uint8Array; mintRootAttachment?: SignedMintRootAttachment; ownerHistory: OwnerHistory;
+  sealedBiscuit: Uint8Array; ownerMintRootAttachment?: SignedOwnerMintRootAttachment;
+  passkeyMintRootAttachment?: SignedMintRootAttachment; ownerHistory: OwnerHistory;
   sign(digest: Uint8Array): Promise<Uint8Array>;
 }
 /** Assemble the portable proof; the caller narrows and seals its existing bearer first. */
@@ -42,7 +44,10 @@ export async function signDelegatedSpoolCreation(input: DelegatedSpoolCreationIn
     ownerStateHash: input.ownerStateHash.slice(), ownerSequence: input.ownerSequence, creatorKey, parentSpoolUuid: input.parentSpoolUuid?.slice() ?? new Uint8Array(),
     parentPathSegments: [...(input.parentPathSegments ?? [])], name: input.name, createdAtUnixSeconds: input.createdAtUnixSeconds });
   const history = fromBinary(OwnerHistorySchema, toBinary(OwnerHistorySchema, input.ownerHistory));
-  const mintRootAttachment = input.mintRootAttachment ? fromBinary(SignedMintRootAttachmentSchema, toBinary(SignedMintRootAttachmentSchema, input.mintRootAttachment)) : undefined;
+  if (input.ownerMintRootAttachment && input.passkeyMintRootAttachment) throw new Error("Creation has ambiguous mint-root associations");
+  let mintRootAssociation: SpoolCreationProof["mintRootAssociation"] = { case: undefined };
+  if (input.ownerMintRootAttachment) mintRootAssociation = { case: "ownerMintRootAttachment", value: fromBinary(SignedOwnerMintRootAttachmentSchema, toBinary(SignedOwnerMintRootAttachmentSchema, input.ownerMintRootAttachment)) };
+  if (input.passkeyMintRootAttachment) mintRootAssociation = { case: "passkeyMintRootAttachment", value: fromBinary(SignedMintRootAttachmentSchema, toBinary(SignedMintRootAttachmentSchema, input.passkeyMintRootAttachment)) };
   const sealedBiscuit = input.sealedBiscuit.slice();
   if (!sealedBiscuit.length || !history.root || history.stateHash.length !== 32 || !history.stateHash.every((byte, index) => byte === statement.ownerStateHash[index])) throw new Error("Incomplete creation bearer or owner history");
   const digest = spoolCreationSigningDigest(statement);
@@ -52,5 +57,5 @@ export async function signDelegatedSpoolCreation(input: DelegatedSpoolCreationIn
   if (!await crypto.subtle.verify("Ed25519", verifier, signature as BufferSource, digest as BufferSource)) throw new Error("Invalid creator signature");
   const signerKeyId = sha256(join(utf8.encode("heddle-key-v1"), key(creatorKey).subarray(0, 4), input.creatorPublicKey));
   return create(SignedSpoolOwnerGenesisSchema, { genesis, delegatedCreation: { statement, creatorSignature: { signerKeyId, signature }, sealedBiscuit,
-    mintRootAttachment, ownerHistory: history } });
+    mintRootAssociation, ownerHistory: history } });
 }

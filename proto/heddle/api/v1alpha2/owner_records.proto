@@ -211,11 +211,36 @@ message MintRootAttachment {
   int64 expires_at_unix_seconds = 8;
   bytes nonce = 9;
 }
-message SignedMintRootAttachment {
+// Owner-signed account-bound attachment retained for registration of a durable
+// independent mint root. Passkey authentication never accepts this shape: its
+// account-free grant and owner-certified passkey chain use
+// SignedMintRootAttachment below.
+message SignedOwnerMintRootAttachment {
   MintRootAttachment attachment = 1;
-  // Exactly one of owner_signature or passkey_delegation is required.
   AuthorizationSignature owner_signature = 2;
-  PasskeyMintDelegation passkey_delegation = 3;
+}
+
+// Account-free request for one passkey to authorize a temporary Ed25519 mint
+// key. Canonical v1 fields follow tag order using fixed-width/length-prefixed
+// encoding. Domain: "heddle-passkey-mint-grant-v1". The WebAuthn challenge is
+// SHA-256(domain || canonical fields). Account and owner fields are deliberately
+// absent and MUST be derived from PasskeyMintDelegation.authority.
+message PasskeyMintGrant {
+  uint32 format_version = 1;
+  AuthorizationVerificationKey mint_root_key = 2;
+  int64 not_before_unix_seconds = 3;
+  int64 expires_at_unix_seconds = 4;
+  bytes nonce = 5;
+  string relying_party_id = 6;
+}
+
+// Portable owner -> passkey -> temporary mint-key authorization. This v2
+// shape is the only SignedMintRootAttachment accepted for passkey sign-in.
+message SignedMintRootAttachment {
+  reserved 3;
+  reserved "attachment", "owner_signature";
+  PasskeyMintGrant grant = 1;
+  PasskeyMintDelegation passkey_delegation = 2;
 }
 
 // Current owner authorization for a passkey to attach temporary Ed25519 mint
@@ -239,7 +264,9 @@ message PasskeyAuthority {
   // Exact serialized origins, sorted and unique; no wildcard matching.
   repeated string allowed_origins = 10;
   // Nonzero and at most 43200. Every issued attachment's interval is bounded by
-  // this value. Renewal beyond the interval requires a new passkey assertion.
+  // this value. Verification uses the exact half-open interval [not_before,
+  // expires) with no clock skew allowance. Renewal beyond the interval requires
+  // a new passkey assertion.
   uint32 max_session_ttl_seconds = 11;
   bytes nonce = 12;
 }
@@ -250,8 +277,9 @@ message SignedPasskeyAuthority {
 message PasskeyMintDelegation {
   SignedPasskeyAuthority authority = 1;
   // WebAuthn get assertion over base64url-no-padding of the existing
-  // mint_root_signing_digest(attachment). The challenge therefore commits to
-  // account, owner state, temporary key, validity interval and fresh nonce.
+  // passkey_mint_grant_signing_digest(grant). The challenge commits to the
+  // temporary key, validity interval, fresh nonce and relying-party ID. The
+  // owner-signed authority supplies every account and owner-state field.
   // Verification requires exact origin, RP hash, user presence and verification,
   // same-origin context, and the credential's signature. No registry signature
   // participates; receivers establish current owner trust independently.
@@ -286,7 +314,14 @@ message SpoolCreationProof {
   // bearer or private attenuation key. A verifier checks all inherited caveats.
   bytes sealed_biscuit = 3;
   // Absent when the credential is rooted directly at the owner authority key.
-  SignedMintRootAttachment mint_root_attachment = 4;
+  // Durable owner-signed roots and temporary passkey roots are separate proof
+  // alternatives; no verifier may reinterpret one encoding as the other. A
+  // verifier MUST scan the raw message before protobuf decoding and reject an
+  // encoding containing both tags 4 and 6; oneof last-wins decoding is unsafe.
+  oneof mint_root_association {
+    SignedOwnerMintRootAttachment owner_mint_root_attachment = 4;
+    SignedMintRootAttachment passkey_mint_root_attachment = 6;
+  }
   // Complete witness for the statement's exact owner state. This witness and
   // creator timestamp alone do not establish that fresh admission occurred.
   OwnerHistory owner_history = 5;

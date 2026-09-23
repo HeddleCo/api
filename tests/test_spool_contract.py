@@ -84,6 +84,7 @@ class SpoolContractTest(unittest.TestCase):
                 ("google.protobuf.Timestamp", "last_activity_at", 4),
                 ("uint32", "thread_count", 5),
                 ("string", "head_thread", 6),
+                ("uint64", "retained_size_bytes", 7),
             ],
         )
         self.assertEqual(

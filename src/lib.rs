@@ -3,6 +3,8 @@
 pub mod descriptor_trust;
 mod failure;
 pub mod framing;
+pub mod mint_root_association;
+pub mod passkey_mint_grant;
 pub mod provider_v2;
 pub mod request_proof;
 pub mod signing;
@@ -10,6 +12,11 @@ mod transport;
 pub mod treadle;
 pub mod v2;
 
+pub use failure::{
+    ACCOUNT_BILLING_LOCK_POLICY_ID, account_billing_lock_error_detail,
+    account_billing_lock_from_error_detail, decode_account_billing_lock_error_detail,
+    encode_account_billing_lock_error_detail,
+};
 pub use transport::{
     ALL_METHODS, HOSTED_ALPN_V1, MethodDescriptor, MethodRoute, PROVIDER_ALPN_V1,
     RequestMetadataError, RoutedCall, StreamingShape, human_verification_challenge,

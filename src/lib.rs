@@ -3,6 +3,7 @@
 pub mod descriptor_trust;
 mod failure;
 pub mod framing;
+pub mod passkey_mint_grant;
 pub mod provider_v2;
 pub mod request_proof;
 pub mod signing;

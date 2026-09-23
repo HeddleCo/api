@@ -26,14 +26,55 @@ unnecessarily persists the initial parent path and name in this portable record.
 
 ## Public evidence
 
+### Passkey-backed temporary mint roots
+
+Usernameless passkey sign-in uses a three-link public chain: the current owner
+signs a `PasskeyAuthority`; the certified passkey signs an account-free
+`PasskeyMintGrant`; and the grant names the temporary Ed25519 mint root. The
+account UUID, owner state hash, owner sequence and owner key occur only in the
+owner-signed authority. They are never copied into client-selected grant fields.
+
+The grant fields, in canonical order, are `format_version`, `mint_root_key`,
+`not_before_unix_seconds`, `expires_at_unix_seconds`, `nonce`, and
+`relying_party_id`. The WebAuthn challenge is exactly:
+
+```text
+SHA-256("heddle-passkey-mint-grant-v1" || canonical_passkey_mint_grant)
+```
+
+Integers are fixed-width big-endian. Byte strings and the UTF-8 relying-party
+ID use a big-endian `u32` length followed by their bytes. Protobuf encoding is
+only the transport container and never participates in this digest.
+
+`SignedMintRootAttachment` is the passkey-only v2 container: `grant` plus
+`passkey_delegation { authority, client_data_json, authenticator_data,
+signature }`. A verifier authenticates the owner-signed authority against
+current owner state, checks that the grant RP and lifetime are bounded by that
+authority, verifies the WebAuthn assertion over the grant digest, and derives
+the account/owner binding solely from the authority.
+
+An empty `BeginAuthentication.account_hint` returns this grant with empty
+`allowed_credential_ids` and no passkey authorities. Completion resolves the
+credential's account, verifies its current authority, and returns that signed
+authority, current `OwnerState`, and the server-assembled v2 attachment. A
+nonempty hint may still return credential IDs and authorities, but uses the
+same grant digest and v2 completion proof.
+
+The account-bound `MintRootAttachment` and
+`SignedOwnerMintRootAttachment` v1 shape remain only for durable owner-signed
+mint roots established by registration. Thread-control and Spool-creation
+proofs expose owner-signed and passkey-v2 associations as distinct oneof cases;
+neither encoding is accepted as a fallback for the other.
+
 Keep the existing immutable `SpoolOwnerGenesis` and direct owner-signature path.
 For delegated creation, replace the embedded Biscuit with public signing-key
 association evidence:
 
 - The complete signed owner history authenticates the exact owner state that
   existed at creation. Fresh admission compares it with the actual current state.
-- An optional existing `SignedMintRootAttachment` associates a device's mint key
-  with that exact owner state. Without it, the chain starts at the current owner
+- An optional owner-signed v1 or passkey-signed v2 mint-root association binds a
+  device's mint key to that exact owner state. The two proof types occupy
+  separate oneof cases. Without either, the chain starts at the current owner
   authority key.
 - A bounded ordered chain of public signing-key delegation certificates extends
   that association to the creator's proof key. Each issuer signs the next key,

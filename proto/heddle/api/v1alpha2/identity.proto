@@ -16,7 +16,9 @@ message ThreadControlAuthority {
   OwnerHistory owner = 2;
   bytes mint_root_public_key = 3; // Ed25519, exactly 32 bytes.
   // Durable owner-signed roots and temporary passkey roots are deliberately
-  // distinct proof shapes; verifiers never reinterpret one as the other.
+  // distinct proof shapes; verifiers never reinterpret one as the other. A
+  // verifier MUST scan the raw message before protobuf decoding and reject an
+  // encoding containing both tags 4 and 6; oneof last-wins decoding is unsafe.
   oneof mint_root_association {
     SignedOwnerMintRootAttachment owner_mint_root_attachment = 4;
     SignedMintRootAttachment passkey_mint_root_attachment = 6;
@@ -171,6 +173,9 @@ message OAuthProof {
 }
 message AuthenticationChallenge {
   RecordRef ref = 1;
+  // For CREDENTIAL_METHOD_PASSKEY this MUST be exactly the 32-byte
+  // passkey_mint_grant_signing_digest(passkey_mint_grant). Password and OAuth
+  // retain their method-specific challenge semantics.
   bytes challenge = 2;
   string relying_party_id = 3;
   google.protobuf.Timestamp expires_at = 4;
@@ -181,7 +186,11 @@ message AuthenticationChallenge {
   // Separate from ceremony expiry; completion cannot extend this upper bound.
   google.protobuf.Timestamp credential_expires_at = 9;
   // For passkey-backed temporary authoring, assert the signing digest of this
-  // exact account-free grant. Completion cannot replace any of its fields.
+  // exact account-free grant. Completion cannot replace any of its fields. A
+  // hinted begin uses the minimum max_session_ttl_seconds among every returned
+  // credential that may sign. An empty-hint begin uses a deployment-configured
+  // minimum that every accepted authority satisfies. This issuance choice does
+  // not replace the verifier's per-authority ceiling and time-window checks.
   PasskeyMintGrant passkey_mint_grant = 10;
   // Owner-signed certificates for the allowed credentials. Certificate order
   // matches allowed_credential_ids; each id and key are verified at registration.
@@ -206,7 +215,10 @@ message PasskeyProof {
 message BeginAuthenticationRequest {
   // Optional for PASSKEY. Empty selects discoverable authentication: begin
   // returns an account-free mint grant with no allowed credential IDs or
-  // passkey authorities. Nonempty preserves account-selected authentication.
+  // passkey authorities. Its TTL uses a deployment-configured minimum that
+  // every accepted authority satisfies. Nonempty preserves account-selected
+  // authentication and uses the minimum TTL ceiling among credentials that may
+  // sign. Completion still verifies the selected authority's exact ceiling.
   string account_hint = 1;
   // Device key whose possession CompleteAuthentication must prove.
   // The challenge records this exact key and the enrollment choice below.

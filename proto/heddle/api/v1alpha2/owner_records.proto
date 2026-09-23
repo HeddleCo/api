@@ -264,7 +264,9 @@ message PasskeyAuthority {
   // Exact serialized origins, sorted and unique; no wildcard matching.
   repeated string allowed_origins = 10;
   // Nonzero and at most 43200. Every issued attachment's interval is bounded by
-  // this value. Renewal beyond the interval requires a new passkey assertion.
+  // this value. Verification uses the exact half-open interval [not_before,
+  // expires) with no clock skew allowance. Renewal beyond the interval requires
+  // a new passkey assertion.
   uint32 max_session_ttl_seconds = 11;
   bytes nonce = 12;
 }
@@ -313,7 +315,9 @@ message SpoolCreationProof {
   bytes sealed_biscuit = 3;
   // Absent when the credential is rooted directly at the owner authority key.
   // Durable owner-signed roots and temporary passkey roots are separate proof
-  // alternatives; no verifier may reinterpret one encoding as the other.
+  // alternatives; no verifier may reinterpret one encoding as the other. A
+  // verifier MUST scan the raw message before protobuf decoding and reject an
+  // encoding containing both tags 4 and 6; oneof last-wins decoding is unsafe.
   oneof mint_root_association {
     SignedOwnerMintRootAttachment owner_mint_root_attachment = 4;
     SignedMintRootAttachment passkey_mint_root_attachment = 6;

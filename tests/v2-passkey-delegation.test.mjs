@@ -3,18 +3,27 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { createHash, createPrivateKey, sign } from 'node:crypto';
 import { clone, fromBinary, toBinary } from '@bufbuild/protobuf';
-import { SignedMintRootAttachmentSchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
+import { AuthenticationChallengeSchema, CredentialMethod, ThreadControlAuthoritySchema } from '../packages/typescript/dist/v1alpha2/identity_pb.js';
+import { SignedMintRootAttachmentSchema, SpoolCreationProofSchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
 import {
   PASSKEY_MINT_GRANT_DOMAIN,
   canonicalPasskeyMintGrant,
   passkeyMintGrantSigningDigest,
+  verifyPasskeyAuthenticationChallenge,
+  verifyPasskeyMintGrantWindow,
   verifyMintRootAttachment,
 } from '../packages/typescript/dist/v1alpha2/owner-certificates.js';
+import {
+  decodeSpoolCreationProofForVerification,
+  decodeThreadControlAuthorityForVerification,
+  verifyMintRootAssociationWire,
+} from '../packages/typescript/dist/v1alpha2/mint-root-association.js';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/passkey-mint-grant-v1.json', import.meta.url), 'utf8'));
 const fromHex = value => new Uint8Array(Buffer.from(value, 'hex'));
 const hex = value => Buffer.from(value).toString('hex');
 const decode = value => fromBinary(SignedMintRootAttachmentSchema, fromHex(value));
+const decodeChallenge = value => fromBinary(AuthenticationChallengeSchema, fromHex(value));
 const positive = decode(fixture.positive.attachment_proto_hex);
 const passkey = createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.alloc(32, 82)]), format: 'der', type: 'pkcs8' });
 
@@ -61,6 +70,49 @@ test('every grant field is challenge-bound and tampering is rejected', async t =
       await assert.rejects(verifyMintRootAttachment(decode(vector.attachment_proto_hex), expectation()));
     });
   }
+});
+
+test('the separate passkey challenge exactly binds the grant while other methods remain method-specific', () => {
+  const positiveChallenge = decodeChallenge(fixture.positive.authentication_challenge_proto_hex);
+  assert.doesNotThrow(() => verifyPasskeyAuthenticationChallenge(positiveChallenge));
+  const vector = fixture.negative_cases.find(value => value.id === 'mismatching-authentication-challenge');
+  const mismatch = decodeChallenge(vector.authentication_challenge_proto_hex);
+  assert.throws(() => verifyPasskeyAuthenticationChallenge(mismatch), /does not bind/);
+
+  mismatch.method = CredentialMethod.PASSWORD;
+  mismatch.challenge = new Uint8Array([1]);
+  assert.doesNotThrow(() => verifyPasskeyAuthenticationChallenge(mismatch));
+});
+
+test('shared grant-window vectors enforce the authority ceiling and exact half-open time', () => {
+  for (const vector of fixture.window_cases) {
+    const grant = clone(SignedMintRootAttachmentSchema, positive).grant;
+    grant.notBeforeUnixSeconds = BigInt(vector.not_before_unix_seconds);
+    grant.expiresAtUnixSeconds = BigInt(vector.expires_at_unix_seconds);
+    const verify = () => verifyPasskeyMintGrantWindow(
+      grant,
+      vector.max_session_ttl_seconds,
+      BigInt(vector.now_unix_seconds),
+    );
+    if (vector.accepted) assert.doesNotThrow(verify, vector.id);
+    else assert.throws(verify, undefined, vector.id);
+  }
+});
+
+test('checked raw decoders reject both oneof arms before protobuf last-wins decoding', () => {
+  for (const vector of fixture.ambiguous_oneof_cases) {
+    const raw = fromHex(vector.raw_proto_hex);
+    assert.throws(() => verifyMintRootAssociationWire(raw), /both owner-v1 and passkey-v2/, vector.id);
+    if (vector.message === 'ThreadControlAuthority') {
+      assert.equal(fromBinary(ThreadControlAuthoritySchema, raw).mintRootAssociation.case, 'passkeyMintRootAttachment');
+      assert.throws(() => decodeThreadControlAuthorityForVerification(raw), /both owner-v1 and passkey-v2/);
+    } else {
+      assert.equal(fromBinary(SpoolCreationProofSchema, raw).mintRootAssociation.case, 'passkeyMintRootAttachment');
+      assert.throws(() => decodeSpoolCreationProofForVerification(raw), /both owner-v1 and passkey-v2/);
+    }
+  }
+  assert.doesNotThrow(() => decodeThreadControlAuthorityForVerification(fromHex('08012200')));
+  assert.doesNotThrow(() => decodeSpoolCreationProofForVerification(fromHex('3200')));
 });
 
 test('a fully re-signed assertion for a different relying party is rejected by the authority binding', async () => {
@@ -124,7 +176,7 @@ test('the owner authority bounds TTL and cannot choose a different current owner
   client.challenge = Buffer.from(passkeyMintGrantSigningDigest(excessive.grant)).toString('base64url');
   excessive.passkeyDelegation.clientDataJson = new TextEncoder().encode(JSON.stringify(client));
   resignAssertion(excessive);
-  await assert.rejects(verifyMintRootAttachment(excessive, expectation()), /bounds/);
+  await assert.rejects(verifyMintRootAttachment(excessive, expectation()), /ceiling/);
 
   const foreignOwner = clone(SignedMintRootAttachmentSchema, positive);
   foreignOwner.passkeyDelegation.authority.authority.ownerKey.publicKey[0] ^= 1;

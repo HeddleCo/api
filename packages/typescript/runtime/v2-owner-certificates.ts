@@ -1,5 +1,6 @@
 import { clone, create } from "@bufbuild/protobuf";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { CredentialMethod, type AuthenticationChallenge } from "./identity_pb.js";
 import { AuthorizationKeyAlgorithm, MintRootAttachmentSchema, SignedOwnerMintRootAttachmentSchema,
   PasskeyAuthoritySchema, SignedPasskeyAuthoritySchema,
   type AuthorizationVerificationKey, type MintRootAttachment, type SignedOwnerMintRootAttachment,
@@ -9,6 +10,7 @@ import { AuthorizationKeyAlgorithm, MintRootAttachmentSchema, SignedOwnerMintRoo
 const utf8 = new TextEncoder();
 const MINT_ROOT_ATTACHMENT_DOMAIN = utf8.encode("heddle-mint-root-attachment-v1");
 export const PASSKEY_MINT_GRANT_DOMAIN = "heddle-passkey-mint-grant-v1";
+export const MAX_PASSKEY_SESSION_TTL_SECONDS = 43200;
 function bytes(value: Uint8Array, length: number, name: string) {
   if (value.length !== length) throw new Error(`Invalid ${name} length`);
 }
@@ -148,6 +150,33 @@ export function passkeyMintGrantSigningDigest(value: PasskeyMintGrant): Uint8Arr
   return sha256(join(utf8.encode(PASSKEY_MINT_GRANT_DOMAIN), canonicalPasskeyMintGrant(value)));
 }
 
+/** Require the separate passkey ceremony challenge to bind the exact grant. */
+export function verifyPasskeyAuthenticationChallenge(value: AuthenticationChallenge): void {
+  if (value.method !== CredentialMethod.PASSKEY) return;
+  if (!value.passkeyMintGrant) throw new Error("Passkey authentication challenge is missing its grant");
+  const digest = passkeyMintGrantSigningDigest(value.passkeyMintGrant);
+  bytes(value.challenge, 32, "passkey authentication challenge");
+  if (!equal(value.challenge, digest)) throw new Error("Passkey authentication challenge does not bind its grant");
+}
+
+/** Enforce the owner-certified ceiling and exact [not_before, expires) window. */
+export function verifyPasskeyMintGrantWindow(
+  value: PasskeyMintGrant,
+  maxSessionTtlSeconds: number,
+  nowUnixSeconds: bigint,
+): void {
+  canonicalPasskeyMintGrant(value);
+  if (!Number.isInteger(maxSessionTtlSeconds) || maxSessionTtlSeconds <= 0
+    || maxSessionTtlSeconds > MAX_PASSKEY_SESSION_TTL_SECONDS) {
+    throw new Error("Passkey authority max_session_ttl_seconds must be in 1..=43200");
+  }
+  const duration = value.expiresAtUnixSeconds - value.notBeforeUnixSeconds;
+  if (duration > BigInt(maxSessionTtlSeconds)) throw new Error("Passkey mint grant lifetime exceeds the authority ceiling");
+  if (nowUnixSeconds < value.notBeforeUnixSeconds || nowUnixSeconds >= value.expiresAtUnixSeconds) {
+    throw new Error("Passkey mint grant is not currently valid");
+  }
+}
+
 export interface PasskeyMintGrantExpectation extends PasskeyOwnerExpectation {
   mintRootPublicKey: Uint8Array;
   relyingPartyId: string;
@@ -162,7 +191,6 @@ export async function verifyMintRootAttachment(signed: SignedMintRootAttachment,
   canonicalPasskeyMintGrant(grant);
   if (!equal(key(grant.mintRootKey).publicKey, expected.mintRootPublicKey)) throw new Error("Grant mint root differs from the independently verified key");
   if (grant.relyingPartyId !== expected.relyingPartyId) throw new Error("Grant relying-party ID differs from the expected relying party");
-  if (expected.nowUnixSeconds < grant.notBeforeUnixSeconds || expected.nowUnixSeconds >= grant.expiresAtUnixSeconds) throw new Error("Grant is not currently valid");
   await verifyPasskeyMintDelegation(proof, grant, expected);
 }
 
@@ -194,9 +222,8 @@ async function verifyPasskeyMintDelegation(proof: PasskeyMintDelegation, grant: 
   if (!proof.authority?.authority) throw new Error("Missing passkey certificate");
   await verifyPasskeyAuthority(proof.authority, expected);
   const authority = proof.authority.authority;
-  const duration = grant.expiresAtUnixSeconds - grant.notBeforeUnixSeconds;
+  verifyPasskeyMintGrantWindow(grant, authority.maxSessionTtlSeconds, expected.nowUnixSeconds);
   if (grant.relyingPartyId !== authority.relyingPartyId
-    || duration <= 0n || duration > BigInt(authority.maxSessionTtlSeconds)
     || proof.clientDataJson.length > 8192 || proof.authenticatorData.length < 37 || proof.authenticatorData.length > 4096
     || proof.signature.length === 0 || proof.signature.length > 80) throw new Error("Passkey delegation exceeds bounds");
   const client: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(proof.clientDataJson));

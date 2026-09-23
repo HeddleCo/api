@@ -4,11 +4,15 @@
 use sha2::{Digest, Sha256};
 
 use crate::heddle::api::v1alpha2::{
-    AuthorizationKeyAlgorithm, AuthorizationVerificationKey, PasskeyMintGrant,
+    AuthenticationChallenge, AuthorizationKeyAlgorithm, AuthorizationVerificationKey,
+    CredentialMethod, PasskeyMintGrant,
 };
 
 /// Exact domain prepended to the canonical grant before SHA-256.
 pub const PASSKEY_MINT_GRANT_DOMAIN: &[u8] = b"heddle-passkey-mint-grant-v1";
+
+/// Absolute passkey session ceiling shared with `PasskeyAuthority`.
+pub const MAX_PASSKEY_SESSION_TTL_SECONDS: u32 = 43_200;
 
 /// A malformed or unsupported passkey mint grant.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
@@ -31,6 +35,18 @@ pub enum PasskeyMintGrantError {
     /// A variable-width field exceeds the canonical u32 length prefix.
     #[error("passkey mint grant field is too long")]
     FieldTooLong,
+    /// A passkey ceremony's separate challenge does not bind its exact grant.
+    #[error("passkey authentication challenge must equal the 32-byte grant signing digest")]
+    ChallengeBinding,
+    /// The authority's configured ceiling is outside the contract range.
+    #[error("passkey authority max_session_ttl_seconds must be in 1..=43200")]
+    SessionTtlCeiling,
+    /// The grant's lifetime exceeds the owner-certified authority ceiling.
+    #[error("passkey mint grant lifetime exceeds the authority ceiling")]
+    SessionTtlExceeded,
+    /// The verifier's exact current time is outside the grant's half-open window.
+    #[error("passkey mint grant is not currently valid")]
+    NotCurrentlyValid,
 }
 
 fn push_u32(out: &mut Vec<u8>, value: u32) {
@@ -108,4 +124,48 @@ pub fn passkey_mint_grant_signing_digest(
     digest.update(PASSKEY_MINT_GRANT_DOMAIN);
     digest.update(canonical);
     Ok(digest.finalize().into())
+}
+
+/// Enforce the second challenge binding for passkey authentication.
+///
+/// Other credential methods retain their method-specific challenge semantics
+/// and are intentionally not interpreted here.
+pub fn verify_passkey_authentication_challenge(
+    value: &AuthenticationChallenge,
+) -> Result<(), PasskeyMintGrantError> {
+    if value.method != CredentialMethod::Passkey as i32 {
+        return Ok(());
+    }
+    let grant = value
+        .passkey_mint_grant
+        .as_ref()
+        .ok_or(PasskeyMintGrantError::ChallengeBinding)?;
+    let digest = passkey_mint_grant_signing_digest(grant)?;
+    if value.challenge.len() != digest.len() || value.challenge.as_slice() != digest {
+        return Err(PasskeyMintGrantError::ChallengeBinding);
+    }
+    Ok(())
+}
+
+/// Enforce the owner-certified grant ceiling and exact half-open validity
+/// window. There is deliberately no clock-skew allowance.
+pub fn verify_passkey_mint_grant_window(
+    value: &PasskeyMintGrant,
+    max_session_ttl_seconds: u32,
+    now_unix_seconds: i64,
+) -> Result<(), PasskeyMintGrantError> {
+    canonical_passkey_mint_grant(value)?;
+    if max_session_ttl_seconds == 0 || max_session_ttl_seconds > MAX_PASSKEY_SESSION_TTL_SECONDS {
+        return Err(PasskeyMintGrantError::SessionTtlCeiling);
+    }
+    let duration = value.expires_at_unix_seconds - value.not_before_unix_seconds;
+    if duration > i64::from(max_session_ttl_seconds) {
+        return Err(PasskeyMintGrantError::SessionTtlExceeded);
+    }
+    if now_unix_seconds < value.not_before_unix_seconds
+        || now_unix_seconds >= value.expires_at_unix_seconds
+    {
+        return Err(PasskeyMintGrantError::NotCurrentlyValid);
+    }
+    Ok(())
 }

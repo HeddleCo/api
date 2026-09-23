@@ -46,6 +46,11 @@ Integers are fixed-width big-endian. Byte strings and the UTF-8 relying-party
 ID use a big-endian `u32` length followed by their bytes. Protobuf encoding is
 only the transport container and never participates in this digest.
 
+For `CREDENTIAL_METHOD_PASSKEY`, the separate
+`AuthenticationChallenge.challenge` field is exactly this 32-byte digest. A
+mismatching or non-32-byte challenge is rejected before WebAuthn completion;
+other credential methods retain their own challenge semantics.
+
 `SignedMintRootAttachment` is the passkey-only v2 container: `grant` plus
 `passkey_delegation { authority, client_data_json, authenticator_data,
 signature }`. A verifier authenticates the owner-signed authority against
@@ -60,11 +65,25 @@ authority, current `OwnerState`, and the server-assembled v2 attachment. A
 nonempty hint may still return credential IDs and authorities, but uses the
 same grant digest and v2 completion proof.
 
+A hinted begin bounds the grant with the minimum `max_session_ttl_seconds`
+among all credentials that may sign. A discoverable empty-hint begin instead
+uses a deployment-configured minimum that every accepted passkey authority must
+satisfy. Neither issuance rule weakens verification: the selected authority's
+ceiling must be nonzero and at most 43200 seconds, the grant duration must not
+exceed it, and `now` must be inside `[not_before, expires)` with no skew.
+
 The account-bound `MintRootAttachment` and
 `SignedOwnerMintRootAttachment` v1 shape remain only for durable owner-signed
 mint roots established by registration. Thread-control and Spool-creation
 proofs expose owner-signed and passkey-v2 associations as distinct oneof cases;
 neither encoding is accepted as a fallback for the other.
+
+Protobuf oneof decoding is last-wins, so a verifier must scan raw
+`ThreadControlAuthority` and `SpoolCreationProof` bytes before decoding and
+reject any encoding containing both owner-v1 tag 4 and passkey-v2 tag 6. The
+shared Rust and TypeScript checked decoders perform this scan; heddle#1802's
+verifier must call one of them (or implement the identical check) before
+interpreting either message.
 
 Keep the existing immutable `SpoolOwnerGenesis` and direct owner-signature path.
 For delegated creation, replace the embedded Biscuit with public signing-key

@@ -11,6 +11,10 @@ import {
   SignedPasskeyAuthoritySchema,
 } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
 import {
+  AuthenticationChallengeSchema,
+  CredentialMethod,
+} from '../packages/typescript/dist/v1alpha2/identity_pb.js';
+import {
   PASSKEY_MINT_GRANT_DOMAIN,
   canonicalPasskeyAuthority,
   canonicalPasskeyMintGrant,
@@ -92,7 +96,16 @@ const attachment = create(SignedMintRootAttachmentSchema, {
   grant,
   passkeyDelegation: assertion(grant),
 });
+const authenticationChallenge = create(AuthenticationChallengeSchema, {
+  challenge: passkeyMintGrantSigningDigest(grant),
+  relyingPartyId: grant.relyingPartyId,
+  method: CredentialMethod.PASSKEY,
+  passkeyMintGrant: grant,
+});
+const mismatchingChallenge = clone(AuthenticationChallengeSchema, authenticationChallenge);
+mismatchingChallenge.challenge[0] ^= 1;
 const encoded = value => hex(toBinary(SignedMintRootAttachmentSchema, value));
+const encodedChallenge = value => hex(toBinary(AuthenticationChallengeSchema, value));
 const altered = (id, field, mutate) => {
   const value = clone(SignedMintRootAttachmentSchema, attachment);
   mutate(value.grant);
@@ -149,6 +162,7 @@ const fixture = {
     },
     canonical_hex: hex(canonicalPasskeyMintGrant(grant)),
     signing_digest_hex: hex(passkeyMintGrantSigningDigest(grant)),
+    authentication_challenge_proto_hex: encodedChallenge(authenticationChallenge),
     attachment_proto_hex: encoded(attachment),
     now_unix_seconds: 1_000_001,
     expected_owner: {
@@ -165,6 +179,13 @@ const fixture = {
     altered('tampered-expires-at', 'expires_at_unix_seconds', value => { value.expiresAtUnixSeconds += 1n; }),
     altered('tampered-nonce', 'nonce', value => { value.nonce[0] ^= 1; }),
     altered('tampered-relying-party-id', 'relying_party_id', value => { value.relyingPartyId = 'heddle.example'; }),
+    {
+      id: 'mismatching-authentication-challenge',
+      kind: 'challenge_binding',
+      authentication_challenge_proto_hex: encodedChallenge(mismatchingChallenge),
+      expected_grant_digest_hex: hex(passkeyMintGrantSigningDigest(grant)),
+      presented_challenge_hex: hex(mismatchingChallenge.challenge),
+    },
     {
       id: 'wrong-relying-party-id',
       kind: 'authority_mismatch',
@@ -190,6 +211,52 @@ const fixture = {
       presented_challenge_hex: hex(legacyDigest),
       expected_grant_digest_hex: hex(passkeyMintGrantSigningDigest(grant)),
       now_unix_seconds: 1_000_001,
+    },
+  ],
+  window_cases: [
+    {
+      id: 'ttl-ceiling-43200-accepted',
+      not_before_unix_seconds: 1_000_000,
+      expires_at_unix_seconds: 1_043_200,
+      max_session_ttl_seconds: 43_200,
+      now_unix_seconds: 1_043_199,
+      accepted: true,
+    },
+    {
+      id: 'ttl-ceiling-43201-rejected',
+      not_before_unix_seconds: 1_000_000,
+      expires_at_unix_seconds: 1_043_200,
+      max_session_ttl_seconds: 43_201,
+      now_unix_seconds: 1_000_000,
+      accepted: false,
+    },
+    {
+      id: 'duration-exceeds-authority-ceiling',
+      not_before_unix_seconds: 1_000_000,
+      expires_at_unix_seconds: 1_003_600,
+      max_session_ttl_seconds: 3_599,
+      now_unix_seconds: 1_000_001,
+      accepted: false,
+    },
+    {
+      id: 'now-equals-expires-rejected',
+      not_before_unix_seconds: 1_000_000,
+      expires_at_unix_seconds: 1_003_600,
+      max_session_ttl_seconds: 43_200,
+      now_unix_seconds: 1_003_600,
+      accepted: false,
+    },
+  ],
+  ambiguous_oneof_cases: [
+    {
+      id: 'thread-control-owner-and-passkey-arms',
+      message: 'ThreadControlAuthority',
+      raw_proto_hex: '080122003200',
+    },
+    {
+      id: 'spool-creation-owner-and-passkey-arms',
+      message: 'SpoolCreationProof',
+      raw_proto_hex: '22003200',
     },
   ],
 };

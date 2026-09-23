@@ -1,7 +1,16 @@
 use heddle_api::{
-    heddle::api::v1alpha2::SignedMintRootAttachment,
+    heddle::api::v1alpha2::{
+        AuthenticationChallenge, CredentialMethod, SignedMintRootAttachment, SpoolCreationProof,
+        ThreadControlAuthority,
+    },
+    mint_root_association::{
+        MintRootAssociationWireError, decode_spool_creation_proof_for_verification,
+        decode_thread_control_authority_for_verification, verify_mint_root_association_wire,
+    },
     passkey_mint_grant::{
-        PASSKEY_MINT_GRANT_DOMAIN, canonical_passkey_mint_grant, passkey_mint_grant_signing_digest,
+        PASSKEY_MINT_GRANT_DOMAIN, PasskeyMintGrantError, canonical_passkey_mint_grant,
+        passkey_mint_grant_signing_digest, verify_passkey_authentication_challenge,
+        verify_passkey_mint_grant_window,
     },
 };
 use prost::Message;
@@ -24,6 +33,11 @@ fn integer(value: &Value, field: &str) -> i64 {
 fn decode_attachment(encoded: &str) -> SignedMintRootAttachment {
     SignedMintRootAttachment::decode(hex::decode(encoded).expect("fixture hex").as_slice())
         .expect("v2 attachment protobuf")
+}
+
+fn decode_challenge(encoded: &str) -> AuthenticationChallenge {
+    AuthenticationChallenge::decode(hex::decode(encoded).expect("fixture hex").as_slice())
+        .expect("authentication challenge protobuf")
 }
 
 fn in_window(value: &SignedMintRootAttachment, now: i64) -> bool {
@@ -92,6 +106,107 @@ fn every_tampered_grant_field_changes_or_invalidates_the_digest() {
             Err(_) => assert_eq!(text(case, "field"), "format_version"),
         }
     }
+}
+
+#[test]
+fn passkey_challenge_is_the_exact_grant_digest_but_other_methods_keep_their_semantics() {
+    let fixture = fixture();
+    let positive = decode_challenge(text(
+        &fixture["positive"],
+        "authentication_challenge_proto_hex",
+    ));
+    verify_passkey_authentication_challenge(&positive).expect("bound challenge");
+
+    let mismatch = fixture["negative_cases"]
+        .as_array()
+        .expect("negative cases")
+        .iter()
+        .find(|case| text(case, "id") == "mismatching-authentication-challenge")
+        .expect("challenge mismatch vector");
+    let mismatch = decode_challenge(text(mismatch, "authentication_challenge_proto_hex"));
+    assert_eq!(
+        verify_passkey_authentication_challenge(&mismatch),
+        Err(PasskeyMintGrantError::ChallengeBinding)
+    );
+
+    let mut password = mismatch;
+    password.method = CredentialMethod::Password as i32;
+    password.challenge = vec![1];
+    verify_passkey_authentication_challenge(&password)
+        .expect("non-passkey challenge semantics are method-specific");
+}
+
+#[test]
+fn shared_grant_window_boundaries_match_the_owner_ceiling_contract() {
+    let fixture = fixture();
+    let attachment = decode_attachment(text(&fixture["positive"], "attachment_proto_hex"));
+    let template = attachment.grant.expect("grant");
+    for case in fixture["window_cases"].as_array().expect("window cases") {
+        let mut grant = template.clone();
+        grant.not_before_unix_seconds = integer(case, "not_before_unix_seconds");
+        grant.expires_at_unix_seconds = integer(case, "expires_at_unix_seconds");
+        let ceiling =
+            u32::try_from(integer(case, "max_session_ttl_seconds")).expect("u32 TTL ceiling");
+        let result =
+            verify_passkey_mint_grant_window(&grant, ceiling, integer(case, "now_unix_seconds"));
+        assert_eq!(
+            result.is_ok(),
+            case["accepted"].as_bool().expect("accepted flag"),
+            "{}: {result:?}",
+            text(case, "id")
+        );
+    }
+}
+
+#[test]
+fn checked_decoders_reject_both_oneof_arms_before_last_wins_decoding() {
+    let fixture = fixture();
+    for case in fixture["ambiguous_oneof_cases"]
+        .as_array()
+        .expect("ambiguous oneof cases")
+    {
+        let bytes = hex::decode(text(case, "raw_proto_hex")).expect("raw protobuf hex");
+        assert_eq!(
+            verify_mint_root_association_wire(&bytes)
+                .expect_err("both raw alternatives must be rejected")
+                .to_string(),
+            MintRootAssociationWireError::BothArms.to_string(),
+            "{}",
+            text(case, "id")
+        );
+        match text(case, "message") {
+            "ThreadControlAuthority" => {
+                assert!(
+                    ThreadControlAuthority::decode(bytes.as_slice())
+                        .expect("ordinary decoder is last-wins")
+                        .mint_root_association
+                        .is_some()
+                );
+                assert!(matches!(
+                    decode_thread_control_authority_for_verification(&bytes),
+                    Err(MintRootAssociationWireError::BothArms)
+                ));
+            }
+            "SpoolCreationProof" => {
+                assert!(
+                    SpoolCreationProof::decode(bytes.as_slice())
+                        .expect("ordinary decoder is last-wins")
+                        .mint_root_association
+                        .is_some()
+                );
+                assert!(matches!(
+                    decode_spool_creation_proof_for_verification(&bytes),
+                    Err(MintRootAssociationWireError::BothArms)
+                ));
+            }
+            other => panic!("unknown fixture message {other}"),
+        }
+    }
+
+    decode_thread_control_authority_for_verification(&hex::decode("08012200").unwrap())
+        .expect("single owner arm");
+    decode_spool_creation_proof_for_verification(&hex::decode("3200").unwrap())
+        .expect("single passkey arm");
 }
 
 #[test]

@@ -2,6 +2,7 @@ syntax = "proto3";
 package heddle.api.v1alpha2;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/common/errors.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
 import "heddle/api/v1alpha2/owner_views.proto";
@@ -421,6 +422,42 @@ message RevokeDeviceRequest {
   // transitions have their separate portable owner-authorization ceremony.
   RecordRef device = 2;
   bytes expected_version = 4;
+}
+
+// Irreversibly deletes the caller's account. The authenticating credential
+// MUST be the direct account owner's proof-bearing credential: agent, service,
+// delegated, derived and attenuated credentials are rejected even if they
+// otherwise carry caller-bound account authority. confirmation_handle MUST
+// exactly equal the account's current handle. Reusing client_operation_id
+// returns the original outcome without deleting or canceling anything twice.
+message DeleteAccountRequest {
+  string client_operation_id = 1;
+  string confirmation_handle = 2;
+}
+
+enum AccountDeletionOutcome {
+  ACCOUNT_DELETION_OUTCOME_UNSPECIFIED = 0;
+  // Account-owned live data was removed before this response was produced.
+  ACCOUNT_DELETION_OUTCOME_COMPLETED = 1;
+  // Some retained data remains until retained_data_delete_after.
+  ACCOUNT_DELETION_OUTCOME_SCHEDULED = 2;
+  // The same account deletion had already completed; no work was repeated.
+  ACCOUNT_DELETION_OUTCOME_ALREADY_DELETED = 3;
+}
+
+message DeleteAccountResponse {
+  // Carries the operation ID and applied/no-op result used for idempotency.
+  MutationReceipt receipt = 1;
+  AccountDeletionOutcome outcome = 2;
+  // Number of account-owned Spools deleted by the original operation.
+  uint64 spools_deleted = 3;
+  // True when the original operation canceled an active paid subscription.
+  bool subscription_canceled = 4;
+  // Time the original deletion operation was accepted.
+  google.protobuf.Timestamp deletion_requested_at = 5;
+  // Latest scheduled deletion time for retained account data. Absent when no
+  // account data is retained after the response.
+  google.protobuf.Timestamp retained_data_delete_after = 6;
 }
 message PutDelegationRequest {
   string client_operation_id = 1;
@@ -919,4 +956,7 @@ message GetIdentityRequest {
 message GetIdentityResponse {
   PrincipalRecord identity = 1;
   CurrentCredentialRecord current_credential = 2;
+  // Present while the account is restricted by the billing lock. The same
+  // message is carried by PolicyDenial.billing_lock on denied calls.
+  heddle.api.common.AccountBillingLock billing_lock = 3;
 }

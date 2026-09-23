@@ -107,6 +107,40 @@ message PolicyDenial {
   string policy_id = 1;
   string rule = 2;
   bool human_verification_can_override = 3;
+  // Present when policy_id is "account_locked_billing". This is the
+  // authoritative machine-readable lock status; clients must not parse rule.
+  AccountBillingLock billing_lock = 4;
+}
+
+// Why an account is restricted to billing recovery and data-removal actions.
+enum AccountBillingLockReason {
+  ACCOUNT_BILLING_LOCK_REASON_UNSPECIFIED = 0;
+  ACCOUNT_BILLING_LOCK_REASON_OVER_FREE_CAP_WITHOUT_PAID_PLAN = 1;
+}
+
+// Operations the lock policy still admits for the account owner. This list is
+// an affordance projection, not an authorization grant: every call must still
+// satisfy its own authentication, proof and authorization contract.
+enum AccountBillingLockAllowedAction {
+  ACCOUNT_BILLING_LOCK_ALLOWED_ACTION_UNSPECIFIED = 0;
+  ACCOUNT_BILLING_LOCK_ALLOWED_ACTION_SIGN_IN = 1;
+  ACCOUNT_BILLING_LOCK_ALLOWED_ACTION_MANAGE_BILLING = 2;
+  ACCOUNT_BILLING_LOCK_ALLOWED_ACTION_LIST_SPOOLS = 3;
+  ACCOUNT_BILLING_LOCK_ALLOWED_ACTION_DELETE_SPOOL = 4;
+  ACCOUNT_BILLING_LOCK_ALLOWED_ACTION_DELETE_ACCOUNT = 5;
+  ACCOUNT_BILLING_LOCK_ALLOWED_ACTION_EXPORT_DATA = 6;
+}
+
+// Current account billing restriction. used_bytes and cap_bytes are retained
+// logical bytes from the same authoritative storage ledger used to apply the
+// Free-plan gate; they are decimal byte counts, not physical/object-store size.
+message AccountBillingLock {
+  AccountBillingLockReason reason = 1;
+  google.protobuf.Timestamp locked_at = 2;
+  google.protobuf.Timestamp delete_after = 3;
+  uint64 used_bytes = 4;
+  uint64 cap_bytes = 5;
+  repeated AccountBillingLockAllowedAction allowed_actions = 6;
 }
 
 // Lossless carrier for an `ErrorDetail.context` arm this client does not know.

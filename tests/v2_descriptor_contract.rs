@@ -282,6 +282,7 @@ fn device_deployment_covers_private_work_without_hosted_account_administration()
         heddle_api::heddle::api::common::SigningTier::ProofOfPossession,
     );
     for name in [
+        "IdentityService/GetIdentity",
         "IdentityService/ObserveIdentity",
         "IdentityService/IntrospectCredential",
         "SpoolService/ObserveSpool",

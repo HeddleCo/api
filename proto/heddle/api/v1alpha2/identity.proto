@@ -885,3 +885,14 @@ message CurrentCredentialRecord {
   // Revoke the specific device, delegation or session using the corresponding
   // observed version; this metadata never permits an account-wide revocation.
 }
+
+// Bounded unary identity lookup for one-shot callers. The principal is always
+// returned; callers can opt into metadata for the authenticating credential.
+message GetIdentityRequest {
+  bool include_current_credential = 1;
+}
+
+message GetIdentityResponse {
+  PrincipalRecord identity = 1;
+  CurrentCredentialRecord current_credential = 2;
+}

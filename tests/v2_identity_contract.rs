@@ -1,7 +1,78 @@
 #![cfg(feature = "reflection")]
 
-use heddle_api::FILE_DESCRIPTOR_SET;
+use heddle_api::{
+    FILE_DESCRIPTOR_SET, StreamingShape,
+    heddle::api::common::{
+        AuthorizationAccess, AuthorizationExistence, AuthorizationRole, AuthorizationScopeSource,
+        RetryBehavior, RpcEffect, SigningTier, StableSigningIdentity,
+    },
+};
 use prost_reflect::{DescriptorPool, Kind};
+
+#[test]
+fn unary_identity_read_is_bounded_and_matches_observation_authorization() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
+    let request = pool
+        .get_message_by_name("heddle.api.v1alpha2.GetIdentityRequest")
+        .expect("unary identity request");
+    assert_eq!(
+        request
+            .fields()
+            .map(|field| field.name().to_owned())
+            .collect::<Vec<_>>(),
+        ["include_current_credential"]
+    );
+
+    let response = pool
+        .get_message_by_name("heddle.api.v1alpha2.GetIdentityResponse")
+        .expect("unary identity response");
+    assert_eq!(
+        response
+            .fields()
+            .map(|field| (field.name().to_owned(), field.kind()))
+            .collect::<Vec<_>>(),
+        [
+            (
+                "identity".to_owned(),
+                Kind::Message(
+                    pool.get_message_by_name("heddle.api.v1alpha2.PrincipalRecord")
+                        .expect("shared principal record")
+                )
+            ),
+            (
+                "current_credential".to_owned(),
+                Kind::Message(
+                    pool.get_message_by_name("heddle.api.v1alpha2.CurrentCredentialRecord")
+                        .expect("shared credential record")
+                )
+            )
+        ]
+    );
+
+    let method =
+        heddle_api::v2::method_descriptor("/heddle.api.v1alpha2.IdentityService/GetIdentity")
+            .expect("GetIdentity route in generated method catalog");
+    assert_eq!(method.streaming, StreamingShape::Unary);
+    assert!(!method.live_stream);
+    assert_eq!(method.effect, RpcEffect::ReadOnly);
+    assert_eq!(method.retry_behavior, RetryBehavior::Safe);
+    assert_eq!(method.signing_tier, SigningTier::ProofOfPossession);
+    assert_eq!(
+        method.signing_identity,
+        StableSigningIdentity::AuthenticatedPrincipal
+    );
+    assert_eq!(
+        method.authorization_access,
+        AuthorizationAccess::AuthenticatedPrincipal
+    );
+    assert_eq!(method.authorization.role, AuthorizationRole::CallerBound);
+    assert_eq!(
+        method.authorization.scope_source,
+        AuthorizationScopeSource::CallerGrants
+    );
+    assert_eq!(method.authorization.existence, AuthorizationExistence::Hide);
+    assert!(method.authorization.targets.is_empty());
+}
 
 #[test]
 fn passkey_sign_in_carries_browser_options_and_one_device_proof() {

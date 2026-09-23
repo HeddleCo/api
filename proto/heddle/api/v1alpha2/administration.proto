@@ -339,6 +339,11 @@ message ListedSpool {
   google.protobuf.Timestamp last_activity_at = 4;
   optional uint32 thread_count = 5;
   string head_thread = 6;
+  // Retained logical bytes attributed to this Spool by the authoritative
+  // storage ledger, including drained totals and undrained deltas. This is the
+  // exact per-Spool quantity rolled up into the account's 5 GB Free-plan gate;
+  // it is a decimal byte count, not physical/object-store size.
+  uint64 retained_size_bytes = 7;
 }
 message ListSpoolsResponse {
   repeated ListedSpool spools = 1;

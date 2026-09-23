@@ -45,6 +45,13 @@ fn unary_identity_read_is_bounded_and_matches_observation_authorization() {
                     pool.get_message_by_name("heddle.api.v1alpha2.CurrentCredentialRecord")
                         .expect("shared credential record")
                 )
+            ),
+            (
+                "billing_lock".to_owned(),
+                Kind::Message(
+                    pool.get_message_by_name("heddle.api.common.AccountBillingLock")
+                        .expect("shared billing-lock status")
+                )
             )
         ]
     );

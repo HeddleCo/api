@@ -261,6 +261,7 @@ fn hosted_call_framing_and_failure_match_the_cross_product_fixture() {
                 policy_id: fixture.policy_id,
                 rule: fixture.policy_rule,
                 human_verification_can_override: fixture.policy_human_verification_can_override,
+                billing_lock: None,
             })),
         }),
     };

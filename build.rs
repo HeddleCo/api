@@ -73,6 +73,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ".heddle.api.v1alpha2.PresenceEvent.event",
         "#[allow(clippy::large_enum_variant)]",
     );
+    // Billing locks carry two timestamps and an action list. Keep the optional
+    // PolicyDenial extension out of line so adding it does not inflate every
+    // CallFailure and the response-frame enums that contain one.
+    config.boxed(".heddle.api.common.PolicyDenial.billing_lock");
     config
         .file_descriptor_set_path(&descriptor)
         .compile_protos(&protos, &[proto_root])?;

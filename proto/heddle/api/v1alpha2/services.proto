@@ -1767,6 +1767,9 @@ service RunService {
     deployment_targets: [DEPLOYMENT_TARGET_HEDDLE_DAEMON]
     maturity: SERVICE_MATURITY_PLANNED
   };
+  // Observe run summaries and optional timeline events. A LATEST timeline
+  // request snapshots one run's newest N records and follows later positions;
+  // ObserveRunsRequest defines its paging, reset, and resume-cursor contract.
   rpc ObserveRuns(ObserveRunsRequest) returns (stream RunEvent) {
     option (heddle.api.common.rpc_contract) = {
       live_stream: true

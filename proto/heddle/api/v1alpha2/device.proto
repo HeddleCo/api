@@ -135,6 +135,16 @@ message CheckoutMutationResponse {
   CaptureSummary capture = 3;
 }
 
+// Selects where a single run's timeline observation begins. This does not
+// change the default oldest-first collection pagination.
+enum TimelineStart {
+  TIMELINE_START_UNSPECIFIED = 0;
+  // Snapshot the last timeline_limit records of the selected run, then follow
+  // every later position. The initial selection is fixed: new records do not
+  // evict older records from this observation's window.
+  TIMELINE_START_LATEST = 1;
+}
+
 message ObserveRunsRequest {
   SpoolRef spool = 1;
   repeated ThreadRef threads = 2;
@@ -142,6 +152,26 @@ message ObserveRunsRequest {
   bool include_timeline = 4;
   PageRequest page = 5;
   ObserveOptions observe = 6;
+  // LATEST requires include_timeline, exactly one run in runs, FOLLOW (or the
+  // default mode), a positive timeline_limit, and no page request. The initial
+  // snapshot includes the selected RunRecord and policy, when present, plus at
+  // most timeline_limit records, ordered by position from oldest to newest.
+  // Its PageInfo is exhausted with an empty next_page. The endpoint rejects
+  // the request if the full initial snapshot exceeds accepted item/byte budgets.
+  // Default UNSPECIFIED retains oldest-first paging and WindowChanged resets
+  // when a non-exhausted page changes. In LATEST, new positions append after
+  // the fixed initial selection; they MUST NOT trigger WindowChanged merely
+  // because more than timeline_limit records now exist. A genuine loss of
+  // continuity or removal may still reset the stream.
+  TimelineStart timeline_start = 7;
+  // Number of latest timeline records to include in the initial snapshot.
+  // Valid only with timeline_start = TIMELINE_START_LATEST; otherwise zero.
+  uint32 timeline_limit = 8;
+  // ObserveOptions.after_cursor is a stream resume cursor, never a page token.
+  // It is bound to timeline_start, timeline_limit and the run filter. Successful
+  // resume continues after that checkpoint without selecting a new latest N;
+  // if replay is unavailable, reset and begin a replacement latest snapshot.
+  // PageRequest.after_page is invalid in LATEST mode.
 }
 
 message RunEvent {
@@ -244,7 +274,18 @@ message TimelineRecord {
   RevisionRef captured_revision = 6;
   repeated RecordRef artifacts = 7;
   SignedRecord source_operation = 8;
-  // Summary is the authorized projection. Raw artifacts require separate reads.
+  // Device checkpoint time, authoritative for event ordering and display;
+  // stream arrival time is not the event time. Position breaks ties within a run.
+  google.protobuf.Timestamp recorded_at = 9;
+  // Tool name, when this event represents a tool call (for example Bash or Edit).
+  optional string tool_name = 10;
+  // Short, redacted, single-line tool input or message excerpt used in summary.
+  // No file contents or environment values. Truncate command lines and keep
+  // tool input to about 120 characters, messages to about 200 characters.
+  optional string detail = 11;
+  // Kind is the machine-readable event name; summary is human-readable display
+  // text. Both summary and detail are authorized projections. Raw artifacts
+  // require separate reads.
 }
 message RunPolicy {
   SpoolRef spool = 1;

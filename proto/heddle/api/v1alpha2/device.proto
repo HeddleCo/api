@@ -170,7 +170,8 @@ message ObserveRunsRequest {
   // ObserveOptions.after_cursor is a stream resume cursor, never a page token.
   // It is bound to timeline_start, timeline_limit and the run filter. Successful
   // resume continues after that checkpoint without selecting a new latest N;
-  // if replay is unavailable, reset and begin a replacement latest snapshot.
+  // if replay is unavailable, the server sends a terminal reset. The client
+  // reconnects without after_cursor to start a replacement latest snapshot.
   // PageRequest.after_page is invalid in LATEST mode.
 }
 

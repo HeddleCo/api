@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package heddle.api.v1alpha2;
 
+import "google/protobuf/timestamp.proto";
 import "heddle/api/common/repository.proto";
 import "heddle/api/v1alpha2/activity.proto";
 import "heddle/api/v1alpha2/administration.proto";
@@ -306,6 +307,14 @@ message DeviceIdentity {
   // for RevokeDevice. Endpoint/key bytes are locators, never substitutes for it.
   RecordRef ref = 6;
   bytes version = 7;
+  // When Weft last observed an authenticated call from this device, not
+  // machine-reported presence. Absent means unknown. Never present for revoked
+  // devices; populated only in owner-scoped views.
+  google.protobuf.Timestamp last_seen_at = 8;
+  // Whether last_seen_at falls within the server's policy-defined online
+  // window. Absent means unknown, not offline. Never present for revoked
+  // devices; populated only in owner-scoped views.
+  optional bool online = 9;
 }
 
 message ObserveOperationsRequest {

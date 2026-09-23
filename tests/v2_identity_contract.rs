@@ -115,6 +115,16 @@ fn passkey_sign_in_carries_browser_options_and_one_device_proof() {
     let challenge = pool
         .get_message_by_name("heddle.api.v1alpha2.AuthenticationChallenge")
         .expect("challenge");
+    assert!(
+        challenge
+            .get_field_by_name("mint_root_attachment")
+            .is_none()
+    );
+    let grant_field = challenge
+        .get_field_by_name("passkey_mint_grant")
+        .expect("account-free grant");
+    assert_eq!(grant_field.number(), 10);
+    assert!(challenge.get_field_by_name("passkey_authorities").is_some());
     assert!(matches!(
         challenge
             .get_field_by_name("user_verification")
@@ -122,6 +132,52 @@ fn passkey_sign_in_carries_browser_options_and_one_device_proof() {
             .kind(),
         Kind::Enum(_)
     ));
+
+    let grant = pool
+        .get_message_by_name("heddle.api.v1alpha2.PasskeyMintGrant")
+        .expect("passkey mint grant");
+    assert_eq!(
+        grant
+            .fields()
+            .map(|field| (field.name().to_owned(), field.number()))
+            .collect::<Vec<_>>(),
+        [
+            ("format_version".into(), 1),
+            ("mint_root_key".into(), 2),
+            ("not_before_unix_seconds".into(), 3),
+            ("expires_at_unix_seconds".into(), 4),
+            ("nonce".into(), 5),
+            ("relying_party_id".into(), 6),
+        ]
+    );
+    let signed = pool
+        .get_message_by_name("heddle.api.v1alpha2.SignedMintRootAttachment")
+        .expect("v2 signed mint root attachment");
+    assert_eq!(
+        signed
+            .fields()
+            .map(|field| (field.name().to_owned(), field.number()))
+            .collect::<Vec<_>>(),
+        [("grant".into(), 1), ("passkey_delegation".into(), 2)]
+    );
+    assert!(complete.get_field_by_name("mint_root_attachment").is_none());
+    let response = pool
+        .get_message_by_name("heddle.api.v1alpha2.AuthenticationResponse")
+        .expect("authentication response");
+    assert_eq!(
+        response
+            .get_field_by_name("passkey_authority")
+            .expect("resolved owner-signed authority")
+            .number(),
+        6
+    );
+    assert_eq!(
+        response
+            .get_field_by_name("mint_root_attachment")
+            .expect("server-assembled v2 attachment")
+            .number(),
+        7
+    );
 }
 
 #[test]

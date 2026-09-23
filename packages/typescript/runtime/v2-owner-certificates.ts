@@ -1,12 +1,16 @@
 import { clone, create } from "@bufbuild/protobuf";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { AuthorizationKeyAlgorithm, MintRootAttachmentSchema, SignedMintRootAttachmentSchema,
+import { CredentialMethod, type AuthenticationChallenge } from "./identity_pb.js";
+import { AuthorizationKeyAlgorithm, MintRootAttachmentSchema, SignedOwnerMintRootAttachmentSchema,
   PasskeyAuthoritySchema, SignedPasskeyAuthoritySchema,
-  type AuthorizationVerificationKey, type MintRootAttachment, type SignedMintRootAttachment,
-  type PasskeyAuthority, type SignedPasskeyAuthority, type PasskeyMintDelegation } from "./owner_records_pb.js";
+  type AuthorizationVerificationKey, type MintRootAttachment, type SignedOwnerMintRootAttachment,
+  type PasskeyAuthority, type SignedPasskeyAuthority, type PasskeyMintDelegation,
+  type PasskeyMintGrant, type SignedMintRootAttachment } from "./owner_records_pb.js";
 
 const utf8 = new TextEncoder();
-const DOMAIN = utf8.encode("heddle-mint-root-attachment-v1");
+const MINT_ROOT_ATTACHMENT_DOMAIN = utf8.encode("heddle-mint-root-attachment-v1");
+export const PASSKEY_MINT_GRANT_DOMAIN = "heddle-passkey-mint-grant-v1";
+export const MAX_PASSKEY_SESSION_TTL_SECONDS = 43200;
 function bytes(value: Uint8Array, length: number, name: string) {
   if (value.length !== length) throw new Error(`Invalid ${name} length`);
 }
@@ -35,7 +39,7 @@ export function canonicalMintRootAttachment(value: MintRootAttachment): Uint8Arr
   return join(u32(value.formatVersion), sized(value.accountUuid), sized(value.ownerStateHash), integer(value.ownerSequence, false),
     encodedKey(value.ownerKey), encodedKey(value.mintRootKey), integer(value.notBeforeUnixSeconds, true), integer(value.expiresAtUnixSeconds, true), sized(value.nonce));
 }
-export function mintRootAttachmentSigningDigest(value: MintRootAttachment): Uint8Array { return sha256(join(DOMAIN, canonicalMintRootAttachment(value))); }
+export function mintRootAttachmentSigningDigest(value: MintRootAttachment): Uint8Array { return sha256(join(MINT_ROOT_ATTACHMENT_DOMAIN, canonicalMintRootAttachment(value))); }
 export interface OwnerCertificateSigner {
   publicKey: Uint8Array;
   /** Ed25519 signature over the supplied SHA-256 digest, using the owner key. */
@@ -43,11 +47,11 @@ export interface OwnerCertificateSigner {
 }
 /** The caller supplies independently verified current owner state. This
  * association confers no action permissions and is never a Biscuit substitute. */
-export interface MintRootAttachmentExpectation {
+export interface OwnerMintRootAttachmentExpectation {
   accountUuid: Uint8Array; ownerStateHash: Uint8Array; ownerSequence: bigint;
   ownerPublicKey: Uint8Array; mintRootPublicKey: Uint8Array; nowUnixSeconds: bigint;
 }
-export async function verifyMintRootAttachment(signed: SignedMintRootAttachment, expected: MintRootAttachmentExpectation): Promise<void> {
+export async function verifyOwnerMintRootAttachment(signed: SignedOwnerMintRootAttachment, expected: OwnerMintRootAttachmentExpectation): Promise<void> {
   const value = signed.attachment;
   if (!value) throw new Error("Missing mint-root certificate");
   const digest = mintRootAttachmentSigningDigest(value);
@@ -55,24 +59,19 @@ export async function verifyMintRootAttachment(signed: SignedMintRootAttachment,
     || value.ownerSequence !== expected.ownerSequence || !equal(key(value.ownerKey).publicKey, expected.ownerPublicKey)
     || !equal(key(value.mintRootKey).publicKey, expected.mintRootPublicKey)) throw new Error("Certificate differs from independently verified current owner or mint root");
   if (expected.nowUnixSeconds < value.notBeforeUnixSeconds || expected.nowUnixSeconds >= value.expiresAtUnixSeconds) throw new Error("Certificate is not currently valid");
-  if (signed.passkeyDelegation) {
-    if (signed.ownerSignature) throw new Error("Certificate has ambiguous owner proofs");
-    await verifyPasskeyMintDelegation(signed.passkeyDelegation, value, expected);
-    return;
-  }
   const signature = signed.ownerSignature;
   if (!signature || !equal(signature.signerKeyId, keyId(key(value.ownerKey)))) throw new Error("Certificate owner signer identity differs");
   bytes(signature.signature, 64, "owner signature");
   const publicKey = await crypto.subtle.importKey("raw", expected.ownerPublicKey as BufferSource, "Ed25519", false, ["verify"]);
   if (!await crypto.subtle.verify("Ed25519", publicKey, signature.signature as BufferSource, digest as BufferSource)) throw new Error("Invalid certificate owner signature");
 }
-export async function signMintRootAttachment(value: MintRootAttachment, signer: OwnerCertificateSigner): Promise<SignedMintRootAttachment> {
+export async function signOwnerMintRootAttachment(value: MintRootAttachment, signer: OwnerCertificateSigner): Promise<SignedOwnerMintRootAttachment> {
   const snapshot = clone(MintRootAttachmentSchema, value);
   const owner = key(snapshot.ownerKey);
   if (!equal(owner.publicKey, signer.publicKey)) throw new Error("Certificate signer is not the owner authority");
   const digest = mintRootAttachmentSigningDigest(snapshot);
-  const signed = create(SignedMintRootAttachmentSchema, { attachment: snapshot, ownerSignature: { signerKeyId: keyId(owner), signature: await signer.sign(digest) } });
-  await verifyMintRootAttachment(signed, { accountUuid: snapshot.accountUuid, ownerStateHash: snapshot.ownerStateHash,
+  const signed = create(SignedOwnerMintRootAttachmentSchema, { attachment: snapshot, ownerSignature: { signerKeyId: keyId(owner), signature: await signer.sign(digest) } });
+  await verifyOwnerMintRootAttachment(signed, { accountUuid: snapshot.accountUuid, ownerStateHash: snapshot.ownerStateHash,
     ownerSequence: snapshot.ownerSequence, ownerPublicKey: owner.publicKey, mintRootPublicKey: key(snapshot.mintRootKey).publicKey, nowUnixSeconds: snapshot.notBeforeUnixSeconds });
   return signed;
 }
@@ -99,7 +98,7 @@ export function canonicalPasskeyAuthority(value: PasskeyAuthority): Uint8Array {
 export function passkeyAuthoritySigningDigest(value: PasskeyAuthority): Uint8Array {
   return sha256(join(PASSKEY_DOMAIN, canonicalPasskeyAuthority(value)));
 }
-type PasskeyOwnerExpectation = Pick<MintRootAttachmentExpectation, "accountUuid" | "ownerStateHash" | "ownerSequence" | "ownerPublicKey">;
+type PasskeyOwnerExpectation = Pick<OwnerMintRootAttachmentExpectation, "accountUuid" | "ownerStateHash" | "ownerSequence" | "ownerPublicKey">;
 
 async function importPasskey(value: PasskeyAuthority): Promise<CryptoKey> {
   const algorithm = value.coseAlgorithm === -8 ? "Ed25519" : { name: "ECDSA", namedCurve: "P-256" };
@@ -132,6 +131,69 @@ export async function signPasskeyAuthority(value: PasskeyAuthority, signer: Owne
   return signed;
 }
 
+/** Canonical account-free passkey grant, in protobuf tag order. */
+export function canonicalPasskeyMintGrant(value: PasskeyMintGrant): Uint8Array {
+  bytes(value.nonce, 32, "passkey mint grant nonce");
+  const rp = utf8.encode(value.relyingPartyId);
+  if (value.formatVersion !== 1 || value.notBeforeUnixSeconds < 0n
+    || value.expiresAtUnixSeconds <= value.notBeforeUnixSeconds
+    || rp.length === 0 || rp.length > 253 || !/^[A-Za-z0-9.-]+$/.test(value.relyingPartyId)) {
+    throw new Error("Invalid passkey mint grant fields or bounds");
+  }
+  return join(u32(value.formatVersion), encodedKey(value.mintRootKey),
+    integer(value.notBeforeUnixSeconds, true), integer(value.expiresAtUnixSeconds, true),
+    sized(value.nonce), sized(rp));
+}
+
+/** WebAuthn challenge digest for a PasskeyMintGrant. */
+export function passkeyMintGrantSigningDigest(value: PasskeyMintGrant): Uint8Array {
+  return sha256(join(utf8.encode(PASSKEY_MINT_GRANT_DOMAIN), canonicalPasskeyMintGrant(value)));
+}
+
+/** Require the separate passkey ceremony challenge to bind the exact grant. */
+export function verifyPasskeyAuthenticationChallenge(value: AuthenticationChallenge): void {
+  if (value.method !== CredentialMethod.PASSKEY) return;
+  if (!value.passkeyMintGrant) throw new Error("Passkey authentication challenge is missing its grant");
+  const digest = passkeyMintGrantSigningDigest(value.passkeyMintGrant);
+  bytes(value.challenge, 32, "passkey authentication challenge");
+  if (!equal(value.challenge, digest)) throw new Error("Passkey authentication challenge does not bind its grant");
+}
+
+/** Enforce the owner-certified ceiling and exact [not_before, expires) window. */
+export function verifyPasskeyMintGrantWindow(
+  value: PasskeyMintGrant,
+  maxSessionTtlSeconds: number,
+  nowUnixSeconds: bigint,
+): void {
+  canonicalPasskeyMintGrant(value);
+  if (!Number.isInteger(maxSessionTtlSeconds) || maxSessionTtlSeconds <= 0
+    || maxSessionTtlSeconds > MAX_PASSKEY_SESSION_TTL_SECONDS) {
+    throw new Error("Passkey authority max_session_ttl_seconds must be in 1..=43200");
+  }
+  const duration = value.expiresAtUnixSeconds - value.notBeforeUnixSeconds;
+  if (duration > BigInt(maxSessionTtlSeconds)) throw new Error("Passkey mint grant lifetime exceeds the authority ceiling");
+  if (nowUnixSeconds < value.notBeforeUnixSeconds || nowUnixSeconds >= value.expiresAtUnixSeconds) {
+    throw new Error("Passkey mint grant is not currently valid");
+  }
+}
+
+export interface PasskeyMintGrantExpectation extends PasskeyOwnerExpectation {
+  mintRootPublicKey: Uint8Array;
+  relyingPartyId: string;
+  nowUnixSeconds: bigint;
+}
+
+/** Verify the portable owner -> passkey -> temporary mint-key chain. */
+export async function verifyMintRootAttachment(signed: SignedMintRootAttachment, expected: PasskeyMintGrantExpectation): Promise<void> {
+  const grant = signed.grant;
+  const proof = signed.passkeyDelegation;
+  if (!grant || !proof) throw new Error("Missing passkey mint grant or delegation");
+  canonicalPasskeyMintGrant(grant);
+  if (!equal(key(grant.mintRootKey).publicKey, expected.mintRootPublicKey)) throw new Error("Grant mint root differs from the independently verified key");
+  if (grant.relyingPartyId !== expected.relyingPartyId) throw new Error("Grant relying-party ID differs from the expected relying party");
+  await verifyPasskeyMintDelegation(proof, grant, expected);
+}
+
 // WebAuthn ES256 uses DER integers; WebCrypto verification requires fixed-width r||s.
 function es256RawSignature(der: Uint8Array): Uint8Array {
   if (der.length < 8 || der.length > 72 || der[0] !== 0x30 || der[1] !== der.length - 2) throw new Error("Invalid ES256 DER sequence");
@@ -156,18 +218,18 @@ function es256RawSignature(der: Uint8Array): Uint8Array {
 function base64url(value: Uint8Array): string {
   return btoa(String.fromCharCode(...value)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
-async function verifyPasskeyMintDelegation(proof: PasskeyMintDelegation, attachment: MintRootAttachment, expected: MintRootAttachmentExpectation): Promise<void> {
+async function verifyPasskeyMintDelegation(proof: PasskeyMintDelegation, grant: PasskeyMintGrant, expected: PasskeyMintGrantExpectation): Promise<void> {
   if (!proof.authority?.authority) throw new Error("Missing passkey certificate");
   await verifyPasskeyAuthority(proof.authority, expected);
   const authority = proof.authority.authority;
-  const duration = attachment.expiresAtUnixSeconds - attachment.notBeforeUnixSeconds;
-  if (duration <= 0n || duration > BigInt(authority.maxSessionTtlSeconds)
+  verifyPasskeyMintGrantWindow(grant, authority.maxSessionTtlSeconds, expected.nowUnixSeconds);
+  if (grant.relyingPartyId !== authority.relyingPartyId
     || proof.clientDataJson.length > 8192 || proof.authenticatorData.length < 37 || proof.authenticatorData.length > 4096
     || proof.signature.length === 0 || proof.signature.length > 80) throw new Error("Passkey delegation exceeds bounds");
   const client: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(proof.clientDataJson));
   if (!client || typeof client !== "object") throw new Error("Invalid passkey client data");
   const data = client as Record<string, unknown>;
-  if (data.type !== "webauthn.get" || data.challenge !== base64url(mintRootAttachmentSigningDigest(attachment))
+  if (data.type !== "webauthn.get" || data.challenge !== base64url(passkeyMintGrantSigningDigest(grant))
     || typeof data.origin !== "string" || !authority.allowedOrigins.includes(data.origin)
     || (data.crossOrigin !== undefined && data.crossOrigin !== false) || data.topOrigin !== undefined) throw new Error("Passkey assertion challenge or origin mismatch");
   const flags = proof.authenticatorData[32]!;

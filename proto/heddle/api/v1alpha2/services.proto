@@ -536,6 +536,24 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  rpc GetIdentity(GetIdentityRequest) returns (GetIdentityResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [
+        DEPLOYMENT_TARGET_WEFT,
+        DEPLOYMENT_TARGET_HEDDLE_DAEMON
+      ]
+      live_stream: false
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   rpc BeginAuthentication(BeginAuthenticationRequest) returns (AuthenticationChallenge) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_NONE

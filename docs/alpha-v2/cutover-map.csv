@@ -72,7 +72,7 @@ IdentityService.SubmitRecoveryProof,IdentityService.SubmitRecoveryProof,native_c
 IdentityService.VerifySignupEmail,IdentityService.CompleteEmailVerification,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
 IdentityService.VetoRecovery,IdentityService.VetoRecovery,native_contract,"Do not collapse distinct signup, recovery, credential, session, handle or invitation semantics merely to reduce method count."
 IdentityService.WaitForDeviceAuthorization,IdentityService.ObservePairing,native_contract,User-root attachment and possession proof must survive without Weft; hosted rendezvous is optional assistance.
-IdentityService.WhoAmI,IdentityService.ObserveIdentity,native_contract,Include identity and effective actions in bootstrap views without forcing repeat calls per page.
+IdentityService.WhoAmI,IdentityService.GetIdentity,native_contract,Use the bounded unary identity read for one-shot callers; retain ObserveIdentity for live account views.
 NotificationService.ListNotifications,NotificationService.ObserveNotifications,native_contract,Reuse snapshot/update/cursor conventions while retaining notification delivery semantics.
 NotificationService.SubscribeNotifications,NotificationService.ObserveNotifications,native_contract,Reuse snapshot/update/cursor conventions while retaining notification delivery semantics.
 NotificationService.MarkNotificationRead,NotificationService.MarkNotificationsRead,native_contract,"Do not conflate notification read state, subscription preferences and attention resolution."

@@ -68,8 +68,24 @@ fn public_catalog_has_no_account_or_private_collections() {
             .fields()
             .map(|field| field.name().to_owned())
             .collect::<Vec<_>>(),
-        ["query", "spools", "observe"]
+        ["query", "spools", "observe", "sort"]
     );
+    let spool = pool
+        .get_message_by_name("heddle.api.v1alpha2.SpoolOverview")
+        .expect("spool overview");
+    for (name, number) in [
+        ("public_owner", 16),
+        ("last_activity_at", 17),
+        ("catalog_activity", 18),
+    ] {
+        assert_eq!(
+            spool
+                .get_field_by_name(name)
+                .expect("catalog field")
+                .number(),
+            number
+        );
+    }
 }
 
 #[test]

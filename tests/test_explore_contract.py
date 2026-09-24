@@ -21,11 +21,34 @@ class ExploreContractTest(unittest.TestCase):
         self.assertRegex(request, r"\bstring\s+query\s*=\s*1\s*;")
         self.assertRegex(request, r"\bPageRequest\s+spools\s*=\s*2\s*;")
         self.assertRegex(request, r"\bObserveOptions\s+observe\s*=\s*3\s*;")
+        self.assertRegex(request, r"\bCatalogSort\s+sort\s*=\s*4\s*;")
+
+        sort = body(VIEWS, "enum", "CatalogSort")
+        for value, number in (
+            ("CATALOG_SORT_UNSPECIFIED", 0),
+            ("CATALOG_SORT_NAME", 1),
+            ("CATALOG_SORT_PATH", 2),
+            ("CATALOG_SORT_RECENT_ACTIVITY", 3),
+        ):
+            self.assertRegex(sort, rf"\b{value}\s*=\s*{number}\s*;")
 
         spool = body(VIEWS, "message", "SpoolOverview")
         for field in ("ref", "name", "audience", "settings", "slug", "path_segments"):
             self.assertRegex(spool, rf"\b{field}\s*=")
+        for field, number in (
+            ("public_owner", 16),
+            ("last_activity_at", 17),
+            ("catalog_activity", 18),
+        ):
+            self.assertRegex(spool, rf"\b{field}\s*=\s*{number}\s*;")
         self.assertNotRegex(spool, r"\b(?:recency|score|lane)\s*=")
+
+        owner = body(VIEWS, "message", "PublicOwner")
+        self.assertRegex(owner, r"\bhandle\s*=\s*1\s*;")
+        self.assertRegex(owner, r"\bdisplay_name\s*=\s*2\s*;")
+        activity = body(VIEWS, "message", "CatalogActivitySummary")
+        self.assertRegex(activity, r"\bopen_thread_count\s*=\s*1\s*;")
+        self.assertRegex(activity, r"\blanded_30d\s*=\s*2\s*;")
 
         event = body(VIEWS, "message", "CatalogEvent")
         self.assertRegex(event, r"\bSpoolOverview\s+spool\s*=\s*2\s*;")

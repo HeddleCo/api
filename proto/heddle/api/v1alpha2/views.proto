@@ -114,6 +114,33 @@ message SpoolOverview {
   // equals the OwnerState.version pinned via verify_current_owner.
   bytes signed_policy_owner_state_hash = 14;
   uint64 signed_policy_ownership_transfer_sequence = 15;
+  // Public catalog label only. Present only when this row is publicly visible;
+  // contains already-public identity, never owner_genesis or a private account.
+  PublicOwner public_owner = 16;
+  // Most recent public activity on this Spool. Absent when none is known.
+  // Private or member-only activity MUST NOT affect this timestamp.
+  google.protobuf.Timestamp last_activity_at = 17;
+  // Catalog counts only. Absent when unavailable; see CatalogActivitySummary.
+  CatalogActivitySummary catalog_activity = 18;
+}
+
+// A display label for a publicly visible catalog row. Neither field grants
+// access or supplies an owner verification key.
+message PublicOwner {
+  // Already-public canonical owner handle, without an address separator.
+  string handle = 1;
+  // Already-public owner display name; may be empty.
+  string display_name = 2;
+}
+
+// Counts of public activity on one catalog Spool. A server deriving these from
+// rollups may serve eventually consistent values; they are display hints, not
+// authorization or a transactional snapshot of underlying Threads/changes.
+message CatalogActivitySummary {
+  // Public Threads currently open on this Spool.
+  uint64 open_thread_count = 1;
+  // Public changes landed during the trailing 30 days at observation time.
+  uint64 landed_30d = 2;
 }
 
 // Committed overview and independently verifiable owner history seed the
@@ -344,11 +371,31 @@ message CancelOperationRequest {
 
 // Public resource discovery never includes private grants, devices or account
 // attention. Exact public content still uses the ordinary resource read APIs.
+enum CatalogSort {
+  // Legacy order: ascending slug, then Spool UUID ascending. Old callers
+  // retain their existing order; select PATH for the full canonical address.
+  CATALOG_SORT_UNSPECIFIED = 0;
+  // Ascending case-normalized public name, then Spool UUID ascending.
+  CATALOG_SORT_NAME = 1;
+  // Ascending case-normalized full canonical path, then Spool UUID ascending.
+  CATALOG_SORT_PATH = 2;
+  // Descending last_activity_at (unknown last), then Spool UUID ascending.
+  CATALOG_SORT_RECENT_ACTIVITY = 3;
+}
+
 message ObserveCatalogRequest {
   // Bounded text search over public spool names, slugs and descriptions.
   string query = 1;
+  // PageInfo.next_page is an opaque token bound to query, sort, caller and
+  // catalog generation. It contains the last row's sort key and Spool UUID;
+  // servers compare that pair strictly after the row using the order above.
+  // For RECENT_ACTIVITY, a null timestamp follows all known timestamps and
+  // UUID breaks ties, including among nulls. A changed sort key or visibility
+  // must advance the generation; stale tokens are rejected for a fresh page.
   PageRequest spools = 2;
   ObserveOptions observe = 3;
+  // Unknown values are invalid. UNSPECIFIED retains the legacy slug order.
+  CatalogSort sort = 4;
 }
 message CatalogEvent {
   StreamFrame frame = 1;

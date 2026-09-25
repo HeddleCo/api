@@ -43,6 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "OperationEvent.payload",
         "AnalysisEvent.payload",
         "CompleteRegistrationRequest.owner",
+        "CompleteAuthenticationRequest.proof",
         "ThreadControlAuthority.mint_root_association",
         "SpoolCreationProof.mint_root_association",
         "OwnershipEvent.payload",

@@ -143,8 +143,8 @@ message InvitationQuota {
   uint32 remaining = 2;
 }
 // Explicit ceremony selection; omitted or unsupported methods are rejected.
-// Password and OAuth authenticate a server-rooted account. They never confer
-// independent mint authority or downgrade an existing self-rooted account.
+// Password unlocks a client-held owner key; OAuth retains its own ceremony.
+// Neither a password verifier signature nor an OAuth proof is owner authority.
 enum CredentialMethod {
   CREDENTIAL_METHOD_UNSPECIFIED = 0;
   CREDENTIAL_METHOD_PASSKEY = 1;
@@ -158,11 +158,193 @@ enum OAuthProvider {
   O_AUTH_PROVIDER_GITHUB = 3;
   O_AUTH_PROVIDER_GITLAB = 4;
 }
-message PasswordProof {
-  // UTF-8 password bytes: at least 15 characters, at most 1024 bytes on signup.
-  // Secret material:
-  // never retained in observations, receipts, logs or challenge metadata.
-  bytes password_utf8 = 1;
+// Encrypted 32-byte Ed25519 owner seed. The server stores and returns these
+// opaque bytes, never a password, KEK, auth seed, or decrypted owner seed.
+// Reject unknown versions/KDFs before use. Discard unknown protobuf fields and
+// persist only the canonical re-encoding of known fields (<= 4096 bytes).
+// AES-GCM AAD is ASCII("heddle-owner-wrap-aad-v1") || 0x00 || u32be(version)
+// || account_uuid || owner_public_key || owner_id || u32be(kdf_id)
+// || u32be(memory_kib) || u32be(iterations) || u32be(parallelism) || wrap_salt.
+message PasswordOwnerEnvelopeV1 {
+  uint32 format_version = 1; // Exactly 1; reject any other value.
+  bytes account_uuid = 2; // Exactly 16 bytes, non-nil.
+  bytes owner_public_key = 3; // Exactly 32 bytes; canonical, decompressible, non-small-order Ed25519 key.
+  bytes owner_id = 4; // Exactly 32 bytes; digest of the accepted root.
+  uint32 kdf_id = 5; // Exactly 1 = Argon2id; reject unknown KDFs.
+  uint32 memory_kib = 6; // Exactly 65536 in v1; reject other costs.
+  uint32 iterations = 7; // Exactly 3 in v1.
+  uint32 parallelism = 8; // Exactly 4 in v1.
+  bytes wrap_salt = 9; // Exactly 16 independent random bytes.
+  bytes nonce = 10; // Exactly 12 fresh random AES-256-GCM bytes.
+  bytes ciphertext_and_tag = 11; // Exactly 48 bytes (32-byte seed + 16-byte tag).
+}
+
+// Public authentication metadata, stored separately from the encrypted seed.
+// Client input is UTF8(NFC(password)), preserving case and all spaces. Client
+// guidance is 15+ Unicode characters and at most 1024 UTF-8 bytes; the server
+// cannot enforce strength without seeing the password. The independent inputs
+// are UTF8("heddle-password-auth-v1") || 0x00 || UTF8(NFC(password)) with
+// auth_salt, and UTF8("heddle-owner-wrap-v1") || 0x00 || UTF8(NFC(password))
+// with wrap_salt. Both use the recorded Argon2id costs and 32-byte output.
+// Only the Ed25519 public key derived from auth_seed crosses the network.
+// Discard unknown fields, including nested envelope fields, and persist only
+// the canonical re-encoding of known fields (<= 4608 bytes).
+// The verifier and owner keys MUST be canonical, decompressible, and non-small-order.
+// Ed25519 signatures use strict verification: canonical R and S, non-small-order
+// points, and the standard group equation. Rust uses verify_strict; WebCrypto
+// callers MUST precheck these conditions before its verify operation.
+message PasswordOwnerSetup {
+  PasswordOwnerEnvelopeV1 envelope = 1; // Required; <= 4096 encoded bytes.
+  bytes auth_salt = 2; // Exactly 16 bytes, different from wrap_salt.
+  bytes auth_verifier_public_key = 3; // Exactly 32-byte Ed25519 public key, never an auth seed.
+  uint32 auth_memory_kib = 4; // Exactly 65536 in v1.
+  uint32 auth_iterations = 5; // Exactly 3 in v1.
+  uint32 auth_parallelism = 6; // Exactly 4 in v1.
+  uint32 auth_kdf_id = 7; // Exactly 1 = Argon2id in v1.
+  uint32 format_version = 8; // Exactly 1 in v1.
+  // Future cost policies use a monotone floor, never below the pinned v1
+  // minimum. Existing envelopes remain readable at their recorded costs.
+  // At signup, Ed25519 signs SHA-256("heddle-password-verifier-possession-v1"
+  // || RegistrationChallenge.challenge[32]); on PUT it signs the setup-
+  // authorization digest. The server verifies this
+  // with auth_verifier_public_key before persisting; the signature is excluded
+  // from setup_sha256 to avoid a circular transcript.
+  bytes auth_verifier_possession_signature = 9; // Exactly 64 bytes.
+}
+
+// Only returned for PASSWORD. Every handle without an active password setup
+// (unknown, passkey-only, deleted, or disabled) gets indistinguishable public
+// metadata: salt derived deterministically from a server secret and the
+// canonical handle, with the same costs, KDF/version, and response shape. Challenge
+// IDs/nonces remain fresh. The server binds the account internally, never via
+// a handle-to-UUID value at begin. Creation is throttled; expiry <= 10 minutes.
+message PasswordChallengeMetadata {
+  reserved 1, 6;
+  reserved "account_uuid", "envelope_revision";
+  bytes auth_salt = 2; // Exactly 16 bytes.
+  uint32 auth_memory_kib = 3; // Exactly 65536 in v1.
+  uint32 auth_iterations = 4; // Exactly 3 in v1.
+  uint32 auth_parallelism = 5; // Exactly 4 in v1.
+  bytes challenge_id = 7; // Exactly 32 random bytes, one-use.
+  bytes nonce = 8; // Exactly 32 random bytes, one-use.
+  uint32 auth_kdf_id = 9; // Exactly 1 = Argon2id in v1.
+  uint32 format_version = 10; // Exactly 1 in v1.
+}
+
+// Proof of the public password verifier only. This message is never accepted
+// by CompleteAuthentication, an owner mutation, or a credential issuer.
+// Ed25519 signs SHA-256("heddle-password-proof-v1" || canonical transcript):
+// challenge_id[32] || nonce[32] || caller_device_public_key[32]
+// || u32be(operation_id UTF-8 byte length)
+// || operation_id UTF-8 || i64be(expiry Unix seconds). No protobuf is signed.
+// The server's one-use challenge record binds the current envelope revision;
+// it is returned only with the continuation after successful proof.
+message PasswordChallengeProof {
+  reserved 3;
+  reserved "envelope_revision";
+  bytes challenge_id = 1; // Exactly 32 bytes.
+  bytes signature = 2; // Exactly 64 Ed25519 bytes.
+  bytes caller_device_public_key = 4; // Exactly 32 bytes; equals begin key.
+}
+
+message ProvePasswordUnlockRequest {
+  string client_operation_id = 1; // 1..128 UTF-8 bytes, bound into proof.
+  PasswordChallengeProof proof = 2; // Required; no owner authority.
+  // CallContext.request_proof MUST be signed by proof.caller_device_public_key,
+  // which equals the begin key. Every failed attempt consumes this challenge.
+  // Reusing client_operation_id with a different proof is a conflict.
+  // Apply shared, atomic per-account and per-IP/prefix limits before verification:
+  // <=5 failed proofs/completions per account and <=20 per IP/prefix per 15 min;
+  // 15-minute account cooldown, progressively extended to at most one hour.
+  // Unknown account, bad proof, locked account, and wrong revision all return
+  // CALL_FAILURE_CODE_UNAUTHENTICATED without account-specific details.
+}
+
+// One-use delivery receipt, never a session, bearer, owner authorization or
+// Biscuit. The continuation is bound to the challenge, revision, account and
+// caller device, expires with the challenge, and is consumed at completion.
+message PasswordUnlockContinuation {
+  PasswordOwnerEnvelopeV1 envelope = 1; // Required; <= 4096 bytes.
+  bytes continuation_id = 2; // Exactly 32 unpredictable bytes.
+  OwnerState current_owner_state = 3; // Public; client verifies active root.
+  uint64 envelope_revision = 4; // Nonzero; server-bound challenge revision.
+  google.protobuf.Timestamp expires_at = 5; // Within 2 minutes and at most challenge expiry.
+}
+
+// The owner signs this exact admission, independently of the password proof.
+// Ed25519 signs SHA-256("heddle-password-device-admission-v1" ||
+// u32be(format_version) || account_uuid[16] || challenge_id[32] ||
+// continuation_id[32] || caller_device_public_key[32] ||
+// owner_state_hash[32] || u64be(owner_sequence) ||
+// u32be(client_operation_id UTF-8 byte length) || client_operation_id UTF-8).
+message PasswordDeviceAdmission {
+  uint32 format_version = 1; // Exactly 1; reject unknown versions.
+  bytes account_uuid = 2; // Exactly 16 bytes, non-nil.
+  bytes challenge_id = 3; // Exactly 32 bytes.
+  bytes continuation_id = 4; // Exactly 32 bytes.
+  bytes caller_device_public_key = 5; // Exactly 32 bytes.
+  bytes owner_state_hash = 6; // Exactly 32 bytes; current accepted state.
+  uint64 owner_sequence = 7; // Current accepted sequence.
+  string client_operation_id = 8; // 1..128 UTF-8 bytes; equals completion.
+}
+message SignedPasswordDeviceAdmission {
+  PasswordDeviceAdmission admission = 1;
+  AuthorizationSignature owner_signature = 2; // 32-byte key ID, 64-byte signature.
+}
+message PasswordUnlockCompletion {
+  bytes continuation_id = 1; // Exactly 32 bytes; consumed atomically.
+  SignedPasswordDeviceAdmission owner_admission = 2; // Required, current root.
+  SignedOwnerMintRootAttachment mint_root_attachment = 3; // Required, same device key.
+  // Completion's challenge RecordRef MUST equal the continuation's PASSWORD
+  // challenge. Completion caller_public_key MUST equal the admission and
+  // continuation device keys. The attachment's account_uuid, owner_state_hash,
+  // and owner_sequence MUST equal the admission; its mint root key MUST equal
+  // the device key. Its nonce MUST equal SHA-256(
+  // "heddle-password-mint-nonce-v1" || challenge nonce[32] || continuation ID[32]);
+  // its expiry MUST be <= challenge.credential_expires_at. Mismatches fail with
+  // CALL_FAILURE_CODE_UNAUTHENTICATED, as do unknown accounts and expired or
+  // wrong-revision continuations.
+}
+
+// Owner authorization for changing the password envelope. The owner signs
+// SHA-256("heddle-password-owner-setup-change-v1" || u32be(format_version)
+// || u32be(action) || account_uuid[16] || owner_state_hash[32]
+// || u64be(expected_revision) || setup_sha256[32]
+// || u32be(client_operation_id UTF-8 byte length) || client_operation_id
+// || i64be(expires_at Unix seconds)). expires_at has zero nanos and is future,
+// with a bounded lifetime of at most 10 minutes from issuance.
+// setup_sha256 is SHA-256 of the fixed-order v1 setup fields (the envelope's
+// fields in tag order, followed by auth_salt, verifier key, auth costs,
+// auth_kdf_id and format_version; the possession signature is excluded),
+// with byte fields raw and integers big-endian. DELETE uses 32 zero bytes.
+// The current active account UUID, owner public key and owner ID MUST equal
+// the setup envelope fields. Both actions CAS the account-lifetime revision.
+// A successful PUT or DELETE atomically increments it and invalidates every
+// outstanding password challenge and continuation. DELETE retains a tombstone
+// revision; re-setup CASes against that value. Revision 0 is allowed only when
+// no password setup has ever existed for this account; no revision is reused.
+message PasswordOwnerSetupAuthorization {
+  uint32 format_version = 1; // Exactly 1; reject unknown versions.
+  uint32 action = 2; // Exactly 1=PUT or 2=DELETE.
+  bytes account_uuid = 3; // Exactly 16 bytes, non-nil.
+  bytes owner_state_hash = 4; // Exactly 32 bytes, current accepted state.
+  uint64 expected_revision = 5; // 0 only if no setup ever existed; CAS thereafter.
+  bytes setup_sha256 = 6; // Exactly 32 bytes; zero for DELETE.
+  string client_operation_id = 7; // 1..128 UTF-8 bytes.
+  google.protobuf.Timestamp expires_at = 8; // Required; covered by signature.
+}
+message SignedPasswordOwnerSetupAuthorization {
+  PasswordOwnerSetupAuthorization authorization = 1;
+  AuthorizationSignature owner_signature = 2; // Current active owner key.
+}
+message PutPasswordOwnerSetupRequest {
+  string client_operation_id = 1; // Equals signed authorization.
+  PasswordOwnerSetup setup = 2; // Required; new salts and nonce.
+  SignedPasswordOwnerSetupAuthorization owner_authorization = 3; // Required.
+}
+message DeletePasswordOwnerSetupRequest {
+  string client_operation_id = 1; // Equals signed authorization.
+  SignedPasswordOwnerSetupAuthorization owner_authorization = 2; // Required.
 }
 message OAuthProof {
   // Provider comes from the original challenge. OIDC tokens bind its nonce;
@@ -173,10 +355,13 @@ message OAuthProof {
   }
 }
 message AuthenticationChallenge {
+  // For PASSWORD, ref.spool MUST be empty and ref.id MUST be an opaque,
+  // randomly generated identifier independent of the account.
   RecordRef ref = 1;
   // For CREDENTIAL_METHOD_PASSKEY this MUST be exactly the 32-byte
-  // passkey_mint_grant_signing_digest(passkey_mint_grant). Password and OAuth
-  // retain their method-specific challenge semantics.
+  // passkey_mint_grant_signing_digest(passkey_mint_grant). For PASSWORD this
+  // MUST equal password_challenge.nonce (32 bytes); expires_at has zero nanos.
+  // OAuth keeps its own challenge semantics.
   bytes challenge = 2;
   string relying_party_id = 3;
   google.protobuf.Timestamp expires_at = 4;
@@ -185,6 +370,8 @@ message AuthenticationChallenge {
   CredentialMethod method = 7;
   OAuthProvider oauth_provider = 8;
   // Separate from ceremony expiry; completion cannot extend this upper bound.
+  // For PASSWORD, this MUST be a deployment-wide value independent of the
+  // account and MUST NOT be derived from per-account policy.
   google.protobuf.Timestamp credential_expires_at = 9;
   // For passkey-backed temporary authoring, assert the signing digest of this
   // exact account-free grant. Completion cannot replace any of its fields. A
@@ -192,11 +379,14 @@ message AuthenticationChallenge {
   // credential that may sign. An empty-hint begin uses a deployment-configured
   // minimum that every accepted authority satisfies. This issuance choice does
   // not replace the verifier's per-authority ceiling and time-window checks.
+  // For PASSWORD, this MUST be absent.
   PasskeyMintGrant passkey_mint_grant = 10;
   // Owner-signed certificates for the allowed credentials. Certificate order
   // matches allowed_credential_ids; each id and key are verified at registration.
-  // Both lists are empty for an empty account_hint so no account is disclosed.
+  // Both lists are empty for an empty account_hint or PASSWORD method.
   repeated SignedPasskeyAuthority passkey_authorities = 11;
+  // Present only for PASSWORD; no envelope or account UUID is returned at begin.
+  PasswordChallengeMetadata password_challenge = 12;
 }
 enum UserVerification {
   USER_VERIFICATION_UNSPECIFIED = 0;
@@ -223,6 +413,7 @@ message BeginAuthenticationRequest {
   string account_hint = 1;
   // Device key whose possession CompleteAuthentication must prove.
   // The challenge records this exact key and the enrollment choice below.
+  // PASSWORD requires a fresh 32-byte Ed25519 key and enroll_device = true.
   bytes caller_public_key = 2;
   // Explicitly attach a fresh browser key after an existing account passkey
   // verifies this challenge. False requires an already enrolled active key.
@@ -236,26 +427,28 @@ message BeginAuthenticationRequest {
   OAuthProvider oauth_provider = 6;
 }
 message CompleteAuthenticationRequest {
-  reserved 5;
-  reserved "mint_root_attachment";
+  reserved 5, 6;
+  reserved "mint_root_attachment", "password";
   string client_operation_id = 1;
   RecordRef challenge = 2;
   oneof proof {
     PasskeyProof passkey = 3;
-    PasswordProof password = 6;
     OAuthProof oauth = 7;
+    // Requires owner admission and existing CallContext device-key PoP.
+    // All password completion failures use CALL_FAILURE_CODE_UNAUTHENTICATED.
+    PasswordUnlockCompletion password_unlock = 10;
   }
   // Same key as BeginAuthentication. CallContext.request_proof signs the
   // exact completion request with this key, including the passkey assertion.
   bytes caller_public_key = 4;
-  // Set true by the browser only AFTER the user consents ("Remember this
-  // browser?"), so the server enrolls the device (writes the device root) only
-  // on explicit post-consent enroll. The decline path signs in without enrolling.
+  // Password completion MUST set true and enroll the owner-admitted device.
+  // Other methods use the existing explicit browser consent path.
   bool enroll_device = 8;
   // When enroll_device == false, this 32-byte browser-derived ephemeral public
   // key is what Weft delegates the short-TTL ephemeral session Biscuit to
   // (PoP-bound to this key). The decline path holds no device root, so the
   // ephemeral session is renewable and self-revocable against this key only.
+  // Forbidden for password completion: password never creates a temporary mint.
   // Ignored when enroll_device == true (an enrolled device roots its own key).
   bytes ephemeral_public_key = 9;
 }
@@ -277,8 +470,8 @@ message AuthenticationResponse {
 // Returned only by a successful credential ceremony, never by an observation.
 // Keyed clients retain their own minting authority. Registration attaches their
 // proved key to an account/session; it does not mint a bearer or confer an
-// independent human root on an agent. Keyless/server-rooted ceremonies can
-// return an issued bearer. Account rooting tier and credential class differ.
+// independent human root on an agent. Other keyless ceremonies can return an
+// issued bearer. Password completion MUST return client_owned, never issued.
 message CredentialResult {
   oneof outcome {
     ClientOwnedCredential client_owned = 1;
@@ -386,12 +579,19 @@ message OwnerRegistration {
   RegistrationRecoveryPolicy recovery = 4;
 }
 message CompleteRegistrationRequest {
+  reserved 10;
+  reserved "password";
   string client_operation_id = 1;
   RecordRef challenge = 2;
   oneof proof {
     PasskeyRegistration passkey = 3;
-    PasswordProof password = 10;
     OAuthProof oauth = 11;
+    // Requires establish_owner, admitted signup, and caller device PoP.
+    // The envelope account UUID, owner public key and owner ID MUST match
+    // the registered account and accepted active root exactly. The verifier
+    // possession signature MUST verify over the domain-separated registration
+    // challenge digest described on PasswordOwnerSetup.
+    PasswordOwnerSetup password_setup = 13;
   }
   bytes caller_public_key = 4;
   PasskeyProof device_binding = 5;

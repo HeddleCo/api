@@ -6,9 +6,10 @@ use prost::Message;
 use sha2::{Digest, Sha256};
 
 use crate::heddle::api::v1alpha2::{
-    PasswordChallengeMetadata, PasswordChallengeProof, PasswordDeviceAdmission,
-    PasswordOwnerEnvelopeV1, PasswordOwnerSetup, PasswordOwnerSetupAuthorization,
-    SignedPasswordDeviceAdmission, SignedPasswordOwnerSetupAuthorization,
+    AuthenticationChallenge, CompleteAuthenticationRequest, PasswordChallengeMetadata,
+    PasswordChallengeProof, PasswordDeviceAdmission, PasswordOwnerEnvelopeV1, PasswordOwnerSetup,
+    PasswordOwnerSetupAuthorization, PasswordUnlockContinuation, SignedPasswordDeviceAdmission,
+    SignedPasswordOwnerSetupAuthorization,
 };
 
 pub const MAX_PASSWORD_ENVELOPE_BYTES: usize = 4096;
@@ -53,6 +54,29 @@ fn size(value: &[u8], expected: usize) -> Result<(), PasswordOwnerError> {
     Ok(())
 }
 
+fn public_key(value: &[u8]) -> Result<VerifyingKey, PasswordOwnerError> {
+    size(value, 32)?;
+    let bytes: &[u8; 32] = value.try_into().map_err(|_| PasswordOwnerError::Length)?;
+    let mut y = *bytes;
+    y[31] &= 0x7f;
+    let mut prime = [0xff; 32];
+    prime[0] = 0xed;
+    prime[31] = 0x7f;
+    for index in (0..32).rev() {
+        if y[index] < prime[index] {
+            break;
+        }
+        if y[index] > prime[index] || index == 0 {
+            return Err(PasswordOwnerError::Signature);
+        }
+    }
+    let key = VerifyingKey::from_bytes(bytes).map_err(|_| PasswordOwnerError::Signature)?;
+    if key.is_weak() {
+        return Err(PasswordOwnerError::Signature);
+    }
+    Ok(key)
+}
+
 fn operation_id(value: &str) -> Result<(), PasswordOwnerError> {
     if value.is_empty() || value.len() > 128 {
         return Err(PasswordOwnerError::Length);
@@ -72,7 +96,7 @@ pub fn validate_password_owner_envelope(
     if value.account_uuid.iter().all(|byte| *byte == 0) {
         return Err(PasswordOwnerError::Binding);
     }
-    size(&value.owner_public_key, 32)?;
+    public_key(&value.owner_public_key)?;
     size(&value.owner_id, 32)?;
     size(&value.wrap_salt, 16)?;
     size(&value.nonce, 12)?;
@@ -83,7 +107,7 @@ pub fn validate_password_owner_envelope(
     Ok(())
 }
 
-/// Reject duplicate/unknown fields and noncanonical encodings before storage.
+/// Decode known fields; callers persist the canonical re-encoding, never raw input.
 pub fn decode_password_owner_envelope_canonical(
     raw: &[u8],
 ) -> Result<PasswordOwnerEnvelopeV1, PasswordOwnerError> {
@@ -93,9 +117,6 @@ pub fn decode_password_owner_envelope_canonical(
     let value =
         PasswordOwnerEnvelopeV1::decode(raw).map_err(|_| PasswordOwnerError::EnvelopeEncoding)?;
     validate_password_owner_envelope(&value)?;
-    if value.encode_to_vec() != raw {
-        return Err(PasswordOwnerError::EnvelopeEncoding);
-    }
     Ok(value)
 }
 
@@ -119,7 +140,9 @@ pub fn password_owner_wrap_aad(
     Ok(aad)
 }
 
-pub fn validate_password_owner_setup(value: &PasswordOwnerSetup) -> Result<(), PasswordOwnerError> {
+fn validate_password_owner_setup_fields(
+    value: &PasswordOwnerSetup,
+) -> Result<(), PasswordOwnerError> {
     let envelope = value.envelope.as_ref().ok_or(PasswordOwnerError::Length)?;
     validate_password_owner_envelope(envelope)?;
     cost(
@@ -128,7 +151,10 @@ pub fn validate_password_owner_setup(value: &PasswordOwnerSetup) -> Result<(), P
         value.auth_parallelism,
     )?;
     size(&value.auth_salt, 16)?;
-    size(&value.auth_verifier_public_key, 32)?;
+    public_key(&value.auth_verifier_public_key)?;
+    if value.format_version != 1 || value.auth_kdf_id != 1 {
+        return Err(PasswordOwnerError::Version);
+    }
     if value.auth_salt == envelope.wrap_salt {
         return Err(PasswordOwnerError::Binding);
     }
@@ -138,7 +164,12 @@ pub fn validate_password_owner_setup(value: &PasswordOwnerSetup) -> Result<(), P
     Ok(())
 }
 
-/// Validate nested envelope bytes without dropping unknown fields on decode.
+pub fn validate_password_owner_setup(value: &PasswordOwnerSetup) -> Result<(), PasswordOwnerError> {
+    validate_password_owner_setup_fields(value)?;
+    size(&value.auth_verifier_possession_signature, 64)
+}
+
+/// Decode known fields, including nested fields; persist the canonical re-encoding.
 pub fn decode_password_owner_setup_canonical(
     raw: &[u8],
 ) -> Result<PasswordOwnerSetup, PasswordOwnerError> {
@@ -148,10 +179,140 @@ pub fn decode_password_owner_setup_canonical(
     let value =
         PasswordOwnerSetup::decode(raw).map_err(|_| PasswordOwnerError::EnvelopeEncoding)?;
     validate_password_owner_setup(&value)?;
-    if value.encode_to_vec() != raw {
-        return Err(PasswordOwnerError::EnvelopeEncoding);
-    }
     Ok(value)
+}
+
+/// Bind an envelope to the accepted account and active owner root.
+pub fn validate_password_owner_setup_binding(
+    setup: &PasswordOwnerSetup,
+    account_uuid: &[u8],
+    owner_public_key: &[u8],
+    owner_id: &[u8],
+) -> Result<(), PasswordOwnerError> {
+    validate_password_owner_setup(setup)?;
+    let envelope = setup.envelope.as_ref().ok_or(PasswordOwnerError::Binding)?;
+    public_key(owner_public_key)?;
+    size(account_uuid, 16)?;
+    size(owner_id, 32)?;
+    if envelope.account_uuid != account_uuid
+        || envelope.owner_public_key != owner_public_key
+        || envelope.owner_id != owner_id
+    {
+        return Err(PasswordOwnerError::Binding);
+    }
+    Ok(())
+}
+
+/// At registration pass the exact challenge bytes; on PUT pass the setup authorization digest.
+pub fn verify_password_auth_verifier_possession(
+    setup: &PasswordOwnerSetup,
+    digest: &[u8; 32],
+) -> Result<(), PasswordOwnerError> {
+    validate_password_owner_setup(setup)?;
+    let signature: &[u8; 64] = setup
+        .auth_verifier_possession_signature
+        .as_slice()
+        .try_into()
+        .map_err(|_| PasswordOwnerError::Length)?;
+    public_key(&signature[..32])?;
+    public_key(&setup.auth_verifier_public_key)?
+        .verify_strict(digest, &Signature::from_bytes(signature))
+        .map_err(|_| PasswordOwnerError::Signature)
+}
+
+/// Every successful PUT or DELETE advances the lifetime revision, including a tombstone.
+pub fn next_password_envelope_revision(
+    current: Option<u64>,
+    expected: u64,
+) -> Result<u64, PasswordOwnerError> {
+    let actual = current.unwrap_or(0);
+    if expected != actual || (current.is_some() && actual == 0) {
+        return Err(PasswordOwnerError::Binding);
+    }
+    actual.checked_add(1).ok_or(PasswordOwnerError::Binding)
+}
+
+/// The owner attachment nonce is specific to this challenge and continuation.
+pub fn password_mint_attachment_nonce(
+    challenge_nonce: &[u8],
+    continuation_id: &[u8],
+) -> Result<[u8; 32], PasswordOwnerError> {
+    size(challenge_nonce, 32)?;
+    size(continuation_id, 32)?;
+    let mut hash = Sha256::new();
+    hash.update(b"heddle-password-mint-nonce-v1");
+    hash.update(challenge_nonce);
+    hash.update(continuation_id);
+    Ok(hash.finalize().into())
+}
+
+/// Bind password completion fields to the stored challenge and continuation.
+/// The host still checks expiry, current accepted root, one-use state and PoP.
+pub fn validate_password_completion_bindings(
+    request: &CompleteAuthenticationRequest,
+    challenge: &AuthenticationChallenge,
+    continuation: &PasswordUnlockContinuation,
+    bound_device_key: &[u8],
+) -> Result<(), PasswordOwnerError> {
+    let password_challenge = challenge
+        .password_challenge
+        .as_ref()
+        .ok_or(PasswordOwnerError::Binding)?;
+    let completion = match request.proof.as_ref() {
+        Some(
+            crate::heddle::api::v1alpha2::complete_authentication_request::Proof::PasswordUnlock(
+                value,
+            ),
+        ) => value,
+        _ => return Err(PasswordOwnerError::Binding),
+    };
+    let admission = completion
+        .owner_admission
+        .as_ref()
+        .and_then(|signed| signed.admission.as_ref())
+        .ok_or(PasswordOwnerError::Binding)?;
+    let attachment = completion
+        .mint_root_attachment
+        .as_ref()
+        .and_then(|signed| signed.attachment.as_ref())
+        .ok_or(PasswordOwnerError::Binding)?;
+    let envelope = continuation
+        .envelope
+        .as_ref()
+        .ok_or(PasswordOwnerError::Binding)?;
+    let credential_expiry = challenge
+        .credential_expires_at
+        .as_ref()
+        .ok_or(PasswordOwnerError::Binding)?;
+    size(bound_device_key, 32)?;
+    if challenge.method != 2
+        || request.challenge != challenge.r#ref
+        || !request.enroll_device
+        || !request.ephemeral_public_key.is_empty()
+        || completion.continuation_id != continuation.continuation_id
+        || admission.challenge_id != password_challenge.challenge_id
+        || admission.continuation_id != continuation.continuation_id
+        || admission.account_uuid != envelope.account_uuid
+        || admission.caller_device_public_key != request.caller_public_key
+        || admission.caller_device_public_key != bound_device_key
+        || admission.client_operation_id != request.client_operation_id
+        || admission.owner_state_hash != attachment.owner_state_hash
+        || admission.owner_sequence != attachment.owner_sequence
+        || admission.account_uuid != attachment.account_uuid
+        || attachment.mint_root_key.as_ref().is_none_or(|key| {
+            key.public_key != admission.caller_device_public_key || key.algorithm != 1
+        })
+        || attachment.nonce
+            != password_mint_attachment_nonce(
+                &password_challenge.nonce,
+                &continuation.continuation_id,
+            )?
+        || continuation.envelope_revision != password_challenge.envelope_revision
+        || attachment.expires_at_unix_seconds > credential_expiry.seconds
+    {
+        return Err(PasswordOwnerError::Binding);
+    }
+    Ok(())
 }
 
 pub fn validate_password_challenge_metadata(
@@ -162,8 +323,7 @@ pub fn validate_password_challenge_metadata(
         value.auth_iterations,
         value.auth_parallelism,
     )?;
-    size(&value.account_uuid, 16)?;
-    if value.account_uuid.iter().all(|byte| *byte == 0) || value.envelope_revision == 0 {
+    if value.envelope_revision == 0 {
         return Err(PasswordOwnerError::Binding);
     }
     size(&value.auth_salt, 16)?;
@@ -187,10 +347,9 @@ pub fn password_challenge_signing_digest(
     {
         return Err(PasswordOwnerError::Binding);
     }
-    let mut canonical = Vec::with_capacity(32 + 32 + 16 + 8 + 32 + 4 + operation.len() + 8);
+    let mut canonical = Vec::with_capacity(32 + 32 + 8 + 32 + 4 + operation.len() + 8);
     canonical.extend_from_slice(&challenge.challenge_id);
     canonical.extend_from_slice(&challenge.nonce);
-    canonical.extend_from_slice(&challenge.account_uuid);
     canonical.extend_from_slice(&challenge.envelope_revision.to_be_bytes());
     canonical.extend_from_slice(&proof.caller_device_public_key);
     canonical.extend_from_slice(&(operation.len() as u32).to_be_bytes());
@@ -215,16 +374,13 @@ pub fn verify_password_challenge_signature(
     size(verifier_public_key, 32)?;
     let digest =
         password_challenge_signing_digest(challenge, proof, operation, expiry_unix_seconds)?;
-    let public: &[u8; 32] = verifier_public_key
-        .try_into()
-        .map_err(|_| PasswordOwnerError::Length)?;
     let signature: &[u8; 64] = proof
         .signature
         .as_slice()
         .try_into()
         .map_err(|_| PasswordOwnerError::Length)?;
-    VerifyingKey::from_bytes(public)
-        .map_err(|_| PasswordOwnerError::Signature)?
+    public_key(&signature[..32])?;
+    public_key(verifier_public_key)?
         .verify_strict(&digest, &Signature::from_bytes(signature))
         .map_err(|_| PasswordOwnerError::Signature)
 }
@@ -284,7 +440,7 @@ pub fn verify_password_device_admission_signature(
 pub fn password_owner_setup_digest(
     value: &PasswordOwnerSetup,
 ) -> Result<[u8; 32], PasswordOwnerError> {
-    validate_password_owner_setup(value)?;
+    validate_password_owner_setup_fields(value)?;
     let envelope = value.envelope.as_ref().ok_or(PasswordOwnerError::Length)?;
     let mut hash = Sha256::new();
     hash.update(envelope.format_version.to_be_bytes());
@@ -303,6 +459,8 @@ pub fn password_owner_setup_digest(
     hash.update(value.auth_memory_kib.to_be_bytes());
     hash.update(value.auth_iterations.to_be_bytes());
     hash.update(value.auth_parallelism.to_be_bytes());
+    hash.update(value.auth_kdf_id.to_be_bytes());
+    hash.update(value.format_version.to_be_bytes());
     Ok(hash.finalize().into())
 }
 
@@ -336,6 +494,13 @@ pub fn password_owner_setup_authorization_digest(
     if value.setup_sha256 != expected_digest {
         return Err(PasswordOwnerError::Binding);
     }
+    let expiry = value
+        .expires_at
+        .as_ref()
+        .ok_or(PasswordOwnerError::Binding)?;
+    if expiry.nanos != 0 || expiry.seconds <= 0 {
+        return Err(PasswordOwnerError::Binding);
+    }
     let mut hash = Sha256::new();
     hash.update(b"heddle-password-owner-setup-change-v1");
     hash.update(value.format_version.to_be_bytes());
@@ -346,7 +511,26 @@ pub fn password_owner_setup_authorization_digest(
     hash.update(&value.setup_sha256);
     hash.update((value.client_operation_id.len() as u32).to_be_bytes());
     hash.update(value.client_operation_id.as_bytes());
+    hash.update(expiry.seconds.to_be_bytes());
     Ok(hash.finalize().into())
+}
+
+/// Check the signed short-lived authorization at the server's verification time.
+pub fn validate_password_owner_setup_authorization_expiry(
+    value: &PasswordOwnerSetupAuthorization,
+    now_unix_seconds: i64,
+) -> Result<(), PasswordOwnerError> {
+    let expiry = value
+        .expires_at
+        .as_ref()
+        .ok_or(PasswordOwnerError::Binding)?;
+    let latest = now_unix_seconds
+        .checked_add(600)
+        .ok_or(PasswordOwnerError::Binding)?;
+    if expiry.nanos != 0 || expiry.seconds <= now_unix_seconds || expiry.seconds > latest {
+        return Err(PasswordOwnerError::Binding);
+    }
+    Ok(())
 }
 
 /// Verify that a setup change has the current owner's signature. Caller PoP
@@ -365,6 +549,13 @@ pub fn verify_password_owner_setup_authorization_signature(
         .as_ref()
         .ok_or(PasswordOwnerError::Signature)?;
     let digest = password_owner_setup_authorization_digest(statement, setup)?;
+    if let Some(setup) = setup {
+        let envelope = setup.envelope.as_ref().ok_or(PasswordOwnerError::Binding)?;
+        if envelope.owner_public_key != current_owner_public_key {
+            return Err(PasswordOwnerError::Binding);
+        }
+        verify_password_auth_verifier_possession(setup, &digest)?;
+    }
     verify_owner_signature(&digest, signature, current_owner_public_key)
 }
 
@@ -383,16 +574,13 @@ fn verify_owner_signature(
     if signature.signer_key_id != key_id.finalize().as_slice() {
         return Err(PasswordOwnerError::Signature);
     }
-    let public: &[u8; 32] = current_owner_public_key
-        .try_into()
-        .map_err(|_| PasswordOwnerError::Length)?;
     let signature: &[u8; 64] = signature
         .signature
         .as_slice()
         .try_into()
         .map_err(|_| PasswordOwnerError::Length)?;
-    VerifyingKey::from_bytes(public)
-        .map_err(|_| PasswordOwnerError::Signature)?
+    public_key(&signature[..32])?;
+    public_key(current_owner_public_key)?
         .verify_strict(digest, &Signature::from_bytes(signature))
         .map_err(|_| PasswordOwnerError::Signature)
 }

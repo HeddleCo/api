@@ -35,6 +35,7 @@
     "./v2/observation": "./dist/v1alpha2/observation.js",
     "./v2/client": "./dist/v1alpha2/client.js",
     "./v2/owner-certificates": "./dist/v1alpha2/owner-certificates.js",
+    "./v2/password-owner": "./dist/v1alpha2/password-owner.js",
     "./v2/mint-root-association": "./dist/v1alpha2/mint-root-association.js",
     "./v2/spool-creation": "./dist/v1alpha2/spool-creation.js",
     "./v2/owner-actions": "./dist/v1alpha2/owner-actions.js",

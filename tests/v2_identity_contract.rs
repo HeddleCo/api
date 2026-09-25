@@ -382,9 +382,15 @@ fn authentication_preserves_account_tiers_and_explicit_credential_issuance() {
 #[test]
 fn credential_ceremonies_have_exclusive_proofs_and_explicit_lifetimes() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("contract descriptors");
-    for name in [
-        "CompleteAuthenticationRequest",
-        "CompleteRegistrationRequest",
+    for (name, expected) in [
+        (
+            "CompleteAuthenticationRequest",
+            ["passkey", "oauth", "password_unlock"],
+        ),
+        (
+            "CompleteRegistrationRequest",
+            ["passkey", "oauth", "password_setup"],
+        ),
     ] {
         let message = pool
             .get_message_by_name(&format!("heddle.api.v1alpha2.{name}"))
@@ -397,7 +403,7 @@ fn credential_ceremonies_have_exclusive_proofs_and_explicit_lifetimes() {
             .fields()
             .map(|field| field.name().to_owned())
             .collect();
-        assert_eq!(names, ["passkey", "password", "oauth"]);
+        assert_eq!(names, expected);
         assert_eq!(
             message
                 .get_field_by_name("passkey")

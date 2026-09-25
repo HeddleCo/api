@@ -204,8 +204,9 @@ message PasswordOwnerSetup {
   uint32 format_version = 8; // Exactly 1 in v1.
   // Future cost policies use a monotone floor, never below the pinned v1
   // minimum. Existing envelopes remain readable at their recorded costs.
-  // Ed25519 signs the exact 32-byte RegistrationChallenge.challenge at signup,
-  // or the signed setup-authorization digest on PUT. The server verifies this
+  // At signup, Ed25519 signs SHA-256("heddle-password-verifier-possession-v1"
+  // || RegistrationChallenge.challenge[32]); on PUT it signs the setup-
+  // authorization digest. The server verifies this
   // with auth_verifier_public_key before persisting; the signature is excluded
   // from setup_sha256 to avoid a circular transcript.
   bytes auth_verifier_possession_signature = 9; // Exactly 64 bytes.
@@ -213,32 +214,36 @@ message PasswordOwnerSetup {
 
 // Only returned for PASSWORD. Every handle without an active password setup
 // (unknown, passkey-only, deleted, or disabled) gets indistinguishable public
-// metadata: salt and revision derived deterministically from a server secret
-// and the canonical handle, with the same costs and response shape. Challenge
+// metadata: salt derived deterministically from a server secret and the
+// canonical handle, with the same costs, KDF/version, and response shape. Challenge
 // IDs/nonces remain fresh. The server binds the account internally, never via
 // a handle-to-UUID value at begin. Creation is throttled; expiry <= 10 minutes.
 message PasswordChallengeMetadata {
-  reserved 1;
-  reserved "account_uuid";
+  reserved 1, 6;
+  reserved "account_uuid", "envelope_revision";
   bytes auth_salt = 2; // Exactly 16 bytes.
   uint32 auth_memory_kib = 3; // Exactly 65536 in v1.
   uint32 auth_iterations = 4; // Exactly 3 in v1.
   uint32 auth_parallelism = 5; // Exactly 4 in v1.
-  uint64 envelope_revision = 6; // Nonzero; synthetic when setup is inactive.
   bytes challenge_id = 7; // Exactly 32 random bytes, one-use.
   bytes nonce = 8; // Exactly 32 random bytes, one-use.
+  uint32 auth_kdf_id = 9; // Exactly 1 = Argon2id in v1.
+  uint32 format_version = 10; // Exactly 1 in v1.
 }
 
 // Proof of the public password verifier only. This message is never accepted
 // by CompleteAuthentication, an owner mutation, or a credential issuer.
 // Ed25519 signs SHA-256("heddle-password-proof-v1" || canonical transcript):
-// challenge_id[32] || nonce[32] || u64be(revision)
-// || caller_device_public_key[32] || u32be(operation_id UTF-8 byte length)
+// challenge_id[32] || nonce[32] || caller_device_public_key[32]
+// || u32be(operation_id UTF-8 byte length)
 // || operation_id UTF-8 || i64be(expiry Unix seconds). No protobuf is signed.
+// The server's one-use challenge record binds the current envelope revision;
+// it is returned only with the continuation after successful proof.
 message PasswordChallengeProof {
+  reserved 3;
+  reserved "envelope_revision";
   bytes challenge_id = 1; // Exactly 32 bytes.
   bytes signature = 2; // Exactly 64 Ed25519 bytes.
-  uint64 envelope_revision = 3; // Nonzero; equals challenge revision.
   bytes caller_device_public_key = 4; // Exactly 32 bytes; equals begin key.
 }
 
@@ -262,7 +267,7 @@ message PasswordUnlockContinuation {
   PasswordOwnerEnvelopeV1 envelope = 1; // Required; <= 4096 bytes.
   bytes continuation_id = 2; // Exactly 32 unpredictable bytes.
   OwnerState current_owner_state = 3; // Public; client verifies active root.
-  uint64 envelope_revision = 4; // Nonzero; equals proof revision.
+  uint64 envelope_revision = 4; // Nonzero; server-bound challenge revision.
   google.protobuf.Timestamp expires_at = 5; // Within 2 minutes and at most challenge expiry.
 }
 
@@ -579,7 +584,8 @@ message CompleteRegistrationRequest {
     // Requires establish_owner, admitted signup, and caller device PoP.
     // The envelope account UUID, owner public key and owner ID MUST match
     // the registered account and accepted active root exactly. The verifier
-    // possession signature MUST verify over RegistrationChallenge.challenge.
+    // possession signature MUST verify over the domain-separated registration
+    // challenge digest described on PasswordOwnerSetup.
     PasswordOwnerSetup password_setup = 13;
   }
   bytes caller_public_key = 4;

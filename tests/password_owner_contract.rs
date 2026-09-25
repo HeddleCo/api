@@ -18,10 +18,12 @@ use heddle_api::{
         password_challenge_signing_digest, password_device_admission_digest,
         password_mint_attachment_nonce, password_owner_setup_authorization_digest,
         password_owner_setup_digest, password_owner_wrap_aad,
+        password_registration_verifier_possession_digest, validate_password_challenge_metadata,
         validate_password_completion_bindings, validate_password_owner_envelope,
         validate_password_owner_setup, validate_password_owner_setup_authorization_expiry,
         validate_password_owner_setup_binding, verify_password_auth_verifier_possession,
-        verify_password_challenge_signature, verify_password_device_admission_signature,
+        verify_password_auth_verifier_registration_possession, verify_password_challenge_signature,
+        verify_password_device_admission_signature,
         verify_password_owner_setup_authorization_signature,
     },
 };
@@ -127,14 +129,14 @@ fn password_verifier_signature_does_not_substitute_for_owner_admission() {
         auth_memory_kib: 65_536,
         auth_iterations: 3,
         auth_parallelism: 4,
-        envelope_revision: 1,
         challenge_id: vec![3; 32],
         nonce: vec![4; 32],
+        auth_kdf_id: 1,
+        format_version: 1,
     };
     let mut proof = PasswordChallengeProof {
         challenge_id: challenge.challenge_id.clone(),
         signature: Vec::new(),
-        envelope_revision: 1,
         caller_device_public_key: vec![5; 32],
     };
     let digest =
@@ -325,6 +327,11 @@ fn password_begin_has_no_account_uuid_or_existence_disclosure() {
         .get_message_by_name("heddle.api.v1alpha2.PasswordChallengeMetadata")
         .unwrap();
     assert!(metadata.get_field_by_name("account_uuid").is_none());
+    assert!(metadata.get_field_by_name("envelope_revision").is_none());
+    let proof = pool
+        .get_message_by_name("heddle.api.v1alpha2.PasswordChallengeProof")
+        .unwrap();
+    assert!(proof.get_field_by_name("envelope_revision").is_none());
     let services = include_str!("../proto/heddle/api/v1alpha2/services.proto");
     let prove = services
         .split("rpc ProvePasswordUnlock(")
@@ -342,6 +349,75 @@ fn password_begin_has_no_account_uuid_or_existence_disclosure() {
         .next()
         .unwrap();
     assert!(complete.contains("authorization_existence: AUTHORIZATION_EXISTENCE_HIDE"));
+}
+
+#[test]
+fn inactive_password_metadata_has_active_shape_and_ranges() {
+    let active = PasswordChallengeMetadata {
+        auth_salt: vec![7; 16],
+        auth_memory_kib: 65_536,
+        auth_iterations: 3,
+        auth_parallelism: 4,
+        challenge_id: vec![9; 32],
+        nonce: vec![10; 32],
+        auth_kdf_id: 1,
+        format_version: 1,
+    };
+    let inactive = PasswordChallengeMetadata {
+        auth_salt: vec![21; 16],
+        challenge_id: vec![22; 32],
+        nonce: vec![23; 32],
+        ..active.clone()
+    };
+    for value in [&active, &inactive] {
+        validate_password_challenge_metadata(value).unwrap();
+        assert_eq!(value.auth_salt.len(), 16);
+        assert_eq!(value.challenge_id.len(), 32);
+        assert_eq!(value.nonce.len(), 32);
+        assert_eq!(
+            (
+                value.auth_memory_kib,
+                value.auth_iterations,
+                value.auth_parallelism
+            ),
+            (65_536, 3, 4)
+        );
+        assert_eq!((value.auth_kdf_id, value.format_version), (1, 1));
+    }
+    assert_eq!(active.encoded_len(), inactive.encoded_len());
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).unwrap();
+    let metadata = pool
+        .get_message_by_name("heddle.api.v1alpha2.PasswordChallengeMetadata")
+        .unwrap();
+    let fields: Vec<_> = metadata
+        .fields()
+        .map(|field| field.name().to_owned())
+        .collect();
+    assert_eq!(
+        fields,
+        [
+            "auth_salt",
+            "auth_memory_kib",
+            "auth_iterations",
+            "auth_parallelism",
+            "challenge_id",
+            "nonce",
+            "auth_kdf_id",
+            "format_version"
+        ]
+    );
+    let mut downgraded = active.clone();
+    downgraded.auth_kdf_id = 0;
+    assert_eq!(
+        validate_password_challenge_metadata(&downgraded),
+        Err(PasswordOwnerError::Version)
+    );
+    downgraded = active;
+    downgraded.format_version = 2;
+    assert_eq!(
+        validate_password_challenge_metadata(&downgraded),
+        Err(PasswordOwnerError::Version)
+    );
 }
 
 #[test]
@@ -381,14 +457,14 @@ fn password_owner_v1_golden_vectors_match_typescript() {
         auth_memory_kib: 65_536,
         auth_iterations: 3,
         auth_parallelism: 4,
-        envelope_revision: 3,
         challenge_id: vec![9; 32],
         nonce: vec![10; 32],
+        auth_kdf_id: 1,
+        format_version: 1,
     };
     let mut proof = PasswordChallengeProof {
         challenge_id: challenge.challenge_id.clone(),
         signature: vec![0; 64],
-        envelope_revision: 3,
         caller_device_public_key: decoded("device_public_key_hex"),
     };
     assert_eq!(
@@ -441,6 +517,25 @@ fn password_owner_v1_golden_vectors_match_typescript() {
         &password_owner_setup_authorization_digest(&authorization, Some(&setup)).unwrap(),
     )
     .unwrap();
+    let registration_challenge = [42; 32];
+    let registration_digest =
+        password_registration_verifier_possession_digest(&registration_challenge).unwrap();
+    assert_eq!(
+        hex::encode(registration_digest),
+        field("registration_challenge_digest_hex")
+    );
+    let mut registration_setup = setup.clone();
+    registration_setup.auth_verifier_possession_signature =
+        decoded("registration_verifier_possession_signature_hex");
+    verify_password_auth_verifier_registration_possession(
+        &registration_setup,
+        &registration_challenge,
+    )
+    .unwrap();
+    assert_eq!(
+        verify_password_auth_verifier_possession(&registration_setup, &registration_challenge),
+        Err(PasswordOwnerError::Signature)
+    );
     proof.signature = decoded("edge_signature_hex");
     assert_eq!(
         verify_password_challenge_signature(
@@ -465,9 +560,10 @@ fn completion_binds_challenge_device_attachment_nonce_and_expiry() {
         auth_memory_kib: 65_536,
         auth_iterations: 3,
         auth_parallelism: 4,
-        envelope_revision: 3,
         challenge_id: vec![9; 32],
         nonce: vec![10; 32],
+        auth_kdf_id: 1,
+        format_version: 1,
     };
     let challenge = AuthenticationChallenge {
         r#ref: Some(challenge_ref.clone()),
@@ -536,6 +632,19 @@ fn completion_binds_challenge_device_attachment_nonce_and_expiry() {
     assert_eq!(
         validate_password_completion_bindings(&request, &challenge, &continuation, &device_key),
         Ok(())
+    );
+    let mut missing_ref_challenge = challenge.clone();
+    missing_ref_challenge.r#ref = None;
+    let mut missing_ref_request = request.clone();
+    missing_ref_request.challenge = None;
+    assert_eq!(
+        validate_password_completion_bindings(
+            &missing_ref_request,
+            &missing_ref_challenge,
+            &continuation,
+            &device_key
+        ),
+        Err(PasswordOwnerError::Binding)
     );
     request.challenge.as_mut().unwrap().id = "other".into();
     assert_eq!(

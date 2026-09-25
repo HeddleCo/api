@@ -175,6 +175,12 @@ export function validatePasswordOwnerSetupBinding(setup: PasswordOwnerSetup, acc
     || !equal(setup.envelope!.ownerId, ownerId)) throw new Error("Password setup active-root binding differs");
 }
 
+/** Hash the signup challenge under the verifier-possession domain before signing. */
+export function passwordRegistrationVerifierPossessionDigest(challenge: Uint8Array): Uint8Array {
+  exact(challenge, 32, "registration challenge");
+  return sha256(join(utf8.encode("heddle-password-verifier-possession-v1"), challenge));
+}
+
 export async function verifyPasswordAuthVerifierPossession(setup: PasswordOwnerSetup, digest: Uint8Array): Promise<void> {
   validatePasswordOwnerSetup(setup);
   exact(digest, 32, "verifier possession digest");
@@ -182,6 +188,11 @@ export async function verifyPasswordAuthVerifierPossession(setup: PasswordOwnerS
   if (!await crypto.subtle.verify("Ed25519", key, setup.authVerifierPossessionSignature as BufferSource, digest as BufferSource)) {
     throw new Error("Invalid verifier possession signature");
   }
+}
+
+export async function verifyPasswordAuthVerifierRegistrationPossession(setup: PasswordOwnerSetup,
+  challenge: Uint8Array): Promise<void> {
+  await verifyPasswordAuthVerifierPossession(setup, passwordRegistrationVerifierPossessionDigest(challenge));
 }
 
 export function nextPasswordEnvelopeRevision(current: bigint | undefined, expected: bigint): bigint {
@@ -197,7 +208,7 @@ export function passwordMintAttachmentNonce(challengeNonce: Uint8Array, continua
   return sha256(join(utf8.encode("heddle-password-mint-nonce-v1"), challengeNonce, continuationId));
 }
 
-/** Bind completion to the stored PASSWORD challenge and continuation before enrollment. */
+/** Bind completion before enrollment; the host also compares the continuation revision with its stored challenge. */
 export function validatePasswordCompletionBindings(request: CompleteAuthenticationRequest,
   challenge: AuthenticationChallenge, continuation: PasswordUnlockContinuation, boundDeviceKey: Uint8Array): void {
   const completion = request.proof.case === "passwordUnlock" ? request.proof.value : undefined;
@@ -214,7 +225,7 @@ export function validatePasswordCompletionBindings(request: CompleteAuthenticati
     admission.ownerSequence !== attachment.ownerSequence || !equal(admission.accountUuid, attachment.accountUuid) ||
     attachment.mintRootKey?.algorithm !== 1 || !equal(attachment.mintRootKey.publicKey, admission.callerDevicePublicKey) ||
     !equal(attachment.nonce, passwordMintAttachmentNonce(metadata.nonce, continuation.continuationId)) ||
-    continuation.envelopeRevision !== metadata.envelopeRevision ||
+    continuation.envelopeRevision === 0n ||
     attachment.expiresAtUnixSeconds > challenge.credentialExpiresAt.seconds) {
     throw new Error("Password completion binding differs");
   }
@@ -222,10 +233,10 @@ export function validatePasswordCompletionBindings(request: CompleteAuthenticati
 
 export function validatePasswordChallengeMetadata(value: PasswordChallengeMetadata): void {
   costs(value.authMemoryKib, value.authIterations, value.authParallelism);
+  if (value.authKdfId !== 1 || value.formatVersion !== 1) throw new Error("Unsupported password challenge version or KDF");
   exact(value.authSalt, 16, "authentication salt");
   exact(value.challengeId, 32, "challenge ID");
   exact(value.nonce, 32, "challenge nonce");
-  if (value.envelopeRevision === 0n) throw new Error("Invalid envelope revision");
 }
 
 /** Ed25519 signs this domain-separated digest; the signature gates blob delivery only. */
@@ -233,10 +244,10 @@ export function passwordChallengeSigningDigest(challenge: PasswordChallengeMetad
   clientOperationId: string, expiryUnixSeconds: bigint): Uint8Array {
   validatePasswordChallengeMetadata(challenge);
   exact(proof.callerDevicePublicKey, 32, "caller device key");
-  if (!equal(proof.challengeId, challenge.challengeId) || proof.envelopeRevision !== challenge.envelopeRevision) throw new Error("Password proof differs from challenge");
+  if (!equal(proof.challengeId, challenge.challengeId)) throw new Error("Password proof differs from challenge");
   const operation = operationId(clientOperationId);
   return sha256(join(utf8.encode("heddle-password-proof-v1"), challenge.challengeId, challenge.nonce,
-    u64(challenge.envelopeRevision), proof.callerDevicePublicKey, u32(operation.length), operation,
+    proof.callerDevicePublicKey, u32(operation.length), operation,
     i64(expiryUnixSeconds)));
 }
 

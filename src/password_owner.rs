@@ -203,7 +203,18 @@ pub fn validate_password_owner_setup_binding(
     Ok(())
 }
 
-/// At registration pass the exact challenge bytes; on PUT pass the setup authorization digest.
+/// At registration hash the challenge with this domain before signing.
+pub fn password_registration_verifier_possession_digest(
+    challenge: &[u8],
+) -> Result<[u8; 32], PasswordOwnerError> {
+    size(challenge, 32)?;
+    let mut hash = Sha256::new();
+    hash.update(b"heddle-password-verifier-possession-v1");
+    hash.update(challenge);
+    Ok(hash.finalize().into())
+}
+
+/// Verify a domain-separated registration digest or setup authorization digest.
 pub fn verify_password_auth_verifier_possession(
     setup: &PasswordOwnerSetup,
     digest: &[u8; 32],
@@ -218,6 +229,15 @@ pub fn verify_password_auth_verifier_possession(
     public_key(&setup.auth_verifier_public_key)?
         .verify_strict(digest, &Signature::from_bytes(signature))
         .map_err(|_| PasswordOwnerError::Signature)
+}
+
+/// Verify signup possession against the registration challenge.
+pub fn verify_password_auth_verifier_registration_possession(
+    setup: &PasswordOwnerSetup,
+    challenge: &[u8],
+) -> Result<(), PasswordOwnerError> {
+    let digest = password_registration_verifier_possession_digest(challenge)?;
+    verify_password_auth_verifier_possession(setup, &digest)
 }
 
 /// Every successful PUT or DELETE advances the lifetime revision, including a tombstone.
@@ -247,7 +267,8 @@ pub fn password_mint_attachment_nonce(
 }
 
 /// Bind password completion fields to the stored challenge and continuation.
-/// The host still checks expiry, current accepted root, one-use state and PoP.
+/// The host still checks expiry, current accepted root, one-use state and PoP,
+/// and compares the continuation revision with its stored challenge revision.
 pub fn validate_password_completion_bindings(
     request: &CompleteAuthenticationRequest,
     challenge: &AuthenticationChallenge,
@@ -286,6 +307,8 @@ pub fn validate_password_completion_bindings(
         .ok_or(PasswordOwnerError::Binding)?;
     size(bound_device_key, 32)?;
     if challenge.method != 2
+        || request.challenge.is_none()
+        || challenge.r#ref.is_none()
         || request.challenge != challenge.r#ref
         || !request.enroll_device
         || !request.ephemeral_public_key.is_empty()
@@ -307,7 +330,7 @@ pub fn validate_password_completion_bindings(
                 &password_challenge.nonce,
                 &continuation.continuation_id,
             )?
-        || continuation.envelope_revision != password_challenge.envelope_revision
+        || continuation.envelope_revision == 0
         || attachment.expires_at_unix_seconds > credential_expiry.seconds
     {
         return Err(PasswordOwnerError::Binding);
@@ -323,8 +346,8 @@ pub fn validate_password_challenge_metadata(
         value.auth_iterations,
         value.auth_parallelism,
     )?;
-    if value.envelope_revision == 0 {
-        return Err(PasswordOwnerError::Binding);
+    if value.auth_kdf_id != 1 || value.format_version != 1 {
+        return Err(PasswordOwnerError::Version);
     }
     size(&value.auth_salt, 16)?;
     size(&value.challenge_id, 32)?;
@@ -342,15 +365,12 @@ pub fn password_challenge_signing_digest(
     validate_password_challenge_metadata(challenge)?;
     operation_id(operation)?;
     size(&proof.caller_device_public_key, 32)?;
-    if proof.challenge_id != challenge.challenge_id
-        || proof.envelope_revision != challenge.envelope_revision
-    {
+    if proof.challenge_id != challenge.challenge_id {
         return Err(PasswordOwnerError::Binding);
     }
-    let mut canonical = Vec::with_capacity(32 + 32 + 8 + 32 + 4 + operation.len() + 8);
+    let mut canonical = Vec::with_capacity(32 + 32 + 32 + 4 + operation.len() + 8);
     canonical.extend_from_slice(&challenge.challenge_id);
     canonical.extend_from_slice(&challenge.nonce);
-    canonical.extend_from_slice(&challenge.envelope_revision.to_be_bytes());
     canonical.extend_from_slice(&proof.caller_device_public_key);
     canonical.extend_from_slice(&(operation.len() as u32).to_be_bytes());
     canonical.extend_from_slice(operation.as_bytes());

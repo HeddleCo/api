@@ -3,13 +3,15 @@ import { test } from 'node:test';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { create, toBinary } from '@bufbuild/protobuf';
-import { PasswordOwnerEnvelopeV1Schema, PasswordOwnerSetupSchema } from '../packages/typescript/dist/v1alpha2/identity_pb.js';
+import { PasswordChallengeMetadataSchema, PasswordOwnerEnvelopeV1Schema, PasswordOwnerSetupSchema } from '../packages/typescript/dist/v1alpha2/identity_pb.js';
 import { RecordRefSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import {
   decodePasswordOwnerEnvelopeCanonical, decodePasswordOwnerSetupCanonical, passwordChallengeSigningDigest,
   passwordDeviceAdmissionDigest, passwordOwnerSetupAuthorizationDigest, passwordOwnerSetupDigest,
-  passwordOwnerWrapAad, validatePasswordOwnerEnvelope, validatePasswordOwnerSetup,
+  passwordOwnerWrapAad, passwordRegistrationVerifierPossessionDigest, validatePasswordChallengeMetadata,
+  validatePasswordOwnerEnvelope, validatePasswordOwnerSetup,
   validatePasswordOwnerSetupBinding, nextPasswordEnvelopeRevision, verifyPasswordAuthVerifierPossession,
+  verifyPasswordAuthVerifierRegistrationPossession,
   verifyPasswordChallengeSignature,
   validatePasswordCompletionBindings, passwordMintAttachmentNonce,
   validatePasswordOwnerSetupAuthorizationExpiry,
@@ -56,9 +58,9 @@ test('password envelope and setup validate costs, salts, roots and canonical sto
 
 test('password and owner signatures have different bound transcripts', () => {
   const challenge = { authSalt: setup.authSalt,
-    authMemoryKib: 65536, authIterations: 3, authParallelism: 4, envelopeRevision: 1n,
+    authMemoryKib: 65536, authIterations: 3, authParallelism: 4, authKdfId: 1, formatVersion: 1,
     challengeId: new Uint8Array(32).fill(9), nonce: new Uint8Array(32).fill(10) };
-  const proof = { challengeId: challenge.challengeId, signature: new Uint8Array(), envelopeRevision: 1n,
+  const proof = { challengeId: challenge.challengeId, signature: new Uint8Array(),
     callerDevicePublicKey: new Uint8Array(32).fill(11) };
   const proofDigest = passwordChallengeSigningDigest(challenge, proof, 'prove-1', 1700000000n);
   const admission = { formatVersion: 1, accountUuid: envelope.accountUuid, challengeId: challenge.challengeId,
@@ -82,6 +84,26 @@ test('password and owner signatures have different bound transcripts', () => {
     { ...setup, envelope: { ...envelope, ciphertextAndTag: new Uint8Array(48).fill(0) } }), /digest differs/);
 });
 
+test('inactive password metadata has the same fields, shape and ranges as active metadata', () => {
+  const active = create(PasswordChallengeMetadataSchema, { authSalt: new Uint8Array(16).fill(7),
+    authMemoryKib: 65536, authIterations: 3, authParallelism: 4, authKdfId: 1, formatVersion: 1,
+    challengeId: new Uint8Array(32).fill(9), nonce: new Uint8Array(32).fill(10) });
+  const inactive = create(PasswordChallengeMetadataSchema, { ...active, authSalt: new Uint8Array(16).fill(21),
+    challengeId: new Uint8Array(32).fill(22), nonce: new Uint8Array(32).fill(23) });
+  assert.deepEqual(Object.keys(active), Object.keys(inactive));
+  assert.deepEqual(Object.keys(active).filter(name => name !== '$typeName'),
+    ['authSalt', 'authMemoryKib', 'authIterations', 'authParallelism', 'challengeId', 'nonce', 'authKdfId', 'formatVersion']);
+  for (const value of [active, inactive]) {
+    validatePasswordChallengeMetadata(value);
+    assert.deepEqual([value.authSalt.length, value.challengeId.length, value.nonce.length], [16, 32, 32]);
+    assert.deepEqual([value.authMemoryKib, value.authIterations, value.authParallelism, value.authKdfId, value.formatVersion],
+      [65536, 3, 4, 1, 1]);
+  }
+  assert.equal(toBinary(PasswordChallengeMetadataSchema, active).length, toBinary(PasswordChallengeMetadataSchema, inactive).length);
+  assert.throws(() => validatePasswordChallengeMetadata({ ...active, authKdfId: 0 }), /version or KDF/);
+  assert.throws(() => validatePasswordChallengeMetadata({ ...active, formatVersion: 2 }), /version or KDF/);
+});
+
 test('lifetime revision retains a tombstone and rejects old expected revisions', () => {
   const first = nextPasswordEnvelopeRevision(undefined, 0n);
   const replaced = nextPasswordEnvelopeRevision(first, first);
@@ -103,8 +125,8 @@ test('shared password-owner v1 hex vectors and strict Ed25519 edge signature', a
   check(passwordOwnerWrapAad(sampleEnvelope), 'aad_hex');
   check(passwordOwnerSetupDigest(sampleSetup), 'setup_digest_hex');
   const challenge = { authSalt: sampleSetup.authSalt, authMemoryKib: 65536, authIterations: 3,
-    authParallelism: 4, envelopeRevision: 3n, challengeId: new Uint8Array(32).fill(9), nonce: new Uint8Array(32).fill(10) };
-  const proof = { challengeId: challenge.challengeId, signature: new Uint8Array(64), envelopeRevision: 3n,
+    authParallelism: 4, authKdfId: 1, formatVersion: 1, challengeId: new Uint8Array(32).fill(9), nonce: new Uint8Array(32).fill(10) };
+  const proof = { challengeId: challenge.challengeId, signature: new Uint8Array(64),
     callerDevicePublicKey: bytes('device_public_key_hex') };
   check(passwordChallengeSigningDigest(challenge, proof, vector.operation_id, 1700000000n), 'proof_digest_hex');
   const admission = { formatVersion: 1, accountUuid: sampleEnvelope.accountUuid,
@@ -117,6 +139,11 @@ test('shared password-owner v1 hex vectors and strict Ed25519 edge signature', a
     clientOperationId: vector.operation_id, expiresAt: { seconds: 1700000600n, nanos: 0 } };
   check(passwordOwnerSetupAuthorizationDigest(authorization, sampleSetup), 'setup_authorization_digest_hex');
   await verifyPasswordAuthVerifierPossession(sampleSetup, passwordOwnerSetupAuthorizationDigest(authorization, sampleSetup));
+  const registrationChallenge = new Uint8Array(32).fill(42);
+  check(passwordRegistrationVerifierPossessionDigest(registrationChallenge), 'registration_challenge_digest_hex');
+  const registrationSetup = { ...sampleSetup, authVerifierPossessionSignature: bytes('registration_verifier_possession_signature_hex') };
+  await verifyPasswordAuthVerifierRegistrationPossession(registrationSetup, registrationChallenge);
+  await assert.rejects(() => verifyPasswordAuthVerifierPossession(registrationSetup, registrationChallenge), /Invalid verifier possession signature/);
   await assert.rejects(() => verifyPasswordChallengeSignature(challenge,
     { ...proof, signature: bytes('edge_signature_hex') }, vector.operation_id, 1700000000n,
     sampleSetup.authVerifierPublicKey), /Noncanonical signature S/);
@@ -125,7 +152,7 @@ test('shared password-owner v1 hex vectors and strict Ed25519 edge signature', a
 test('password completion binds the challenge, device, attachment nonce and expiry', () => {
   const ref = create(RecordRefSchema, { id: 'password-challenge' });
   const metadata = { authSalt: new Uint8Array(16).fill(7), authMemoryKib: 65536, authIterations: 3,
-    authParallelism: 4, envelopeRevision: 3n, challengeId: new Uint8Array(32).fill(9), nonce: new Uint8Array(32).fill(10) };
+    authParallelism: 4, authKdfId: 1, formatVersion: 1, challengeId: new Uint8Array(32).fill(9), nonce: new Uint8Array(32).fill(10) };
   const challenge = { ref, method: 2, passwordChallenge: metadata,
     credentialExpiresAt: { seconds: 1700001000n, nanos: 0 } };
   const continuation = { envelope, continuationId: new Uint8Array(32).fill(12), envelopeRevision: 3n };
@@ -142,6 +169,8 @@ test('password completion binds the challenge, device, attachment nonce and expi
   const request = { clientOperationId: 'complete', challenge: ref, proof: { case: 'passwordUnlock', value: completion },
     callerPublicKey: deviceKey, enrollDevice: true, ephemeralPublicKey: new Uint8Array() };
   validatePasswordCompletionBindings(request, challenge, continuation, deviceKey);
+  assert.throws(() => validatePasswordCompletionBindings({ ...request, challenge: undefined },
+    { ...challenge, ref: undefined }, continuation, deviceKey), /binding differs/);
   assert.throws(() => validatePasswordCompletionBindings({ ...request, challenge: create(RecordRefSchema, { id: 'other' }) },
     challenge, continuation, deviceKey), /binding differs/);
   assert.throws(() => validatePasswordCompletionBindings({ ...request, proof: { case: 'passwordUnlock',

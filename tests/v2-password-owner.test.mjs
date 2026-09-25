@@ -42,6 +42,7 @@ test('password envelope and setup validate costs, salts, roots and canonical sto
   assert.throws(() => validatePasswordOwnerEnvelope({ ...envelope, memoryKib: 1 }), /costs/);
   assert.throws(() => validatePasswordOwnerEnvelope({ ...envelope, ownerPublicKey: new Uint8Array(32) }), /Small-order/);
   assert.throws(() => validatePasswordOwnerEnvelope({ ...envelope, ownerPublicKey: new Uint8Array(32).fill(255) }), /Noncanonical/);
+  assert.throws(() => validatePasswordOwnerEnvelope({ ...envelope, ownerPublicKey: new Uint8Array(32).fill(2) }), /Undecompressible/);
   assert.throws(() => validatePasswordOwnerSetup({ ...setup, authSalt: envelope.wrapSalt }), /independent/);
   const wire = Uint8Array.from([...toBinary(PasswordOwnerEnvelopeV1Schema, envelope), 0x60, 0x01]);
   assert.deepEqual(decodePasswordOwnerEnvelopeCanonical(wire), envelope);

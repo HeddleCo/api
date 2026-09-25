@@ -78,6 +78,11 @@ fn envelope_rejects_unknown_versions_costs_salt_reuse_and_unknown_wire_fields() 
         validate_password_owner_envelope(&changed),
         Err(PasswordOwnerError::Signature)
     );
+    changed.owner_public_key = vec![2; 32];
+    assert_eq!(
+        validate_password_owner_envelope(&changed),
+        Err(PasswordOwnerError::Signature)
+    );
     let mut wire = good.encode_to_vec();
     wire.extend_from_slice(&[0x60, 0x01]); // Unknown field 12 is discarded.
     assert_eq!(

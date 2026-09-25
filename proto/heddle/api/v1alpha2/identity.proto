@@ -355,6 +355,8 @@ message OAuthProof {
   }
 }
 message AuthenticationChallenge {
+  // For PASSWORD, ref.spool MUST be empty and ref.id MUST be an opaque,
+  // randomly generated identifier independent of the account.
   RecordRef ref = 1;
   // For CREDENTIAL_METHOD_PASSKEY this MUST be exactly the 32-byte
   // passkey_mint_grant_signing_digest(passkey_mint_grant). For PASSWORD this
@@ -368,6 +370,8 @@ message AuthenticationChallenge {
   CredentialMethod method = 7;
   OAuthProvider oauth_provider = 8;
   // Separate from ceremony expiry; completion cannot extend this upper bound.
+  // For PASSWORD, this MUST be a deployment-wide value independent of the
+  // account and MUST NOT be derived from per-account policy.
   google.protobuf.Timestamp credential_expires_at = 9;
   // For passkey-backed temporary authoring, assert the signing digest of this
   // exact account-free grant. Completion cannot replace any of its fields. A
@@ -375,6 +379,7 @@ message AuthenticationChallenge {
   // credential that may sign. An empty-hint begin uses a deployment-configured
   // minimum that every accepted authority satisfies. This issuance choice does
   // not replace the verifier's per-authority ceiling and time-window checks.
+  // For PASSWORD, this MUST be absent.
   PasskeyMintGrant passkey_mint_grant = 10;
   // Owner-signed certificates for the allowed credentials. Certificate order
   // matches allowed_credential_ids; each id and key are verified at registration.

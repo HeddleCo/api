@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { create, toBinary } from '@bufbuild/protobuf';
-import { PasswordChallengeMetadataSchema, PasswordOwnerEnvelopeV1Schema, PasswordOwnerSetupSchema } from '../packages/typescript/dist/v1alpha2/identity_pb.js';
+import { AuthenticationChallengeSchema, PasswordChallengeMetadataSchema, PasswordOwnerEnvelopeV1Schema, PasswordOwnerSetupSchema } from '../packages/typescript/dist/v1alpha2/identity_pb.js';
 import { RecordRefSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import {
   decodePasswordOwnerEnvelopeCanonical, decodePasswordOwnerSetupCanonical, passwordChallengeSigningDigest,
@@ -100,6 +100,32 @@ test('inactive password metadata has the same fields, shape and ranges as active
       [65536, 3, 4, 1, 1]);
   }
   assert.equal(toBinary(PasswordChallengeMetadataSchema, active).length, toBinary(PasswordChallengeMetadataSchema, inactive).length);
+  const credentialExpiresAt = { seconds: 1700001000n, nanos: 0 };
+  const makeChallenge = (metadata, id) => create(AuthenticationChallengeSchema, {
+    ref: create(RecordRefSchema, { id }), challenge: metadata.nonce,
+    expiresAt: { seconds: 1700000000n, nanos: 0 }, method: 2,
+    credentialExpiresAt, passwordChallenge: metadata,
+  });
+  const activeChallenge = makeChallenge(active, '8db685d0a2234ad89bb11d924b80d331');
+  const inactiveChallenge = makeChallenge(inactive, 'f6c36765f468434fa07bb1a67f6a1fd4');
+  assert.deepEqual(Object.keys(activeChallenge), Object.keys(inactiveChallenge));
+  assert.deepEqual(Object.keys(activeChallenge).filter(name => name !== '$typeName'),
+    ['ref', 'challenge', 'relyingPartyId', 'expiresAt', 'allowedCredentialIds', 'userVerification',
+      'method', 'oauthProvider', 'credentialExpiresAt', 'passkeyAuthorities', 'passwordChallenge']);
+  for (const value of [activeChallenge, inactiveChallenge]) {
+    assert.equal(value.ref.spool, undefined);
+    assert.ok(value.ref.id.length > 0);
+    assert.equal(value.method, 2);
+    assert.deepEqual(value.challenge, value.passwordChallenge.nonce);
+    assert.deepEqual([value.credentialExpiresAt.seconds, value.credentialExpiresAt.nanos],
+      [credentialExpiresAt.seconds, credentialExpiresAt.nanos]);
+    assert.equal(value.passkeyMintGrant, undefined);
+    assert.deepEqual(value.allowedCredentialIds, []);
+    assert.deepEqual(value.passkeyAuthorities, []);
+  }
+  assert.notEqual(activeChallenge.ref.id, inactiveChallenge.ref.id);
+  assert.equal(toBinary(AuthenticationChallengeSchema, activeChallenge).length,
+    toBinary(AuthenticationChallengeSchema, inactiveChallenge).length);
   assert.throws(() => validatePasswordChallengeMetadata({ ...active, authKdfId: 0 }), /version or KDF/);
   assert.throws(() => validatePasswordChallengeMetadata({ ...active, formatVersion: 2 }), /version or KDF/);
 });

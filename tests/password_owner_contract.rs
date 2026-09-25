@@ -406,6 +406,69 @@ fn inactive_password_metadata_has_active_shape_and_ranges() {
             "format_version"
         ]
     );
+    let credential_expiry = Timestamp {
+        seconds: 1_700_001_000,
+        nanos: 0,
+    };
+    let make_challenge = |metadata: PasswordChallengeMetadata, id: &str| AuthenticationChallenge {
+        r#ref: Some(RecordRef {
+            id: id.into(),
+            ..Default::default()
+        }),
+        challenge: metadata.nonce.clone(),
+        expires_at: Some(Timestamp {
+            seconds: 1_700_000_000,
+            nanos: 0,
+        }),
+        method: 2,
+        credential_expires_at: Some(credential_expiry),
+        password_challenge: Some(metadata),
+        ..Default::default()
+    };
+    let active_challenge = make_challenge(active.clone(), "8db685d0a2234ad89bb11d924b80d331");
+    let inactive_challenge = make_challenge(inactive, "f6c36765f468434fa07bb1a67f6a1fd4");
+    for challenge in [&active_challenge, &inactive_challenge] {
+        let reference = challenge.r#ref.as_ref().unwrap();
+        assert!(reference.spool.is_none());
+        assert!(!reference.id.is_empty());
+        assert_eq!(challenge.method, 2);
+        assert_eq!(
+            challenge.challenge,
+            challenge.password_challenge.as_ref().unwrap().nonce
+        );
+        assert_eq!(challenge.credential_expires_at, Some(credential_expiry));
+        assert!(challenge.passkey_mint_grant.is_none());
+        assert!(challenge.allowed_credential_ids.is_empty());
+        assert!(challenge.passkey_authorities.is_empty());
+    }
+    assert_ne!(active_challenge.r#ref, inactive_challenge.r#ref);
+    assert_eq!(
+        active_challenge.encoded_len(),
+        inactive_challenge.encoded_len()
+    );
+    let challenge_fields: Vec<_> = pool
+        .get_message_by_name("heddle.api.v1alpha2.AuthenticationChallenge")
+        .unwrap()
+        .fields()
+        .map(|field| field.name().to_owned())
+        .collect();
+    assert_eq!(
+        challenge_fields,
+        [
+            "ref",
+            "challenge",
+            "relying_party_id",
+            "expires_at",
+            "allowed_credential_ids",
+            "user_verification",
+            "method",
+            "oauth_provider",
+            "credential_expires_at",
+            "passkey_mint_grant",
+            "passkey_authorities",
+            "password_challenge"
+        ]
+    );
     let mut downgraded = active.clone();
     downgraded.auth_kdf_id = 0;
     assert_eq!(

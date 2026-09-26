@@ -7,9 +7,9 @@ import {
   CatalogEventSchema,
   CatalogSort,
   ObserveCatalogRequestSchema,
-  PublicOwnerSchema,
   SpoolOverviewSchema,
 } from "../packages/typescript/dist/v1alpha2/views_pb.js";
+import { PublicOwnerSchema } from "../packages/typescript/dist/v1alpha2/common_pb.js";
 
 test("public catalog fields and sort survive binary round trips", () => {
   const request = create(ObserveCatalogRequestSchema, {

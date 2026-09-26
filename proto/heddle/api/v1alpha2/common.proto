@@ -26,6 +26,15 @@ message PublicPrincipalSummary {
   string display_name = 3;
 }
 
+// A display label for a publicly visible account. Neither field grants
+// access or supplies an owner verification key.
+message PublicOwner {
+  // Already-public canonical owner handle, without an address separator.
+  string handle = 1;
+  // Already-public owner display name; may be empty.
+  string display_name = 2;
+}
+
 message SpoolRef {
   // Stable spool UUID; names, paths and account handles are presentation.
   string id = 1;

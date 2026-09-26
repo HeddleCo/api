@@ -49,3 +49,17 @@ fn catalog_row_and_sort_round_trip() {
     assert_eq!(decoded_spool.last_activity_at, spool.last_activity_at);
     assert_eq!(decoded_spool.catalog_activity, spool.catalog_activity);
 }
+
+#[cfg(feature = "reflection")]
+#[test]
+fn public_owner_is_defined_in_common_for_catalog_and_invitation() {
+    let pool = prost_reflect::DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET)
+        .expect("valid descriptor");
+    let owner = pool
+        .get_message_by_name("heddle.api.v1alpha2.PublicOwner")
+        .expect("shared public owner");
+    assert_eq!(
+        owner.parent_file().name(),
+        "heddle/api/v1alpha2/common.proto"
+    );
+}

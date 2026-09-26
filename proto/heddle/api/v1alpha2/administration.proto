@@ -263,7 +263,13 @@ message CreateInvitationResponse {
 }
 // Public capability preview. The invitation ID alone reveals nothing; the
 // redemption secret is passed in the request body and never placed in a URL
-// path or query. No recipient email or inviter identity is disclosed.
+// path or query. Invitation links get forwarded: any holder of the secret can
+// see the spool address (including path segments) and name, role, expiry,
+// inviter's public handle and display name, and the delegated agent's display
+// label when present. The inviter's handle also reveals that this person
+// administers the spool, even if the spool is private. No recipient email is
+// disclosed. The inviter lookup MUST use the same query shape for every status
+// so timing does not reveal invitation validity.
 message ResolveInvitationRequest {
   RecordRef invitation = 1;
   bytes redemption_secret = 2;
@@ -276,10 +282,31 @@ message InvitationResolution {
     STATUS_UNAVAILABLE = 3;
   }
   Status status = 1;
+  // Filled only for AVAILABLE and REDEEMED after the redemption-secret check;
+  // path_segments is subject to the same gating as the other spool details.
+  // Every UNAVAILABLE response MUST be byte-identical, with no spool details,
+  // inviter or agent label, regardless of whether the secret is wrong, expired
+  // or revoked.
   SpoolAddress spool = 2;
   string spool_name = 3;
   ResourceRole role = 4;
   google.protobuf.Timestamp expires_at = 5;
+  // Accountable human who created the invitation. Filled only for AVAILABLE
+  // and REDEEMED, after the redemption-secret check. Resolve at read time:
+  // show the current public handle even if this account is no longer a spool
+  // member or administrator. Use only already-public values, never a username
+  // fallback. Leave inviter and inviter_via_agent_label empty if the creator
+  // has no public handle or its account is deleted, locked or disabled.
+  // Clients MUST display inviter.handle. They MAY show display_name only
+  // alongside the handle, never by itself.
+  PublicOwner inviter = 6;
+  // Already-public current display label of the delegated agent credential
+  // used to create this invitation, if any. Only set alongside an inviter
+  // with a public handle, after the redemption-secret check for AVAILABLE or
+  // REDEEMED.
+  // Clients MAY render it only as "via <label>" after inviter.handle; it
+  // never replaces the accountable human inviter.
+  string inviter_via_agent_label = 7;
 }
 message RedeemInvitationRequest {
   string client_operation_id = 1;

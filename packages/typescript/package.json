@@ -42,6 +42,7 @@
     "./v2/provider": "./dist/v1alpha2/provider.js",
     "./v2/collaboration": "./dist/v1alpha2/collaboration.js",
     "./v2/source-targets": "./dist/v1alpha2/source-targets.js",
+    "./v2/invitation": "./dist/v1alpha2/invitation.js",
     "./v2/pairing": "./dist/v1alpha2/pairing.js",
     "./v2/thread-control": "./dist/v1alpha2/thread-control.js",
     "./v2/thread-genesis": "./dist/v1alpha2/thread-genesis.js",

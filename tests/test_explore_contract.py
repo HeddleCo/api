@@ -5,6 +5,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 VIEWS = (ROOT / "proto/heddle/api/v1alpha2/views.proto").read_text()
+COMMON = (ROOT / "proto/heddle/api/v1alpha2/common.proto").read_text()
 SERVICES = (ROOT / "proto/heddle/api/v1alpha2/services.proto").read_text()
 
 
@@ -43,7 +44,7 @@ class ExploreContractTest(unittest.TestCase):
             self.assertRegex(spool, rf"\b{field}\s*=\s*{number}\s*;")
         self.assertNotRegex(spool, r"\b(?:recency|score|lane)\s*=")
 
-        owner = body(VIEWS, "message", "PublicOwner")
+        owner = body(COMMON, "message", "PublicOwner")
         self.assertRegex(owner, r"\bhandle\s*=\s*1\s*;")
         self.assertRegex(owner, r"\bdisplay_name\s*=\s*2\s*;")
         activity = body(VIEWS, "message", "CatalogActivitySummary")

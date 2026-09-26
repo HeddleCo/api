@@ -124,15 +124,6 @@ message SpoolOverview {
   CatalogActivitySummary catalog_activity = 18;
 }
 
-// A display label for a publicly visible catalog row. Neither field grants
-// access or supplies an owner verification key.
-message PublicOwner {
-  // Already-public canonical owner handle, without an address separator.
-  string handle = 1;
-  // Already-public owner display name; may be empty.
-  string display_name = 2;
-}
-
 // Counts of public activity on one catalog Spool. A server deriving these from
 // rollups may serve eventually consistent values; they are display hints, not
 // authorization or a transactional snapshot of underlying Threads/changes.

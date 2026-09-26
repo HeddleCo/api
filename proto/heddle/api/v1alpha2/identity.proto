@@ -109,6 +109,8 @@ message SessionRecord {
 message PasskeyRecord {
   RecordRef ref = 1;
   bytes version = 2;
+  // The stored, trimmed label, or "Passkey" when no label is stored. The
+  // label is account metadata and is not part of the owner-signed certificate.
   string label = 3;
   SignedPasskeyAuthority certificate = 4;
   bool revoked = 5;
@@ -569,6 +571,10 @@ message PasskeyRegistration {
   bytes credential_id = 1;
   bytes client_data_json = 2;
   bytes attestation_object = 3;
+  // Optional display label. Trim surrounding whitespace before storage; the
+  // trimmed UTF-8 encoding MUST be at most 256 bytes. Reject control
+  // characters. Empty or omitted selects the server default, "Passkey".
+  optional string label = 4;
 }
 message OwnerRegistration {
   SignedOwnerRoot root = 1;
@@ -622,6 +628,25 @@ message RevokeDeviceRequest {
   // transitions have their separate portable owner-authorization ceremony.
   RecordRef device = 2;
   bytes expected_version = 4;
+}
+// Renames an account-owned passkey without changing its credential, owner,
+// sign-in authority, or owner-signed PasskeyAuthority. A successful rename
+// changes only the stored label and advances the passkey record version.
+message RenamePasskeyRequest {
+  string client_operation_id = 1;
+  // Account-private PasskeyRecord.ref, authorized against the caller's account.
+  RecordRef passkey = 2;
+  // Required exact PasskeyRecord.version. A mismatch changes no state.
+  bytes expected_version = 3;
+  // Trim surrounding whitespace before storage; the trimmed UTF-8 encoding
+  // MUST be at most 256 bytes. Reject control characters. Empty resets to the
+  // server default, "Passkey".
+  string label = 4;
+}
+message RenamePasskeyResponse {
+  MutationReceipt receipt = 1;
+  // Updated record with its new version and display label.
+  PasskeyRecord passkey = 2;
 }
 
 // Irreversibly deletes the caller's account. The authenticating credential

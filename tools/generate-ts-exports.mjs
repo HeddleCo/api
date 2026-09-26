@@ -58,6 +58,7 @@ copyFileSync("packages/typescript/runtime/v2-initial-source.ts", join(v2Root, "i
 copyFileSync("packages/typescript/runtime/v2-collaboration.ts", join(v2Root, "collaboration.ts"));
 copyFileSync("packages/typescript/runtime/v2-source-targets.ts", join(v2Root, "source-targets.ts"));
 copyFileSync("packages/typescript/runtime/v2-invitation.ts", join(v2Root, "invitation.ts"));
+copyFileSync("packages/typescript/runtime/v2-passkey-label.ts", join(v2Root, "passkey-label.ts"));
 copyFileSync("packages/typescript/runtime/v2-msgpack.ts", join(v2Root, "_collaboration-msgpack.ts"));
 const v2Modules = readdirSync(v2Root)
   .filter((name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_"))

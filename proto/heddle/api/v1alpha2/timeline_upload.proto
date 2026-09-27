@@ -167,11 +167,15 @@ message UploadTimelineEvent {
 // uploader key MUST equal origin.uploader_device_public_key. In the write
 // transaction, recheck its live credential, revocation, exact Thread/Spool
 // writer authority, sharing destination/facet, billing and deletion gates.
-// The complete origin chain must be live, unrevoked and unexpired at that
-// transaction; the signature or client timestamp cannot date itself.
-// Under (uploader account, client_operation_id), store a digest of the exact
-// canonical Spool/Thread/run, complete origin endorsement including signature,
-// and registration format version, plus the server transaction timestamp.
+// For a NEW registration, the complete origin chain must be live, unrevoked
+// and unexpired at that transaction; the signature or client timestamp cannot
+// date itself. Under (uploader account, client_operation_id), store
+// registration_digest = SHA-256(UTF8("heddle-timeline-registration-v1") || 0x00
+// || counted(client_operation_id) || counted(spool UUID) || counted(ThreadId)
+// || counted(run ID) || counted(origin_sha256)), where counted is u32be length
+// plus exact bytes, UUIDs are canonical lowercase 36-byte ASCII, and
+// origin_sha256 includes the complete signed endorsement. Transport PoP is
+// excluded. Store the original server transaction timestamp beside the digest.
 // A different digest for the same operation ID conflicts. An identical retry
 // with a FRESH transport proof returns the original registered_at and digest,
 // even after origin expiry, without re-dating or re-registering; it still checks

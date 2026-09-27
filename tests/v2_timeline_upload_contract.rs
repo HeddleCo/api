@@ -364,6 +364,7 @@ fn timeline_privacy_authority_and_replay_rules_remain_normative() {
         assert!(stream.contains(rule), "missing stream rule: {rule}");
     }
     for rule in [
+        "heddle-timeline-registration-v1",
         "original registered_at and digest",
         "Origin revocation\n// invalidates the registered admission basis immediately",
         "BEFORE checking first_position",

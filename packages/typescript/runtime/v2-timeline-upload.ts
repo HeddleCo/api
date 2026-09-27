@@ -7,7 +7,7 @@ import {
   TimelineOriginCredentialClass, UploadTimelineEventKind, UploadTimelineTool,
   UploadRunSummarySchema, UploadTimelineEventSchema,
   UploadScrubbedTimelineRequestSchema,
-  type TimelineOriginEndorsement, type TimelineAdmissionAcceptance,
+  type TimelineOriginCredentialIdentity, type TimelineOriginEndorsement, type TimelineAdmissionAcceptance,
   type UploadRunSummary, type UploadTimelineEvent, type UploadScrubbedTimelineRequest,
   type RegisterTimelineOriginRequest,
 } from "./timeline_upload_pb.js";
@@ -16,13 +16,14 @@ export const MAX_TIMELINE_REQUEST_BYTES = 256 * 1024;
 export const MAX_TIMELINE_EVENT_BYTES = 2 * 1024;
 export const MAX_TIMELINE_SNAPSHOT_BYTES = 4 * 1024;
 export const MAX_TIMELINE_EVENTS = 64;
+export const MAX_TIMELINE_ORIGIN_BISCUIT_BYTES = 64 * 1024;
 /** Check lengths before fully decoding untrusted protobuf bytes. */
 export function validateTimelineRawSize(raw: Uint8Array, kind: "request" | "event" | "snapshot"): void {
   const limit = kind === "request" ? MAX_TIMELINE_REQUEST_BYTES
     : kind === "event" ? MAX_TIMELINE_EVENT_BYTES : MAX_TIMELINE_SNAPSHOT_BYTES;
   if (raw.length > limit) throw new Error(`Invalid hosted timeline ${kind} size`);
 }
-export const ORIGIN_DOMAIN = "heddle-timeline-run-origin-v1";
+export const ORIGIN_DOMAIN = "heddle-timeline-run-origin-v2";
 export const ACCEPTANCE_DOMAIN = "heddle-timeline-run-acceptance-v1";
 export const UPLOAD_DOMAIN = "heddle-timeline-upload-v1";
 const encoder = new TextEncoder();
@@ -83,12 +84,35 @@ function validateOriginFields(value: TimelineOriginEndorsement): void {
   requireField(value.credentialClass === TimelineOriginCredentialClass.DIRECT_HUMAN
     || value.credentialClass === TimelineOriginCredentialClass.AGENT, "origin credential class");
   requireField(value.effectivePopKeySha256.length === 32, "origin actor digest");
-  requireField(value.originCredentialId.length >= 1 && value.originCredentialId.length <= 128, "origin credential ID");
+  requireField(value.credentialIdentity !== undefined, "origin credential identity");
+  validateTimelineCredentialIdentity(value.credentialIdentity);
+  requireField(value.credentialIdentity.identity.case !== "offlineDerived"
+    || value.credentialClass === TimelineOriginCredentialClass.AGENT, "offline origin class");
   requireField(value.uploaderDevicePublicKey.length === 32, "origin uploader key");
+}
+export function validateTimelineCredentialIdentity(value: TimelineOriginCredentialIdentity): void {
+  const identity = value.identity;
+  if (identity.case === "serverIssued") {
+    requireField(identity.value.credentialId.length >= 1 && identity.value.credentialId.length <= 128,
+      "issued credential ID");
+  } else if (identity.case === "offlineDerived") {
+    requireField(identity.value.issuedAncestorCredentialId.length >= 1
+      && identity.value.issuedAncestorCredentialId.length <= 128, "issued ancestor credential ID");
+    requireField(identity.value.terminalRevocationId.length === 64, "terminal revocation ID");
+  } else {
+    throw new Error("Invalid hosted timeline credential identity variant");
+  }
 }
 export function validateTimelineOrigin(value: TimelineOriginEndorsement): void {
   validateOriginFields(value);
   requireField(value.signature.length === 64, "origin signature");
+}
+
+function validateOriginBiscuit(origin: TimelineOriginEndorsement, biscuit: Uint8Array, requiredForOffline: boolean): void {
+  const variant = origin.credentialIdentity!.identity.case;
+  if (variant === "serverIssued") requireField(biscuit.length === 0, "issued origin biscuit");
+  else requireField(biscuit.length <= MAX_TIMELINE_ORIGIN_BISCUIT_BYTES
+    && (!requiredForOffline || biscuit.length > 0), "offline origin biscuit");
 }
 
 function validateAcceptanceFields(value: TimelineAdmissionAcceptance): void {
@@ -124,6 +148,7 @@ export function validateTimelineRegistration(value: RegisterTimelineOriginReques
   requireField(validCanonicalUuid(value.clientOperationId), "client operation ID");
   requireField(value.origin !== undefined, "origin");
   validateTimelineOrigin(value.origin);
+  validateOriginBiscuit(value.origin, value.originCredentialBiscuit, true);
   binding(value.thread, value.run, value.origin);
 }
 
@@ -141,6 +166,7 @@ export function validateTimelineUpload(value: UploadScrubbedTimelineRequest, now
   });
   requireField(value.origin !== undefined, "origin");
   validateTimelineOrigin(value.origin);
+  validateOriginBiscuit(value.origin, value.originCredentialBiscuit, false);
   binding(value.thread, value.run, value.origin);
   if (value.acceptance !== undefined) {
     const acceptance = value.acceptance;
@@ -181,11 +207,20 @@ function u32(value: number): Uint8Array {
   new DataView(result.buffer).setUint32(0, value);
   return result;
 }
+export function timelineCredentialIdentitySigningBytes(value: TimelineOriginCredentialIdentity): Uint8Array {
+  validateTimelineCredentialIdentity(value);
+  const identity = value.identity;
+  if (identity.case === "serverIssued") return join([Uint8Array.of(1), counted(identity.value.credentialId)]);
+  if (identity.case === "offlineDerived") return join([Uint8Array.of(2),
+    counted(identity.value.issuedAncestorCredentialId), counted(identity.value.terminalRevocationId)]);
+  throw new Error("Invalid hosted timeline credential identity variant");
+}
 export function timelineOriginSigningBytes(value: TimelineOriginEndorsement): Uint8Array {
   validateOriginFields(value);
   return join([domain(ORIGIN_DOMAIN), counted(value.deploymentPublicKey), counted(encoder.encode(value.spoolId)),
     counted(value.threadId), counted(encoder.encode(value.runId)), counted(encoder.encode(value.principalId)),
-    Uint8Array.of(value.credentialClass), counted(value.effectivePopKeySha256), counted(value.originCredentialId),
+    Uint8Array.of(value.credentialClass), counted(value.effectivePopKeySha256),
+    timelineCredentialIdentitySigningBytes(value.credentialIdentity!),
     counted(value.uploaderDevicePublicKey)]);
 }
 export function timelineOriginDigest(value: TimelineOriginEndorsement): Uint8Array {

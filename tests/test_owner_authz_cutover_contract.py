@@ -124,7 +124,7 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
                 ("SPOOL_CAPABILITY_ACTION_ACCEPT_TIMELINE_ORIGIN", "2"),
             ],
         )
-        self.assertIn("V1: exactly PURGE. V2: exactly ACCEPT_TIMELINE_ORIGIN", OWNER)
+        self.assertIn("V1: exactly PURGE. V3: exactly ACCEPT_TIMELINE_ORIGIN", OWNER)
         transfer = block(SYNC, "message", "TransferSidecar")
         self.assertIn("PURGE requires the independently verified owner", transfer)
         self.assertIn("Ordinary write cannot satisfy that requirement", transfer)

@@ -7,17 +7,19 @@ use heddle_api::heddle::api::common::{
     DeploymentTarget, RetryBehavior, RpcEffect, SigningTier, StableSigningIdentity,
 };
 use heddle_api::heddle::api::v1alpha2::{
-    OperationRecord, RecordRef, SpoolRef, ThreadId, ThreadRef, TimelineAdmissionAcceptance,
-    TimelineOriginCredentialClass, TimelineOriginEndorsement, UploadRunSummary,
-    UploadScrubbedTimelineRequest, UploadTimelineEvent, UploadTimelineEventKind,
+    OperationRecord, RecordRef, RegisterTimelineOriginRequest, SpoolRef, ThreadId, ThreadRef,
+    TimelineAdmissionAcceptance, TimelineOfflineDerivedCredential, TimelineOriginCredentialClass,
+    TimelineOriginCredentialIdentity, TimelineOriginEndorsement, TimelineServerIssuedCredential,
+    UploadRunSummary, UploadScrubbedTimelineRequest, UploadTimelineEvent, UploadTimelineEventKind,
     UploadTimelineTool, operation_record, timeline_admission_acceptance::Authority,
+    timeline_origin_credential_identity::Identity,
 };
 use heddle_api::timeline_upload::{
-    MAX_TIMELINE_EVENT_BYTES, MAX_TIMELINE_REQUEST_BYTES, MAX_TIMELINE_SNAPSHOT_BYTES,
-    acceptance_signing_bytes, logical_request_digest, origin_digest, origin_signing_bytes,
-    valid_agent_label, valid_canonical_uuid, valid_run_id, valid_verified_agent_id, validate_event,
-    validate_raw_event_size, validate_raw_request_size, validate_raw_snapshot_size,
-    validate_summary, validate_upload,
+    MAX_TIMELINE_EVENT_BYTES, MAX_TIMELINE_ORIGIN_BISCUIT_BYTES, MAX_TIMELINE_REQUEST_BYTES,
+    MAX_TIMELINE_SNAPSHOT_BYTES, acceptance_signing_bytes, logical_request_digest, origin_digest,
+    origin_signing_bytes, valid_agent_label, valid_canonical_uuid, valid_run_id,
+    valid_verified_agent_id, validate_event, validate_raw_event_size, validate_raw_request_size,
+    validate_raw_snapshot_size, validate_registration, validate_summary, validate_upload,
 };
 use heddle_api::{FILE_DESCRIPTOR_SET, StreamingShape, v2::method_descriptor};
 use prost_reflect::{Cardinality, DescriptorPool, Kind, MessageDescriptor};
@@ -33,7 +35,11 @@ fn origin() -> TimelineOriginEndorsement {
         principal_id: UUID.into(),
         credential_class: TimelineOriginCredentialClass::Agent as i32,
         effective_pop_key_sha256: vec![3; 32],
-        origin_credential_id: vec![4; 16],
+        credential_identity: Some(TimelineOriginCredentialIdentity {
+            identity: Some(Identity::ServerIssued(TimelineServerIssuedCredential {
+                credential_id: vec![4; 16],
+            })),
+        }),
         uploader_device_public_key: vec![5; 32],
         signature: vec![6; 64],
     }
@@ -152,6 +158,7 @@ fn allowed_fields(
                 O,
                 None,
             ),
+            ("origin_credential_biscuit", 5, "bytes", O, None),
         ],
         "heddle.api.v1alpha2.UploadScrubbedTimelineRequest" => &[
             ("client_operation_id", 1, "string", O, None),
@@ -194,6 +201,7 @@ fn allowed_fields(
                 None,
             ),
             ("first_position", 10, "uint64", O, None),
+            ("origin_credential_biscuit", 11, "bytes", O, None),
         ],
         "heddle.api.v1alpha2.ThreadRef" => &[
             ("spool", 1, "message:heddle.api.v1alpha2.SpoolRef", O, None),
@@ -219,7 +227,13 @@ fn allowed_fields(
                 None,
             ),
             ("effective_pop_key_sha256", 7, "bytes", O, None),
-            ("origin_credential_id", 8, "bytes", O, None),
+            (
+                "credential_identity",
+                8,
+                "message:heddle.api.v1alpha2.TimelineOriginCredentialIdentity",
+                O,
+                None,
+            ),
             ("uploader_device_public_key", 9, "bytes", O, None),
             ("signature", 10, "bytes", O, None),
         ],
@@ -233,6 +247,43 @@ fn allowed_fields(
             ("principal_credential_id", 7, "bytes", O, Some("authority")),
             ("owner_derived_capability", 8, "bytes", O, Some("authority")),
             ("signature", 9, "bytes", O, None),
+        ],
+        "heddle.api.v1alpha2.TimelineOriginCredentialIdentity" => &[
+            (
+                "server_issued",
+                1,
+                "message:heddle.api.v1alpha2.TimelineServerIssuedCredential",
+                O,
+                Some("identity"),
+            ),
+            (
+                "offline_derived",
+                2,
+                "message:heddle.api.v1alpha2.TimelineOfflineDerivedCredential",
+                O,
+                Some("identity"),
+            ),
+        ],
+        "heddle.api.v1alpha2.TimelineServerIssuedCredential" => {
+            &[("credential_id", 1, "bytes", O, None)]
+        }
+        "heddle.api.v1alpha2.TimelineOfflineDerivedCredential" => &[
+            ("issued_ancestor_credential_id", 1, "bytes", O, None),
+            ("terminal_revocation_id", 2, "bytes", O, None),
+        ],
+        "heddle.api.v1alpha2.TimelineAcceptanceScope" => &[
+            ("principal_account_uuid", 1, "bytes", O, None),
+            (
+                "credential_identity",
+                2,
+                "message:heddle.api.v1alpha2.TimelineOriginCredentialIdentity",
+                O,
+                None,
+            ),
+            ("effective_pop_key_sha256", 3, "bytes", O, None),
+            ("credential_class", 4, "uint32", O, None),
+            ("thread_id", 5, "bytes", O, None),
+            ("origin_sha256", 6, "bytes", O, None),
         ],
         "heddle.api.v1alpha2.UploadRunSummary" => &[
             (
@@ -336,6 +387,7 @@ fn upload_inputs_have_only_the_allowlisted_projection_fields_and_no_free_text() 
     for root in [
         "RegisterTimelineOriginRequest",
         "UploadScrubbedTimelineRequest",
+        "TimelineAcceptanceScope",
     ] {
         walk_allowlist(
             pool.get_message_by_name(&format!("heddle.api.v1alpha2.{root}"))
@@ -355,7 +407,7 @@ fn timeline_privacy_authority_and_replay_rules_remain_normative() {
         "Thread owners, Spool owners and administrators have\nno override",
         "before order/limit or count",
         "identical status/error wording, count, cursor and reset\nshapes",
-        "format-2 `OwnerAuthorizationBundle`",
+        "format-3 `OwnerAuthorizationBundle`",
         "Origin revocation invalidates registration as an admission basis",
         "unique `(spool_id, run_id)` across Threads",
         "retry checks that receipt before position or current run\nrevision",
@@ -366,7 +418,7 @@ fn timeline_privacy_authority_and_replay_rules_remain_normative() {
     for rule in [
         "heddle-timeline-registration-v1",
         "original registered_at and digest",
-        "Origin revocation\n// invalidates the registered admission basis immediately",
+        "Biscuit block invalidates the registered admission",
         "BEFORE checking first_position",
         "same revision with another hash conflicts",
         "A purged run cannot be resurrected with a new",
@@ -376,7 +428,7 @@ fn timeline_privacy_authority_and_replay_rules_remain_normative() {
     for rule in [
         "message TimelineAcceptanceScope",
         "SPOOL_CAPABILITY_ACTION_ACCEPT_TIMELINE_ORIGIN = 2",
-        "canonical_owner_capability_v2",
+        "canonical_owner_capability_v3",
         "subject Biscuit bound to its exact subject key/kind/ID",
     ] {
         assert!(owner.contains(rule), "missing owner authority rule: {rule}");
@@ -480,7 +532,7 @@ fn origin_transcript_binds_every_identity_field_and_signature() {
         })
         .unwrap()
     );
-    assert!(signed.starts_with(b"heddle-timeline-run-origin-v1\0"));
+    assert!(signed.starts_with(b"heddle-timeline-run-origin-v2\0"));
     assert_ne!(
         signed,
         origin_signing_bytes(&TimelineOriginEndorsement {
@@ -510,8 +562,89 @@ fn origin_transcript_binds_every_identity_field_and_signature() {
     );
     assert_eq!(
         hex::encode(logical_request_digest(&request(), 1_700_000_000_000_000).unwrap()),
-        "5b46eb711c38a7aa9c0587ee5c579872892afcf7327602fb31e9ae01fd404fd5"
+        "f1a5e5cce0033a50b6875d918d0bc91fa242a43c9b5528080d42fea0d0690470"
     );
+}
+
+#[test]
+fn origin_identity_variants_have_byte_exact_transcripts_and_strict_bounds() {
+    let golden: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/timeline-origin-v2.json")).unwrap();
+    let server = origin();
+    assert_eq!(
+        hex::encode(origin_signing_bytes(&server).unwrap()),
+        golden["server_issued"].as_str().unwrap()
+    );
+
+    let mut derived = origin();
+    derived.credential_identity = Some(TimelineOriginCredentialIdentity {
+        identity: Some(Identity::OfflineDerived(TimelineOfflineDerivedCredential {
+            issued_ancestor_credential_id: vec![4; 16],
+            terminal_revocation_id: vec![7; 64],
+        })),
+    });
+    assert_eq!(
+        hex::encode(origin_signing_bytes(&derived).unwrap()),
+        golden["offline_derived"].as_str().unwrap()
+    );
+    assert_ne!(
+        origin_signing_bytes(&server).unwrap(),
+        origin_signing_bytes(&derived).unwrap()
+    );
+
+    let mut missing = derived.clone();
+    missing.credential_identity.as_mut().unwrap().identity = None;
+    assert!(origin_signing_bytes(&missing).is_err());
+    let mut short = derived.clone();
+    if let Some(Identity::OfflineDerived(id)) = short
+        .credential_identity
+        .as_mut()
+        .unwrap()
+        .identity
+        .as_mut()
+    {
+        id.terminal_revocation_id.pop();
+    }
+    assert!(origin_signing_bytes(&short).is_err());
+    let mut long = derived.clone();
+    if let Some(Identity::OfflineDerived(id)) =
+        long.credential_identity.as_mut().unwrap().identity.as_mut()
+    {
+        id.issued_ancestor_credential_id = vec![4; 129];
+    }
+    assert!(origin_signing_bytes(&long).is_err());
+    let mut wrong_class = derived;
+    wrong_class.credential_class = TimelineOriginCredentialClass::DirectHuman as i32;
+    assert!(origin_signing_bytes(&wrong_class).is_err());
+}
+
+#[test]
+fn offline_registration_requires_bounded_presented_chain_and_upload_can_use_registered_binding() {
+    let mut upload = request();
+    upload.origin.as_mut().unwrap().credential_identity = Some(TimelineOriginCredentialIdentity {
+        identity: Some(Identity::OfflineDerived(TimelineOfflineDerivedCredential {
+            issued_ancestor_credential_id: vec![4; 16],
+            terminal_revocation_id: vec![7; 64],
+        })),
+    });
+    let mut registration = RegisterTimelineOriginRequest {
+        client_operation_id: UUID.into(),
+        thread: upload.thread.clone(),
+        run: upload.run.clone(),
+        origin: upload.origin.clone(),
+        origin_credential_biscuit: vec![],
+    };
+    assert!(validate_registration(&registration).is_err());
+    registration.origin_credential_biscuit = vec![1];
+    validate_registration(&registration).unwrap();
+    registration.origin_credential_biscuit = vec![1; MAX_TIMELINE_ORIGIN_BISCUIT_BYTES + 1];
+    assert!(validate_registration(&registration).is_err());
+    validate_upload(&upload, 1_700_000_000_000_000).unwrap();
+    upload.origin_credential_biscuit = vec![1; MAX_TIMELINE_ORIGIN_BISCUIT_BYTES + 1];
+    assert!(validate_upload(&upload, 1_700_000_000_000_000).is_err());
+    let mut issued = request();
+    issued.origin_credential_biscuit = vec![1];
+    assert!(validate_upload(&issued, 1_700_000_000_000_000).is_err());
 }
 
 #[test]

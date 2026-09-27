@@ -3,17 +3,18 @@ syntax = "proto3";
 package heddle.api.v1alpha2;
 
 import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/timeline_upload.proto";
 
 // Portable ownership evidence. These typed containers retain the independent
 // canonical signature domains, field ordering and durable format versions.
 // RPC package names are not signed. V1 owner capabilities authorize only
-// PURGE; v2 also permits exact-subject Thread timeline acceptance. Ordinary
+// PURGE; v3 permits exact-subject Thread timeline acceptance. Ordinary
 // spool access remains an ordinary Biscuit decision.
 // No private key is transported or supplied by a verifier.
 
 // Owner-anchored purge authorization and self-rooted identity objects.
 //
-// A v1 OwnerAuthorizationBundle authorizes only PURGE. A v2 bundle can
+// A v1 OwnerAuthorizationBundle authorizes only PURGE. A v3 bundle can
 // authorize the separate exact-subject timeline acceptance operation below.
 // Ordinary redaction, state-visibility, and state-attachment writes are
 // authorized by the transport's spool-write Biscuit and carry no owner sidecar.
@@ -388,7 +389,7 @@ enum SpoolCapabilityAction {
   SPOOL_CAPABILITY_ACTION_UNSPECIFIED = 0;
   // V1's sole action. Ordinary spool operations use transport Biscuits.
   SPOOL_CAPABILITY_ACTION_PURGE = 1;
-  // V2 only; authorizes a subject-key signature over one exact timeline
+  // V3 only; authorizes a subject-key signature over one exact timeline
   // acceptance transcript, subject to TimelineAcceptanceScope.
   SPOOL_CAPABILITY_ACTION_ACCEPT_TIMELINE_ORIGIN = 2;
 }
@@ -409,11 +410,11 @@ message CapabilityPrincipal {
   AuthorizationVerificationKey key = 3;
 }
 
-// V2 grant scope. This names the ORIGINAL credential, not the accepting
+// V3 grant scope. This names the ORIGINAL credential, not the accepting
 // subject key or an agent display label. All fields are mandatory and exact.
 message TimelineAcceptanceScope {
   bytes principal_account_uuid = 1; // Raw 16-byte run-principal UUID.
-  bytes origin_credential_id = 2; // Exact server-issued ID, 1..128 bytes.
+  TimelineOriginCredentialIdentity credential_identity = 2; // Exact original variant and values.
   bytes effective_pop_key_sha256 = 3; // Original effective key digest, 32 bytes.
   uint32 credential_class = 4; // TimelineOriginCredentialClass 1 or 2.
   bytes thread_id = 5; // Exact ThreadId.value, 32 bytes.
@@ -422,36 +423,45 @@ message TimelineAcceptanceScope {
 
 message SpoolCapabilityGrant {
   SpoolSelector spool = 1;
-  // V1: exactly PURGE. V2: exactly ACCEPT_TIMELINE_ORIGIN.
+  // V1: exactly PURGE. V3: exactly ACCEPT_TIMELINE_ORIGIN.
   SpoolCapabilityAction action = 2;
-  // Required only for V2 ACCEPT_TIMELINE_ORIGIN; forbidden for V1/PURGE.
+  // Required only for V3 ACCEPT_TIMELINE_ORIGIN; forbidden for V1/PURGE.
   TimelineAcceptanceScope timeline_acceptance = 3;
 }
 
-// V1 canonicalization and signature remain unchanged. For format_version=2,
-// canonical_owner_capability_v2 uses the v1 field order and encodings, but
+// V1 canonicalization and signature remain unchanged. The alpha.5 format-2
+// timeline grant is a hard cut: reject it. For format_version=3,
+// canonical_owner_capability_v3 uses the v1 field order and encodings, but
 // every grant appends one presence byte after action (exactly 0x01) followed
-// by scope fields 1..6: each bytes field is u32be(length)||bytes, and class is
-// u32be. The scope is included both with and without capability_id. The v2
-// capability_id is SHA-256("heddle-owner-capability-v2" || canonical body
-// without capability_id); its owner signature is Ed25519 over SHA-256 of that
-// domain followed by the canonical body WITH capability_id. The v1 domain and
-// body never acquire a trailing scope field. Unknown fields fail closed.
-// A v2 chain is direct (parent_capability_id empty), has one signed capability
+// by scope fields 1..6. Byte fields are counted; credential_identity uses
+// precisely the origin transcript's tag (0x01 or 0x02) and counted IDs, not a
+// protobuf serialization; class is u32be. The scope is included both with and
+// without capability_id. The v3 capability_id is SHA-256(
+// UTF8("heddle-owner-capability-v3") || canonical body without capability_id);
+// its owner signature is Ed25519 over SHA-256 of that domain followed by the
+// canonical body WITH capability_id. The v1 domain and body never change.
+// Unknown fields and unsupported versions fail closed.
+// A v3 chain is direct (parent_capability_id empty), has one signed capability
 // and a single-block subject Biscuit bound to its exact subject key/kind/ID
 // and grant. Its authority block has the v1 owner_subject, owner_capability,
 // owner_validity facts plus exactly one
-// owner_timeline_accept("<spool_uuid_hex>", "<path_hex>",
-// "<principal_uuid_hex>", "<origin_credential_id_hex>", "<pop_sha256_hex>",
-// <class_u32>, "<thread_id_hex>", "<origin_sha256_hex>") fact, where path_hex
-// is the v1 u32-length-prefixed canonical path segments as lower-case hex.
+// owner_timeline_accept_server("<spool_uuid_hex>", "<path_hex>",
+// "<principal_uuid_hex>", "<credential_id_hex>", "<pop_sha256_hex>",
+// <class_u32>, "<thread_id_hex>", "<origin_sha256_hex>") OR
+// owner_timeline_accept_offline("<spool_uuid_hex>", "<path_hex>",
+// "<principal_uuid_hex>", "<issued_ancestor_credential_id_hex>",
+// "<terminal_revocation_id_hex>", "<pop_sha256_hex>", <class_u32>,
+// "<thread_id_hex>", "<origin_sha256_hex>") fact, selected exactly by the
+// original credential_identity variant. IDs are lowercase raw-byte hex only
+// inside this Biscuit fact; path_hex is the v1 u32-length-prefixed canonical
+// path segments as lower-case hex.
 // Reject extra facts, attenuation blocks, duplicate grants and any PURGE fact;
 // this direct exact grant cannot be widened by a later block. The grant
 // selector MUST equal the actual canonical Spool UUID/path and MUST have
-// include_descendants=false. V1 PURGE verifiers reject v2 rather
+// include_descendants=false. V1 PURGE verifiers reject v3 rather
 // than treating this action as purge or ordinary spool-write authority.
 message OwnerCapability {
-  // 1 for PURGE or 2 for exact-subject timeline acceptance.
+  // 1 for PURGE or 3 for exact-subject timeline acceptance.
   uint32 format_version = 1;
   bytes owner_id = 2;
   bytes issuer_state_hash = 3;

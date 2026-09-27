@@ -224,13 +224,25 @@ Origin revocation invalidates registration as an admission basis. A pre-expiry
 registration never substitutes for fresh acceptance of a revoked original.
 
 Fresh acceptance uses a current direct-human run-principal credential or the
-format-2 `OwnerAuthorizationBundle` with an exact `TimelineAcceptanceScope`
+format-3 `OwnerAuthorizationBundle` with an exact `TimelineAcceptanceScope`
 grant from `owner_records.proto`. The encoded bundle is bound into the
 acceptance transcript; its leaf subject's effective Ed25519 key signs it.
 The verifier resolves signer and owner state from persisted current records,
-checks the original subject and Thread exactly, and enforces capability
+checks the original credential identity variant and values, subject and Thread
+exactly, and enforces capability
 attenuation, rotation/recovery, expiry and revocation at admission. A v1 PURGE
 grant, owner/admin status or uploader key does not imply acceptance authority.
+
+The origin identity is either one exact Weft-issued credential ID or an offline
+derivation path: the exact issued ancestor ID plus the terminal 64-byte raw
+Biscuit revocation identifier. The latter is the final element returned by
+`Biscuit::revocation_identifiers()`, not its hex rendering. Live-chain admission
+requires the presented derived chain. Weft verifies the named root, terminal
+identifier, effective PoP key and all signatures and attenuation, then checks
+expiry and every ancestor and block revocation. Pre-expiry registration records
+that verified binding for later admission after expiry; any revocation makes
+the recorded basis unusable. The identity variants cannot substitute for one
+another. The signed origin transcript is `heddle-timeline-run-origin-v2`.
 
 First admission reserves unique `(spool_id, run_id)` across Threads and freezes
 Thread, principal, actor class/key, uploader account/key and sharing epoch.

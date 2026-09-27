@@ -113,7 +113,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
         )
         self.assertIn("TOFU-pins spool_uuid -> owner_public_key", OWNER)
 
-    def test_owner_capability_keeps_purge_v1_and_scopes_timeline_v2(self) -> None:
+    def test_owner_capability_keeps_purge_v1_and_scopes_timeline_v3(self) -> None:
         self.assertEqual(
             enum_values(OWNER, "SpoolCapabilityAction"),
             [
@@ -126,7 +126,7 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
             fields(OWNER, "TimelineAcceptanceScope"),
             [
                 ("", "bytes", "principal_account_uuid", 1),
-                ("", "bytes", "origin_credential_id", 2),
+                ("", "TimelineOriginCredentialIdentity", "credential_identity", 2),
                 ("", "bytes", "effective_pop_key_sha256", 3),
                 ("", "uint32", "credential_class", 4),
                 ("", "bytes", "thread_id", 5),
@@ -141,7 +141,9 @@ class OwnerAuthorizationContractTest(unittest.TestCase):
                 ("", "TimelineAcceptanceScope", "timeline_acceptance", 3),
             ],
         )
-        self.assertIn("heddle-owner-capability-v2", OWNER)
+        self.assertIn("heddle-owner-capability-v3", OWNER)
+        self.assertIn("owner_timeline_accept_server", OWNER)
+        self.assertIn("owner_timeline_accept_offline", OWNER)
         self.assertEqual(
             fields(OWNER, "OwnerAuthorizationBundle"),
             [

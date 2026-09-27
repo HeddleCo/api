@@ -17,13 +17,46 @@ enum TimelineOriginCredentialClass {
   TIMELINE_ORIGIN_CREDENTIAL_CLASS_AGENT = 2;
 }
 
+// Exactly one credential identity. The selected route has no fallback.
+message TimelineOriginCredentialIdentity {
+  oneof identity {
+    TimelineServerIssuedCredential server_issued = 1;
+    TimelineOfflineDerivedCredential offline_derived = 2;
+  }
+}
+
+message TimelineServerIssuedCredential {
+  bytes credential_id = 1; // Exact Weft-issued ID, 1..128 opaque bytes.
+}
+
+message TimelineOfflineDerivedCredential {
+  // Exact Weft-issued ancestor ID, 1..128 opaque bytes.
+  bytes issued_ancestor_credential_id = 1;
+  // Exactly 64 raw bytes: the LAST Biscuit::revocation_identifiers() element,
+  // the terminal block signature. Never hex, base64, hash or protobuf bytes.
+  bytes terminal_revocation_id = 2;
+}
+
 // The active origin credential signs this exact transcript with Ed25519:
-// UTF8("heddle-timeline-run-origin-v1") || 0x00, then, in field order below,
+// UTF8("heddle-timeline-run-origin-v2") || 0x00, then, in field order below,
 // each byte/string field as u32be(byte_length) || its exact bytes; class is
-// one unsigned byte (1 or 2). UUIDs are 36 lowercase ASCII bytes in canonical
+// one unsigned byte (1 or 2). Credential identity is one tag byte followed by
+// counted IDs: 0x01 || counted(credential_id) for server_issued, or 0x02 ||
+// counted(issued_ancestor_credential_id) || counted(terminal_revocation_id)
+// for offline_derived. UUIDs are 36 lowercase ASCII bytes in canonical
 // hyphenated form. The signature itself is excluded. No protobuf serialization,
 // client timestamp or hash of a reconstructed RunRecord is a signing input.
-// Weft verifies the complete persisted origin chain and effective proof key.
+// Weft verifies the complete origin chain and effective proof key. For an
+// offline_derived live-chain admission, origin_credential_biscuit MUST carry
+// the derived chain. Verify signatures and attenuation; match its root
+// authority block to the named Weft-issued ancestor; recompute the terminal raw
+// revocation ID; and match SHA-256(final effective PoP public key) to the
+// digest below before verifying this endorsement with that effective key.
+// Require at least one attenuation block. Reject a missing chain, wrong root,
+// terminal ID or key, an expired chain, or revocation of any ancestor credential
+// or any Biscuit block. The ancestor ID alone never authenticates the agent.
+// A pre-expiry registration stores the verified identity, chain binding and
+// full revocation set; any later ancestor or block revocation invalidates it.
 message TimelineOriginEndorsement {
   // Weft deployment public identity, exactly 32 bytes; not a replica key.
   bytes deployment_public_key = 1;
@@ -38,8 +71,7 @@ message TimelineOriginEndorsement {
   TimelineOriginCredentialClass credential_class = 6;
   // SHA-256 of the final effective PoP public key, exactly 32 bytes.
   bytes effective_pop_key_sha256 = 7;
-  // Exact server-issued origin credential ID; 1..128 opaque bytes.
-  bytes origin_credential_id = 8;
+  TimelineOriginCredentialIdentity credential_identity = 8;
   // Exact enrolled or paired uploader device proof key, 32 bytes.
   bytes uploader_device_public_key = 9;
   // Ed25519 signature by the verified origin credential, exactly 64 bytes.
@@ -81,10 +113,11 @@ message TimelineOriginEndorsement {
 // transition history against the independently pinned CURRENT owner state of
 // the run-principal account; OwnerRoot.account_uuid MUST equal the verified
 // principal UUID (never accept a state supplied only by this bundle). Then
-// verify the single format-2 capability and subject Biscuit. The grant's exact
+// verify the single format-3 capability and subject Biscuit. The grant's exact
 // Spool selector, Thread ID, original principal UUID, credential class,
-// original credential ID, effective key digest and signed origin SHA-256 MUST
-// equal the verified origin. The leaf CapabilityPrincipal.key is the effective
+// original credential identity variant and values, effective key digest and
+// signed origin SHA-256 MUST equal the verified origin. The leaf
+// CapabilityPrincipal.key is the effective
 // Ed25519 signing key for this acceptance. SignedOwnerCapability.signature
 // signer_key_id instead resolves to the owner issuer key through the accepted
 // owner transition at issuer_state_hash and its live rotation/recovery signing
@@ -167,27 +200,35 @@ message UploadTimelineEvent {
 // uploader key MUST equal origin.uploader_device_public_key. In the write
 // transaction, recheck its live credential, revocation, exact Thread/Spool
 // writer authority, sharing destination/facet, billing and deletion gates.
-// For a NEW registration, the complete origin chain must be live, unrevoked
-// and unexpired at that transaction; the signature or client timestamp cannot
+// For a NEW registration, the complete origin chain must be presented, verified,
+// live, unrevoked and unexpired at that transaction; a client timestamp cannot
 // date itself. Under (uploader account, client_operation_id), store
 // registration_digest = SHA-256(UTF8("heddle-timeline-registration-v1") || 0x00
 // || counted(client_operation_id) || counted(spool UUID) || counted(ThreadId)
 // || counted(run ID) || counted(origin_sha256)), where counted is u32be length
 // plus exact bytes, UUIDs are canonical lowercase 36-byte ASCII, and
-// origin_sha256 includes the complete signed endorsement. Transport PoP is
-// excluded. Store the original server transaction timestamp beside the digest.
+// origin_sha256 includes the complete signed endorsement. The presented chain
+// and transport PoP are authorization evidence excluded from this digest.
+// Store the original server transaction timestamp, verified identity, chain
+// binding and full revocation set beside the digest.
 // A different digest for the same operation ID conflicts. An identical retry
 // with a FRESH transport proof returns the original registered_at and digest,
 // even after origin expiry, without re-dating or re-registering; it still checks
-// current uploader, sharing, deletion and billing gates. Origin revocation
-// invalidates the registered admission basis immediately. Registration never
-// overrides revocation and never authorizes a later range by itself once the
+// current uploader, sharing, deletion and billing gates. Revocation of the
+// issued ancestor or any Biscuit block invalidates the registered admission
+// basis immediately. Registration never overrides revocation and never
+// authorizes a later range by itself once the
 // original has been revoked; fresh acceptance is then required.
 message RegisterTimelineOriginRequest {
   string client_operation_id = 1; // Canonical UUID.
   ThreadRef thread = 2; // Exact Spool and 32-byte Thread identity.
   RecordRef run = 3; // Same Spool; run ID syntax above.
   TimelineOriginEndorsement origin = 4;
+  // For offline_derived, required even on a same-digest retry; the stored
+  // result can replay after expiry without re-dating it. Empty for
+  // server_issued. At most 65536 raw Biscuit::to_vec() bytes, not base64.
+  // A NEW registration verifies this chain before recording the binding.
+  bytes origin_credential_biscuit = 5;
 }
 message RegisterTimelineOriginResponse {
   bytes origin_sha256 = 1; // Exactly 32 bytes; exact registered endorsement.
@@ -210,8 +251,8 @@ message RegisterTimelineOriginResponse {
 // purge, including runs with no policy deadline. Delete them with Thread/Spool
 // deletion or relevant account/billing-lock deletion; the durable deletion
 // fence then makes old attempts uniformly absent.
-// A first upload requires a live origin chain at transaction time, an exact
-// previously registered pre-expiry origin that has not since been revoked, or
+// A first upload requires a presented live origin chain at transaction time,
+// an exact previously registered pre-expiry origin not since revoked, or
 // fresh scoped acceptance of this request. Later batches recheck the recorded
 // admission basis and acceptance range, plus current uploader, sharing,
 // billing, deletion, retention and revocation gates in the transaction.
@@ -236,6 +277,12 @@ message UploadScrubbedTimelineRequest {
   // cannot authorize this exact batch; later ranges need fresh acceptance.
   TimelineAdmissionAcceptance acceptance = 9;
   uint64 first_position = 10; // 0..2^63-1; equals first event position if present.
+  // Empty for server_issued. For offline_derived, at most 65536 raw
+  // Biscuit::to_vec() bytes. Required for the live-chain admission basis;
+  // may be empty with verified registration, fresh acceptance or a same-digest
+  // receipt replay. If present, verify it against the signed identity. This
+  // authorization evidence is excluded from the logical request digest.
+  bytes origin_credential_biscuit = 11;
 }
 
 message UploadScrubbedTimelineAck {

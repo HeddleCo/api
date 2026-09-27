@@ -4,7 +4,7 @@ use heddle_api::{
     FILE_DESCRIPTOR_SET,
     heddle::api::{
         common::{
-            AuthorizationAccess, AuthorizationExistence, AuthorizationRole,
+            AuthorizationAccess, AuthorizationExistence, AuthorizationRole, CapabilityArea,
             AuthorizationScopeSource, RetryBehavior, RpcEffect, SigningTier, StableSigningIdentity,
         },
         v1alpha2::{PasskeyRegistration, RenamePasskeyRequest},
@@ -18,7 +18,7 @@ use heddle_api::{
     },
 };
 use prost::Message;
-use prost_reflect::{DescriptorPool, Kind};
+use prost_reflect::{DescriptorPool, Kind, Value};
 
 #[test]
 fn passkey_label_is_additive_and_rename_has_a_version_checked_receipt() {
@@ -89,6 +89,18 @@ fn passkey_label_is_additive_and_rename_has_a_version_checked_receipt() {
         .expect("rename method");
     assert_eq!(rename.input(), request);
     assert_eq!(rename.output(), response);
+    let rpc_contract = pool
+        .get_extension_by_name("heddle.api.common.rpc_contract")
+        .expect("RPC contract option");
+    let options = rename.options();
+    let contract = options.get_extension(&rpc_contract);
+    let Value::Message(contract) = contract.as_ref() else {
+        panic!("RPC contract must be a message");
+    };
+    assert_eq!(
+        contract.get_field_by_name("capability").expect("capability").as_ref(),
+        &Value::EnumNumber(CapabilityArea::IdentityAndCredentials as i32)
+    );
     let route = method_descriptor("/heddle.api.v1alpha2.IdentityService/RenamePasskey")
         .expect("generated route");
     assert_eq!(
@@ -111,6 +123,26 @@ fn passkey_label_is_additive_and_rename_has_a_version_checked_receipt() {
     );
     assert_eq!(route.authorization.existence, AuthorizationExistence::Hide);
     assert!(route.authorization.targets.is_empty());
+}
+
+#[test]
+fn passkey_label_unicode_vectors_match_shared_contract() {
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "fixtures/passkey-label-unicode.json"
+    ))
+    .expect("shared Unicode vectors");
+    for vector in vectors.as_array().expect("vector list") {
+        let name = vector["name"].as_str().expect("vector name");
+        let input = vector["input"].as_str().expect("vector input");
+        match vector.get("normalized") {
+            Some(expected) => assert_eq!(
+                normalize_passkey_label(input).expect(name),
+                expected.as_str().expect("normalized string"),
+                "{name}"
+            ),
+            None => assert!(normalize_passkey_label(input).is_err(), "{name}"),
+        }
+    }
 }
 
 #[test]

@@ -234,15 +234,20 @@ attenuation, rotation/recovery, expiry and revocation at admission. A v1 PURGE
 grant, owner/admin status or uploader key does not imply acceptance authority.
 
 The origin identity is either one exact Weft-issued credential ID or an offline
-derivation path: the exact issued ancestor ID plus the terminal 64-byte raw
-Biscuit revocation identifier. The latter is the final element returned by
-`Biscuit::revocation_identifiers()`, not its hex rendering. Live-chain admission
-requires the presented derived chain. Weft verifies the named root, terminal
-identifier, effective PoP key and all signatures and attenuation, then checks
-expiry and every ancestor and block revocation. Pre-expiry registration records
-that verified binding for later admission after expiry; any revocation makes
-the recorded basis unusable. The identity variants cannot substitute for one
-another. The signed origin transcript is `heddle-timeline-run-origin-v2`.
+derivation path: the exact issued ancestor ID, terminal 64-byte raw Biscuit
+revocation identifier and a 32-byte SHA-256 commitment to every ordered raw
+revocation identifier from the issued authority block through the terminal
+block. The path digest uses `heddle-timeline-derivation-path-v1\0`, a u32be
+block count and the consecutive 64-byte IDs. Weft verifies uninterrupted
+signature-v1 chaining from the exact issued ancestor and rejects any v0 block,
+even if a general Biscuit verifier accepts it. It recomputes the path and
+effective PoP key and verifies the endorsement with the original effective
+public key. The chain is required unless an exact verified pre-expiry
+registration stores the binding and original key. Fresh acceptance can override
+original expiry or revocation for admission, but cannot skip that provenance
+check. Registration alone cannot admit a revoked original. The identity variants
+cannot substitute for one another. The signed origin transcript is
+`heddle-timeline-run-origin-v3`.
 
 First admission reserves unique `(spool_id, run_id)` across Threads and freezes
 Thread, principal, actor class/key, uploader account/key and sharing epoch.

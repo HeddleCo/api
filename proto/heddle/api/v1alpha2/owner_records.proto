@@ -450,7 +450,8 @@ message SpoolCapabilityGrant {
 // <class_u32>, "<thread_id_hex>", "<origin_sha256_hex>") OR
 // owner_timeline_accept_offline("<spool_uuid_hex>", "<path_hex>",
 // "<principal_uuid_hex>", "<issued_ancestor_credential_id_hex>",
-// "<terminal_revocation_id_hex>", "<pop_sha256_hex>", <class_u32>,
+// "<terminal_revocation_id_hex>", "<derivation_path_sha256_hex>",
+// "<pop_sha256_hex>", <class_u32>,
 // "<thread_id_hex>", "<origin_sha256_hex>") fact, selected exactly by the
 // original credential_identity variant. IDs are lowercase raw-byte hex only
 // inside this Biscuit fact; path_hex is the v1 u32-length-prefixed canonical
@@ -473,7 +474,7 @@ message OwnerCapability {
   int64 expires_at_unix_seconds = 8;
   // Exactly 32 random bytes.
   bytes nonce = 9;
-  // Recomputed from the matching canonical v1/v2 body without capability_id.
+  // Recomputed from the matching canonical v1/v3 body without capability_id.
   bytes capability_id = 10;
 }
 

@@ -35,28 +35,43 @@ message TimelineOfflineDerivedCredential {
   // Exactly 64 raw bytes: the LAST Biscuit::revocation_identifiers() element,
   // the terminal block signature. Never hex, base64, hash or protobuf bytes.
   bytes terminal_revocation_id = 2;
+  // Exactly 32 bytes: SHA-256 of the complete ordered derivation path below.
+  bytes derivation_path_sha256 = 3;
 }
 
 // The active origin credential signs this exact transcript with Ed25519:
-// UTF8("heddle-timeline-run-origin-v2") || 0x00, then, in field order below,
+// UTF8("heddle-timeline-run-origin-v3") || 0x00, then, in field order below,
 // each byte/string field as u32be(byte_length) || its exact bytes; class is
 // one unsigned byte (1 or 2). Credential identity is one tag byte followed by
 // counted IDs: 0x01 || counted(credential_id) for server_issued, or 0x02 ||
 // counted(issued_ancestor_credential_id) || counted(terminal_revocation_id)
+// || counted(derivation_path_sha256)
 // for offline_derived. UUIDs are 36 lowercase ASCII bytes in canonical
 // hyphenated form. The signature itself is excluded. No protobuf serialization,
 // client timestamp or hash of a reconstructed RunRecord is a signing input.
-// Weft verifies the complete origin chain and effective proof key. For an
-// offline_derived live-chain admission, origin_credential_biscuit MUST carry
-// the derived chain. Verify signatures and attenuation; match its root
-// authority block to the named Weft-issued ancestor; recompute the terminal raw
-// revocation ID; and match SHA-256(final effective PoP public key) to the
-// digest below before verifying this endorsement with that effective key.
-// Require at least one attenuation block. Reject a missing chain, wrong root,
-// terminal ID or key, an expired chain, or revocation of any ancestor credential
-// or any Biscuit block. The ancestor ID alone never authenticates the agent.
-// A pre-expiry registration stores the verified identity, chain binding and
-// full revocation set; any later ancestor or block revocation invalidates it.
+// For offline_derived, Weft verifies the COMPLETE chain from the exact named
+// Weft-issued ancestor authority block through the terminal block, with at
+// least one attenuation block. Every block, including authority, MUST use
+// Biscuit signature-v1; verify each signature binds the previous signature
+// without a gap. Reject any signature-v0 block even if a general Biscuit
+// verifier accepts it. Verify attenuation and lineage against the issued
+// ancestor, then derive revocation IDs from every block in order, including
+// the authority and terminal blocks. Each is the 64 raw signature bytes from
+// Biscuit::revocation_identifiers(). Compute derivation_path_sha256 as
+// SHA-256(UTF8("heddle-timeline-derivation-path-v1") || 0x00 || u32be(N)
+// || ID[0] || ... || ID[N-1]), where N >= 2 and IDs are exactly 64 bytes.
+// Require the computed path digest and terminal ID to equal the signed identity;
+// match SHA-256(final effective PoP public key) to the signed key digest, then
+// verify the endorsement with that effective public key. The ancestor ID alone
+// never authenticates the agent. Reject a wrong root, path, terminal ID or key.
+// An exact pre-expiry registration may supply the stored VERIFIED chain binding
+// and original effective public key when the chain is absent from an upload.
+// Otherwise the complete chain is required, including with fresh acceptance or
+// a receipt retry. Fresh acceptance may override original expiry or revocation
+// only for ADMISSION; it never skips lineage, path/key recomputation, signature
+// verification, or original public-key resolution. A live-chain admission
+// requires the chain to be live, unexpired and unrevoked. Registration stores
+// the full revocation set; later revocation invalidates its admission basis.
 message TimelineOriginEndorsement {
   // Weft deployment public identity, exactly 32 bytes; not a replica key.
   bytes deployment_public_key = 1;
@@ -78,7 +93,7 @@ message TimelineOriginEndorsement {
   bytes signature = 10;
 }
 
-// A current direct-human run-principal authority or a current v2
+// A current direct-human run-principal authority or a current format-3
 // OwnerAuthorizationBundle (owner_records.proto) with an
 // ACCEPT_TIMELINE_ORIGIN grant signs this exact acceptance:
 // UTF8("heddle-timeline-run-acceptance-v1") || 0x00 followed by fields 1..6
@@ -253,7 +268,10 @@ message RegisterTimelineOriginResponse {
 // fence then makes old attempts uniformly absent.
 // A first upload requires a presented live origin chain at transaction time,
 // an exact previously registered pre-expiry origin not since revoked, or
-// fresh scoped acceptance of this request. Later batches recheck the recorded
+// fresh scoped acceptance of this request. For offline_derived, the complete
+// verified chain MUST be presented unless that exact verified registration
+// binding is available; acceptance never supplies provenance evidence. Later
+// batches recheck the recorded
 // admission basis and acceptance range, plus current uploader, sharing,
 // billing, deletion, retention and revocation gates in the transaction.
 message UploadScrubbedTimelineRequest {
@@ -279,8 +297,9 @@ message UploadScrubbedTimelineRequest {
   uint64 first_position = 10; // 0..2^63-1; equals first event position if present.
   // Empty for server_issued. For offline_derived, at most 65536 raw
   // Biscuit::to_vec() bytes. Required for the live-chain admission basis;
-  // may be empty with verified registration, fresh acceptance or a same-digest
-  // receipt replay. If present, verify it against the signed identity. This
+  // may be empty only when an exact verified pre-expiry registration binding
+  // is available, including on a retry or with fresh acceptance. If present,
+  // verify it against the signed identity. This
   // authorization evidence is excluded from the logical request digest.
   bytes origin_credential_biscuit = 11;
 }

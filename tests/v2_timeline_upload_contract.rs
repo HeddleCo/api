@@ -16,13 +16,15 @@ use heddle_api::heddle::api::v1alpha2::{
 };
 use heddle_api::timeline_upload::{
     MAX_TIMELINE_EVENT_BYTES, MAX_TIMELINE_ORIGIN_BISCUIT_BYTES, MAX_TIMELINE_REQUEST_BYTES,
-    MAX_TIMELINE_SNAPSHOT_BYTES, acceptance_signing_bytes, logical_request_digest, origin_digest,
-    origin_signing_bytes, valid_agent_label, valid_canonical_uuid, valid_run_id,
-    valid_verified_agent_id, validate_event, validate_raw_event_size, validate_raw_request_size,
-    validate_raw_snapshot_size, validate_registration, validate_summary, validate_upload,
+    MAX_TIMELINE_SNAPSHOT_BYTES, acceptance_signing_bytes, derivation_path_sha256,
+    logical_request_digest, origin_digest, origin_signing_bytes, valid_agent_label,
+    valid_canonical_uuid, valid_run_id, valid_verified_agent_id, validate_event,
+    validate_raw_event_size, validate_raw_request_size, validate_raw_snapshot_size,
+    validate_registration, validate_summary, validate_upload, validate_upload_provenance,
 };
 use heddle_api::{FILE_DESCRIPTOR_SET, StreamingShape, v2::method_descriptor};
 use prost_reflect::{Cardinality, DescriptorPool, Kind, MessageDescriptor};
+use sha2::Digest;
 
 const UUID: &str = "123e4567-e89b-12d3-a456-426614174000";
 
@@ -270,6 +272,7 @@ fn allowed_fields(
         "heddle.api.v1alpha2.TimelineOfflineDerivedCredential" => &[
             ("issued_ancestor_credential_id", 1, "bytes", O, None),
             ("terminal_revocation_id", 2, "bytes", O, None),
+            ("derivation_path_sha256", 3, "bytes", O, None),
         ],
         "heddle.api.v1alpha2.TimelineAcceptanceScope" => &[
             ("principal_account_uuid", 1, "bytes", O, None),
@@ -422,6 +425,10 @@ fn timeline_privacy_authority_and_replay_rules_remain_normative() {
         "BEFORE checking first_position",
         "same revision with another hash conflicts",
         "A purged run cannot be resurrected with a new",
+        "Every block, including authority, MUST use",
+        "Reject any signature-v0 block",
+        "Fresh acceptance may override original expiry or revocation",
+        "Otherwise the complete chain is required",
     ] {
         assert!(upload.contains(rule), "missing upload rule: {rule}");
     }
@@ -532,7 +539,7 @@ fn origin_transcript_binds_every_identity_field_and_signature() {
         })
         .unwrap()
     );
-    assert!(signed.starts_with(b"heddle-timeline-run-origin-v2\0"));
+    assert!(signed.starts_with(b"heddle-timeline-run-origin-v3\0"));
     assert_ne!(
         signed,
         origin_signing_bytes(&TimelineOriginEndorsement {
@@ -562,14 +569,14 @@ fn origin_transcript_binds_every_identity_field_and_signature() {
     );
     assert_eq!(
         hex::encode(logical_request_digest(&request(), 1_700_000_000_000_000).unwrap()),
-        "f1a5e5cce0033a50b6875d918d0bc91fa242a43c9b5528080d42fea0d0690470"
+        "1fa8d6021e529bfc266c5d7e3605944fa71f356c6454cc73fad8ff76606cf4a2"
     );
 }
 
 #[test]
 fn origin_identity_variants_have_byte_exact_transcripts_and_strict_bounds() {
     let golden: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/timeline-origin-v2.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/timeline-origin-v3.json")).unwrap();
     let server = origin();
     assert_eq!(
         hex::encode(origin_signing_bytes(&server).unwrap()),
@@ -581,6 +588,7 @@ fn origin_identity_variants_have_byte_exact_transcripts_and_strict_bounds() {
         identity: Some(Identity::OfflineDerived(TimelineOfflineDerivedCredential {
             issued_ancestor_credential_id: vec![4; 16],
             terminal_revocation_id: vec![7; 64],
+            derivation_path_sha256: vec![8; 32],
         })),
     });
     assert_eq!(
@@ -619,12 +627,104 @@ fn origin_identity_variants_have_byte_exact_transcripts_and_strict_bounds() {
 }
 
 #[test]
+fn collision_paths_must_have_distinct_signed_identities() {
+    #[derive(Clone, PartialEq, prost::Message)]
+    struct SignedBlockWire {
+        #[prost(bytes, tag = "3")]
+        signature: Vec<u8>,
+        #[prost(uint32, optional, tag = "5")]
+        version: Option<u32>,
+    }
+    #[derive(Clone, PartialEq, prost::Message)]
+    struct BiscuitWire {
+        #[prost(message, optional, tag = "2")]
+        authority: Option<SignedBlockWire>,
+        #[prost(message, repeated, tag = "3")]
+        blocks: Vec<SignedBlockWire>,
+    }
+    fn chain_ids(raw: &str) -> Vec<Vec<u8>> {
+        use prost::Message;
+        let wire = BiscuitWire::decode(hex::decode(raw).unwrap().as_slice()).unwrap();
+        let blocks = std::iter::once(wire.authority.unwrap()).chain(wire.blocks);
+        blocks
+            .map(|block| {
+                assert_eq!(block.version.unwrap_or(0), 0, "fixture must exercise v0");
+                assert_eq!(block.signature.len(), 64);
+                block.signature
+            })
+            .collect()
+    }
+    let vector: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/timeline-origin-collision-v0.json")).unwrap();
+    let a_ids = chain_ids(vector["a_chain_hex"].as_str().unwrap());
+    let b_ids = chain_ids(vector["b_chain_hex"].as_str().unwrap());
+    assert_eq!(
+        a_ids.iter().map(hex::encode).collect::<Vec<_>>(),
+        vector["a_revocation_ids_hex"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        b_ids.iter().map(hex::encode).collect::<Vec<_>>(),
+        vector["b_revocation_ids_hex"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(a_ids.len(), b_ids.len());
+    assert_ne!(a_ids[2], b_ids[2]);
+    assert_eq!(a_ids.last(), b_ids.last());
+    let a_path = derivation_path_sha256(&a_ids).unwrap();
+    let b_path = derivation_path_sha256(&b_ids).unwrap();
+    assert_eq!(
+        hex::encode(a_path),
+        vector["a_path_sha256_hex"].as_str().unwrap()
+    );
+    assert_eq!(
+        hex::encode(b_path),
+        vector["b_path_sha256_hex"].as_str().unwrap()
+    );
+    assert_ne!(a_path, b_path);
+
+    let mut a = origin();
+    a.effective_pop_key_sha256 = sha2::Sha256::digest(
+        hex::decode(vector["effective_pop_key_hex"].as_str().unwrap()).unwrap(),
+    )
+    .to_vec();
+    a.credential_identity = Some(TimelineOriginCredentialIdentity {
+        identity: Some(Identity::OfflineDerived(TimelineOfflineDerivedCredential {
+            issued_ancestor_credential_id: vec![4; 16],
+            terminal_revocation_id: a_ids.last().unwrap().clone(),
+            derivation_path_sha256: a_path.to_vec(),
+        })),
+    });
+    let mut b = a.clone();
+    if let Some(Identity::OfflineDerived(id)) =
+        b.credential_identity.as_mut().unwrap().identity.as_mut()
+    {
+        id.derivation_path_sha256 = b_path.to_vec();
+    }
+    // The old signed inputs (ancestor, terminal ID, key digest) collide.
+    assert_eq!(a.effective_pop_key_sha256, b.effective_pop_key_sha256);
+    assert_ne!(
+        origin_signing_bytes(&a).unwrap(),
+        origin_signing_bytes(&b).unwrap()
+    );
+}
+
+#[test]
 fn offline_registration_requires_bounded_presented_chain_and_upload_can_use_registered_binding() {
     let mut upload = request();
     upload.origin.as_mut().unwrap().credential_identity = Some(TimelineOriginCredentialIdentity {
         identity: Some(Identity::OfflineDerived(TimelineOfflineDerivedCredential {
             issued_ancestor_credential_id: vec![4; 16],
             terminal_revocation_id: vec![7; 64],
+            derivation_path_sha256: vec![8; 32],
         })),
     });
     let mut registration = RegisterTimelineOriginRequest {
@@ -668,4 +768,33 @@ fn acceptance_is_bound_to_one_original_and_exact_batch_range() {
     value.acceptance.as_mut().unwrap().event_count = 1;
     value.acceptance.as_mut().unwrap().request_sha256[0] ^= 1;
     assert!(validate_upload(&value, now).is_err());
+}
+
+#[test]
+fn fresh_acceptance_still_requires_offline_provenance_without_exact_registration() {
+    let now = 1_700_000_000_000_000;
+    let mut value = request();
+    value.origin.as_mut().unwrap().credential_identity = Some(TimelineOriginCredentialIdentity {
+        identity: Some(Identity::OfflineDerived(TimelineOfflineDerivedCredential {
+            issued_ancestor_credential_id: vec![4; 16],
+            terminal_revocation_id: vec![7; 64],
+            derivation_path_sha256: vec![8; 32],
+        })),
+    });
+    let origin = value.origin.as_ref().unwrap();
+    value.acceptance = Some(TimelineAdmissionAcceptance {
+        origin_sha256: origin_digest(origin).unwrap().to_vec(),
+        uploader_device_public_key: origin.uploader_device_public_key.clone(),
+        deployment_public_key: origin.deployment_public_key.clone(),
+        request_sha256: logical_request_digest(&value, now).unwrap().to_vec(),
+        first_position: 0,
+        event_count: 1,
+        authority: Some(Authority::PrincipalCredentialId(vec![5])),
+        signature: vec![6; 64],
+    });
+    validate_upload(&value, now).unwrap();
+    assert!(validate_upload_provenance(&value, false).is_err());
+    validate_upload_provenance(&value, true).unwrap();
+    value.origin_credential_biscuit = vec![1];
+    validate_upload_provenance(&value, false).unwrap();
 }

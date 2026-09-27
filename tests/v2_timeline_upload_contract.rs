@@ -20,7 +20,7 @@ use heddle_api::timeline_upload::{
     validate_summary, validate_upload,
 };
 use heddle_api::{FILE_DESCRIPTOR_SET, StreamingShape, v2::method_descriptor};
-use prost_reflect::{DescriptorPool, Kind, MessageDescriptor};
+use prost_reflect::{Cardinality, DescriptorPool, Kind, MessageDescriptor};
 
 const UUID: &str = "123e4567-e89b-12d3-a456-426614174000";
 
@@ -120,27 +120,211 @@ fn timeline_routes_pin_weft_writer_proof_and_client_operation_retry() {
     }
 }
 
-fn walk_no_free_text(message: MessageDescriptor, visited: &mut BTreeSet<String>) {
+// The only admitted strings are the exact bounded identifiers or closed harness
+// selector below. Bytes are exact IDs, hashes, keys, signatures, or the bounded
+// owner authority bundle. Any new field, even inside a reused common message,
+// changes this contract and must be reviewed here before it reaches a client.
+fn allowed_fields(
+    name: &str,
+) -> &'static [(
+    &'static str,
+    u32,
+    &'static str,
+    Cardinality,
+    Option<&'static str>,
+)] {
+    use Cardinality::{Optional as O, Repeated as R};
+    match name {
+        "heddle.api.v1alpha2.RegisterTimelineOriginRequest" => &[
+            ("client_operation_id", 1, "string", O, None),
+            (
+                "thread",
+                2,
+                "message:heddle.api.v1alpha2.ThreadRef",
+                O,
+                None,
+            ),
+            ("run", 3, "message:heddle.api.v1alpha2.RecordRef", O, None),
+            (
+                "origin",
+                4,
+                "message:heddle.api.v1alpha2.TimelineOriginEndorsement",
+                O,
+                None,
+            ),
+        ],
+        "heddle.api.v1alpha2.UploadScrubbedTimelineRequest" => &[
+            ("client_operation_id", 1, "string", O, None),
+            (
+                "thread",
+                2,
+                "message:heddle.api.v1alpha2.ThreadRef",
+                O,
+                None,
+            ),
+            ("run", 3, "message:heddle.api.v1alpha2.RecordRef", O, None),
+            ("canonicalization_version", 4, "uint32", O, None),
+            ("run_revision", 5, "uint64", O, None),
+            (
+                "snapshot",
+                6,
+                "message:heddle.api.v1alpha2.UploadRunSummary",
+                O,
+                None,
+            ),
+            (
+                "events",
+                7,
+                "message:heddle.api.v1alpha2.UploadTimelineEvent",
+                R,
+                None,
+            ),
+            (
+                "origin",
+                8,
+                "message:heddle.api.v1alpha2.TimelineOriginEndorsement",
+                O,
+                None,
+            ),
+            (
+                "acceptance",
+                9,
+                "message:heddle.api.v1alpha2.TimelineAdmissionAcceptance",
+                O,
+                None,
+            ),
+            ("first_position", 10, "uint64", O, None),
+        ],
+        "heddle.api.v1alpha2.ThreadRef" => &[
+            ("spool", 1, "message:heddle.api.v1alpha2.SpoolRef", O, None),
+            ("id", 2, "message:heddle.api.v1alpha2.ThreadId", O, None),
+        ],
+        "heddle.api.v1alpha2.SpoolRef" => &[("id", 1, "string", O, None)],
+        "heddle.api.v1alpha2.ThreadId" => &[("value", 1, "bytes", O, None)],
+        "heddle.api.v1alpha2.RecordRef" => &[
+            ("spool", 1, "message:heddle.api.v1alpha2.SpoolRef", O, None),
+            ("id", 2, "string", O, None),
+        ],
+        "heddle.api.v1alpha2.TimelineOriginEndorsement" => &[
+            ("deployment_public_key", 1, "bytes", O, None),
+            ("spool_id", 2, "string", O, None),
+            ("thread_id", 3, "bytes", O, None),
+            ("run_id", 4, "string", O, None),
+            ("principal_id", 5, "string", O, None),
+            (
+                "credential_class",
+                6,
+                "enum:heddle.api.v1alpha2.TimelineOriginCredentialClass",
+                O,
+                None,
+            ),
+            ("effective_pop_key_sha256", 7, "bytes", O, None),
+            ("origin_credential_id", 8, "bytes", O, None),
+            ("uploader_device_public_key", 9, "bytes", O, None),
+            ("signature", 10, "bytes", O, None),
+        ],
+        "heddle.api.v1alpha2.TimelineAdmissionAcceptance" => &[
+            ("origin_sha256", 1, "bytes", O, None),
+            ("uploader_device_public_key", 2, "bytes", O, None),
+            ("deployment_public_key", 3, "bytes", O, None),
+            ("request_sha256", 4, "bytes", O, None),
+            ("first_position", 5, "uint64", O, None),
+            ("event_count", 6, "uint32", O, None),
+            ("principal_credential_id", 7, "bytes", O, Some("authority")),
+            ("owner_derived_capability", 8, "bytes", O, Some("authority")),
+            ("signature", 9, "bytes", O, None),
+        ],
+        "heddle.api.v1alpha2.UploadRunSummary" => &[
+            (
+                "state",
+                1,
+                "enum:heddle.api.v1alpha2.OperationRecord.State",
+                O,
+                None,
+            ),
+            ("harness", 2, "string", O, None),
+        ],
+        "heddle.api.v1alpha2.UploadTimelineEvent" => &[
+            ("position", 1, "uint64", O, None),
+            (
+                "kind",
+                2,
+                "enum:heddle.api.v1alpha2.UploadTimelineEventKind",
+                O,
+                None,
+            ),
+            (
+                "recorded_at",
+                3,
+                "message:google.protobuf.Timestamp",
+                O,
+                None,
+            ),
+            (
+                "tool_name",
+                4,
+                "enum:heddle.api.v1alpha2.UploadTimelineTool",
+                O,
+                Some("_tool_name"),
+            ),
+        ],
+        "google.protobuf.Timestamp" => &[
+            ("seconds", 1, "int64", O, None),
+            ("nanos", 2, "int32", O, None),
+        ],
+        _ => panic!("unreviewed message reachable from timeline request: {name}"),
+    }
+}
+
+fn field_kind(kind: Kind) -> String {
+    match kind {
+        Kind::String => "string".into(),
+        Kind::Bytes => "bytes".into(),
+        Kind::Uint32 => "uint32".into(),
+        Kind::Uint64 => "uint64".into(),
+        Kind::Int32 => "int32".into(),
+        Kind::Int64 => "int64".into(),
+        Kind::Enum(value) => format!("enum:{}", value.full_name()),
+        Kind::Message(value) => format!("message:{}", value.full_name()),
+        other => panic!("unreviewed timeline field kind: {other:?}"),
+    }
+}
+
+fn walk_allowlist(message: MessageDescriptor, visited: &mut BTreeSet<String>) {
     if !visited.insert(message.full_name().to_owned()) {
         return;
     }
+    let expected = allowed_fields(message.full_name());
+    assert_eq!(
+        message.fields().len(),
+        expected.len(),
+        "{} field count",
+        message.full_name()
+    );
     for field in message.fields() {
-        if field.kind() == Kind::String {
-            let name = field.name().to_ascii_lowercase();
-            assert!(
-                ![
-                    "summary", "detail", "command", "message", "model", "action", "path",
-                    "artifact"
-                ]
+        let actual = (
+            field.name(),
+            field.number(),
+            field_kind(field.kind()),
+            field.cardinality(),
+            field
+                .containing_oneof()
+                .map(|oneof| oneof.name().to_owned()),
+        );
+        assert!(
+            expected
                 .iter()
-                .any(|forbidden| name.contains(forbidden)),
-                "free-text upload field {}.{} is forbidden",
-                message.full_name(),
-                field.name()
-            );
-        }
+                .any(|&(name, number, kind, cardinality, oneof)| actual.0 == name
+                    && actual.1 == number
+                    && actual.2 == kind
+                    && actual.3 == cardinality
+                    && actual.4.as_deref() == oneof),
+            "unreviewed timeline request field {}.{}: {actual:?}",
+            message.full_name(),
+            field.name()
+        );
         if let Kind::Message(child) = field.kind() {
-            walk_no_free_text(child, visited);
+            walk_allowlist(child, visited);
         }
     }
 }
@@ -148,40 +332,64 @@ fn walk_no_free_text(message: MessageDescriptor, visited: &mut BTreeSet<String>)
 #[test]
 fn upload_inputs_have_only_the_allowlisted_projection_fields_and_no_free_text() {
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).unwrap();
-    let summary = pool
-        .get_message_by_name("heddle.api.v1alpha2.UploadRunSummary")
-        .unwrap();
-    let event = pool
-        .get_message_by_name("heddle.api.v1alpha2.UploadTimelineEvent")
-        .unwrap();
-    let request = pool
-        .get_message_by_name("heddle.api.v1alpha2.UploadScrubbedTimelineRequest")
-        .unwrap();
-    walk_no_free_text(request, &mut BTreeSet::new());
-    let summary_fields: BTreeSet<_> = summary
-        .fields()
-        .map(|field| field.name().to_owned())
-        .collect();
-    let event_fields: BTreeSet<_> = event
-        .fields()
-        .map(|field| field.name().to_owned())
-        .collect();
-    assert_eq!(
-        summary_fields,
-        BTreeSet::from(["state".into(), "harness".into()])
+    let mut visited = BTreeSet::new();
+    for root in [
+        "RegisterTimelineOriginRequest",
+        "UploadScrubbedTimelineRequest",
+    ] {
+        walk_allowlist(
+            pool.get_message_by_name(&format!("heddle.api.v1alpha2.{root}"))
+                .unwrap(),
+            &mut visited,
+        );
+    }
+}
+
+#[test]
+fn timeline_privacy_authority_and_replay_rules_remain_normative() {
+    let stream = include_str!("../docs/alpha-v2/streams.md");
+    let upload = include_str!("../proto/heddle/api/v1alpha2/timeline_upload.proto");
+    let owner = include_str!("../proto/heddle/api/v1alpha2/owner_records.proto");
+    let views = include_str!("../proto/heddle/api/v1alpha2/views.proto");
+    for rule in [
+        "Thread owners, Spool owners and administrators have\nno override",
+        "before order/limit or count",
+        "identical status/error wording, count, cursor and reset\nshapes",
+        "format-2 `OwnerAuthorizationBundle`",
+        "Origin revocation invalidates registration as an admission basis",
+        "unique `(spool_id, run_id)` across Threads",
+        "retry checks that receipt before position or current run\nrevision",
+        "A zero-event run revision requires\n`first_position == next_position`",
+    ] {
+        assert!(stream.contains(rule), "missing stream rule: {rule}");
+    }
+    for rule in [
+        "original registered_at and digest",
+        "Origin revocation\n// invalidates the registered admission basis immediately",
+        "BEFORE checking first_position",
+        "same revision with another hash conflicts",
+        "A purged run cannot be resurrected with a new",
+    ] {
+        assert!(upload.contains(rule), "missing upload rule: {rule}");
+    }
+    for rule in [
+        "message TimelineAcceptanceScope",
+        "SPOOL_CAPABILITY_ACTION_ACCEPT_TIMELINE_ORIGIN = 2",
+        "canonical_owner_capability_v2",
+        "subject Biscuit bound to its exact subject key/kind/ID",
+    ] {
+        assert!(owner.contains(rule), "missing owner authority rule: {rule}");
+    }
+    assert!(
+        views.contains("same-principal agent whose final effective PoP key digest exactly equals")
     );
-    assert_eq!(
-        event_fields,
-        BTreeSet::from([
-            "position".into(),
-            "kind".into(),
-            "recorded_at".into(),
-            "tool_name".into()
-        ])
+    assert!(
+        views.contains("Forbidden and absent run IDs, pages and cursors have identical status")
     );
 }
 
 #[test]
+#[allow(clippy::clone_on_copy)] // Keep the mutation probes compiling when an event gains a field.
 fn ids_enums_positions_timestamps_and_bounds_reject_invalid_values() {
     assert!(valid_canonical_uuid(UUID));
     assert!(!valid_canonical_uuid(&UUID.to_uppercase()));
@@ -221,7 +429,7 @@ fn ids_enums_positions_timestamps_and_bounds_reject_invalid_values() {
     value.events[0].position = 1;
     assert!(validate_upload(&value, now).is_err());
     value.events[0].position = 0;
-    value.events = vec![value.events[0]; 65];
+    value.events = vec![value.events[0].clone(); 65];
     assert!(validate_upload(&value, now).is_err());
     let mut summary = value.snapshot.unwrap();
     summary.harness = "x".repeat(MAX_TIMELINE_SNAPSHOT_BYTES + 1);

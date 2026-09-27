@@ -112,7 +112,7 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
         self.assertIn("heddle-purge-operation-v2", OWNER)
         self.assertNotIn("SidecarOperationSigningBody", OWNER)
 
-    def test_owner_capability_action_set_is_purge_only(self) -> None:
+    def test_owner_capability_action_set_preserves_v1_purge_scope(self) -> None:
         actions = block(OWNER, "enum", "SpoolCapabilityAction")
         self.assertEqual(
             re.findall(
@@ -121,8 +121,10 @@ class OwnerAuthzCutoverContractTest(unittest.TestCase):
             [
                 ("SPOOL_CAPABILITY_ACTION_UNSPECIFIED", "0"),
                 ("SPOOL_CAPABILITY_ACTION_PURGE", "1"),
+                ("SPOOL_CAPABILITY_ACTION_ACCEPT_TIMELINE_ORIGIN", "2"),
             ],
         )
+        self.assertIn("V1: exactly PURGE. V2: exactly ACCEPT_TIMELINE_ORIGIN", OWNER)
         transfer = block(SYNC, "message", "TransferSidecar")
         self.assertIn("PURGE requires the independently verified owner", transfer)
         self.assertIn("Ordinary write cannot satisfy that requirement", transfer)

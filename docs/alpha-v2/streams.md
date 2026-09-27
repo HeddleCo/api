@@ -128,6 +128,35 @@ and harness, and a timeline event has position, closed kind and tool enums, and
 device `recorded_at`. Hosted display summaries are fixed server templates and
 `detail` is absent. Device `ObserveRuns` keeps its separate local behavior.
 
+The timeline reader must first pass current resource-reader authority for the
+Spool and Thread with the actual catalog-derived Spool audience, current Thread
+audience, sharing destination/facet and epoch, billing and deletion ceilings.
+Those gates only narrow access. For each run and event, the caller must also be
+either (1) a verified direct-human credential for that run's immutable principal
+account UUID, through a live independent root, passkey browser session or
+direct-human paired browser/device chain with current parent and proof-key
+binding, or (2) a live, unrevoked, unexpired delegated agent of that SAME
+principal whose final effective PoP public-key SHA-256 equals the run's frozen
+actor digest. The exact server-issued delegation credential establishes class;
+an `agent_id`, missing label, session ID or caller-asserted account does not.
+A direct human can read that principal's agent runs when their human authority
+passes the ordinary Thread gates; an agent can read only its exact actor runs.
+Direct-human runs have no agent match. Service, anonymous and public readers
+have no timeline run class. Thread owners, Spool owners and administrators have
+no override, even on local-key-only Threads. The current Thread owner is a
+deletion fence and ordinary audience input, never a run-reader predicate.
+
+Every list, exact-run read, page and follow query joins current sharing, run
+attribution, audience, Spool access, billing, deletion and per-payload deadline
+before order/limit or count. A deadline passes only while the database clock is
+earlier than its non-null value. Hidden rows cannot consume page slots or
+advance a visible cursor/checkpoint. Forbidden and absent run IDs, pages and
+resume cursors have identical status/error wording, count, cursor and reset
+shapes, with no existence preflight or wake leaking hidden changes. This
+timeline privacy rule supersedes the generic empty/unavailable distinction
+below: a visible empty eligible collection gets its SectionStatus, while a
+forbidden/absent selector has the same externally observable shape.
+
 `pages.timeline` requires the timeline section and requests at most 64 events.
 The shared `ReadBudget` charges each visible run frame alongside every event,
 overview, status, removal and checkpoint frame in all selected sections.
@@ -158,9 +187,15 @@ an unexhausted fixed-page change, or bounded slow-consumer backpressure ends
 with terminal `Reset → FIN`; the client starts a new observation. A hidden
 run's purge produces no visible removal or checkpoint. `ONCE` ends after
 checkpoint, `Complete`, and FIN. Every protected timeline frame is authorized
-again from current database state immediately before handoff; the server
-reserves capacity before taking its authorization epoch lock and never waits
-for downstream capacity while holding that lock.
+again from current database state immediately before handoff, including current
+credential class/effective key, delegation/session revocation and expiry,
+sharing epoch, grant, billing/deletion fences and DB-clock deadline. This applies
+to run, event, removal, status, replacement and checkpoint frames conveying
+timeline eligibility. The server reserves capacity before taking its
+authorization epoch `FOR SHARE` lock, holds it across the bounded handoff, and
+never waits for downstream capacity while holding it. The next handoff after a
+narrowing commit cannot use a cached authorization result. Idle followers arm
+the earliest relevant expiry timer and recheck without waiting for a sweep.
 
 `SyncService.UploadScrubbedTimeline` is a unary durable write, bounded to
 256 KiB, 64 consecutive events, 2 KiB per event and 4 KiB per snapshot. A
@@ -176,6 +211,42 @@ whole batch commits. A same-operation-ID digest mismatch is a conflict; an
 ineligible member makes the whole request terminal `RESOURCE_GONE` and erases
 the exact ack. Pressure returns `RESOURCE_EXHAUSTED` with retry advice, and
 storage failure returns `UNAVAILABLE` without an ack.
+
+The authenticated uploader key must equal the origin's key. Only a persisted
+enrolled independent device root or active paired credential whose
+`receiver_kind=device` may upload or register; both require current enrollment,
+endpoint binding and proof. The transaction rechecks credential revocation,
+Thread writer, signed sharing destination/facet, billing and deletion. A
+registration stores an uploader-account operation ID, canonical binding/origin
+digest and server transaction timestamp. An identical fresh-proof retry returns
+that original timestamp even after origin expiry; a different digest conflicts.
+Origin revocation invalidates registration as an admission basis. A pre-expiry
+registration never substitutes for fresh acceptance of a revoked original.
+
+Fresh acceptance uses a current direct-human run-principal credential or the
+format-2 `OwnerAuthorizationBundle` with an exact `TimelineAcceptanceScope`
+grant from `owner_records.proto`. The encoded bundle is bound into the
+acceptance transcript; its leaf subject's effective Ed25519 key signs it.
+The verifier resolves signer and owner state from persisted current records,
+checks the original subject and Thread exactly, and enforces capability
+attenuation, rotation/recovery, expiry and revocation at admission. A v1 PURGE
+grant, owner/admin status or uploader key does not imply acceptance authority.
+
+First admission reserves unique `(spool_id, run_id)` across Threads and freezes
+Thread, principal, actor class/key, uploader account/key and sharing epoch.
+Every new operation ID checks the live run plus its persistent keyed replay
+fence, including across sharing re-enable; no purged run can be resurrected.
+A request's durable receipt retains its original logical digest and exact ack.
+After current gates, retry checks that receipt before position or current run
+revision: same digest replays the old ack if all members remain eligible,
+different digest conflicts, and any ineligible member yields whole-request
+terminal `RESOURCE_GONE` with ack bytes erased and digest fence retained.
+Same revision/hash is replay, conflicting same revision is rejected, and changed
+snapshot requires increasing revision. A zero-event run revision requires
+`first_position == next_position` and emits a run upsert. Purge, DISCARD and
+expiry retain a keyed run fence even with no hosted deadline. Thread/Spool or
+relevant account/billing-lock deletion erases receipts and fences after its
+durable deletion fence makes the target uniformly absent.
 
 Filters define an endpoint-local window, with deterministic order and stable ID
 as a tie breaker. Zero size selects a bounded default. Page tokens bind the

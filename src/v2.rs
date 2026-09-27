@@ -2,6 +2,7 @@
 pub mod client;
 pub mod identity_management;
 pub mod invitation;
+pub mod passkey_label;
 use crate::StreamingShape;
 use crate::heddle::api::common::{
     AuthorizationAccess, AuthorizationExistence, AuthorizationRole, AuthorizationScopeSource,

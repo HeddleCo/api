@@ -1,0 +1,86 @@
+[
+  {
+    "name": "plain trim",
+    "input": "  Work laptop  ",
+    "normalized": "Work laptop"
+  },
+  {
+    "name": "empty default",
+    "input": " 　  ",
+    "normalized": ""
+  },
+  {
+    "name": "unicode whitespace trim",
+    "input": "　 東京 　",
+    "normalized": "東京"
+  },
+  {
+    "name": "bidi override U+202E",
+    "input": "Work‮Laptop"
+  },
+  {
+    "name": "bidi isolate U+2066",
+    "input": "Work⁦Laptop"
+  },
+  {
+    "name": "zero width space U+200B",
+    "input": "Work​Laptop"
+  },
+  {
+    "name": "byte order mark U+FEFF",
+    "input": "﻿Work"
+  },
+  {
+    "name": "zero width joiner U+200D",
+    "input": "👩‍💻"
+  },
+  {
+    "name": "private use",
+    "input": "Name"
+  },
+  {
+    "name": "unassigned",
+    "input": "Name͸"
+  },
+  {
+    "name": "line separator",
+    "input": "Name Next"
+  },
+  {
+    "name": "paragraph separator",
+    "input": "Name Next"
+  },
+  {
+    "name": "embedded control",
+    "input": "Name\nNext"
+  },
+  {
+    "name": "NFC composition",
+    "input": "Café",
+    "normalized": "Café"
+  },
+  {
+    "name": "256 bytes before NFC",
+    "input": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx",
+    "normalized": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééx"
+  },
+  {
+    "name": "256 bytes after NFC",
+    "input": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+    "normalized": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+  },
+  {
+    "name": "over 256 bytes after NFC",
+    "input": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+  },
+  {
+    "name": "emoji allowed",
+    "input": "🔐 laptop",
+    "normalized": "🔐 laptop"
+  },
+  {
+    "name": "CJK allowed",
+    "input": "東京の鍵",
+    "normalized": "東京の鍵"
+  }
+]

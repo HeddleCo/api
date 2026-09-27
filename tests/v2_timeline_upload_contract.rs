@@ -425,8 +425,8 @@ fn timeline_privacy_authority_and_replay_rules_remain_normative() {
         "BEFORE checking first_position",
         "same revision with another hash conflicts",
         "A purged run cannot be resurrected with a new",
-        "Every block, including authority, MUST use",
-        "Reject any signature-v0 block",
+        "Both Biscuit signature-v0 and signature-v1",
+        "complete ordered signature list",
         "Fresh acceptance may override original expiry or revocation",
         "Otherwise the complete chain is required",
     ] {
@@ -626,38 +626,41 @@ fn origin_identity_variants_have_byte_exact_transcripts_and_strict_bounds() {
     assert!(origin_signing_bytes(&wrong_class).is_err());
 }
 
+#[derive(Clone, PartialEq, prost::Message)]
+struct SignedBlockWire {
+    #[prost(bytes, tag = "3")]
+    signature: Vec<u8>,
+    #[prost(uint32, optional, tag = "5")]
+    version: Option<u32>,
+}
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct BiscuitWire {
+    #[prost(message, optional, tag = "2")]
+    authority: Option<SignedBlockWire>,
+    #[prost(message, repeated, tag = "3")]
+    blocks: Vec<SignedBlockWire>,
+}
+
+fn v0_chain_ids(raw: &str) -> Vec<Vec<u8>> {
+    use prost::Message;
+    let wire = BiscuitWire::decode(hex::decode(raw).unwrap().as_slice()).unwrap();
+    let blocks = std::iter::once(wire.authority.unwrap()).chain(wire.blocks);
+    blocks
+        .map(|block| {
+            assert_eq!(block.version.unwrap_or(0), 0, "fixture must exercise v0");
+            assert_eq!(block.signature.len(), 64);
+            block.signature
+        })
+        .collect()
+}
+
 #[test]
 fn collision_paths_must_have_distinct_signed_identities() {
-    #[derive(Clone, PartialEq, prost::Message)]
-    struct SignedBlockWire {
-        #[prost(bytes, tag = "3")]
-        signature: Vec<u8>,
-        #[prost(uint32, optional, tag = "5")]
-        version: Option<u32>,
-    }
-    #[derive(Clone, PartialEq, prost::Message)]
-    struct BiscuitWire {
-        #[prost(message, optional, tag = "2")]
-        authority: Option<SignedBlockWire>,
-        #[prost(message, repeated, tag = "3")]
-        blocks: Vec<SignedBlockWire>,
-    }
-    fn chain_ids(raw: &str) -> Vec<Vec<u8>> {
-        use prost::Message;
-        let wire = BiscuitWire::decode(hex::decode(raw).unwrap().as_slice()).unwrap();
-        let blocks = std::iter::once(wire.authority.unwrap()).chain(wire.blocks);
-        blocks
-            .map(|block| {
-                assert_eq!(block.version.unwrap_or(0), 0, "fixture must exercise v0");
-                assert_eq!(block.signature.len(), 64);
-                block.signature
-            })
-            .collect()
-    }
     let vector: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/timeline-origin-collision-v0.json")).unwrap();
-    let a_ids = chain_ids(vector["a_chain_hex"].as_str().unwrap());
-    let b_ids = chain_ids(vector["b_chain_hex"].as_str().unwrap());
+    let a_ids = v0_chain_ids(vector["a_chain_hex"].as_str().unwrap());
+    let b_ids = v0_chain_ids(vector["b_chain_hex"].as_str().unwrap());
     assert_eq!(
         a_ids.iter().map(hex::encode).collect::<Vec<_>>(),
         vector["a_revocation_ids_hex"]
@@ -714,6 +717,82 @@ fn collision_paths_must_have_distinct_signed_identities() {
     assert_ne!(
         origin_signing_bytes(&a).unwrap(),
         origin_signing_bytes(&b).unwrap()
+    );
+}
+
+#[test]
+fn v0_chain_is_eligible_for_registration_and_has_distinct_path_identity() {
+    let vector: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/timeline-origin-v0-admission.json")).unwrap();
+    let chain = hex::decode(vector["accepted_chain_hex"].as_str().unwrap()).unwrap();
+    let ids = v0_chain_ids(vector["accepted_chain_hex"].as_str().unwrap());
+    let comparison_ids = vector["comparison_revocation_ids_hex"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| hex::decode(id.as_str().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(ids.len(), 4);
+    assert_eq!(
+        ids.iter().map(hex::encode).collect::<Vec<_>>(),
+        vector["accepted_revocation_ids_hex"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|id| id.as_str().unwrap())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(ids.last(), comparison_ids.last());
+    let path = derivation_path_sha256(&ids).unwrap();
+    let comparison_path = derivation_path_sha256(&comparison_ids).unwrap();
+    assert_eq!(
+        hex::encode(path),
+        vector["accepted_path_sha256_hex"].as_str().unwrap()
+    );
+    assert_eq!(
+        hex::encode(comparison_path),
+        vector["comparison_path_sha256_hex"].as_str().unwrap()
+    );
+    assert_ne!(path, comparison_path);
+
+    let mut registration = RegisterTimelineOriginRequest {
+        client_operation_id: UUID.into(),
+        thread: request().thread,
+        run: request().run,
+        origin: Some(origin()),
+        origin_credential_biscuit: chain,
+    };
+    registration
+        .origin
+        .as_mut()
+        .unwrap()
+        .effective_pop_key_sha256 = sha2::Sha256::digest(
+        hex::decode(vector["effective_pop_key_hex"].as_str().unwrap()).unwrap(),
+    )
+    .to_vec();
+    registration.origin.as_mut().unwrap().credential_identity =
+        Some(TimelineOriginCredentialIdentity {
+            identity: Some(Identity::OfflineDerived(TimelineOfflineDerivedCredential {
+                issued_ancestor_credential_id: vec![4; 16],
+                terminal_revocation_id: ids.last().unwrap().clone(),
+                derivation_path_sha256: path.to_vec(),
+            })),
+        });
+    validate_registration(&registration).unwrap();
+    let endorsed = registration.origin.as_mut().unwrap();
+    let accepted_signing_bytes = origin_signing_bytes(endorsed).unwrap();
+    if let Some(Identity::OfflineDerived(id)) = endorsed
+        .credential_identity
+        .as_mut()
+        .unwrap()
+        .identity
+        .as_mut()
+    {
+        id.derivation_path_sha256 = comparison_path.to_vec();
+    }
+    assert_ne!(
+        accepted_signing_bytes,
+        origin_signing_bytes(endorsed).unwrap()
     );
 }
 

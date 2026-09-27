@@ -20,6 +20,7 @@ import {
 
 const golden = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-v3.json', import.meta.url), 'utf8'));
 const collision = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-collision-v0.json', import.meta.url), 'utf8'));
+const v0Admission = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-v0-admission.json', import.meta.url), 'utf8'));
 
 const uuid = '123e4567-e89b-12d3-a456-426614174000';
 const filled = (n, size = 32) => new Uint8Array(size).fill(n);
@@ -163,6 +164,31 @@ test('reviewer collision shares the old terminal identity but changes the ordere
     } }),
   });
   assert.notDeepEqual(timelineOriginSigningBytes(make(aPath)), timelineOriginSigningBytes(make(bPath)));
+});
+
+test('v0 chain registration is eligible and its signed path differs from the colliding terminal', () => {
+  const acceptedIds = v0Admission.accepted_revocation_ids_hex.map((id) => Uint8Array.from(Buffer.from(id, 'hex')));
+  const comparisonIds = v0Admission.comparison_revocation_ids_hex.map((id) => Uint8Array.from(Buffer.from(id, 'hex')));
+  const path = timelineDerivationPathSha256(acceptedIds);
+  const comparisonPath = timelineDerivationPathSha256(comparisonIds);
+  assert.equal(Buffer.from(path).toString('hex'), v0Admission.accepted_path_sha256_hex);
+  assert.equal(Buffer.from(comparisonPath).toString('hex'), v0Admission.comparison_path_sha256_hex);
+  assert.equal(v0Admission.accepted_revocation_ids_hex.at(-1), v0Admission.comparison_revocation_ids_hex.at(-1));
+  const origin = { ...fixture().origin, credentialIdentity: create(TimelineOriginCredentialIdentitySchema, {
+    identity: { case: 'offlineDerived', value: create(TimelineOfflineDerivedCredentialSchema, {
+      issuedAncestorCredentialId: filled(4, 16), terminalRevocationId: acceptedIds.at(-1),
+      derivationPathSha256: path,
+    }) },
+  }) };
+  const registration = create(RegisterTimelineOriginRequestSchema, {
+    clientOperationId: uuid, thread, run, origin,
+    originCredentialBiscuit: Uint8Array.from(Buffer.from(v0Admission.accepted_chain_hex, 'hex')),
+  });
+  validateTimelineRegistration(registration);
+  const other = { ...origin, credentialIdentity: { identity: { case: 'offlineDerived', value: {
+    ...origin.credentialIdentity.identity.value, derivationPathSha256: comparisonPath,
+  } } } };
+  assert.notDeepEqual(timelineOriginSigningBytes(origin), timelineOriginSigningBytes(other));
 });
 
 test('acceptance binds one original and exact request range', () => {

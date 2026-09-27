@@ -238,10 +238,12 @@ derivation path: the exact issued ancestor ID, terminal 64-byte raw Biscuit
 revocation identifier and a 32-byte SHA-256 commitment to every ordered raw
 revocation identifier from the issued authority block through the terminal
 block. The path digest uses `heddle-timeline-derivation-path-v1\0`, a u32be
-block count and the consecutive 64-byte IDs. Weft verifies uninterrupted
-signature-v1 chaining from the exact issued ancestor and rejects any v0 block,
-even if a general Biscuit verifier accepts it. It recomputes the path and
-effective PoP key and verifies the endorsement with the original effective
+block count and the consecutive 64-byte IDs. Weft verifies the complete chain
+from the exact issued ancestor and accepts both signature-v0 and signature-v1
+blocks. Each block signature binds its block, so the ordered signature list
+commits to the path regardless of signature version; the terminal signature
+alone may collide for different intermediate v0 blocks. Weft recomputes the
+path and effective PoP key and verifies the endorsement with the original effective
 public key. The chain is required unless an exact verified pre-expiry
 registration stores the binding and original key. Fresh acceptance can override
 original expiry or revocation for admission, but cannot skip that provenance

@@ -4,8 +4,9 @@ use heddle_api::{
     FILE_DESCRIPTOR_SET,
     heddle::api::{
         common::{
-            AuthorizationAccess, AuthorizationExistence, AuthorizationRole, CapabilityArea,
-            AuthorizationScopeSource, RetryBehavior, RpcEffect, SigningTier, StableSigningIdentity,
+            AuthorizationAccess, AuthorizationExistence, AuthorizationRole,
+            AuthorizationScopeSource, CapabilityArea, RetryBehavior, RpcEffect, SigningTier,
+            StableSigningIdentity,
         },
         v1alpha2::{PasskeyRegistration, RenamePasskeyRequest},
     },
@@ -98,7 +99,10 @@ fn passkey_label_is_additive_and_rename_has_a_version_checked_receipt() {
         panic!("RPC contract must be a message");
     };
     assert_eq!(
-        contract.get_field_by_name("capability").expect("capability").as_ref(),
+        contract
+            .get_field_by_name("capability")
+            .expect("capability")
+            .as_ref(),
         &Value::EnumNumber(CapabilityArea::IdentityAndCredentials as i32)
     );
     let route = method_descriptor("/heddle.api.v1alpha2.IdentityService/RenamePasskey")
@@ -127,10 +131,9 @@ fn passkey_label_is_additive_and_rename_has_a_version_checked_receipt() {
 
 #[test]
 fn passkey_label_unicode_vectors_match_shared_contract() {
-    let vectors: serde_json::Value = serde_json::from_str(include_str!(
-        "fixtures/passkey-label-unicode.json"
-    ))
-    .expect("shared Unicode vectors");
+    let vectors: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/passkey-label-unicode.json"))
+            .expect("shared Unicode vectors");
     for vector in vectors.as_array().expect("vector list") {
         let name = vector["name"].as_str().expect("vector name");
         let input = vector["input"].as_str().expect("vector input");
@@ -146,17 +149,17 @@ fn passkey_label_unicode_vectors_match_shared_contract() {
 }
 
 #[test]
-fn passkey_labels_trim_count_utf8_bytes_reject_controls_and_default() {
+fn passkey_labels_normalize_count_utf8_bytes_reject_invalid_characters_and_default() {
     assert_eq!(
         normalize_passkey_label("  Work laptop  "),
-        Ok("Work laptop")
+        Ok("Work laptop".into())
     );
-    assert_eq!(normalize_passkey_label("   "), Ok(""));
+    assert_eq!(normalize_passkey_label("   "), Ok("".into()));
     assert_eq!(passkey_display_label(""), DEFAULT_PASSKEY_LABEL);
     assert_eq!(passkey_display_label("Work laptop"), "Work laptop");
     assert_eq!(
         normalize_passkey_label(&"é".repeat(128)),
-        Ok("é".repeat(128).as_str())
+        Ok("é".repeat(128))
     );
     assert_eq!(
         normalize_passkey_label(&"x".repeat(257)),
@@ -166,12 +169,13 @@ fn passkey_labels_trim_count_utf8_bytes_reject_controls_and_default() {
         normalize_passkey_label(&"é".repeat(129)),
         Err(PasskeyLabelError::TooLong)
     );
-    for label in ["a\nb", "\tname", "name\u{7f}", "name\u{85}"] {
+    for label in ["a\nb", "na\tme", "name\u{7f}", "na\u{85}me"] {
         assert_eq!(
             normalize_passkey_label(label),
-            Err(PasskeyLabelError::ControlCharacter)
+            Err(PasskeyLabelError::InvalidCharacter)
         );
     }
+    assert_eq!(normalize_passkey_label("\tname\u{85}"), Ok("name".into()));
 
     let registration = PasskeyRegistration {
         label: Some("Work laptop".into()),

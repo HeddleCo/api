@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { normalizePasskeyLabel, passkeyDisplayLabel, DEFAULT_PASSKEY_LABEL } from '../packages/typescript/dist/v1alpha2/passkey-label.js';
 
-test('passkey labels trim, count UTF-8 bytes, reject controls, and use the default', () => {
+test('passkey labels normalize, count UTF-8 bytes, reject invalid characters, and use the default', () => {
   assert.equal(normalizePasskeyLabel('  Work laptop  '), 'Work laptop');
   assert.equal(normalizePasskeyLabel('   '), '');
   assert.equal(passkeyDisplayLabel(''), DEFAULT_PASSKEY_LABEL);
@@ -12,9 +12,10 @@ test('passkey labels trim, count UTF-8 bytes, reject controls, and use the defau
   for (const label of ['x'.repeat(257), 'é'.repeat(129)]) {
     assert.throws(() => normalizePasskeyLabel(label), /256 UTF-8 bytes/);
   }
-  for (const label of ['a\nb', '\tname', 'name\x7f', 'name\x85']) {
-    assert.throws(() => normalizePasskeyLabel(label), /control character/);
+  for (const label of ['a\nb', 'na\tme', 'name\x7f', 'na\x85me', 'name\ud800']) {
+    assert.throws(() => normalizePasskeyLabel(label), /forbidden Unicode character/);
   }
+  assert.equal(normalizePasskeyLabel('\tname\x85'), 'name');
 });
 
 const vectors = JSON.parse(readFileSync(new URL('./fixtures/passkey-label-unicode.json', import.meta.url), 'utf8'));

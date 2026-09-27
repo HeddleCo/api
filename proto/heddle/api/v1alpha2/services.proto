@@ -16,6 +16,7 @@ import "heddle/api/v1alpha2/integration.proto";
 import "heddle/api/v1alpha2/ownership.proto";
 import "heddle/api/v1alpha2/sync.proto";
 import "heddle/api/v1alpha2/thread.proto";
+import "heddle/api/v1alpha2/timeline_upload.proto";
 import "heddle/api/v1alpha2/views.proto";
 
 // Clean alpha cutover. All requests and responses belong to v2. Endpoints
@@ -2053,6 +2054,49 @@ service SyncService {
     ]
     maturity: SERVICE_MATURITY_PLANNED
   };
+  // Registers an unchanged run-origin endorsement while its full origin chain
+  // is live. This is an admission basis for a later offline upload, not an
+  // upload receipt or evidence of when the device created the run.
+  rpc RegisterTimelineOrigin(RegisterTimelineOriginRequest) returns (RegisterTimelineOriginResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Bounded unary durable write. Sign each retry of identical logical bytes
+  // with a fresh Tier-1 method-bound proof nonce and timestamp.
+  rpc UploadScrubbedTimeline(UploadScrubbedTimelineRequest) returns (UploadScrubbedTimelineResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // A live, durable, policy-scoped exchange. Reconnect by causal frontier;
   // independent local operations do not contend on a remote Thread version.
   rpc ReplicateThread(stream ReplicateThreadRequest) returns (stream ReplicateThreadResponse) {

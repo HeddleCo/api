@@ -18,6 +18,8 @@ enum ObservationMode {
 
 message ReadBudget {
   // Zero selects the endpoint's advertised default; it never means unbounded.
+  // ObserveThread timeline charges every visible run and event frame, status,
+  // overview, removal and checkpoint against this one shared budget.
   uint32 max_items = 1;
   uint32 max_frame_bytes = 2;
   uint64 max_snapshot_bytes = 3;
@@ -34,7 +36,10 @@ message ObserveOptions {
 
 message PageRequest {
   uint32 size = 1;
-  // Opaque, query-bound token. Changing filters/order requires a new first page.
+  // Opaque, query-bound token. ObserveThread timeline uses an AEAD-sealed
+  // fresh-nonce cursor bound to deployment, Thread, exact caller authority and
+  // actor class, sections, budget, last caller-visible tuple and upper server
+  // change watermark. It exposes no hidden sequence or count.
   bytes after_page = 2;
 }
 

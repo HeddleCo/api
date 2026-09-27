@@ -24,6 +24,9 @@ message ThreadPages {
   PageRequest captures = 1;
   PageRequest reviews = 2;
   PageRequest collaboration = 3;
+  // Requires THREAD_SECTION_TIMELINE. At most 64 events; visible run frames
+  // and all selected-section controls also consume the shared ReadBudget.
+  // Continuation is sealed to this exact caller, Thread, sections and budget.
   PageRequest timeline = 4;
   // Current exact-revision checks and acknowledgements for the current policy.
   // This independent mixed window has its own opaque cursor and evidence status.
@@ -55,6 +58,11 @@ message ObserveThreadRequest {
 // collaboration (discussion, turn, context, source_target); analysis (analysis); checkouts
 // (checkout); timeline (timeline_event, run, operation); sharing (sharing,
 // publication). Replacement clears only that section's committed collection.
+// V1 timeline "operation" is explicitly empty. Timeline always reports a
+// section status, including an eligible empty collection. Timeline run/event
+// frames reuse RunRecord/TimelineRecord output, ordered by server change
+// sequence; recorded_at is display time only. Removal uses Removal. A lost
+// timeline membership proof or change-log continuity ends with Reset then FIN.
 // Unknown section semantics require a fresh supported view, never silent loss.
 message ThreadEvent {
   StreamFrame frame = 1;

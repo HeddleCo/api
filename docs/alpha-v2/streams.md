@@ -116,6 +116,67 @@ and return a usable continuation whenever an entry and completion can fit.
 
 ## Views, paging and bounded work
 
+### Hosted Thread timeline
+
+`ObserveThread` with the timeline section always emits its `SectionStatus`,
+including when the eligible collection is empty. V1 emits `run` and
+`timeline_event` using the existing `RunRecord` and `TimelineRecord` output
+types. The `operation` timeline key is empty. The hosted server reconstructs
+these records from validated `UploadRunSummary` and `UploadTimelineEvent`
+primitives; upload accepts no device free text. A run summary has only state
+and harness, and a timeline event has position, closed kind and tool enums, and
+device `recorded_at`. Hosted display summaries are fixed server templates and
+`detail` is absent. Device `ObserveRuns` keeps its separate local behavior.
+
+`pages.timeline` requires the timeline section and requests at most 64 events.
+The shared `ReadBudget` charges each visible run frame alongside every event,
+overview, status, removal and checkpoint frame in all selected sections.
+Sixty-four events across 64 runs can need 128 data frames plus controls. A
+server rejects an impossible combined budget before querying or returns a
+shorter page with continuation. It never emits an unbudgeted run frame. An
+event whose run summary has expired can appear with its run reference and no
+synthetic run frame.
+
+Hosted timeline pages and follow use server change sequence; device
+`recorded_at` is display time and position orders events within one run.
+Each fixed page captures an upper change watermark and continues by the last
+caller-visible `(change_sequence, run_id, position)` tuple. The page token is
+AEAD-sealed with a fresh nonce and binds deployment, Thread, exact caller
+authority and actor class, sections, budget, visible tuple and upper watermark.
+It reveals no plaintext sequence or hidden count. A hidden-only append never
+advances a visible cursor or checkpoint, and timeline changes never advance the
+causal Thread replica generation.
+
+`FOLLOW` installs its subscription and durable watermark before its initial
+bounded snapshot, then checkpoints and replays changes above that watermark.
+Run-only revisions produce run upserts. A removal is sent only for an item
+actually handed to that observation, using sealed delivered membership and
+current authorization even after the payload is erased. Its log entry has an
+opaque item key and keyed eligibility tags, without payload bytes. Missing
+membership proof, lost change continuity, sharing epoch loss, cursor overflow,
+an unexhausted fixed-page change, or bounded slow-consumer backpressure ends
+with terminal `Reset → FIN`; the client starts a new observation. A hidden
+run's purge produces no visible removal or checkpoint. `ONCE` ends after
+checkpoint, `Complete`, and FIN. Every protected timeline frame is authorized
+again from current database state immediately before handoff; the server
+reserves capacity before taking its authorization epoch lock and never waits
+for downstream capacity while holding that lock.
+
+`SyncService.UploadScrubbedTimeline` is a unary durable write, bounded to
+256 KiB, 64 consecutive events, 2 KiB per event and 4 KiB per snapshot. A
+logical retry keeps its operation ID and canonical request bytes, but signs a
+fresh Tier-1 method-bound transport proof with a new nonce and timestamp.
+`RegisterTimelineOrigin` can durably timestamp an exact origin endorsement
+while its verified chain is live; otherwise first admission needs a live origin
+chain or a fresh scoped acceptance for the exact request digest and positions.
+Both calls require the independent uploader device's current Thread writer
+authority. See `timeline_upload.proto` for the byte-exact origin and acceptance
+signature transcripts and admission limits. An ack is returned only after the
+whole batch commits. A same-operation-ID digest mismatch is a conflict; an
+ineligible member makes the whole request terminal `RESOURCE_GONE` and erases
+the exact ack. Pressure returns `RESOURCE_EXHAUSTED` with retry advice, and
+storage failure returns `UNAVAILABLE` without an ack.
+
 Filters define an endpoint-local window, with deterministic order and stable ID
 as a tie breaker. Zero size selects a bounded default. Page tokens bind the
 query and snapshot; they are distinct from change cursors. Each composed section

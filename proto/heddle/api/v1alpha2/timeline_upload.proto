@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha2;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha2/common.proto";
+
+// V1 hosted timeline input. Unknown fields, including nested unknown fields,
+// are invalid; a server must inspect the wire before a decoder drops them.
+// The server reconstructs RunRecord and TimelineRecord from these primitives.
+// No client-supplied summary, detail, model, action, path, command, message,
+// artifact or operation is admitted into the hosted projection.
+
+enum TimelineOriginCredentialClass {
+  TIMELINE_ORIGIN_CREDENTIAL_CLASS_UNSPECIFIED = 0;
+  TIMELINE_ORIGIN_CREDENTIAL_CLASS_DIRECT_HUMAN = 1;
+  TIMELINE_ORIGIN_CREDENTIAL_CLASS_AGENT = 2;
+}
+
+// The active origin credential signs this exact transcript with Ed25519:
+// UTF8("heddle-timeline-run-origin-v1") || 0x00, then, in field order below,
+// each byte/string field as u32be(byte_length) || its exact bytes; class is
+// one unsigned byte (1 or 2). UUIDs are 36 lowercase ASCII bytes in canonical
+// hyphenated form. The signature itself is excluded. No protobuf serialization,
+// client timestamp or hash of a reconstructed RunRecord is a signing input.
+// Weft verifies the complete persisted origin chain and effective proof key.
+message TimelineOriginEndorsement {
+  // Weft deployment public identity, exactly 32 bytes; not a replica key.
+  bytes deployment_public_key = 1;
+  // Canonical Spool UUID; must match thread.spool and run.spool.
+  string spool_id = 2;
+  // Exact ThreadId.value, 32 bytes.
+  bytes thread_id = 3;
+  // ASCII [A-Za-z0-9_-]{1,128}.
+  string run_id = 4;
+  // Server-verified run-principal canonical account UUID.
+  string principal_id = 5;
+  TimelineOriginCredentialClass credential_class = 6;
+  // SHA-256 of the final effective PoP public key, exactly 32 bytes.
+  bytes effective_pop_key_sha256 = 7;
+  // Exact server-issued origin credential ID; 1..128 opaque bytes.
+  bytes origin_credential_id = 8;
+  // Exact enrolled or paired uploader device proof key, 32 bytes.
+  bytes uploader_device_public_key = 9;
+  // Ed25519 signature by the verified origin credential, exactly 64 bytes.
+  bytes signature = 10;
+}
+
+// A current run-principal authority or a current owner-derived capability
+// explicitly scoped to this original subject signs this exact acceptance:
+// UTF8("heddle-timeline-run-acceptance-v1") || 0x00 followed by fields 1..6
+// below, then one authority byte (1 for principal credential, 2 for owner
+// capability) and counted(exact authority bytes). Byte fields use
+// u32be(length)||bytes, uint64 fields use u64be, and event_count uses u32be.
+// The signature and transport PoP are excluded. The original digest is
+// SHA-256 of the origin transcript plus
+// its 64-byte signature. The request digest is SHA-256 of:
+// UTF8("heddle-timeline-upload-v1") || 0x00 || counted(client_operation_id)
+// || counted(spool UUID) || counted(ThreadId.value) || counted(run ID)
+// || u32be(canonicalization_version) || u64be(run_revision)
+// || one byte snapshot presence || [u32be(state)||counted(harness) if present]
+// || u32be(event count), then for each event in wire order:
+// u64be(position)||u32be(kind)||i64be(recorded_at.seconds)
+// ||u32be(recorded_at.nanos)||one byte tool presence
+// || [u32be(tool) if present]
+// || counted(origin SHA-256) || u64be(first_position).
+// `counted` means u32be(byte_length)||exact bytes; presence is 0 or 1. The
+// acceptance, its authority selector and transport PoP are excluded. Unknown
+// fields are invalid. This layout is independent of protobuf serialization.
+// An acceptance is valid only for this exact digest and position range.
+message TimelineAdmissionAcceptance {
+  bytes origin_sha256 = 1; // Exactly 32 bytes.
+  bytes uploader_device_public_key = 2; // Exactly 32 bytes.
+  bytes deployment_public_key = 3; // Exactly 32 bytes.
+  bytes request_sha256 = 4; // Exactly 32 bytes.
+  uint64 first_position = 5; // 0..2^63-1.
+  uint32 event_count = 6; // 0..64.
+  // Exactly one current authority route; credential IDs are 1..128 bytes and
+  // owner-derived capability bytes are at most 4096 bytes.
+  oneof authority {
+    bytes principal_credential_id = 7;
+    bytes owner_derived_capability = 8;
+  }
+  bytes signature = 9; // Ed25519, exactly 64 bytes.
+}
+
+// Dedicated upload summary: only the two allowlisted v1 fields.
+message UploadRunSummary {
+  // Exactly QUEUED, RUNNING, COMPLETED, FAILED, CANCELED,
+  // WAITING_FOR_HUMAN or PAUSED. Unspecified/unknown values are invalid.
+  OperationRecord.State state = 1;
+  // Exactly "claude-code", "codex" or "other"; at most 11 ASCII bytes.
+  string harness = 2;
+}
+
+enum UploadTimelineEventKind {
+  UPLOAD_TIMELINE_EVENT_KIND_UNSPECIFIED = 0;
+  UPLOAD_TIMELINE_EVENT_KIND_RUN_STARTED = 1;
+  UPLOAD_TIMELINE_EVENT_KIND_TURN_STARTED = 2;
+  UPLOAD_TIMELINE_EVENT_KIND_TURN_FINISHED = 3;
+  UPLOAD_TIMELINE_EVENT_KIND_TOOL_STARTED = 4;
+  UPLOAD_TIMELINE_EVENT_KIND_TOOL_FINISHED = 5;
+  UPLOAD_TIMELINE_EVENT_KIND_PROMPT_SUBMITTED = 6;
+  UPLOAD_TIMELINE_EVENT_KIND_RUN_FINISHED = 7;
+  UPLOAD_TIMELINE_EVENT_KIND_RUN_FAILED = 8;
+}
+
+enum UploadTimelineTool {
+  UPLOAD_TIMELINE_TOOL_UNSPECIFIED = 0;
+  UPLOAD_TIMELINE_TOOL_BASH = 1;
+  UPLOAD_TIMELINE_TOOL_EDIT = 2;
+  UPLOAD_TIMELINE_TOOL_READ = 3;
+  UPLOAD_TIMELINE_TOOL_WRITE = 4;
+  UPLOAD_TIMELINE_TOOL_GREP = 5;
+  UPLOAD_TIMELINE_TOOL_GLOB = 6;
+  UPLOAD_TIMELINE_TOOL_TASK = 7;
+  UPLOAD_TIMELINE_TOOL_OTHER = 8;
+}
+
+// Dedicated event input; canonical encoded event size is at most 2048 bytes.
+message UploadTimelineEvent {
+  uint64 position = 1; // 0..2^63-1; batch positions are consecutive.
+  // Maps to the eight lowercase snake-case TimelineRecord.kind strings.
+  UploadTimelineEventKind kind = 2; // Unspecified/unknown is invalid.
+  // Valid microsecond-normalized device time, at most five minutes in the
+  // future at admission. Past timestamps are valid for offline drain.
+  google.protobuf.Timestamp recorded_at = 3;
+  // Present exactly for TOOL_STARTED or TOOL_FINISHED. Maps to Bash, Edit,
+  // Read, Write, Grep, Glob, Task or Other (at most 5 ASCII bytes).
+  optional UploadTimelineTool tool_name = 4; // Zero/unknown is invalid.
+}
+
+// Optional pre-expiry registration of an unchanged origin endorsement.
+// Registration is durable and server-timestamped only while the complete
+// origin chain is live, unrevoked and unexpired; a signature cannot date itself.
+message RegisterTimelineOriginRequest {
+  string client_operation_id = 1; // Canonical UUID.
+  ThreadRef thread = 2; // Exact Spool and 32-byte Thread identity.
+  RecordRef run = 3; // Same Spool; run ID syntax above.
+  TimelineOriginEndorsement origin = 4;
+}
+message RegisterTimelineOriginResponse {
+  bytes origin_sha256 = 1; // Exactly 32 bytes; exact registered endorsement.
+  google.protobuf.Timestamp registered_at = 2; // Server transaction time.
+}
+
+// One logical request for one Spool/Thread/run; encoded request <= 256 KiB.
+// The full batch commits atomically. Every network attempt needs a fresh
+// method-bound Tier-1 PoP nonce/timestamp, including an identical retry.
+message UploadScrubbedTimelineRequest {
+  string client_operation_id = 1; // Canonical UUID; digest-bound under uploader account.
+  ThreadRef thread = 2; // Exact 32-byte Thread ID and canonical Spool UUID.
+  RecordRef run = 3; // Same Spool; run ID ASCII [A-Za-z0-9_-]{1,128}.
+  uint32 canonicalization_version = 4; // Exactly 1 in v1.
+  uint64 run_revision = 5; // Monotone; changed snapshot requires increase.
+  // Canonical encoded summary <= 4096 bytes; required at first admission and
+  // for a zero-event run-only revision.
+  UploadRunSummary snapshot = 6;
+  // 0..64 events, consecutive from first_position. Zero requires a snapshot
+  // for a run-only revision and still writes a durable run-upsert change.
+  repeated UploadTimelineEvent events = 7;
+  TimelineOriginEndorsement origin = 8; // Immutable across all batches.
+  // Required when current origin authority or a registered pre-expiry basis
+  // cannot authorize this exact batch; later ranges need fresh acceptance.
+  TimelineAdmissionAcceptance acceptance = 9;
+  uint64 first_position = 10; // 0..2^63-1; equals first event position if present.
+}
+
+message UploadScrubbedTimelineAck {
+  RecordRef run = 1; // Exact admitted run identity.
+  uint64 run_revision = 2;
+  bytes run_version = 3; // Server-computed canonical 32-byte snapshot hash.
+  uint64 next_position = 4; // Next consecutive position expected by Weft.
+  uint32 accepted_event_count = 5; // 0..64; exact committed batch.
+  RecordRef operation = 6; // Durable uploader-account native operation.
+}
+message UploadTimelinePositionGap {
+  uint64 expected_next_position = 1; // No write and no receipt.
+}
+message UploadScrubbedTimelineResponse {
+  oneof outcome {
+    UploadScrubbedTimelineAck ack = 1; // Only after durable commit.
+    UploadTimelinePositionGap gap = 2; // Entire batch rejected without write.
+  }
+}
+
+// Failures use common.CallFailure: digest mismatch for the same operation ID
+// is ALREADY_EXISTS/OPERATION_ID_REUSED; immutable run/revision conflicts are
+// ABORTED/VERSION_CONFLICT. If any member of a logical request is ineligible,
+// its exact receipt is erased and the whole retry is terminal
+// FAILED_PRECONDITION/RESOURCE_GONE, even if later positions remain. A deleted
+// target is uniformly NOT_FOUND. Pressure is RESOURCE_EXHAUSTED with RetryAdvice;
+// storage failure is UNAVAILABLE without an ack. No partial replay or charge.

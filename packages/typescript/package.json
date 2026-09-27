@@ -33,6 +33,7 @@
     "./attachment-authorization": "./dist/attachment-authorization.js",
     "./v2": "./dist/v1alpha2/index.js",
     "./v2/observation": "./dist/v1alpha2/observation.js",
+    "./v2/timeline-upload": "./dist/v1alpha2/timeline-upload.js",
     "./v2/client": "./dist/v1alpha2/client.js",
     "./v2/owner-certificates": "./dist/v1alpha2/owner-certificates.js",
     "./v2/password-owner": "./dist/v1alpha2/password-owner.js",

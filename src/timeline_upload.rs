@@ -6,16 +6,19 @@ use sha2::{Digest, Sha256};
 
 use crate::heddle::api::v1alpha2::{
     RegisterTimelineOriginRequest, TimelineAdmissionAcceptance, TimelineOriginCredentialClass,
-    TimelineOriginEndorsement, UploadRunSummary, UploadScrubbedTimelineRequest,
-    UploadTimelineEvent, UploadTimelineEventKind, UploadTimelineTool, operation_record,
-    timeline_admission_acceptance::Authority,
+    TimelineOriginCredentialIdentity, TimelineOriginEndorsement, UploadRunSummary,
+    UploadScrubbedTimelineRequest, UploadTimelineEvent, UploadTimelineEventKind,
+    UploadTimelineTool, operation_record, timeline_admission_acceptance::Authority,
+    timeline_origin_credential_identity::Identity,
 };
 
 pub const MAX_TIMELINE_REQUEST_BYTES: usize = 256 * 1024;
 pub const MAX_TIMELINE_EVENT_BYTES: usize = 2 * 1024;
 pub const MAX_TIMELINE_SNAPSHOT_BYTES: usize = 4 * 1024;
 pub const MAX_TIMELINE_EVENTS: usize = 64;
-pub const ORIGIN_DOMAIN: &[u8] = b"heddle-timeline-run-origin-v1\0";
+pub const MAX_TIMELINE_ORIGIN_BISCUIT_BYTES: usize = 64 * 1024;
+pub const ORIGIN_DOMAIN: &[u8] = b"heddle-timeline-run-origin-v3\0";
+pub const DERIVATION_PATH_DOMAIN: &[u8] = b"heddle-timeline-derivation-path-v1\0";
 pub const ACCEPTANCE_DOMAIN: &[u8] = b"heddle-timeline-run-acceptance-v1\0";
 pub const UPLOAD_DOMAIN: &[u8] = b"heddle-timeline-upload-v1\0";
 const MAX_POSITION: u64 = i64::MAX as u64;
@@ -165,15 +168,128 @@ fn validate_origin_fields(
         value.effective_pop_key_sha256.len() == 32,
         "origin actor digest",
     )?;
+    let identity = value
+        .credential_identity
+        .as_ref()
+        .ok_or(TimelineValidationError("origin credential identity"))?;
+    validate_credential_identity(identity)?;
     check(
-        (1..=128).contains(&value.origin_credential_id.len()),
-        "origin credential ID",
+        !matches!(identity.identity, Some(Identity::OfflineDerived(_)))
+            || value.credential_class == TimelineOriginCredentialClass::Agent as i32,
+        "offline origin class",
     )?;
     check(
         value.uploader_device_public_key.len() == 32,
         "origin uploader key",
     )?;
     Ok(())
+}
+
+pub fn validate_credential_identity(
+    value: &TimelineOriginCredentialIdentity,
+) -> Result<(), TimelineValidationError> {
+    match value.identity.as_ref() {
+        Some(Identity::ServerIssued(issued)) => check(
+            (1..=128).contains(&issued.credential_id.len()),
+            "issued credential ID",
+        ),
+        Some(Identity::OfflineDerived(derived)) => {
+            check(
+                (1..=128).contains(&derived.issued_ancestor_credential_id.len()),
+                "issued ancestor credential ID",
+            )?;
+            check(
+                derived.terminal_revocation_id.len() == 64,
+                "terminal revocation ID",
+            )?;
+            check(
+                derived.derivation_path_sha256.len() == 32,
+                "derivation path digest",
+            )
+        }
+        None => Err(TimelineValidationError("credential identity variant")),
+    }
+}
+
+fn append_credential_identity(
+    value: &TimelineOriginCredentialIdentity,
+    bytes: &mut Vec<u8>,
+) -> Result<(), TimelineValidationError> {
+    validate_credential_identity(value)?;
+    match value.identity.as_ref() {
+        Some(Identity::ServerIssued(issued)) => {
+            bytes.push(1);
+            counted(&issued.credential_id, bytes);
+        }
+        Some(Identity::OfflineDerived(derived)) => {
+            bytes.push(2);
+            counted(&derived.issued_ancestor_credential_id, bytes);
+            counted(&derived.terminal_revocation_id, bytes);
+            counted(&derived.derivation_path_sha256, bytes);
+        }
+        None => return Err(TimelineValidationError("credential identity variant")),
+    }
+    Ok(())
+}
+
+/// Commit to every raw Biscuit revocation ID, from the issued authority block
+/// through the terminal block. The 64 KiB chain bound limits the input size.
+pub fn derivation_path_sha256(
+    revocation_ids: &[Vec<u8>],
+) -> Result<[u8; 32], TimelineValidationError> {
+    check(
+        (2..=MAX_TIMELINE_ORIGIN_BISCUIT_BYTES / 64).contains(&revocation_ids.len())
+            && revocation_ids.iter().all(|id| id.len() == 64),
+        "derivation path IDs",
+    )?;
+    let mut bytes = DERIVATION_PATH_DOMAIN.to_vec();
+    bytes.extend_from_slice(&(revocation_ids.len() as u32).to_be_bytes());
+    for id in revocation_ids {
+        bytes.extend_from_slice(id);
+    }
+    Ok(Sha256::digest(bytes).into())
+}
+
+/// Admission must resolve an exact previously verified registration before an
+/// offline-derived upload may omit its chain. Acceptance is not provenance.
+pub fn validate_upload_provenance(
+    value: &UploadScrubbedTimelineRequest,
+    exact_verified_registration_binding: bool,
+) -> Result<(), TimelineValidationError> {
+    let origin = value
+        .origin
+        .as_ref()
+        .ok_or(TimelineValidationError("origin"))?;
+    let identity = origin
+        .credential_identity
+        .as_ref()
+        .ok_or(TimelineValidationError("origin credential identity"))?;
+    validate_origin_biscuit(
+        origin,
+        &value.origin_credential_biscuit,
+        matches!(identity.identity, Some(Identity::OfflineDerived(_)))
+            && !exact_verified_registration_binding,
+    )
+}
+
+fn validate_origin_biscuit(
+    origin: &TimelineOriginEndorsement,
+    biscuit: &[u8],
+    required_for_offline: bool,
+) -> Result<(), TimelineValidationError> {
+    let identity = origin
+        .credential_identity
+        .as_ref()
+        .ok_or(TimelineValidationError("origin credential identity"))?;
+    match identity.identity.as_ref() {
+        Some(Identity::ServerIssued(_)) => check(biscuit.is_empty(), "issued origin biscuit"),
+        Some(Identity::OfflineDerived(_)) => check(
+            biscuit.len() <= MAX_TIMELINE_ORIGIN_BISCUIT_BYTES
+                && (!required_for_offline || !biscuit.is_empty()),
+            "offline origin biscuit",
+        ),
+        None => Err(TimelineValidationError("credential identity variant")),
+    }
 }
 
 pub fn validate_origin(value: &TimelineOriginEndorsement) -> Result<(), TimelineValidationError> {
@@ -260,6 +376,7 @@ pub fn validate_registration(
         .as_ref()
         .ok_or(TimelineValidationError("origin"))?;
     validate_origin(origin)?;
+    validate_origin_biscuit(origin, &value.origin_credential_biscuit, true)?;
     validate_binding(value.thread.as_ref(), value.run.as_ref(), origin)
 }
 
@@ -307,6 +424,7 @@ pub fn validate_upload(
         .as_ref()
         .ok_or(TimelineValidationError("origin"))?;
     validate_origin(origin)?;
+    validate_origin_biscuit(origin, &value.origin_credential_biscuit, false)?;
     validate_binding(value.thread.as_ref(), value.run.as_ref(), origin)?;
     if let Some(acceptance) = &value.acceptance {
         validate_acceptance(acceptance)?;
@@ -412,7 +530,13 @@ pub fn origin_signing_bytes(
     counted(value.principal_id.as_bytes(), &mut bytes);
     bytes.push(value.credential_class as u8);
     counted(&value.effective_pop_key_sha256, &mut bytes);
-    counted(&value.origin_credential_id, &mut bytes);
+    append_credential_identity(
+        value
+            .credential_identity
+            .as_ref()
+            .ok_or(TimelineValidationError("origin credential identity"))?,
+        &mut bytes,
+    )?;
     counted(&value.uploader_device_public_key, &mut bytes);
     Ok(bytes)
 }

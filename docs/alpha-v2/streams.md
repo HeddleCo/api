@@ -224,13 +224,32 @@ Origin revocation invalidates registration as an admission basis. A pre-expiry
 registration never substitutes for fresh acceptance of a revoked original.
 
 Fresh acceptance uses a current direct-human run-principal credential or the
-format-2 `OwnerAuthorizationBundle` with an exact `TimelineAcceptanceScope`
+format-3 `OwnerAuthorizationBundle` with an exact `TimelineAcceptanceScope`
 grant from `owner_records.proto`. The encoded bundle is bound into the
 acceptance transcript; its leaf subject's effective Ed25519 key signs it.
 The verifier resolves signer and owner state from persisted current records,
-checks the original subject and Thread exactly, and enforces capability
+checks the original credential identity variant and values, subject and Thread
+exactly, and enforces capability
 attenuation, rotation/recovery, expiry and revocation at admission. A v1 PURGE
 grant, owner/admin status or uploader key does not imply acceptance authority.
+
+The origin identity is either one exact Weft-issued credential ID or an offline
+derivation path: the exact issued ancestor ID, terminal 64-byte raw Biscuit
+revocation identifier and a 32-byte SHA-256 commitment to every ordered raw
+revocation identifier from the issued authority block through the terminal
+block. The path digest uses `heddle-timeline-derivation-path-v1\0`, a u32be
+block count and the consecutive 64-byte IDs. Weft verifies the complete chain
+from the exact issued ancestor and accepts both signature-v0 and signature-v1
+blocks. Each block signature binds its block, so the ordered signature list
+commits to the path regardless of signature version; the terminal signature
+alone may collide for different intermediate v0 blocks. Weft recomputes the
+path and effective PoP key and verifies the endorsement with the original effective
+public key. The chain is required unless an exact verified pre-expiry
+registration stores the binding and original key. Fresh acceptance can override
+original expiry or revocation for admission, but cannot skip that provenance
+check. Registration alone cannot admit a revoked original. The identity variants
+cannot substitute for one another. The signed origin transcript is
+`heddle-timeline-run-origin-v3`.
 
 First admission reserves unique `(spool_id, run_id)` across Threads and freezes
 Thread, principal, actor class/key, uploader account/key and sharing epoch.

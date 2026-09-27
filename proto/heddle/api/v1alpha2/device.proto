@@ -222,6 +222,10 @@ message ProposedHumanAction {
 }
 
 message RunRecord {
+  // Hosted ObserveThread reconstructs this output from the validated v1
+  // upload projection. The server supplies ref/thread/version and verified
+  // principal/agent attribution; checkout, model, actions, controls,
+  // permissions and artifacts are absent in hosted timeline frames.
   RecordRef ref = 1;
   bytes version = 2;
   ThreadRef thread = 3;
@@ -267,6 +271,9 @@ message RunPermission {
 }
 
 message TimelineRecord {
+  // Hosted ObserveThread derives ref/run, fixed-template summary and the
+  // validated event primitives; no upload field supplies free-text summary,
+  // detail, artifacts, captured_revision or source_operation.
   RecordRef ref = 1;
   RecordRef run = 2;
   uint64 position = 3;
@@ -275,8 +282,9 @@ message TimelineRecord {
   RevisionRef captured_revision = 6;
   repeated RecordRef artifacts = 7;
   SignedRecord source_operation = 8;
-  // Device checkpoint time, authoritative for event ordering and display;
-  // stream arrival time is not the event time. Position breaks ties within a run.
+  // Device checkpoint time for display/local ObserveRuns order. Hosted
+  // ObserveThread timeline pages and follow use server change sequence;
+  // position is the order within a run, regardless of device wall time.
   google.protobuf.Timestamp recorded_at = 9;
   // Tool name, when this event represents a tool call (for example Bash or Edit).
   optional string tool_name = 10;

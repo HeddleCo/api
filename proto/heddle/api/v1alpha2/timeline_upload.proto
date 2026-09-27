@@ -1,0 +1,275 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha2;
+
+import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha2/common.proto";
+
+// V1 hosted timeline input. Unknown fields, including nested unknown fields,
+// are invalid; a server must inspect the wire before a decoder drops them.
+// The server reconstructs RunRecord and TimelineRecord from these primitives.
+// No client-supplied summary, detail, model, action, path, command, message,
+// artifact or operation is admitted into the hosted projection.
+
+enum TimelineOriginCredentialClass {
+  TIMELINE_ORIGIN_CREDENTIAL_CLASS_UNSPECIFIED = 0;
+  TIMELINE_ORIGIN_CREDENTIAL_CLASS_DIRECT_HUMAN = 1;
+  TIMELINE_ORIGIN_CREDENTIAL_CLASS_AGENT = 2;
+}
+
+// The active origin credential signs this exact transcript with Ed25519:
+// UTF8("heddle-timeline-run-origin-v1") || 0x00, then, in field order below,
+// each byte/string field as u32be(byte_length) || its exact bytes; class is
+// one unsigned byte (1 or 2). UUIDs are 36 lowercase ASCII bytes in canonical
+// hyphenated form. The signature itself is excluded. No protobuf serialization,
+// client timestamp or hash of a reconstructed RunRecord is a signing input.
+// Weft verifies the complete persisted origin chain and effective proof key.
+message TimelineOriginEndorsement {
+  // Weft deployment public identity, exactly 32 bytes; not a replica key.
+  bytes deployment_public_key = 1;
+  // Canonical Spool UUID; must match thread.spool and run.spool.
+  string spool_id = 2;
+  // Exact ThreadId.value, 32 bytes.
+  bytes thread_id = 3;
+  // ASCII [A-Za-z0-9_-]{1,128}.
+  string run_id = 4;
+  // Server-verified run-principal canonical account UUID.
+  string principal_id = 5;
+  TimelineOriginCredentialClass credential_class = 6;
+  // SHA-256 of the final effective PoP public key, exactly 32 bytes.
+  bytes effective_pop_key_sha256 = 7;
+  // Exact server-issued origin credential ID; 1..128 opaque bytes.
+  bytes origin_credential_id = 8;
+  // Exact enrolled or paired uploader device proof key, 32 bytes.
+  bytes uploader_device_public_key = 9;
+  // Ed25519 signature by the verified origin credential, exactly 64 bytes.
+  bytes signature = 10;
+}
+
+// A current direct-human run-principal authority or a current v2
+// OwnerAuthorizationBundle (owner_records.proto) with an
+// ACCEPT_TIMELINE_ORIGIN grant signs this exact acceptance:
+// UTF8("heddle-timeline-run-acceptance-v1") || 0x00 followed by fields 1..6
+// below, then one authority byte (1 for principal credential, 2 for owner
+// capability) and counted(exact authority bytes). Byte fields use
+// u32be(length)||bytes, uint64 fields use u64be, and event_count uses u32be.
+// The signature and transport PoP are excluded. The original digest is
+// SHA-256 of the origin transcript plus
+// its 64-byte signature. The request digest is SHA-256 of:
+// UTF8("heddle-timeline-upload-v1") || 0x00 || counted(client_operation_id)
+// || counted(spool UUID) || counted(ThreadId.value) || counted(run ID)
+// || u32be(canonicalization_version) || u64be(run_revision)
+// || one byte snapshot presence || [u32be(state)||counted(harness) if present]
+// || u32be(event count), then for each event in wire order:
+// u64be(position)||u32be(kind)||i64be(recorded_at.seconds)
+// ||u32be(recorded_at.nanos)||one byte tool presence
+// || [u32be(tool) if present]
+// || counted(origin SHA-256) || u64be(first_position).
+// `counted` means u32be(byte_length)||exact bytes; presence is 0 or 1. The
+// acceptance, its authority selector and transport PoP are excluded. Unknown
+// fields are invalid. This layout is independent of protobuf serialization.
+// An acceptance is valid only for this exact digest and position range.
+// For principal_credential_id, Weft resolves the exact ID in its current
+// credential registry, verifies a live independent root or server-issued
+// direct-human session/pairing chain, and uses that chain's final effective
+// Ed25519 PoP key for this signature. Its account MUST be the origin's verified
+// principal. Agent labels, account claims and uploader credentials do not
+// confer acceptance permission.
+// For owner_derived_capability, the bytes are a protobuf wire encoding of
+// OwnerAuthorizationBundle, at most 4096 bytes. Decode the complete bundle,
+// rejecting unknown fields and trailing bytes. Verify its owner root and
+// transition history against the independently pinned CURRENT owner state of
+// the run-principal account; OwnerRoot.account_uuid MUST equal the verified
+// principal UUID (never accept a state supplied only by this bundle). Then
+// verify the single format-2 capability and subject Biscuit. The grant's exact
+// Spool selector, Thread ID, original principal UUID, credential class,
+// original credential ID, effective key digest and signed origin SHA-256 MUST
+// equal the verified origin. The leaf CapabilityPrincipal.key is the effective
+// Ed25519 signing key for this acceptance. SignedOwnerCapability.signature
+// signer_key_id instead resolves to the owner issuer key through the accepted
+// owner transition at issuer_state_hash and its live rotation/recovery signing
+// window; reject an obsolete, vetoed or uncommitted issuer state. The subject
+// signs this acceptance transcript with its effective key, not the
+// owner key or the uploader key. Recheck capability validity interval,
+// direct-only/single-block attenuation restriction, active owner
+// transitions/recovery windows, every credential and capability revocation,
+// and the subject proof at the admission transaction.
+// No v1 PURGE grant, generic grant envelope, passkey certificate alone, or
+// owner/admin status authorizes acceptance. The acceptance bytes do not replace
+// the uploader's independent Tier-1 transport proof.
+message TimelineAdmissionAcceptance {
+  bytes origin_sha256 = 1; // Exactly 32 bytes.
+  bytes uploader_device_public_key = 2; // Exactly 32 bytes.
+  bytes deployment_public_key = 3; // Exactly 32 bytes.
+  bytes request_sha256 = 4; // Exactly 32 bytes.
+  uint64 first_position = 5; // 0..2^63-1.
+  uint32 event_count = 6; // 0..64.
+  // Exactly one current authority route; credential IDs are 1..128 bytes and
+  // owner-derived capability bundles are at most 4096 bytes.
+  oneof authority {
+    bytes principal_credential_id = 7;
+    bytes owner_derived_capability = 8;
+  }
+  bytes signature = 9; // Ed25519, exactly 64 bytes.
+}
+
+// Dedicated upload summary: only the two allowlisted v1 fields.
+message UploadRunSummary {
+  // Exactly QUEUED, RUNNING, COMPLETED, FAILED, CANCELED,
+  // WAITING_FOR_HUMAN or PAUSED. Unspecified/unknown values are invalid.
+  OperationRecord.State state = 1;
+  // Exactly "claude-code", "codex" or "other"; at most 11 ASCII bytes.
+  string harness = 2;
+}
+
+enum UploadTimelineEventKind {
+  UPLOAD_TIMELINE_EVENT_KIND_UNSPECIFIED = 0;
+  UPLOAD_TIMELINE_EVENT_KIND_RUN_STARTED = 1;
+  UPLOAD_TIMELINE_EVENT_KIND_TURN_STARTED = 2;
+  UPLOAD_TIMELINE_EVENT_KIND_TURN_FINISHED = 3;
+  UPLOAD_TIMELINE_EVENT_KIND_TOOL_STARTED = 4;
+  UPLOAD_TIMELINE_EVENT_KIND_TOOL_FINISHED = 5;
+  UPLOAD_TIMELINE_EVENT_KIND_PROMPT_SUBMITTED = 6;
+  UPLOAD_TIMELINE_EVENT_KIND_RUN_FINISHED = 7;
+  UPLOAD_TIMELINE_EVENT_KIND_RUN_FAILED = 8;
+}
+
+enum UploadTimelineTool {
+  UPLOAD_TIMELINE_TOOL_UNSPECIFIED = 0;
+  UPLOAD_TIMELINE_TOOL_BASH = 1;
+  UPLOAD_TIMELINE_TOOL_EDIT = 2;
+  UPLOAD_TIMELINE_TOOL_READ = 3;
+  UPLOAD_TIMELINE_TOOL_WRITE = 4;
+  UPLOAD_TIMELINE_TOOL_GREP = 5;
+  UPLOAD_TIMELINE_TOOL_GLOB = 6;
+  UPLOAD_TIMELINE_TOOL_TASK = 7;
+  UPLOAD_TIMELINE_TOOL_OTHER = 8;
+}
+
+// Dedicated event input; canonical encoded event size is at most 2048 bytes.
+message UploadTimelineEvent {
+  uint64 position = 1; // 0..2^63-1; batch positions are consecutive.
+  // Maps to the eight lowercase snake-case TimelineRecord.kind strings.
+  UploadTimelineEventKind kind = 2; // Unspecified/unknown is invalid.
+  // Valid microsecond-normalized device time, at most five minutes in the
+  // future at admission. Past timestamps are valid for offline drain.
+  google.protobuf.Timestamp recorded_at = 3;
+  // Present exactly for TOOL_STARTED or TOOL_FINISHED. Maps to Bash, Edit,
+  // Read, Write, Grep, Glob, Task or Other (at most 5 ASCII bytes).
+  optional UploadTimelineTool tool_name = 4; // Zero/unknown is invalid.
+}
+
+// Optional pre-expiry registration of an unchanged origin endorsement.
+// Before the handler, middleware verifies a fresh method-bound Tier-1 proof.
+// The caller must be an enrolled independent device root or active
+// paired_credentials receiver_kind=device, with a persisted enrollment/pairing
+// proof for its account, endpoint and proof key. Its authenticated effective
+// uploader key MUST equal origin.uploader_device_public_key. In the write
+// transaction, recheck its live credential, revocation, exact Thread/Spool
+// writer authority, sharing destination/facet, billing and deletion gates.
+// For a NEW registration, the complete origin chain must be live, unrevoked
+// and unexpired at that transaction; the signature or client timestamp cannot
+// date itself. Under (uploader account, client_operation_id), store
+// registration_digest = SHA-256(UTF8("heddle-timeline-registration-v1") || 0x00
+// || counted(client_operation_id) || counted(spool UUID) || counted(ThreadId)
+// || counted(run ID) || counted(origin_sha256)), where counted is u32be length
+// plus exact bytes, UUIDs are canonical lowercase 36-byte ASCII, and
+// origin_sha256 includes the complete signed endorsement. Transport PoP is
+// excluded. Store the original server transaction timestamp beside the digest.
+// A different digest for the same operation ID conflicts. An identical retry
+// with a FRESH transport proof returns the original registered_at and digest,
+// even after origin expiry, without re-dating or re-registering; it still checks
+// current uploader, sharing, deletion and billing gates. Origin revocation
+// invalidates the registered admission basis immediately. Registration never
+// overrides revocation and never authorizes a later range by itself once the
+// original has been revoked; fresh acceptance is then required.
+message RegisterTimelineOriginRequest {
+  string client_operation_id = 1; // Canonical UUID.
+  ThreadRef thread = 2; // Exact Spool and 32-byte Thread identity.
+  RecordRef run = 3; // Same Spool; run ID syntax above.
+  TimelineOriginEndorsement origin = 4;
+}
+message RegisterTimelineOriginResponse {
+  bytes origin_sha256 = 1; // Exactly 32 bytes; exact registered endorsement.
+  google.protobuf.Timestamp registered_at = 2; // Server transaction time.
+}
+
+// One logical request for one Spool/Thread/run; encoded request <= 256 KiB.
+// The full batch commits atomically. Every attempt needs a fresh method-bound
+// Tier-1 PoP nonce/timestamp, including an identical retry. The authenticated
+// uploader is an enrolled independent device root or active paired device as
+// above, and its effective key must match the immutable origin uploader key.
+// Under the Spool/Thread lock first admission enforces unique (spool_id,run_id)
+// across ALL Threads and sharing epochs, and freezes the exact Thread,
+// principal, actor class/effective key digest, uploader account/key and first
+// sharing epoch. A different Thread or uploader cannot re-admit that run.
+// Before accepting a new operation ID, check both the live run and durable
+// keyed run fence across epochs. A purged run cannot be resurrected with a new
+// operation ID, origin signature, or sharing re-enable. Retain the terminal
+// operation digest fence and run HMAC fence after expiry, DISCARD or sharing
+// purge, including runs with no policy deadline. Delete them with Thread/Spool
+// deletion or relevant account/billing-lock deletion; the durable deletion
+// fence then makes old attempts uniformly absent.
+// A first upload requires a live origin chain at transaction time, an exact
+// previously registered pre-expiry origin that has not since been revoked, or
+// fresh scoped acceptance of this request. Later batches recheck the recorded
+// admission basis and acceptance range, plus current uploader, sharing,
+// billing, deletion, retention and revocation gates in the transaction.
+message UploadScrubbedTimelineRequest {
+  string client_operation_id = 1; // Canonical UUID; digest-bound under uploader account.
+  ThreadRef thread = 2; // Exact 32-byte Thread ID and canonical Spool UUID.
+  RecordRef run = 3; // Same Spool; run ID ASCII [A-Za-z0-9_-]{1,128}.
+  uint32 canonicalization_version = 4; // Exactly 1 in v1.
+  // Changed canonical snapshot requires a strictly larger revision. Same
+  // revision and hash is replay; same revision with another hash conflicts.
+  // An older revision cannot replace a newer snapshot.
+  uint64 run_revision = 5;
+  // Canonical encoded summary <= 4096 bytes; required at first admission and
+  // for a zero-event run-only revision.
+  UploadRunSummary snapshot = 6;
+  // 0..64 events, consecutive from first_position. Zero requires a snapshot
+  // for a run-only revision, first_position == current next_position, and a
+  // durable run-upsert change despite accepting no event.
+  repeated UploadTimelineEvent events = 7;
+  TimelineOriginEndorsement origin = 8; // Immutable across all batches.
+  // Required when current origin authority or a registered pre-expiry basis
+  // cannot authorize this exact batch; later ranges need fresh acceptance.
+  TimelineAdmissionAcceptance acceptance = 9;
+  uint64 first_position = 10; // 0..2^63-1; equals first event position if present.
+}
+
+message UploadScrubbedTimelineAck {
+  RecordRef run = 1; // Exact admitted run identity.
+  uint64 run_revision = 2;
+  bytes run_version = 3; // Server-computed canonical 32-byte snapshot hash.
+  uint64 next_position = 4; // Next consecutive position expected by Weft.
+  uint32 accepted_event_count = 5; // 0..64; exact committed batch.
+  RecordRef operation = 6; // Durable uploader-account native operation.
+}
+message UploadTimelinePositionGap {
+  uint64 expected_next_position = 1; // No write and no receipt.
+}
+message UploadScrubbedTimelineResponse {
+  oneof outcome {
+    UploadScrubbedTimelineAck ack = 1; // Only after durable commit.
+    UploadTimelinePositionGap gap = 2; // Entire batch rejected without write.
+  }
+}
+
+// On a fresh-PoP retry, lock the uploader-account operation row and compare
+// its stored original logical digest BEFORE checking first_position or the
+// current run revision. A digest mismatch conflicts. If committed and every
+// requested payload remains eligible, replay the exact stored ack, including
+// its old next_position, even after newer batches. If any member became
+// ineligible, erase ack bytes and return terminal RESOURCE_GONE for the whole
+// request; preserve the operation ID/digest fence. Only a new operation may
+// check current next_position and commit a whole batch. A gap writes nothing.
+// The digest includes canonicalization version; projection-rule changes never
+// rewrite a stored digest or retroactively change the retry comparison.
+// Failures use common.CallFailure: digest mismatch for the same operation ID
+// is ALREADY_EXISTS/OPERATION_ID_REUSED; immutable run/revision conflicts are
+// ABORTED/VERSION_CONFLICT. If any member of a logical request is ineligible,
+// its exact receipt is erased and the whole retry is terminal
+// FAILED_PRECONDITION/RESOURCE_GONE, even if later positions remain. A deleted
+// target is uniformly NOT_FOUND. Pressure is RESOURCE_EXHAUSTED with RetryAdvice;
+// storage failure is UNAVAILABLE without an ack. No partial replay or charge.

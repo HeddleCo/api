@@ -24,6 +24,9 @@ message ThreadPages {
   PageRequest captures = 1;
   PageRequest reviews = 2;
   PageRequest collaboration = 3;
+  // Requires THREAD_SECTION_TIMELINE. At most 64 events; visible run frames
+  // and all selected-section controls also consume the shared ReadBudget.
+  // Continuation is sealed to this exact caller, Thread, sections and budget.
   PageRequest timeline = 4;
   // Current exact-revision checks and acknowledgements for the current policy.
   // This independent mixed window has its own opaque cursor and evidence status.
@@ -55,6 +58,21 @@ message ObserveThreadRequest {
 // collaboration (discussion, turn, context, source_target); analysis (analysis); checkouts
 // (checkout); timeline (timeline_event, run, operation); sharing (sharing,
 // publication). Replacement clears only that section's committed collection.
+// V1 timeline "operation" is explicitly empty. Timeline always reports a
+// section status, including an eligible empty collection. Timeline run/event
+// frames reuse RunRecord/TimelineRecord output, ordered by server change
+// sequence; recorded_at is display time only. Removal uses Removal. A lost
+// timeline membership proof or change-log continuity ends with Reset then FIN.
+// Resource-reader and Thread/Spool audience rights are ceilings. A run/event
+// is visible only to its verified direct-human principal account or a live
+// same-principal agent whose final effective PoP key digest exactly equals
+// the run's frozen actor digest. Agent labels, Thread/Spool owner and admin
+// roles never override that predicate. Join current sharing epoch, audience,
+// billing/deletion gates and the payload deadline before order, limit or count.
+// Forbidden and absent run IDs, pages and cursors have identical status,
+// count, cursor and Reset shapes. No hidden append advances a visible cursor.
+// Every eligibility-bearing frame gets a fresh current database authorization
+// check immediately before handoff; expiry wakes idle followers without a sweep.
 // Unknown section semantics require a fresh supported view, never silent loss.
 message ThreadEvent {
   StreamFrame frame = 1;

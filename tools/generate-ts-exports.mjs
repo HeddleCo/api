@@ -42,6 +42,7 @@ for (const name of readdirSync(commonRoot).filter((name) => name.endsWith(".ts")
 }
 
 copyFileSync("packages/typescript/runtime/v2-observation.ts", join(v2Root, "observation.ts"));
+copyFileSync("packages/typescript/runtime/v2-timeline-upload.ts", join(v2Root, "timeline-upload.ts"));
 copyFileSync("packages/typescript/runtime/v2-client.ts", join(v2Root, "client.ts"));
 copyFileSync("packages/typescript/runtime/v2-owner-certificates.ts", join(v2Root, "owner-certificates.ts"));
 copyFileSync("packages/typescript/runtime/v2-password-owner.ts", join(v2Root, "password-owner.ts"));

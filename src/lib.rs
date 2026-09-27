@@ -9,6 +9,7 @@ pub mod password_owner;
 pub mod provider_v2;
 pub mod request_proof;
 pub mod signing;
+pub mod timeline_upload;
 mod transport;
 pub mod treadle;
 pub mod v2;

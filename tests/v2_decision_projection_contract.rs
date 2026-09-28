@@ -1,7 +1,10 @@
 use heddle_api::heddle::api::v1alpha2::{
-    EvidenceCurrency, LandingRequirementKind, ThreadOverview, capture_summary,
+    Blocked, EvidenceCurrency, LandingRequirementKind, MutationReceipt, Requirement,
+    RequirementKind, ThreadOverview, capture_summary, mutation_receipt, review_decision,
+    satisfied_policy_requirement,
 };
 use prost::Message;
+use std::collections::HashSet;
 
 #[test]
 fn golden_thread_round_trips_two_heads_evidence_and_landing_fields() {
@@ -43,6 +46,43 @@ fn golden_thread_round_trips_two_heads_evidence_and_landing_fields() {
                 .attribution_assurance,
             capture_summary::AttributionAssurance::Claimed as i32
         );
+        assert_eq!(
+            alternative.assessment.as_ref(),
+            Some(
+                &overview.landing_assessments[overview
+                    .source_heads
+                    .iter()
+                    .position(|candidate| candidate == head)
+                    .expect("head index")]
+            ),
+            "duplicated assessment must be equal"
+        );
+        let checks: HashSet<_> = alternative
+            .checks
+            .iter()
+            .map(|check| &check.check)
+            .collect();
+        assert_eq!(checks.len(), alternative.checks.len(), "unique check names");
+        assert_eq!(
+            alternative.checks,
+            alternative.assessment.as_ref().unwrap().checks
+        );
+        if alternative
+            .assessment
+            .as_ref()
+            .unwrap()
+            .requirements
+            .iter()
+            .any(|requirement| {
+                requirement.landing_kind == LandingRequirementKind::ReviewRejected as i32
+            })
+        {
+            assert!(alternative.reviews.iter().any(|review| {
+                review.decision.as_ref().is_some_and(|decision| {
+                    decision.kind == review_decision::Kind::Rejection as i32
+                })
+            }));
+        }
     }
     let first = &overview.alternatives[0];
     assert_eq!(
@@ -50,6 +90,12 @@ fn golden_thread_round_trips_two_heads_evidence_and_landing_fields() {
         "openai"
     );
     assert_eq!(first.reviews.len(), 1);
+    assert_eq!(first.producer.as_ref().unwrap().principal_name, "Alice");
+    assert_eq!(
+        first.producer.as_ref().unwrap().principal_email,
+        "alice@example.test"
+    );
+    assert!(first.producer.as_ref().unwrap().principal_id.is_empty());
     assert_eq!(first.checks[0].currency, EvidenceCurrency::Stale as i32);
     assert_ne!(
         first.checks[0].recorded_revision.as_ref(),
@@ -85,11 +131,27 @@ fn golden_thread_round_trips_two_heads_evidence_and_landing_fields() {
             .satisfied_by
             .as_ref()
             .expect("satisfaction")
-            .requirements[1]
+            .requirements[2]
             .evidence[0]
             .id,
         "evidence-lint-a"
     );
+    let rules = &assessment.satisfied_by.as_ref().unwrap().requirements;
+    assert_eq!(
+        rules[0].rule_source,
+        satisfied_policy_requirement::RuleSource::SpoolSettingsRequireReviewToLand as i32
+    );
+    assert_eq!(
+        rules[1].rule_source,
+        satisfied_policy_requirement::RuleSource::ReviewPolicy as i32
+    );
+    assert_eq!(rules[1].review_policy.as_ref().unwrap().id, "policy-b");
+    assert_eq!(
+        rules[2].rule_source,
+        satisfied_policy_requirement::RuleSource::ReviewPolicy as i32
+    );
+    assert_eq!(rules[2].review_policy.as_ref().unwrap().id, "policy-a");
+    assert_eq!(rules[2].rule_index, 1);
     let second = &overview.alternatives[1];
     assert_eq!(second.checks[0].currency, EvidenceCurrency::Missing as i32);
     assert_eq!(second.checks[1].currency, EvidenceCurrency::Failed as i32);
@@ -123,6 +185,34 @@ fn golden_thread_round_trips_two_heads_evidence_and_landing_fields() {
     assert_eq!(landing.review_evidence_digests.len(), 2);
     assert_eq!(landing.executor_key, vec![11; 32]);
     assert_eq!(landing.raw_signed_operation, vec![13; 32]);
+    assert_eq!(landing.initiating_principal_id, "alice");
+    assert_eq!(landing.initiating_agent_id, "agent-a");
+}
+
+#[test]
+fn blocked_landing_receipt_preserves_typed_conflict() {
+    let receipt = MutationReceipt {
+        outcome: Some(mutation_receipt::Outcome::Blocked(Blocked {
+            requirements: vec![Requirement {
+                kind: RequirementKind::ConflictResolution as i32,
+                landing_kind: LandingRequirementKind::ConflictMultipleHeads as i32,
+                ..Default::default()
+            }],
+        })),
+        ..Default::default()
+    };
+    let decoded = MutationReceipt::decode(receipt.encode_to_vec().as_slice()).unwrap();
+    let Some(mutation_receipt::Outcome::Blocked(blocked)) = decoded.outcome else {
+        panic!("blocked landing receipt");
+    };
+    assert_eq!(
+        blocked.requirements[0].kind,
+        RequirementKind::ConflictResolution as i32
+    );
+    assert_eq!(
+        blocked.requirements[0].landing_kind,
+        LandingRequirementKind::ConflictMultipleHeads as i32
+    );
 }
 
 #[cfg(feature = "reflection")]
@@ -152,12 +242,25 @@ fn descriptor_pins_landing_cause_and_projection_fields() {
                 ("agent_provider", 8),
                 ("agent_model", 9),
                 ("attribution_assurance", 10),
+                ("principal_name", 11),
+                ("principal_email", 12),
+                ("raw_signed_capture_operation", 13),
+                ("identity_binding_authority", 14),
             ],
+        ),
+        (
+            "heddle.api.v1alpha2.SatisfiedPolicyRequirement",
+            vec![("rule_source", 6), ("review_policy", 7), ("rule_index", 8)],
         ),
         ("heddle.api.v1alpha2.Requirement", vec![("landing_kind", 7)]),
         (
             "heddle.api.v1alpha2.LandingRecord",
-            vec![("policy_version", 7), ("raw_signed_operation", 13)],
+            vec![
+                ("policy_version", 7),
+                ("raw_signed_operation", 13),
+                ("initiating_principal_id", 14),
+                ("initiating_agent_id", 15),
+            ],
         ),
     ] {
         let descriptor = message(name);
@@ -184,6 +287,26 @@ fn descriptor_pins_landing_cause_and_projection_fields() {
         ("LANDING_REQUIREMENT_KIND_CONFLICT_MULTIPLE_HEADS", 9),
         ("LANDING_REQUIREMENT_KIND_CONFLICT_UNRESOLVED_METADATA", 10),
         ("LANDING_REQUIREMENT_KIND_DISCUSSION_BLOCKING", 11),
+        (
+            "LANDING_REQUIREMENT_KIND_CONFLICT_SOURCE_TARGET_DIVERGED",
+            12,
+        ),
+        (
+            "LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_MULTIPLE_HEADS",
+            13,
+        ),
+        ("LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_NAME", 14),
+        ("LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_FRONTIER", 15),
+        ("LANDING_REQUIREMENT_KIND_POLICY_DEFAULT_UNAVAILABLE", 16),
+        (
+            "LANDING_REQUIREMENT_KIND_POLICY_APPROVAL_GROUP_UNAVAILABLE",
+            17,
+        ),
+        (
+            "LANDING_REQUIREMENT_KIND_POLICY_AUTHOR_BINDING_UNAVAILABLE",
+            18,
+        ),
+        ("LANDING_REQUIREMENT_KIND_REFRESH_SOURCE_ALREADY_LANDED", 19),
     ] {
         assert_eq!(
             kinds.get_value_by_name(name).expect("cause").number(),

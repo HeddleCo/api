@@ -214,9 +214,12 @@ enum RequirementKind {
   REQUIREMENT_KIND_DISCUSSION = 12;
 }
 
-// Specific cause from a landing evaluator. This refines Requirement.kind for
-// landing only; it is not inferred from explanation text. UNSPECIFIED means an
-// older producer did not report a cause, not that landing is permitted.
+// Specific cause from a landing evaluator or a blocked LandThread/LandStack
+// mutation receipt. Never infer it from explanation text. EVIDENCE_* pairs
+// with Requirement.kind=EVIDENCE; REVIEW_* with REVIEW; REFRESH_* with
+// REFRESH; POLICY_* with POLICY; CONFLICT_* with CONFLICT_RESOLUTION; and
+// DISCUSSION_* with DISCUSSION. UNSPECIFIED is only a legacy/unknown cause,
+// never evidence that landing is permitted. Do not report hidden record detail.
 enum LandingRequirementKind {
   LANDING_REQUIREMENT_KIND_UNSPECIFIED = 0;
   LANDING_REQUIREMENT_KIND_EVIDENCE_MISSING = 1;
@@ -230,6 +233,14 @@ enum LandingRequirementKind {
   LANDING_REQUIREMENT_KIND_CONFLICT_MULTIPLE_HEADS = 9;
   LANDING_REQUIREMENT_KIND_CONFLICT_UNRESOLVED_METADATA = 10;
   LANDING_REQUIREMENT_KIND_DISCUSSION_BLOCKING = 11;
+  LANDING_REQUIREMENT_KIND_CONFLICT_SOURCE_TARGET_DIVERGED = 12;
+  LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_MULTIPLE_HEADS = 13;
+  LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_NAME = 14;
+  LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_FRONTIER = 15;
+  LANDING_REQUIREMENT_KIND_POLICY_DEFAULT_UNAVAILABLE = 16;
+  LANDING_REQUIREMENT_KIND_POLICY_APPROVAL_GROUP_UNAVAILABLE = 17;
+  LANDING_REQUIREMENT_KIND_POLICY_AUTHOR_BINDING_UNAVAILABLE = 18;
+  LANDING_REQUIREMENT_KIND_REFRESH_SOURCE_ALREADY_LANDED = 19;
 }
 
 message Requirement {
@@ -240,8 +251,9 @@ message Requirement {
   string explanation = 5;
   // Canonical typed RPC route; advice never grants authority or executes it.
   string recovery_method = 6;
-  // Set only for a landing assessment. The broad kind remains for older
-  // clients; the typed cause is the source of truth for landing presentation.
+  // Set for landing assessments and blocked LandThread/LandStack mutation
+  // receipts. The broad kind remains for older clients; use the typed cause
+  // for landing presentation. Other operations leave this unset.
   LandingRequirementKind landing_kind = 7;
 }
 

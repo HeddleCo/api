@@ -148,6 +148,19 @@ message SatisfiedPolicyRequirement {
   repeated RecordRef approvals = 4;
   // Signed EvidenceRecord.ref values that passed for the assessment's source.
   repeated RecordRef evidence = 5;
+  // Rule identity within LandingSatisfaction.policy_version. A review policy
+  // uses review_policy plus rule_index: zero for required_approvals, otherwise
+  // the 1-based position in required_checks or groups (selected by kind).
+  // The settings approval rule has its own source and index zero. Do not merge
+  // equal check/group names from different policies or repeated rules.
+  enum RuleSource {
+    RULE_SOURCE_UNSPECIFIED = 0;
+    RULE_SOURCE_REVIEW_POLICY = 1;
+    RULE_SOURCE_SPOOL_SETTINGS_REQUIRE_REVIEW_TO_LAND = 2;
+  }
+  RuleSource rule_source = 6;
+  RecordRef review_policy = 7;
+  uint32 rule_index = 8;
 }
 
 enum EvidenceCurrency {
@@ -208,6 +221,12 @@ message LandingRecord {
   // Exact sorted digests from the signed record. Review and evidence originals
   // are distinguished by resolving each digest, not by array position.
   repeated bytes review_evidence_digests = 8;
+  // Typed digest of the exact retained signed landing request proof. Weft
+  // must index and serve to authorized verifiers, by this digest, the canonical
+  // signed preimage (method, exact request body, timestamp, nonce and signing
+  // identity), signature, and portable account/delegation authority that bound
+  // the signer at admission. Do not disclose a reusable bearer credential.
+  // A digest or an account database row alone names no actor.
   bytes initiating_request_proof_digest = 9;
   bytes executor_key = 10;
   // Hosted integrations use the immutable Spool owner genesis. A local record
@@ -217,6 +236,12 @@ message LandingRecord {
   // Exact original signed operation bytes, including signature. Locally signed
   // integration records can use this slot with their own format and trust pin.
   bytes raw_signed_operation = 13;
+  // Display attribution derived from the retained request proof and its
+  // verified account/delegation chain, never from the executor signature.
+  // Agent is empty for a direct principal request. If the proof or authority
+  // is unavailable, leave both IDs unset; do not guess from the uploader.
+  string initiating_principal_id = 14;
+  string initiating_agent_id = 15;
 }
 
 message ThreadOwnership {
@@ -298,19 +323,31 @@ message CaptureSummary {
   ThreadRef thread = 2;
   string summary = 3;
   uint64 changed_files = 4;
+  // Authenticated account/delegation bindings only. A State does not contain
+  // these IDs. Leave them empty if the portable binding proof is unavailable.
   string principal_id = 5;
   string agent_id = 6;
   google.protobuf.Timestamp captured_at = 7;
-  // Copied from the producing State when present. These are actor claims,
-  // including the already-present principal_id and agent_id, not proof that a
-  // provider ran a model or that a principal personally made the capture.
+  // Copied from the producing State when present. State actor labels are
+  // claims, not proof that a provider ran a model or a person made a capture.
   string agent_provider = 8;
   string agent_model = 9;
   enum AttributionAssurance {
     ATTRIBUTION_ASSURANCE_UNSPECIFIED = 0;
     ATTRIBUTION_ASSURANCE_CLAIMED = 1;
   }
+  // Applies to State labels only. Authenticated IDs have separate provenance.
   AttributionAssurance attribution_assurance = 10;
+  string principal_name = 11;
+  string principal_email = 12;
+  // Exact signed source/capture operation and its account/delegation authority
+  // chain, retained in portable replication history. These are public binding
+  // proofs, never live bearer credentials. A consumer verifies the
+  // operation's exact State/thread binding and the signer-to-principal/agent
+  // chain against independent trust pins before using the IDs. The State's
+  // name/email and provider/model are never used to derive those IDs.
+  bytes raw_signed_capture_operation = 13;
+  repeated SignedRecord identity_binding_authority = 14;
 }
 
 enum SharedFacet {

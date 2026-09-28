@@ -239,10 +239,10 @@ revocation identifier and a 32-byte SHA-256 commitment to every ordered raw
 revocation identifier from the issued authority block through the terminal
 block. The path digest uses `heddle-timeline-derivation-path-v1\0`, a u32be
 block count and the consecutive 64-byte IDs. Weft verifies the complete chain
-from the exact issued ancestor and accepts both signature-v0 and signature-v1
-blocks. Each block signature binds its block, so the ordered signature list
-commits to the path regardless of signature version; the terminal signature
-alone may collide for different intermediate v0 blocks. Weft recomputes the
+from the exact issued ancestor. Every block, including the authority, MUST use
+Biscuit signature-v1. Each attenuation signature covers the preceding block
+signature; any chain containing a signature-v0 block is rejected. The complete
+ordered signature list commits to the path. Weft recomputes the
 path and effective PoP key and verifies the endorsement with the original effective
 public key. The chain is required unless an exact verified pre-expiry
 registration stores the binding and original key. Fresh acceptance can override

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
 import { OperationRecord_State, RecordRefSchema, SpoolRefSchema, ThreadIdSchema, ThreadRefSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import {
@@ -20,7 +21,46 @@ import {
 
 const golden = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-v3.json', import.meta.url), 'utf8'));
 const collision = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-collision-v0.json', import.meta.url), 'utf8'));
-const v0Admission = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-v0-admission.json', import.meta.url), 'utf8'));
+const v1Admission = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-v1-admission.json', import.meta.url), 'utf8'));
+
+function protobufFields(bytes) {
+  const fields = [];
+  let offset = 0;
+  const varint = () => {
+    let value = 0;
+    let shift = 0;
+    while (offset < bytes.length && shift < 35) {
+      const byte = bytes[offset++];
+      value += (byte & 0x7f) * 2 ** shift;
+      if ((byte & 0x80) === 0) return value;
+      shift += 7;
+    }
+    throw new Error('invalid protobuf varint');
+  };
+  while (offset < bytes.length) {
+    const key = varint();
+    const tag = Math.floor(key / 8);
+    const wire = key % 8;
+    if (wire === 0) fields.push({ tag, value: varint() });
+    else if (wire === 2) {
+      const length = varint();
+      assert.ok(offset + length <= bytes.length, 'protobuf field is bounded');
+      fields.push({ tag, bytes: bytes.subarray(offset, offset + length) });
+      offset += length;
+    } else throw new Error(`unsupported protobuf wire type ${wire}`);
+  }
+  return fields;
+}
+
+function biscuitBlockVersions(chainHex) {
+  const chain = Buffer.from(chainHex, 'hex');
+  const blocks = protobufFields(chain).filter(({ tag }) => tag === 2 || tag === 3);
+  assert.equal(blocks.filter(({ tag }) => tag === 2).length, 1, 'one authority block');
+  return blocks.map(({ bytes }) => {
+    const version = protobufFields(bytes).find(({ tag }) => tag === 5);
+    return version?.value ?? 0;
+  });
+}
 
 const uuid = '123e4567-e89b-12d3-a456-426614174000';
 const filled = (n, size = 32) => new Uint8Array(size).fill(n);
@@ -146,6 +186,10 @@ test('offline registration carries a bounded chain while registered uploads may 
 });
 
 test('reviewer collision shares the old terminal identity but changes the ordered path', () => {
+  assert.match(collision.description, /REJECTED/);
+  for (const chain of [collision.a_chain_hex, collision.b_chain_hex]) {
+    assert.ok(biscuitBlockVersions(chain).includes(0), 'a v0 block rejects the chain');
+  }
   const aIds = collision.a_revocation_ids_hex.map((id) => Uint8Array.from(Buffer.from(id, 'hex')));
   const bIds = collision.b_revocation_ids_hex.map((id) => Uint8Array.from(Buffer.from(id, 'hex')));
   assert.equal(collision.a_revocation_ids_hex.at(-1), collision.b_revocation_ids_hex.at(-1));
@@ -166,15 +210,15 @@ test('reviewer collision shares the old terminal identity but changes the ordere
   assert.notDeepEqual(timelineOriginSigningBytes(make(aPath)), timelineOriginSigningBytes(make(bPath)));
 });
 
-test('v0 chain registration is eligible and its signed path differs from the colliding terminal', () => {
-  const acceptedIds = v0Admission.accepted_revocation_ids_hex.map((id) => Uint8Array.from(Buffer.from(id, 'hex')));
-  const comparisonIds = v0Admission.comparison_revocation_ids_hex.map((id) => Uint8Array.from(Buffer.from(id, 'hex')));
+test('all-v1 chain registration has an exact signed origin transcript', () => {
+  const versions = biscuitBlockVersions(v1Admission.accepted_chain_hex);
+  assert.deepEqual(versions, [1, 1, 1, 1], 'authority and every attenuation block use signature-v1');
+  const acceptedIds = v1Admission.accepted_revocation_ids_hex.map((id) => Uint8Array.from(Buffer.from(id, 'hex')));
   const path = timelineDerivationPathSha256(acceptedIds);
-  const comparisonPath = timelineDerivationPathSha256(comparisonIds);
-  assert.equal(Buffer.from(path).toString('hex'), v0Admission.accepted_path_sha256_hex);
-  assert.equal(Buffer.from(comparisonPath).toString('hex'), v0Admission.comparison_path_sha256_hex);
-  assert.equal(v0Admission.accepted_revocation_ids_hex.at(-1), v0Admission.comparison_revocation_ids_hex.at(-1));
-  const origin = { ...fixture().origin, credentialIdentity: create(TimelineOriginCredentialIdentitySchema, {
+  assert.equal(Buffer.from(path).toString('hex'), v1Admission.accepted_path_sha256_hex);
+  const origin = { ...fixture().origin,
+    effectivePopKeySha256: createHash('sha256').update(Buffer.from(v1Admission.effective_pop_key_hex, 'hex')).digest(),
+    credentialIdentity: create(TimelineOriginCredentialIdentitySchema, {
     identity: { case: 'offlineDerived', value: create(TimelineOfflineDerivedCredentialSchema, {
       issuedAncestorCredentialId: filled(4, 16), terminalRevocationId: acceptedIds.at(-1),
       derivationPathSha256: path,
@@ -182,13 +226,10 @@ test('v0 chain registration is eligible and its signed path differs from the col
   }) };
   const registration = create(RegisterTimelineOriginRequestSchema, {
     clientOperationId: uuid, thread, run, origin,
-    originCredentialBiscuit: Uint8Array.from(Buffer.from(v0Admission.accepted_chain_hex, 'hex')),
+    originCredentialBiscuit: Uint8Array.from(Buffer.from(v1Admission.accepted_chain_hex, 'hex')),
   });
   validateTimelineRegistration(registration);
-  const other = { ...origin, credentialIdentity: { identity: { case: 'offlineDerived', value: {
-    ...origin.credentialIdentity.identity.value, derivationPathSha256: comparisonPath,
-  } } } };
-  assert.notDeepEqual(timelineOriginSigningBytes(origin), timelineOriginSigningBytes(other));
+  assert.equal(Buffer.from(timelineOriginSigningBytes(origin)).toString('hex'), v1Admission.origin_signing_bytes_hex);
 });
 
 test('acceptance binds one original and exact request range', () => {

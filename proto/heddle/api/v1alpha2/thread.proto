@@ -93,7 +93,21 @@ message ThreadOverview {
   // An incomplete frontier cannot be used for an ownership claim.
   SourceOperationFrontier source_frontier = 24;
   // Present only when ObserveThread selected an independently readable target.
+  // Legacy single-head projection. New producers also fill landing_assessments
+  // and alternatives; never choose one competing head for this field.
   LandingAssessment landing_assessment = 25;
+  // Exactly one per visible published source head when a target is readable.
+  // Every assessment.source matches one source_heads entry; a multi-head
+  // source is blocked for conflict while each head still has a result.
+  // Each entry must equal the matching alternative.assessment below.
+  repeated LandingAssessment landing_assessments = 26;
+  // One per visible published source head, including a sole head. Each has an
+  // assessment when the target is readable. The same audience/section gates
+  // apply to actor, review, evidence and diff material as to their originals.
+  repeated ThreadAlternative alternatives = 27;
+  // Optional after landing. A local landing can supply its own signed executor
+  // record with the same semantics; absence is not evidence of permission.
+  LandingRecord landing_record = 28;
 }
 
 message LandingAssessment {
@@ -103,6 +117,106 @@ message LandingAssessment {
   bytes policy_version = 4;
   ReviewReadiness readiness = 5;
   repeated Requirement requirements = 6;
+  // Successful policy requirements for this exact source, target and policy
+  // version. Empty/unset never asserts that an unavailable policy passed.
+  LandingSatisfaction satisfied_by = 7;
+  // One result for every required check, including checks with no record.
+  repeated CheckEvidenceCurrency checks = 8;
+}
+
+message LandingSatisfaction {
+  // Must equal LandingAssessment.policy_version. Never borrow satisfying
+  // records from another source, target or policy version.
+  bytes policy_version = 1;
+  repeated SatisfiedPolicyRequirement requirements = 2;
+}
+
+message SatisfiedPolicyRequirement {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_REQUIRED_CHECK = 1;
+    KIND_REVIEW_APPROVALS = 2;
+    KIND_REVIEW_GROUP = 3;
+  }
+  Kind kind = 1;
+  // For REQUIRED_CHECK, the exact policy check name.
+  string check = 2;
+  // For REVIEW_GROUP, the exact policy group record.
+  RecordRef group = 3;
+  // Signed ReviewRecord.decision.ref values that passed the evaluator for the
+  // assessment's source, target and policy. No opinions or previews here.
+  repeated RecordRef approvals = 4;
+  // Signed EvidenceRecord.ref values that passed for the assessment's source.
+  repeated RecordRef evidence = 5;
+}
+
+enum EvidenceCurrency {
+  EVIDENCE_CURRENCY_UNSPECIFIED = 0;
+  // Passing, authorized evidence for the exact source revision.
+  EVIDENCE_CURRENCY_CURRENT = 1;
+  // Previously passing evidence on recorded_revision, not this source.
+  EVIDENCE_CURRENCY_STALE = 2;
+  // The current exact-source terminal result is failed, errored or skipped.
+  EVIDENCE_CURRENCY_FAILED = 3;
+  // No retained result available for this required check/source.
+  EVIDENCE_CURRENCY_MISSING = 4;
+}
+
+message CheckEvidenceCurrency {
+  string check = 1;
+  // Exact head being assessed. A stale record never satisfies this revision.
+  RevisionRef source = 2;
+  EvidenceCurrency currency = 3;
+  // Present for CURRENT, STALE or FAILED; the exact signed evidence record.
+  RecordRef evidence = 4;
+  // The revision on which the cited evidence was recorded. Required for STALE;
+  // equals source for CURRENT and FAILED. Absent with evidence/actor for MISSING.
+  RevisionRef recorded_revision = 5;
+  // Derived from that evidence's signed original, not the observer/courier.
+  string principal_id = 6;
+  string agent_id = 7;
+}
+
+message ThreadAlternative {
+  RevisionRef head = 1;
+  // Attribution comes from this head's State; a missing producer stays unknown.
+  CaptureSummary producer = 2;
+  // The exact comparison used when requesting diff frames for this head.
+  ReviewComparison diff = 3;
+  // Only reviews bound to this head, selected target and policy version.
+  repeated ReviewRecord reviews = 4;
+  LandingAssessment assessment = 5;
+  repeated CheckEvidenceCurrency checks = 6;
+}
+
+// Decoded executor-signed integration, plus the exact signed Thread operation.
+// The decoded fields are display/index hints, not independent authority. Verify
+// raw_signed_operation against an independently pinned executor and referenced
+// source, policy, review and evidence originals before trusting a landing. A
+// local equivalent is a signed local target-history landing record with the
+// same bindings, produced by a locally trusted executor. Only disclose these
+// fields when the reader can inspect the corresponding signed originals.
+message LandingRecord {
+  ThreadRef source_thread = 1;
+  RevisionRef source_revision = 2;
+  ThreadRef target_thread = 3;
+  RevisionRef result_revision = 4;
+  bytes source_operation_digest = 5;
+  // Exact sorted operation digests from the signed record, not a mutable tip.
+  repeated bytes expected_target_frontier = 6;
+  bytes policy_version = 7;
+  // Exact sorted digests from the signed record. Review and evidence originals
+  // are distinguished by resolving each digest, not by array position.
+  repeated bytes review_evidence_digests = 8;
+  bytes initiating_request_proof_digest = 9;
+  bytes executor_key = 10;
+  // Hosted integrations use the immutable Spool owner genesis. A local record
+  // can name its independently pinned local executor trust anchor.
+  bytes executor_trust_anchor_digest = 11;
+  google.protobuf.Timestamp executed_at = 12;
+  // Exact original signed operation bytes, including signature. Locally signed
+  // integration records can use this slot with their own format and trust pin.
+  bytes raw_signed_operation = 13;
 }
 
 message ThreadOwnership {
@@ -187,6 +301,16 @@ message CaptureSummary {
   string principal_id = 5;
   string agent_id = 6;
   google.protobuf.Timestamp captured_at = 7;
+  // Copied from the producing State when present. These are actor claims,
+  // including the already-present principal_id and agent_id, not proof that a
+  // provider ran a model or that a principal personally made the capture.
+  string agent_provider = 8;
+  string agent_model = 9;
+  enum AttributionAssurance {
+    ATTRIBUTION_ASSURANCE_UNSPECIFIED = 0;
+    ATTRIBUTION_ASSURANCE_CLAIMED = 1;
+  }
+  AttributionAssurance attribution_assurance = 10;
 }
 
 enum SharedFacet {

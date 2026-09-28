@@ -210,6 +210,26 @@ enum RequirementKind {
   REQUIREMENT_KIND_ANALYSIS = 8;
   REQUIREMENT_KIND_PUBLICATION = 9;
   REQUIREMENT_KIND_REFRESH = 10;
+  REQUIREMENT_KIND_POLICY = 11;
+  REQUIREMENT_KIND_DISCUSSION = 12;
+}
+
+// Specific cause from a landing evaluator. This refines Requirement.kind for
+// landing only; it is not inferred from explanation text. UNSPECIFIED means an
+// older producer did not report a cause, not that landing is permitted.
+enum LandingRequirementKind {
+  LANDING_REQUIREMENT_KIND_UNSPECIFIED = 0;
+  LANDING_REQUIREMENT_KIND_EVIDENCE_MISSING = 1;
+  LANDING_REQUIREMENT_KIND_EVIDENCE_STALE = 2;
+  LANDING_REQUIREMENT_KIND_EVIDENCE_FAILED = 3;
+  LANDING_REQUIREMENT_KIND_REVIEW_MISSING = 4;
+  LANDING_REQUIREMENT_KIND_REVIEW_REJECTED = 5;
+  LANDING_REQUIREMENT_KIND_REVIEW_CONCURRENT = 6;
+  LANDING_REQUIREMENT_KIND_REFRESH_TARGET_MOVED = 7;
+  LANDING_REQUIREMENT_KIND_POLICY_VERSION_CHANGED = 8;
+  LANDING_REQUIREMENT_KIND_CONFLICT_MULTIPLE_HEADS = 9;
+  LANDING_REQUIREMENT_KIND_CONFLICT_UNRESOLVED_METADATA = 10;
+  LANDING_REQUIREMENT_KIND_DISCUSSION_BLOCKING = 11;
 }
 
 message Requirement {
@@ -220,6 +240,9 @@ message Requirement {
   string explanation = 5;
   // Canonical typed RPC route; advice never grants authority or executes it.
   string recovery_method = 6;
+  // Set only for a landing assessment. The broad kind remains for older
+  // clients; the typed cause is the source of truth for landing presentation.
+  LandingRequirementKind landing_kind = 7;
 }
 
 message ActionAvailability {

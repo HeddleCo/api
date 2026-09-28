@@ -210,6 +210,37 @@ enum RequirementKind {
   REQUIREMENT_KIND_ANALYSIS = 8;
   REQUIREMENT_KIND_PUBLICATION = 9;
   REQUIREMENT_KIND_REFRESH = 10;
+  REQUIREMENT_KIND_POLICY = 11;
+  REQUIREMENT_KIND_DISCUSSION = 12;
+}
+
+// Specific cause from a landing evaluator or a blocked LandThread/LandStack
+// mutation receipt. Never infer it from explanation text. EVIDENCE_* pairs
+// with Requirement.kind=EVIDENCE; REVIEW_* with REVIEW; REFRESH_* with
+// REFRESH; POLICY_* with POLICY; CONFLICT_* with CONFLICT_RESOLUTION; and
+// DISCUSSION_* with DISCUSSION. UNSPECIFIED is only a legacy/unknown cause,
+// never evidence that landing is permitted. Do not report hidden record detail.
+enum LandingRequirementKind {
+  LANDING_REQUIREMENT_KIND_UNSPECIFIED = 0;
+  LANDING_REQUIREMENT_KIND_EVIDENCE_MISSING = 1;
+  LANDING_REQUIREMENT_KIND_EVIDENCE_STALE = 2;
+  LANDING_REQUIREMENT_KIND_EVIDENCE_FAILED = 3;
+  LANDING_REQUIREMENT_KIND_REVIEW_MISSING = 4;
+  LANDING_REQUIREMENT_KIND_REVIEW_REJECTED = 5;
+  LANDING_REQUIREMENT_KIND_REVIEW_CONCURRENT = 6;
+  LANDING_REQUIREMENT_KIND_REFRESH_TARGET_MOVED = 7;
+  LANDING_REQUIREMENT_KIND_POLICY_VERSION_CHANGED = 8;
+  LANDING_REQUIREMENT_KIND_CONFLICT_MULTIPLE_HEADS = 9;
+  LANDING_REQUIREMENT_KIND_CONFLICT_UNRESOLVED_METADATA = 10;
+  LANDING_REQUIREMENT_KIND_DISCUSSION_BLOCKING = 11;
+  LANDING_REQUIREMENT_KIND_CONFLICT_SOURCE_TARGET_DIVERGED = 12;
+  LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_MULTIPLE_HEADS = 13;
+  LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_NAME = 14;
+  LANDING_REQUIREMENT_KIND_CONFLICT_TARGET_FRONTIER = 15;
+  LANDING_REQUIREMENT_KIND_POLICY_DEFAULT_UNAVAILABLE = 16;
+  LANDING_REQUIREMENT_KIND_POLICY_APPROVAL_GROUP_UNAVAILABLE = 17;
+  LANDING_REQUIREMENT_KIND_POLICY_AUTHOR_BINDING_UNAVAILABLE = 18;
+  LANDING_REQUIREMENT_KIND_REFRESH_SOURCE_ALREADY_LANDED = 19;
 }
 
 message Requirement {
@@ -220,6 +251,10 @@ message Requirement {
   string explanation = 5;
   // Canonical typed RPC route; advice never grants authority or executes it.
   string recovery_method = 6;
+  // Set for landing assessments and blocked LandThread/LandStack mutation
+  // receipts. The broad kind remains for older clients; use the typed cause
+  // for landing presentation. Other operations leave this unset.
+  LandingRequirementKind landing_kind = 7;
 }
 
 message ActionAvailability {

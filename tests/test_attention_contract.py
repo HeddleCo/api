@@ -41,6 +41,13 @@ class AttentionContractTest(unittest.TestCase):
                 ("string", "principal_id", 5),
                 ("string", "agent_id", 6),
                 ("google.protobuf.Timestamp", "captured_at", 7),
+                ("string", "agent_provider", 8),
+                ("string", "agent_model", 9),
+                ("AttributionAssurance", "attribution_assurance", 10),
+                ("string", "principal_name", 11),
+                ("string", "principal_email", 12),
+                ("bytes", "raw_signed_capture_operation", 13),
+                ("SignedRecord", "identity_binding_authority", 14),
             ],
         )
         item = body(ACTIVITY, "message", "AttentionItem")

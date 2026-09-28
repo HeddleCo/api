@@ -425,8 +425,9 @@ fn timeline_privacy_authority_and_replay_rules_remain_normative() {
         "BEFORE checking first_position",
         "same revision with another hash conflicts",
         "A purged run cannot be resurrected with a new",
-        "Both Biscuit signature-v0 and signature-v1",
-        "complete ordered signature list",
+        "Every Biscuit block, including the authority,",
+        "Reject any chain containing a signature-v0 block",
+        "Each signature-v1 attenuation block binds to its predecessor",
         "Fresh acceptance may override original expiry or revocation",
         "Otherwise the complete chain is required",
     ] {
@@ -655,10 +656,48 @@ fn v0_chain_ids(raw: &str) -> Vec<Vec<u8>> {
         .collect()
 }
 
+fn signature_v1_chain_ids(raw: &str) -> Option<Vec<Vec<u8>>> {
+    use prost::Message;
+    let wire = BiscuitWire::decode(hex::decode(raw).unwrap().as_slice()).unwrap();
+    std::iter::once(wire.authority.unwrap())
+        .chain(wire.blocks)
+        .map(|block| {
+            (block.version == Some(1) && block.signature.len() == 64).then_some(block.signature)
+        })
+        .collect()
+}
+
+#[test]
+fn every_block_version_is_required_for_v1_admission() {
+    use prost::Message;
+    let vector: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/timeline-origin-v1-admission.json")).unwrap();
+    let raw = vector["accepted_chain_hex"].as_str().unwrap();
+    let wire = BiscuitWire::decode(hex::decode(raw).unwrap().as_slice()).unwrap();
+    assert_eq!(signature_v1_chain_ids(raw).unwrap().len(), 4);
+    for index in 0..4 {
+        for bad_version in [None, Some(0)] {
+            let mut changed = wire.clone();
+            if index == 0 {
+                changed.authority.as_mut().unwrap().version = bad_version;
+            } else {
+                changed.blocks[index - 1].version = bad_version;
+            }
+            assert!(
+                signature_v1_chain_ids(&hex::encode(changed.encode_to_vec())).is_none(),
+                "block {index} with version {bad_version:?} must reject the chain"
+            );
+        }
+    }
+}
+
 #[test]
 fn collision_paths_must_have_distinct_signed_identities() {
     let vector: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/timeline-origin-collision-v0.json")).unwrap();
+    assert!(vector["description"].as_str().unwrap().contains("REJECTED"));
+    assert!(signature_v1_chain_ids(vector["a_chain_hex"].as_str().unwrap()).is_none());
+    assert!(signature_v1_chain_ids(vector["b_chain_hex"].as_str().unwrap()).is_none());
     let a_ids = v0_chain_ids(vector["a_chain_hex"].as_str().unwrap());
     let b_ids = v0_chain_ids(vector["b_chain_hex"].as_str().unwrap());
     assert_eq!(
@@ -721,17 +760,12 @@ fn collision_paths_must_have_distinct_signed_identities() {
 }
 
 #[test]
-fn v0_chain_is_eligible_for_registration_and_has_distinct_path_identity() {
+fn all_v1_chain_is_eligible_for_registration_with_byte_exact_transcript() {
     let vector: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/timeline-origin-v0-admission.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/timeline-origin-v1-admission.json")).unwrap();
     let chain = hex::decode(vector["accepted_chain_hex"].as_str().unwrap()).unwrap();
-    let ids = v0_chain_ids(vector["accepted_chain_hex"].as_str().unwrap());
-    let comparison_ids = vector["comparison_revocation_ids_hex"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|id| hex::decode(id.as_str().unwrap()).unwrap())
-        .collect::<Vec<_>>();
+    let ids = signature_v1_chain_ids(vector["accepted_chain_hex"].as_str().unwrap())
+        .expect("authority and every attenuation block must be signature-v1");
     assert_eq!(ids.len(), 4);
     assert_eq!(
         ids.iter().map(hex::encode).collect::<Vec<_>>(),
@@ -742,18 +776,11 @@ fn v0_chain_is_eligible_for_registration_and_has_distinct_path_identity() {
             .map(|id| id.as_str().unwrap())
             .collect::<Vec<_>>()
     );
-    assert_eq!(ids.last(), comparison_ids.last());
     let path = derivation_path_sha256(&ids).unwrap();
-    let comparison_path = derivation_path_sha256(&comparison_ids).unwrap();
     assert_eq!(
         hex::encode(path),
         vector["accepted_path_sha256_hex"].as_str().unwrap()
     );
-    assert_eq!(
-        hex::encode(comparison_path),
-        vector["comparison_path_sha256_hex"].as_str().unwrap()
-    );
-    assert_ne!(path, comparison_path);
 
     let mut registration = RegisterTimelineOriginRequest {
         client_operation_id: UUID.into(),
@@ -780,7 +807,10 @@ fn v0_chain_is_eligible_for_registration_and_has_distinct_path_identity() {
         });
     validate_registration(&registration).unwrap();
     let endorsed = registration.origin.as_mut().unwrap();
-    let accepted_signing_bytes = origin_signing_bytes(endorsed).unwrap();
+    assert_eq!(
+        hex::encode(origin_signing_bytes(endorsed).unwrap()),
+        vector["origin_signing_bytes_hex"].as_str().unwrap()
+    );
     if let Some(Identity::OfflineDerived(id)) = endorsed
         .credential_identity
         .as_mut()
@@ -788,11 +818,11 @@ fn v0_chain_is_eligible_for_registration_and_has_distinct_path_identity() {
         .identity
         .as_mut()
     {
-        id.derivation_path_sha256 = comparison_path.to_vec();
+        id.derivation_path_sha256 = vec![0; 32];
     }
     assert_ne!(
-        accepted_signing_bytes,
-        origin_signing_bytes(endorsed).unwrap()
+        hex::encode(origin_signing_bytes(endorsed).unwrap()),
+        vector["origin_signing_bytes_hex"].as_str().unwrap()
     );
 }
 

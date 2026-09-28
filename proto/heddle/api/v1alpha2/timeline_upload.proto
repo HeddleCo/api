@@ -51,17 +51,18 @@ message TimelineOfflineDerivedCredential {
 // client timestamp or hash of a reconstructed RunRecord is a signing input.
 // For offline_derived, Weft verifies the COMPLETE chain from the exact named
 // Weft-issued ancestor authority block through the terminal block, with at
-// least one attenuation block. Both Biscuit signature-v0 and signature-v1
-// blocks are accepted when the complete chain verifies against the issued
-// ancestor. Verify attenuation and lineage against that ancestor, then derive
+// least one attenuation block. Every Biscuit block, including the authority,
+// MUST use signature-v1. Each attenuation signature covers the preceding block
+// signature.
+// Reject any chain containing a signature-v0 block. Verify the complete chain,
+// attenuation and lineage against the issued ancestor, then derive
 // revocation IDs from every block in order, including the authority and terminal
 // blocks. Each is the 64 raw signature bytes from
 // Biscuit::revocation_identifiers(). Compute derivation_path_sha256 as
 // SHA-256(UTF8("heddle-timeline-derivation-path-v1") || 0x00 || u32be(N)
 // || ID[0] || ... || ID[N-1]), where N >= 2 and IDs are exactly 64 bytes.
-// Each block signature binds its block, so the complete ordered signature list
-// commits to the entire path regardless of signature version. A shared terminal
-// signature alone does not prove that intermediate v0 blocks are identical.
+// Each signature-v1 attenuation block binds to its predecessor, and the
+// complete ordered signature list commits to the entire path.
 // Require the computed path digest and terminal ID to equal the signed identity;
 // match SHA-256(final effective PoP public key) to the signed key digest, then
 // verify the endorsement with that effective public key. The ancestor ID alone

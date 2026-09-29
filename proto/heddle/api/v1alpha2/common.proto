@@ -291,6 +291,25 @@ message MutationResponse {
   MutationReceipt receipt = 1;
 }
 
+message SkippedImportRef {
+  string name = 1;
+  string reason = 2;
+}
+
+message ImportReport {
+  enum Fidelity {
+    FIDELITY_UNSPECIFIED = 0;
+    FAITHFUL = 1;
+    PARTIAL = 2;
+    FAILED = 3;
+  }
+  Fidelity fidelity = 1;
+  uint64 commits = 2;
+  uint64 branches = 3;
+  uint64 tags = 4;
+  repeated SkippedImportRef skipped_refs = 5;
+}
+
 message OperationRecord {
   RecordRef ref = 1;
   string client_operation_id = 2;
@@ -319,6 +338,7 @@ message OperationRecord {
   // Current observed affordances. Clients still submit against this record's
   // exact version; the server rechecks authorization at command admission.
   repeated ActionAvailability actions = 13;
+  ImportReport import_report = 14;
 }
 
 // A durable, versioned record. Its format defines canonical bytes, domain,

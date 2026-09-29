@@ -116,21 +116,30 @@ message SetRemoteLinkRequest {
   RemoteLinkRecord remote = 2;
   bytes expected_version = 3;
 }
+// One Git branch selected for native Thread publication. The caller supplies
+// the original creator-signed genesis and its authority for this branch.
+message ImportBranchGenesis {
+  string ref_name = 1;
+  SignedRecord thread_genesis = 2;
+  bytes creator_authority = 3;
+}
+
 message ImportSourceRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
   ProviderRepository source = 3;
   bytes expected_destination_version = 4;
-  // Original creator-signed canonical Thread genesis, as in StartThread. Import
-  // never fabricates the caller's creator signature. The hosted executor signs
-  // its later import receipt and preserves Git attribution in the Capture.
-  SignedRecord thread_genesis = 5;
-  bytes creator_authority = 6;
+  reserved 5, 6;
+  reserved "thread_genesis", "creator_authority";
   // Optional canonical synthetic empty State, at most 4096 bytes, whose identity
-  // exactly matches thread_genesis.base. Enables a fresh Spool import in one
-  // call without requiring a pre-existing hosted base. Nonempty source closures
-  // use SyncService publication instead. The creator signature binds this base.
+  // matches the base in each supplied branch genesis. Enables a fresh Spool
+  // import in one call without requiring a pre-existing hosted base. Nonempty
+  // source closures use SyncService publication instead. Each creator signature
+  // binds this base.
   bytes initial_base_state = 7;
+  // Import never fabricates a creator signature. The hosted executor signs its
+  // later import receipt and preserves Git attribution in the Capture.
+  repeated ImportBranchGenesis branches = 8;
 }
 // Retry a failed native source fetch/adoption into its original Thread. The
 // original operation remains immutable; this command creates a new operation

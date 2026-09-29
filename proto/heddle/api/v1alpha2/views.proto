@@ -31,6 +31,8 @@ message ThreadPages {
   // Current exact-revision checks and acknowledgements for the current policy.
   // This independent mixed window has its own opaque cursor and evidence status.
   PageRequest evidence = 5;
+  // Former heads resolved by later captures; independent of capture history.
+  PageRequest resolved_alternatives = 6;
 }
 message ObserveThreadRequest {
   ThreadRef thread = 1;
@@ -55,6 +57,7 @@ message ObserveThreadRequest {
 // delta batches become visible only at their checkpoint.
 // SectionReplacement.section and SectionStatus.section use these exact keys:
 // overview (overview); captures (capture); review (comparison, review, diff); evidence (evidence, check_acknowledgement);
+// resolved_alternatives (resolved_alternative);
 // collaboration (discussion, turn, context, source_target); analysis (analysis); checkouts
 // (checkout); timeline (timeline_event, run, operation); sharing (sharing,
 // publication). Replacement clears only that section's committed collection.
@@ -99,6 +102,7 @@ message ThreadEvent {
     ReviewComparison comparison = 21;
     CheckAcknowledgementRecord check_acknowledgement = 22;
     SourceTargetResolutionEvent source_target = 23;
+    ResolvedAlternative resolved_alternative = 24;
   }
 }
 

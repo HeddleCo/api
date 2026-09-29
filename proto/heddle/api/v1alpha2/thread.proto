@@ -316,6 +316,7 @@ enum ThreadSection {
   THREAD_SECTION_TIMELINE = 7;
   THREAD_SECTION_SHARING = 8;
   THREAD_SECTION_EVIDENCE = 9;
+  THREAD_SECTION_RESOLVED_ALTERNATIVES = 10;
 }
 
 message CaptureSummary {
@@ -348,6 +349,29 @@ message CaptureSummary {
   // name/email and provider/model are never used to derive those IDs.
   bytes raw_signed_capture_operation = 13;
   repeated SignedRecord identity_binding_authority = 14;
+  // Exact parents of this capture's State. A merge names every head it
+  // combined; these are revisions, not mutable source-head positions.
+  repeated RevisionRef parent_revisions = 15;
+}
+
+enum ResolutionKind {
+  RESOLUTION_KIND_UNSPECIFIED = 0;
+  RESOLUTION_KIND_MERGED = 1;
+  RESOLUTION_KIND_SUPERSEDED = 2;
+  RESOLUTION_KIND_PICKED = 3;
+}
+
+// A former source head resolved by a later capture. Producer and resolver
+// retain the State's claimed actor labels and their attribution assurance;
+// authenticated IDs remain subject to CaptureSummary's proof requirements.
+message ResolvedAlternative {
+  RevisionRef head = 1;
+  CaptureSummary producer = 2;
+  // Reviews of this exact former head, including rejections.
+  repeated ReviewRecord reviews = 3;
+  RevisionRef resolving_revision = 4;
+  CaptureSummary resolver = 5;
+  ResolutionKind kind = 6;
 }
 
 enum SharedFacet {

@@ -48,6 +48,7 @@ class AttentionContractTest(unittest.TestCase):
                 ("string", "principal_email", 12),
                 ("bytes", "raw_signed_capture_operation", 13),
                 ("SignedRecord", "identity_binding_authority", 14),
+                ("RevisionRef", "parent_revisions", 15),
             ],
         )
         item = body(ACTIVITY, "message", "AttentionItem")

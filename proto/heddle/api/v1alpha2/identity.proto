@@ -761,6 +761,16 @@ message BeginPairingRequest {
   }
   bytes subject_public_key = 3;
   SignedRecord subject_possession = 4;
+  // Optional. Empty means the server uses its configured default web origin.
+  // The server accepts a value only when it matches the server's CORS
+  // allowlist and the preview-origin policy: a canonical HTTPS DNS host, with
+  // no port, userinfo, path, or extra label. Otherwise the request fails with
+  // InvalidArgument. It changes only the host of the returned verification_uri.
+  // It grants nothing and is not a secret. It is not part of the signed pairing
+  // binding: subject_possession still signs PairingInitiationBinding only. The
+  // server checks this host against its own policy, so signing it would not
+  // grant a wider origin.
+  string web_origin = 6;
 }
 message PairingRecord {
   RecordRef ref = 1;

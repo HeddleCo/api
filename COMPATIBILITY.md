@@ -49,3 +49,17 @@ today (`pinned` stays the absolute pin value on every call). Older messages
 decode with no snooze, and older consumers may ignore the fields. No breaking
 override or legacy migration-manifest change is required. Package versions
 remain unchanged; the next release is cut separately.
+
+`BeginPairingRequest.web_origin` (tag 6) is an optional string for
+HeddleCo/api#278 and HeddleCo/weft#2421. Empty means the server uses its
+configured default web origin. The server accepts a value only when it matches
+the server's CORS allowlist and the preview-origin policy (canonical HTTPS DNS
+host; no port, userinfo, path, or extra label); otherwise the request fails
+with InvalidArgument. It changes only the host of the returned
+`verification_uri`. It grants nothing, is not a secret, and is not part of the
+signed pairing binding (`subject_possession` / `PairingInitiationBinding`): the
+server checks the host against its own policy, so signing it would not grant a
+wider origin. Older messages decode as empty (server default), and older
+consumers may ignore the field. No breaking override or legacy
+migration-manifest change is required. Package versions remain unchanged; the
+next release is cut separately.

@@ -199,6 +199,34 @@ class SignupContractTest(unittest.TestCase):
         self.assertIn("RPC_EFFECT_DURABLE_WRITE", contract)
         self.assertIn("AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL", contract)
 
+    def test_begin_pairing_web_origin_is_optional_and_unsigned(self) -> None:
+        self.assertEqual(
+            fields(IDENTITY, "BeginPairingRequest"),
+            [
+                ("client_operation_id", 1),
+                ("device", 2),
+                ("browser", 5),
+                ("subject_public_key", 3),
+                ("subject_possession", 4),
+                ("web_origin", 6),
+            ],
+        )
+        request = body(IDENTITY, "message", "BeginPairingRequest")
+        self.assertIn("configured default web origin", request)
+        self.assertIn("server's CORS", request)
+        self.assertIn("allowlist and the preview-origin policy", request)
+        self.assertIn("canonical HTTPS DNS host", request)
+        self.assertIn("no port, userinfo, path, or extra label", request)
+        self.assertIn("InvalidArgument", request)
+        self.assertIn("returned verification_uri", request)
+        self.assertIn("is not a secret", request)
+        self.assertIn("not part of the signed pairing", request)
+        self.assertIn("PairingInitiationBinding only", request)
+        self.assertNotIn(
+            "web_origin",
+            [name for name, _tag in fields(IDENTITY, "PairingInitiationBinding")],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,7 @@ use heddle_api::{
     FILE_DESCRIPTOR_SET,
     heddle::api::common::{AuthorizationAccess, SigningTier},
 };
-use prost_reflect::DescriptorPool;
+use prost_reflect::{DescriptorPool, Kind};
 #[test]
 fn pending_pairing_observation_requires_subject_possession_without_account() {
     let method =
@@ -99,4 +99,17 @@ fn browser_pairing_has_exclusive_receiver_and_proof_without_endpoint_claims() {
             "missing signed approval field {name}"
         );
     }
+    let begin = pool
+        .get_message_by_name("heddle.api.v1alpha2.BeginPairingRequest")
+        .expect("begin pairing");
+    let web_origin = begin.get_field_by_name("web_origin").expect("web origin");
+    assert_eq!(web_origin.number(), 6);
+    assert_eq!(web_origin.kind(), Kind::String);
+    let binding = pool
+        .get_message_by_name("heddle.api.v1alpha2.PairingInitiationBinding")
+        .expect("signed binding");
+    assert!(
+        binding.get_field_by_name("web_origin").is_none(),
+        "web origin is not part of the signed pairing binding"
+    );
 }

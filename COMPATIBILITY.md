@@ -25,3 +25,12 @@ Their migration requires the [Weft adapter](https://github.com/HeddleCo/weft/iss
 and [Tapestry adapter](https://github.com/HeddleCo/tapestry/issues/163) before
 HeddleCo/heddle#1021 repins; until then the shared descriptor is a cutover
 contract, not authorization to remove the live legacy registration.
+
+`ProviderRepository.linked_spools` (tag 7) is an additive repeated `SpoolRef`
+projection for HeddleCo/api#271 and HeddleCo/weft#2392. It covers the account's
+caller-visible spools with a matching provider repository id or clone origin,
+including spools outside the `ObserveIntegrations` request. Invisible links are
+omitted without failing the read; an empty list means no visible link. Older
+messages decode with an empty list, and older consumers may ignore the field.
+No breaking override or legacy migration-manifest change is required. Package
+versions remain unchanged; the next release is cut separately.

@@ -26,6 +26,13 @@ message ProviderRepository {
   // Exact installation whose user grant listed this repository. ImportSource
   // verifies this association again before selecting provider custody.
   string installation_id = 6;
+  // Spools that already hold a remote link for this repository (same provider
+  // repository id or clone origin) AND that the caller can observe. Spools the
+  // caller cannot see are omitted — never revealed and never an error. Empty
+  // means no visible link. Repeated: one repository may be linked into several
+  // spools. Scope is the caller-visible spools of the account, not only the
+  // spools named in the ObserveIntegrations request.
+  repeated SpoolRef linked_spools = 7;
 }
 message RemoteLinkRecord {
   RecordRef ref = 1;

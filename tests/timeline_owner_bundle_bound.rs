@@ -1,9 +1,13 @@
 use ed25519_dalek::{Signer, SigningKey, Verifier};
 use heddle_api::heddle::api::v1alpha2::{
-    OwnerAuthorizationBundle, OwnerKeyTransitionKind, TimelineAdmissionAcceptance,
-    timeline_admission_acceptance::Authority,
+    OwnerAuthorizationBundle, OwnerKeyTransitionKind, RecordRef, SpoolRef, ThreadId, ThreadRef,
+    TimelineAdmissionAcceptance, TimelineOriginEndorsement, UploadRunSummary,
+    UploadScrubbedTimelineRequest, operation_record, timeline_admission_acceptance::Authority,
 };
-use heddle_api::timeline_upload::{acceptance_signing_bytes, validate_acceptance};
+use heddle_api::timeline_upload::{
+    MAX_TIMELINE_OWNER_BUNDLE_BYTES, acceptance_signing_bytes, logical_request_digest,
+    origin_digest, validate_acceptance, validate_upload,
+};
 use prost::Message;
 
 fn acceptance(bytes: Vec<u8>) -> TimelineAdmissionAcceptance {
@@ -79,6 +83,47 @@ fn long_owner_history_with_twenty_rotations_and_recovery_is_accepted() {
         signer.verifying_key().to_bytes(),
     );
     let mut value = acceptance(bytes);
+    let origin_bytes =
+        hex::decode(fixture["origin_hex"].as_str().expect("origin hex")).expect("origin bytes");
+    let origin =
+        TimelineOriginEndorsement::decode(origin_bytes.as_slice()).expect("fixture origin");
+    let now = i128::from(
+        fixture["now_unix_seconds"]
+            .as_i64()
+            .expect("admission time"),
+    ) * 1_000_000;
+    let mut request = UploadScrubbedTimelineRequest {
+        client_operation_id: "123e4567-e89b-12d3-a456-426614174000".into(),
+        thread: Some(ThreadRef {
+            spool: Some(SpoolRef {
+                id: origin.spool_id.clone(),
+            }),
+            id: Some(ThreadId {
+                value: origin.thread_id.clone(),
+            }),
+        }),
+        run: Some(RecordRef {
+            spool: Some(SpoolRef {
+                id: origin.spool_id.clone(),
+            }),
+            id: origin.run_id.clone(),
+        }),
+        canonicalization_version: 1,
+        run_revision: 1,
+        snapshot: Some(UploadRunSummary {
+            state: operation_record::State::Running as i32,
+            harness: "codex".into(),
+        }),
+        origin: Some(origin.clone()),
+        ..Default::default()
+    };
+    value.origin_sha256 = origin_digest(&origin).expect("original digest").to_vec();
+    value.uploader_device_public_key = origin.uploader_device_public_key;
+    value.deployment_public_key = origin.deployment_public_key;
+    value.request_sha256 = logical_request_digest(&request, now)
+        .expect("request digest")
+        .to_vec();
+    value.event_count = 0;
     validate_acceptance(&value).expect("long current-owner history is within the acceptance bound");
     let transcript = acceptance_signing_bytes(&value).expect("long-history transcript");
     let signature = signer.sign(&transcript);
@@ -88,11 +133,14 @@ fn long_owner_history_with_twenty_rotations_and_recovery_is_accepted() {
         .verify(&transcript, &signature)
         .expect("subject acceptance signature");
     validate_acceptance(&value).expect("signed long-history acceptance");
+    request.acceptance = Some(value);
+    validate_upload(&request, now).expect("upload with the exact fixture original");
 }
 
 #[test]
 fn owner_bundle_bound_is_inclusive_and_rejects_over_64_kib() {
     // The API validates the envelope size; consumers verify the bundle contents.
+    assert_eq!(MAX_TIMELINE_OWNER_BUNDLE_BYTES, 65536);
     let at_limit = acceptance(vec![7; 65536]);
     validate_acceptance(&at_limit).expect("exactly 64 KiB is allowed");
     acceptance_signing_bytes(&at_limit).expect("64 KiB authority can be signed");

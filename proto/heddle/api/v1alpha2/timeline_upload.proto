@@ -126,7 +126,7 @@ message TimelineOriginEndorsement {
 // principal. Agent labels, account claims and uploader credentials do not
 // confer acceptance permission.
 // For owner_derived_capability, the bytes are a protobuf wire encoding of
-// OwnerAuthorizationBundle, at most 4096 bytes. Decode the complete bundle,
+// OwnerAuthorizationBundle, at most 65536 bytes (64 KiB). Decode the complete bundle,
 // rejecting unknown fields and trailing bytes. Verify its owner root and
 // transition history against the independently pinned CURRENT owner state of
 // the run-principal account; OwnerRoot.account_uuid MUST equal the verified
@@ -156,7 +156,7 @@ message TimelineAdmissionAcceptance {
   uint64 first_position = 5; // 0..2^63-1.
   uint32 event_count = 6; // 0..64.
   // Exactly one current authority route; credential IDs are 1..128 bytes and
-  // owner-derived capability bundles are at most 4096 bytes.
+  // owner-derived capability bundles are 1..65536 bytes (64 KiB).
   oneof authority {
     bytes principal_credential_id = 7;
     bytes owner_derived_capability = 8;

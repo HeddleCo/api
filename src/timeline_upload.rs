@@ -17,6 +17,7 @@ pub const MAX_TIMELINE_EVENT_BYTES: usize = 2 * 1024;
 pub const MAX_TIMELINE_SNAPSHOT_BYTES: usize = 4 * 1024;
 pub const MAX_TIMELINE_EVENTS: usize = 64;
 pub const MAX_TIMELINE_ORIGIN_BISCUIT_BYTES: usize = 64 * 1024;
+pub const MAX_TIMELINE_OWNER_BUNDLE_BYTES: usize = 64 * 1024;
 pub const ORIGIN_DOMAIN: &[u8] = b"heddle-timeline-run-origin-v3\0";
 pub const DERIVATION_PATH_DOMAIN: &[u8] = b"heddle-timeline-derivation-path-v1\0";
 pub const ACCEPTANCE_DOMAIN: &[u8] = b"heddle-timeline-run-acceptance-v1\0";
@@ -322,9 +323,10 @@ fn validate_acceptance_fields(
         Some(Authority::PrincipalCredentialId(id)) => {
             check((1..=128).contains(&id.len()), "acceptance credential ID")
         }
-        Some(Authority::OwnerDerivedCapability(bytes)) => {
-            check((1..=4096).contains(&bytes.len()), "acceptance capability")
-        }
+        Some(Authority::OwnerDerivedCapability(bytes)) => check(
+            (1..=MAX_TIMELINE_OWNER_BUNDLE_BYTES).contains(&bytes.len()),
+            "acceptance capability",
+        ),
         None => Err(TimelineValidationError("acceptance authority")),
     }
 }

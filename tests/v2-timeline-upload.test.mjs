@@ -13,7 +13,7 @@ import {
   UploadTimelineTool,
 } from '../packages/typescript/dist/v1alpha2/timeline_upload_pb.js';
 import {
-  MAX_TIMELINE_EVENT_BYTES, MAX_TIMELINE_ORIGIN_BISCUIT_BYTES, MAX_TIMELINE_REQUEST_BYTES, MAX_TIMELINE_SNAPSHOT_BYTES,
+  MAX_TIMELINE_EVENT_BYTES, MAX_TIMELINE_ORIGIN_BISCUIT_BYTES, MAX_TIMELINE_OWNER_BUNDLE_BYTES, MAX_TIMELINE_REQUEST_BYTES, MAX_TIMELINE_SNAPSHOT_BYTES,
   timelineAcceptanceSigningBytes, timelineDerivationPathSha256, timelineLogicalRequestDigest,
   timelineOriginDigest, timelineOriginSigningBytes, validateTimelineUploadProvenance,
   validAgentLabel, validCanonicalUuid, validRunId, validVerifiedAgentId,
@@ -262,7 +262,11 @@ test('long owner history with twenty rotations and recovery is accepted', () => 
   });
   assert.equal(bundle.capabilityChain[0].capability.formatVersion, 3);
   assert.equal(Buffer.from(bundle.capabilityChain[0].capability.issuerStateHash).toString('hex'), history.accepted_state_hash_hex);
-  const value = fixture();
+  const value = structuredClone(fixture());
+  value.origin = fromBinary(TimelineOriginEndorsementSchema, Uint8Array.from(Buffer.from(history.origin_hex, 'hex')));
+  value.thread.spool.id = value.origin.spoolId;
+  value.thread.id.value = value.origin.threadId;
+  value.run.spool.id = value.origin.spoolId;
   const acceptance = create(TimelineAdmissionAcceptanceSchema, {
     originSha256: timelineOriginDigest(value.origin),
     uploaderDevicePublicKey: value.origin.uploaderDevicePublicKey,
@@ -282,6 +286,7 @@ test('long owner history with twenty rotations and recovery is accepted', () => 
 });
 
 test('owner bundle bound is inclusive and rejects over 64 KiB', () => {
+  assert.equal(MAX_TIMELINE_OWNER_BUNDLE_BYTES, 65536);
   const acceptance = create(TimelineAdmissionAcceptanceSchema, {
     originSha256: filled(1), uploaderDevicePublicKey: filled(2), deploymentPublicKey: filled(3),
     requestSha256: filled(4), firstPosition: 0n, eventCount: 1,

@@ -1,0 +1,6 @@
+{
+  "generated_by": "node tests/generate-pairing-web-origin-fixture.mjs",
+  "client_operation_id": "pair-1",
+  "web_origin": "https://preview.example.com",
+  "wire_hex": "0a06706169722d31321b68747470733a2f2f707265766965772e6578616d706c652e636f6d"
+}

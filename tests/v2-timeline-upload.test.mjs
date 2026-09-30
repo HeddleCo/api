@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { create } from '@bufbuild/protobuf';
+import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
+import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
+import { OwnerAuthorizationBundleSchema, OwnerKeyTransitionKind } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
 import { OperationRecord_State, RecordRefSchema, SpoolRefSchema, ThreadIdSchema, ThreadRefSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import {
   TimelineAdmissionAcceptanceSchema, TimelineOriginCredentialClass, TimelineOriginCredentialIdentitySchema,
@@ -16,7 +17,7 @@ import {
   timelineAcceptanceSigningBytes, timelineDerivationPathSha256, timelineLogicalRequestDigest,
   timelineOriginDigest, timelineOriginSigningBytes, validateTimelineUploadProvenance,
   validAgentLabel, validCanonicalUuid, validRunId, validVerifiedAgentId,
-  validateTimelineRawSize, validateTimelineRegistration, validateTimelineUpload, validateUploadEvent, validateUploadSummary,
+  validateTimelineAcceptance, validateTimelineRawSize, validateTimelineRegistration, validateTimelineUpload, validateUploadEvent, validateUploadSummary,
 } from '../packages/typescript/dist/v1alpha2/timeline-upload.js';
 
 const golden = JSON.parse(readFileSync(new URL('./fixtures/timeline-origin-v3.json', import.meta.url), 'utf8'));
@@ -245,4 +246,52 @@ test('acceptance binds one original and exact request range', () => {
   validateTimelineUpload({ ...value, acceptance }, now);
   assert.throws(() => validateTimelineUpload({ ...value, acceptance: { ...acceptance, eventCount: 2 } }, now), /acceptance range/);
   assert.throws(() => validateTimelineUpload({ ...value, acceptance: { ...acceptance, requestSha256: filled(0) } }, now), /acceptance request digest/);
+});
+
+test('long owner history with twenty rotations and recovery is accepted', () => {
+  const history = JSON.parse(readFileSync(new URL('./fixtures/timeline-owner-long-history.json', import.meta.url), 'utf8'));
+  const bytes = Uint8Array.from(Buffer.from(history.bundle_hex, 'hex'));
+  assert.equal(bytes.length, history.bundle_bytes);
+  assert.ok(bytes.length > 4096 && bytes.length < 65536);
+  const bundle = fromBinary(OwnerAuthorizationBundleSchema, bytes);
+  assert.deepEqual(toBinary(OwnerAuthorizationBundleSchema, bundle), bytes);
+  assert.equal(bundle.ownerStateChain.length, 21);
+  bundle.ownerStateChain.forEach(({ transition }, index) => {
+    assert.equal(transition.sequence, BigInt(index + 1));
+    assert.equal(transition.kind, index < 20 ? OwnerKeyTransitionKind.ROTATE : OwnerKeyTransitionKind.RECOVER);
+  });
+  assert.equal(bundle.capabilityChain[0].capability.formatVersion, 3);
+  assert.equal(Buffer.from(bundle.capabilityChain[0].capability.issuerStateHash).toString('hex'), history.accepted_state_hash_hex);
+  const value = fixture();
+  const acceptance = create(TimelineAdmissionAcceptanceSchema, {
+    originSha256: timelineOriginDigest(value.origin),
+    uploaderDevicePublicKey: value.origin.uploaderDevicePublicKey,
+    deploymentPublicKey: value.origin.deploymentPublicKey,
+    requestSha256: timelineLogicalRequestDigest(value, now),
+    firstPosition: 0n, eventCount: 1,
+    authority: { case: 'ownerDerivedCapability', value: bytes }, signature: filled(6, 64),
+  });
+  validateTimelineAcceptance(acceptance);
+  const key = createPrivateKey({ key: Buffer.concat([
+    Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(history.subject_seed_hex, 'hex'),
+  ]), format: 'der', type: 'pkcs8' });
+  const transcript = timelineAcceptanceSigningBytes(acceptance);
+  acceptance.signature = new Uint8Array(sign(null, transcript, key));
+  assert.ok(verify(null, transcript, createPublicKey(key), acceptance.signature));
+  validateTimelineUpload({ ...value, acceptance }, now);
+});
+
+test('owner bundle bound is inclusive and rejects over 64 KiB', () => {
+  const acceptance = create(TimelineAdmissionAcceptanceSchema, {
+    originSha256: filled(1), uploaderDevicePublicKey: filled(2), deploymentPublicKey: filled(3),
+    requestSha256: filled(4), firstPosition: 0n, eventCount: 1,
+    authority: { case: 'ownerDerivedCapability', value: filled(7, 65536) }, signature: filled(5, 64),
+  });
+  validateTimelineAcceptance(acceptance);
+  timelineAcceptanceSigningBytes(acceptance);
+  for (const size of [0, 65537]) {
+    const invalid = { ...acceptance, authority: { case: 'ownerDerivedCapability', value: filled(7, size) } };
+    assert.throws(() => validateTimelineAcceptance(invalid), /acceptance authority/);
+    assert.throws(() => timelineAcceptanceSigningBytes(invalid), /acceptance authority/);
+  }
 });

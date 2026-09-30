@@ -1,0 +1,16 @@
+{
+  "generated_by": "node tests/generate-attention-snooze-fixture.mjs",
+  "item_id": "attn-1",
+  "version_hex": "010203",
+  "resolution": 1,
+  "pinned": true,
+  "snoozed_until_seconds": 1800000000,
+  "snoozed_until_nanos": 123000000,
+  "set_client_operation_id": "op-snooze",
+  "clear_client_operation_id": "op-clear",
+  "unchanged_client_operation_id": "op-pin",
+  "item_wire_hex": "0a0812066174746e2d31120301020338014001720b0880a4a7da0610c0a9d33a",
+  "set_wire_hex": "0a096f702d736e6f6f7a65120812066174746e2d311a0301020320012801320b0880a4a7da0610c0a9d33a",
+  "clear_wire_hex": "0a086f702d636c656172120812066174746e2d311a03010203200128013801",
+  "unchanged_wire_hex": "0a066f702d70696e120812066174746e2d311a0301020320012801"
+}

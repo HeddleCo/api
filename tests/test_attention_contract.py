@@ -68,6 +68,14 @@ class AttentionContractTest(unittest.TestCase):
                 ("RESOLUTION_ACTED_ON", "3"),
             ],
         )
+        self.assertIn(
+            ("google.protobuf.Timestamp", "snoozed_until", 14),
+            fields(ACTIVITY, "AttentionItem"),
+        )
+        self.assertIn("Unset or a time in the past means not snoozed", item)
+        self.assertIn("new activity arrives on its subject", item)
+        self.assertIn("bumps version", item)
+        request = body(ACTIVITY, "message", "SetAttentionStateRequest")
         self.assertEqual(
             fields(ACTIVITY, "SetAttentionStateRequest"),
             [
@@ -76,8 +84,15 @@ class AttentionContractTest(unittest.TestCase):
                 ("bytes", "expected_version", 3),
                 ("AttentionItem.Resolution", "resolution", 4),
                 ("bool", "pinned", 5),
+                ("google.protobuf.Timestamp", "snoozed_until", 6),
+                ("bool", "clear_snooze", 7),
             ],
         )
+        self.assertRegex(request, r"oneof snooze \{")
+        self.assertIn("leaves the current snooze unchanged", request)
+        self.assertIn("false is rejected", request)
+        self.assertIn("client_operation_id idempotency behave as today", request)
+        self.assertIn("absolute pin value on every call", request)
 
     def test_observation_and_mutations_keep_distinct_effects(self) -> None:
         event = body(VIEWS, "message", "AttentionEvent")

@@ -34,3 +34,18 @@ omitted without failing the read; an empty list means no visible link. Older
 messages decode with an empty list, and older consumers may ignore the field.
 No breaking override or legacy migration-manifest change is required. Package
 versions remain unchanged; the next release is cut separately.
+
+`AttentionItem.snoozed_until` (tag 14) and the `SetAttentionStateRequest.snooze`
+oneof (`snoozed_until` tag 6, `clear_snooze` tag 7) are additive for
+HeddleCo/api#273 and HeddleCo/weft#2400. On the item, an unset or past timestamp
+means not snoozed. A future time removes the item from pending on every device.
+It returns as pending when that time passes, or earlier when new activity
+arrives on its subject; the server then clears the snooze and bumps version.
+On the request, an absent `snooze` oneof leaves the current snooze unchanged,
+so a resolution or `pinned` update does not clear it. `snoozed_until` sets a
+snooze. `clear_snooze` must be true and clears it; false is rejected.
+`expected_version`, `client_operation_id` idempotency and `pinned` behave as
+today (`pinned` stays the absolute pin value on every call). Older messages
+decode with no snooze, and older consumers may ignore the fields. No breaking
+override or legacy migration-manifest change is required. Package versions
+remain unchanged; the next release is cut separately.

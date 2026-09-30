@@ -87,6 +87,7 @@ class AdditiveBundleContractTest(unittest.TestCase):
                 ("name", 4),
                 ("private", 5),
                 ("installation_id", 6),
+                ("linked_spools", 7),
             ],
         )
         connection = body(INTEGRATION, "message", "ProviderConnection")

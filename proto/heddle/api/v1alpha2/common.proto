@@ -182,6 +182,27 @@ enum Coverage {
   COVERAGE_FAILED = 7;
 }
 
+// A safe explanation for partial or unavailable section coverage. Reasons never
+// grant access or disclose withheld content, identifiers, paths, or counts.
+enum SectionStatusReason {
+  // No explanation supplied (including older servers). Clients show a generic
+  // coverage label; unknown future codes must use the same fallback.
+  SECTION_STATUS_REASON_UNSPECIFIED = 0;
+  // Required base ancestry cannot be resolved/read to build the comparison.
+  // Clients show "Base ancestry unavailable", not an empty successful diff.
+  SECTION_STATUS_REASON_BASE_ANCESTRY_UNAVAILABLE = 1;
+  // Caller authority withholds data. Set only when this coarse state is safe
+  // to disclose; preserve indistinguishable forbidden/absent responses otherwise.
+  // Clients show "Access unavailable" without revealing any withheld content.
+  SECTION_STATUS_REASON_ACCESS_WITHHELD = 2;
+  // Multiple caller-visible heads prevent selecting one comparison head.
+  // Clients show "Multiple heads" and offer explicit selection when supported.
+  SECTION_STATUS_REASON_MULTIPLE_HEADS = 3;
+  // Some requested coverage cannot be established and no more specific safe
+  // reason applies. Clients show "Coverage incomplete" with available results.
+  SECTION_STATUS_REASON_COVERAGE_INCOMPLETE = 4;
+}
+
 message SectionStatus {
   // Contract-defined section name, not a client-supplied query expression.
   string section = 1;
@@ -189,6 +210,11 @@ message SectionStatus {
   RevisionRef computed_for = 3;
   RecordRef operation = 4;
   PageInfo page = 5;
+  // Supplement for COVERAGE_PARTIAL or COVERAGE_UNAVAILABLE; otherwise leave
+  // UNSPECIFIED. Coverage remains authoritative. Set the most specific safe
+  // reason, preferring ACCESS_WITHHELD if another code would expose hidden state.
+  // Replace it with coverage at each status update; never retain a stale reason.
+  SectionStatusReason reason = 6;
 }
 
 message SectionReplacement {

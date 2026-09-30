@@ -274,6 +274,37 @@ reports its own coverage and pagination. Not requested, pending, partial, stale,
 unavailable and complete have different meanings. Unavailable data must not be
 reported as an empty successful collection.
 
+`SectionStatus.reason` adds a typed explanation for `COVERAGE_PARTIAL` or
+`COVERAGE_UNAVAILABLE`. Servers set the most specific applicable reason they
+can safely disclose. Coverage remains authoritative: a reason neither changes
+coverage nor turns unavailable data into an empty collection. Servers leave
+the reason `SECTION_STATUS_REASON_UNSPECIFIED` for other coverage states and
+when no safe, supported explanation is available. Clients render their own
+localized text from the code; no server free text is needed.
+
+| Reason | When the server sets it | What a client should show |
+| --- | --- | --- |
+| `SECTION_STATUS_REASON_UNSPECIFIED` (0) | No explanation supplied, including messages from older servers. | A generic label from coverage, such as "Partially available" or "Unavailable". |
+| `SECTION_STATUS_REASON_BASE_ANCESTRY_UNAVAILABLE` (1) | A comparison needs base ancestry that cannot be resolved or read, so its requested coverage cannot be built. | "Base ancestry unavailable"; do not imply an empty diff. |
+| `SECTION_STATUS_REASON_ACCESS_WITHHELD` (2) | Current caller authority withholds some or all section data, and disclosing that coarse availability state is permitted by the section's privacy contract. | "Access unavailable"; never name withheld resources or show hidden content, identifiers, paths, counts, or policy details. |
+| `SECTION_STATUS_REASON_MULTIPLE_HEADS` (3) | Multiple caller-visible heads prevent selecting the single head required for the requested/default comparison. | "Multiple heads; select a comparison" when explicit selection is supported, otherwise "Multiple heads". |
+| `SECTION_STATUS_REASON_COVERAGE_INCOMPLETE` (4) | The endpoint can establish only some requested coverage (for example because of missing inputs or a work budget), and no more specific safe reason applies. | "Coverage incomplete"; show available results as partial and use any supplied continuation. |
+
+For example, when `ObserveThread` cannot build the default `review` comparison,
+it emits `COVERAGE_UNAVAILABLE` with `BASE_ANCESTRY_UNAVAILABLE` or
+`MULTIPLE_HEADS` rather than silently omitting the comparison. The reason names
+in that example abbreviate the `SECTION_STATUS_REASON_` prefix.
+
+Reason selection must not reveal withheld content or its existence. Access
+withheld takes precedence over more specific causes when those causes would
+disclose hidden state. If even that coarse reason would distinguish forbidden
+from absent resources, retain the section's indistinguishable response behavior;
+do not emit an access-withheld status merely to explain a denial. In particular,
+the hosted timeline privacy rules above still apply. The reason carries no
+resource references or human-readable detail. Clients treat unknown future
+reason codes like UNSPECIFIED and replace coverage and reason together when a
+new status commits, clearing an old explanation when coverage becomes complete.
+
 Upsert replaces a keyed record. Remove evicts a record from this observed window;
 it does not claim physical purge. A SectionReplacement stages clearing the named
 section followed by its replacement records within one checkpoint batch. Use it

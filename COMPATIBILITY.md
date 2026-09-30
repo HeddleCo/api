@@ -1,5 +1,15 @@
 # Compatibility policy
 
+`SectionStatus.reason` (tag 6) and `SectionStatusReason` are additive for
+HeddleCo/api#277 and HeddleCo/weft#2423. Existing tags 1–5 are unchanged.
+An omitted reason decodes as UNSPECIFIED (0), preserving older servers;
+older consumers may ignore the new field. Clients use a generic coverage label
+for unspecified or unknown future codes. The reason supplements PARTIAL or
+UNAVAILABLE coverage and cannot disclose withheld content or existence; see
+the [stream contract](docs/alpha-v2/streams.md#views-paging-and-bounded-work).
+No breaking override or legacy migration-manifest change is required.
+Package versions remain unchanged; the next release is cut separately.
+
 All `0.x` consumers exact-pin package versions. Breaking changes increment the
 minor version and require a checked-in report under `breaking/` plus coordinated
 consumer release candidates. Removed field names and tags are reserved and are

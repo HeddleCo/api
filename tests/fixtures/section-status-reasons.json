@@ -1,0 +1,88 @@
+{
+  "vectors": [
+    {
+      "name": "partial-unspecified",
+      "coverage": 3,
+      "reason": 0,
+      "reason_name": "SECTION_STATUS_REASON_UNSPECIFIED",
+      "wire_hex": "0a067265766965771003"
+    },
+    {
+      "name": "partial-base_ancestry_unavailable",
+      "coverage": 3,
+      "reason": 1,
+      "reason_name": "SECTION_STATUS_REASON_BASE_ANCESTRY_UNAVAILABLE",
+      "wire_hex": "0a0672657669657710033001"
+    },
+    {
+      "name": "partial-access_withheld",
+      "coverage": 3,
+      "reason": 2,
+      "reason_name": "SECTION_STATUS_REASON_ACCESS_WITHHELD",
+      "wire_hex": "0a0672657669657710033002"
+    },
+    {
+      "name": "partial-multiple_heads",
+      "coverage": 3,
+      "reason": 3,
+      "reason_name": "SECTION_STATUS_REASON_MULTIPLE_HEADS",
+      "wire_hex": "0a0672657669657710033003"
+    },
+    {
+      "name": "partial-coverage_incomplete",
+      "coverage": 3,
+      "reason": 4,
+      "reason_name": "SECTION_STATUS_REASON_COVERAGE_INCOMPLETE",
+      "wire_hex": "0a0672657669657710033004"
+    },
+    {
+      "name": "partial-future-reason",
+      "coverage": 3,
+      "reason": 99,
+      "reason_name": null,
+      "wire_hex": "0a0672657669657710033063"
+    },
+    {
+      "name": "unavailable-unspecified",
+      "coverage": 6,
+      "reason": 0,
+      "reason_name": "SECTION_STATUS_REASON_UNSPECIFIED",
+      "wire_hex": "0a067265766965771006"
+    },
+    {
+      "name": "unavailable-base_ancestry_unavailable",
+      "coverage": 6,
+      "reason": 1,
+      "reason_name": "SECTION_STATUS_REASON_BASE_ANCESTRY_UNAVAILABLE",
+      "wire_hex": "0a0672657669657710063001"
+    },
+    {
+      "name": "unavailable-access_withheld",
+      "coverage": 6,
+      "reason": 2,
+      "reason_name": "SECTION_STATUS_REASON_ACCESS_WITHHELD",
+      "wire_hex": "0a0672657669657710063002"
+    },
+    {
+      "name": "unavailable-multiple_heads",
+      "coverage": 6,
+      "reason": 3,
+      "reason_name": "SECTION_STATUS_REASON_MULTIPLE_HEADS",
+      "wire_hex": "0a0672657669657710063003"
+    },
+    {
+      "name": "unavailable-coverage_incomplete",
+      "coverage": 6,
+      "reason": 4,
+      "reason_name": "SECTION_STATUS_REASON_COVERAGE_INCOMPLETE",
+      "wire_hex": "0a0672657669657710063004"
+    },
+    {
+      "name": "unavailable-future-reason",
+      "coverage": 6,
+      "reason": 99,
+      "reason_name": null,
+      "wire_hex": "0a0672657669657710063063"
+    }
+  ]
+}

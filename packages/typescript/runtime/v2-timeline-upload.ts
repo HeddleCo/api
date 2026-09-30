@@ -17,6 +17,7 @@ export const MAX_TIMELINE_EVENT_BYTES = 2 * 1024;
 export const MAX_TIMELINE_SNAPSHOT_BYTES = 4 * 1024;
 export const MAX_TIMELINE_EVENTS = 64;
 export const MAX_TIMELINE_ORIGIN_BISCUIT_BYTES = 64 * 1024;
+export const MAX_TIMELINE_OWNER_BUNDLE_BYTES = 64 * 1024;
 /** Check lengths before fully decoding untrusted protobuf bytes. */
 export function validateTimelineRawSize(raw: Uint8Array, kind: "request" | "event" | "snapshot"): void {
   const limit = kind === "request" ? MAX_TIMELINE_REQUEST_BYTES
@@ -128,7 +129,7 @@ function validateAcceptanceFields(value: TimelineAdmissionAcceptance): void {
   requireField(authority.case === "principalCredentialId"
     ? authority.value.length >= 1 && authority.value.length <= 128
     : authority.case === "ownerDerivedCapability"
-      ? authority.value.length >= 1 && authority.value.length <= 4096 : false, "acceptance authority");
+      ? authority.value.length >= 1 && authority.value.length <= MAX_TIMELINE_OWNER_BUNDLE_BYTES : false, "acceptance authority");
 }
 export function validateTimelineAcceptance(value: TimelineAdmissionAcceptance): void {
   validateAcceptanceFields(value);

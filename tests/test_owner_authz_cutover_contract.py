@@ -32,6 +32,18 @@ def fields(source: str, name: str) -> list[tuple[str, int]]:
 
 
 class OwnerAuthzCutoverContractTest(unittest.TestCase):
+    def test_timeline_owner_bundle_bound_matches_rust_and_typescript(self) -> None:
+        timeline = (PROTO / "timeline_upload.proto").read_text()
+        self.assertIn("at most 65536 bytes (64 KiB)", timeline)
+        self.assertIn("bundles are 1..65536 bytes (64 KiB)", timeline)
+        for relative, declaration in [
+            ("src/timeline_upload.rs", "MAX_TIMELINE_OWNER_BUNDLE_BYTES: usize"),
+            ("packages/typescript/runtime/v2-timeline-upload.ts", "MAX_TIMELINE_OWNER_BUNDLE_BYTES"),
+        ]:
+            with self.subTest(mirror=relative):
+                source = (ROOT / relative).read_text()
+                self.assertIn(f"{declaration} = 64 * 1024;", source)
+
     def test_guardian_default_and_custody_consent_are_distinct(self) -> None:
         selection = block(OWNER, "message", "RegistrationRecoveryPolicy")
         self.assertRegex(

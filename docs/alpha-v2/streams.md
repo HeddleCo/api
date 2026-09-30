@@ -225,7 +225,10 @@ registration never substitutes for fresh acceptance of a revoked original.
 
 Fresh acceptance uses a current direct-human run-principal credential or the
 format-3 `OwnerAuthorizationBundle` with an exact `TimelineAcceptanceScope`
-grant from `owner_records.proto`. The encoded bundle is bound into the
+grant from `owner_records.proto`. The encoded bundle is 1..65536 bytes (64 KiB),
+inclusive, matching the identity envelope ceiling and allowing long signed owner
+histories. See [the bound and consumer audit](timeline-owner-bundle-bound.md).
+The encoded bundle is bound into the
 acceptance transcript; its leaf subject's effective Ed25519 key signs it.
 The verifier resolves signer and owner state from persisted current records,
 checks the original credential identity variant and values, subject and Thread

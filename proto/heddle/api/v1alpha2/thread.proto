@@ -4,6 +4,7 @@ package heddle.api.v1alpha2;
 
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha2/administration.proto";
+import "heddle/api/v1alpha2/collaboration.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/stream.proto";
 
@@ -242,6 +243,14 @@ message LandingRecord {
   // is unavailable, leave both IDs unset; do not guess from the uploader.
   string initiating_principal_id = 14;
   string initiating_agent_id = 15;
+  // Server-derived snapshot of the blocking-discussion resolutions considered
+  // at landing, exposing administrator overrides in the landing receipt. Same
+  // admission metadata as discussion history, bound to exact operation IDs.
+  // Auxiliary display metadata, outside the executor-signed landing body and
+  // raw_signed_operation; never infer signed approval/authorization from it.
+  // Only disclose reader-visible originals. Empty may mean unavailable on an
+  // older server; it does not prove that no administrator override occurred.
+  repeated DiscussionResolutionRecord blocking_discussion_resolutions = 16;
 }
 
 message ThreadOwnership {

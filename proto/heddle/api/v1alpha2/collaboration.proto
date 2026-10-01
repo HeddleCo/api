@@ -104,6 +104,48 @@ message CollaborationAnchor {
   }
 }
 
+enum DiscussionActionKind {
+  DISCUSSION_ACTION_KIND_UNSPECIFIED = 0;
+  DISCUSSION_ACTION_KIND_RESOLVE = 1;
+  DISCUSSION_ACTION_KIND_REOPEN = 2;
+  DISCUSSION_ACTION_KIND_CHANGE_BLOCKING = 3;
+}
+
+// Caller-specific advice following ActionAvailability's conventions. A typed
+// action also describes blocking changes without inventing a mutation RPC or
+// changing the signed collaboration format. Advice never grants authority.
+message DiscussionActionAvailability {
+  DiscussionActionKind action = 1;
+  bool implemented = 2;
+  bool authorized = 3;
+  // Display reasons use Requirement.explanation, e.g. "Only the opener or an
+  // administrator can resolve this blocking discussion". State/version and
+  // policy requirements remain explicit even when the caller is authorized.
+  repeated Requirement requirements = 4;
+  repeated ExpectedVersion observed_versions = 5;
+}
+
+// Server-derived admission metadata for one original signed resolution. NOT
+// part of ResolveDiscussionRequest or the canonical author-signed operation;
+// neither the client nor the courier can assert an override. Retain the rule
+// and marker at admission, never recompute history from today's spool settings.
+// This projection is not an offline-verifiable authorization proof.
+message DiscussionResolutionRecord {
+  RecordRef discussion = 1;
+  // Exact causal operation ID of the original signed resolution.
+  bytes causal_id = 2;
+  // Verified original actor, not the uploader. Agent acts as principal_id.
+  string principal_id = 3;
+  string agent_id = 4;
+  // Effective, non-UNSPECIFIED rule in force when admitted.
+  BlockingDiscussionResolveRule rule = 5;
+  // True exactly when a blocking discussion was resolved under OPENER_OR_ADMIN
+  // by an authorized spool administrator whose person differs from its opener.
+  // False for opener resolutions, ANY_WRITER, and non-blocking discussions.
+  // Missing metadata means unknown, not evidence that no override occurred.
+  bool administrator_override = 6;
+}
+
 message DiscussionRecord {
   RecordRef ref = 1;
   bytes version = 2;
@@ -126,6 +168,19 @@ message DiscussionRecord {
   // to Private{audience_label}; this is an additional restriction on scope ACL.
   Audience audience = 10;
   string audience_label = 11;
+  // One entry per supported/unsupported DiscussionActionKind, evaluated for this
+  // caller and version: actionable only if implemented, authorized, and with
+  // no unmet requirements. Missing entries mean unknown, never permitted.
+  // Resolve/reopen use the inherited blocking rule; blocking-to-non-blocking
+  // cannot bypass it. Non-blocking discussions keep ordinary writer behavior.
+  // CHANGE_BLOCKING remains unimplemented until a mutation is supported; this
+  // field does not add an RPC or signed operation variant. Agents act as their
+  // person within all existing agent ceilings, including administrator agents.
+  repeated DiscussionActionAvailability actions = 12;
+  // Metadata for current resolution operations; concurrent resolutions remain
+  // distinct by causal_id. include_history also includes past resolutions,
+  // including those followed by reopen. Only disclose reader-visible originals.
+  repeated DiscussionResolutionRecord resolutions = 13;
 }
 
 message DiscussionTurn {
@@ -322,9 +377,14 @@ message ResolveDiscussionRequest {
     RevisionRef resolved_by_edit = 5;
     string dismissal_reason = 6;
   }
+  // Original author-signed canonical operation. The override marker is derived
+  // by the admitting server and exposed via DiscussionResolutionRecord; it is
+  // never a client input and does not change these signed bytes.
   SignedRecord signed_operation = 7;
 }
 
+// Reopening a blocking discussion obeys the same inherited rule as resolving;
+// non-blocking discussions retain ordinary writer authorization.
 message ReopenDiscussionRequest {
   string client_operation_id = 1;
   RecordRef discussion = 2;

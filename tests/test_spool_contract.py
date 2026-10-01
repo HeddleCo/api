@@ -60,6 +60,7 @@ class SpoolContractTest(unittest.TestCase):
                 ("google.protobuf.Duration", "abandoned_thread_retention", 6),
                 ("RecordRef", "default_review_policy", 7),
                 ("HoldLifecycle", "hold_lifecycle", 8),
+                ("BlockingDiscussionResolveRule", "blocking_discussion_resolve_rule", 9),
             ],
         )
         audience = body(COMMON, "enum", "Audience")

@@ -52,6 +52,26 @@ enum HoldLifecycle {
   HOLD_LIFECYCLE_AUTO_CLEAR_ON_RESUBMIT = 2;
 }
 
+// Delegated blocking-discussion rule, inherited down the spool tree. The
+// nearest non-UNSPECIFIED setting wins; an unset root defaults to ANY_WRITER,
+// preserving existing behavior. This is not an owner-signed policy ceiling.
+// Every permitted actor still needs ordinary write access. Non-blocking
+// discussions are unchanged. Reopening a resolved blocking discussion and
+// changing blocking to non-blocking obey the same rule as resolving it.
+// Agents act as their person (including opener identity), within agent ceilings;
+// an administrator role never bypasses those ceilings or OPENER_ONLY.
+// Unknown values MUST be rejected rather than widening permission.
+enum BlockingDiscussionResolveRule {
+  // Remove the local override and inherit; unset root means ANY_WRITER.
+  BLOCKING_DISCUSSION_RESOLVE_RULE_UNSPECIFIED = 0;
+  // Any otherwise-authorized writer; today's behavior.
+  BLOCKING_DISCUSSION_RESOLVE_RULE_ANY_WRITER = 1;
+  // Opener's person or an otherwise-authorized spool administrator.
+  BLOCKING_DISCUSSION_RESOLVE_RULE_OPENER_OR_ADMIN = 2;
+  // Opener's person only, including when the caller is an administrator.
+  BLOCKING_DISCUSSION_RESOLVE_RULE_OPENER_ONLY = 3;
+}
+
 // Fresh bootstrap permits child creation and has no implicit approval mandate.
 // Explicit review policies still apply. A revision supplies the complete record;
 // its settings participate in the observed review policy version.
@@ -82,6 +102,11 @@ message SpoolSettings {
   google.protobuf.Duration abandoned_thread_retention = 6;
   RecordRef default_review_policy = 7;
   HoldLifecycle hold_lifecycle = 8;
+  // Local override, changed via ReviseSpool under resource administrator
+  // authority, like hold_lifecycle. UNSPECIFIED removes the local override and
+  // inherits from the parent; root fallback is ANY_WRITER. A child may choose
+  // any explicit rule; this is nearest-ancestor inheritance, not a min ceiling.
+  BlockingDiscussionResolveRule blocking_discussion_resolve_rule = 9;
   // Opaque compare-and-swap version belongs to the containing spool record.
 }
 message SpoolMount {

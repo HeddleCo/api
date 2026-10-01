@@ -61,6 +61,7 @@ class SpoolContractTest(unittest.TestCase):
                 ("RecordRef", "default_review_policy", 7),
                 ("HoldLifecycle", "hold_lifecycle", 8),
                 ("BlockingDiscussionResolveRule", "blocking_discussion_resolve_rule", 9),
+                ("ThreadRef", "default_thread", 10),
             ],
         )
         audience = body(COMMON, "enum", "Audience")

@@ -2,8 +2,10 @@ syntax = "proto3";
 package heddle.api.v1alpha2;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/common/contract.proto";
 import "heddle/api/common/errors.proto";
 import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/import_authority.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
 import "heddle/api/v1alpha2/owner_views.proto";
 import "heddle/api/v1alpha2/stream.proto";
@@ -53,6 +55,7 @@ message FetchOpen {
   Delivery delivery = 6;
   // Transport hints only. The connected peer identity remains authoritative.
   repeated ProviderDialRoute routes = 7;
+  heddle.api.common.ProtocolCompatibility protocol = 8;
 }
 message PackExtent {
   ObjectAddress pack = 1;
@@ -155,6 +158,8 @@ message TransferReady {
   // Fetch inventory, present only for include_semantic_index and a usable,
   // authorized attachment. Same manifest/closure validation as PublishContent.
   repeated SemanticIndexPublication semantic_indexes = 18;
+  heddle.api.common.ProtocolCompatibility protocol = 19;
+  ImportPublicProofBundleV1 import_authority = 20;
 }
 message ProviderExtent {
   EndpointRef provider = 1;
@@ -292,6 +297,7 @@ message PublicationReceipt {
   RevisionRef revision = 4;
   bytes sharing_policy_version = 5;
   ObjectAddress accepted_inventory = 6;
+  ImportPublicProofBundleV1 import_authority = 9;
   oneof outcome {
     Applied accepted = 7;
     heddle.api.common.CallFailure rejected = 8;
@@ -354,6 +360,8 @@ message PublishContentOpen {
   // Over-limit decode/walk fails with typed RESOURCE_EXHAUSTED, never partial
   // installation. Only exactly declared semantic extras may enter source packs.
   repeated SemanticIndexPublication semantic_indexes = 8;
+  heddle.api.common.ProtocolCompatibility protocol = 9;
+  ImportPublicProofBundleV1 import_authority = 10;
 }
 message PublishContentFinish {
   // Names the server's current committed transfer plan, not a caller assertion
@@ -468,6 +476,8 @@ message ReplicationOpen {
   ThreadGenesisRecord thread_genesis = 4;
   ReadBudget budget = 5;
   repeated string record_formats = 6;
+  heddle.api.common.ProtocolCompatibility protocol = 10;
+  ImportPublicProofBundleV1 import_authority = 11;
   // Fresh session binding; the request PoP covers this exact opening.
   bytes session_nonce = 7;
   // The opening PoP binds both Iroh identities; replay on another peer or
@@ -482,6 +492,8 @@ message ReplicationReady {
   bytes sharing_policy_version = 4;
   ReadBudget budget = 5;
   repeated string record_formats = 6;
+  heddle.api.common.ProtocolCompatibility protocol = 7;
+  ImportPublicProofBundleV1 import_authority = 8;
 }
 message ReplicationHave {
   repeated CausalFrontier frontiers = 1;
@@ -513,6 +525,7 @@ message ReplicationOperations {
   // acceptance, never a fabricated historical authorization timestamp. Evidence
   // contributes to the existing batch byte budget; operations remains nonempty.
   repeated SignedRecord boundary_acceptances = 3;
+  ImportPublicProofBundleV1 import_authority = 4;
 }
 message ReplicationRejection {
   bytes operation_id = 1;

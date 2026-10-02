@@ -1,0 +1,91 @@
+syntax = "proto3";
+package heddle.api.common;
+
+// HYBRID v1 canonical encodings and bounds: docs/alpha-v2/import-authority-host-witness.md.
+// Containers are never protobuf signing inputs. Unknown fields/versions fail closed.
+enum HostedWitnessPurpose {
+  HOSTED_WITNESS_PURPOSE_UNSPECIFIED = 0;
+  HOSTED_WITNESS_PURPOSE_GENESIS_FIRST_ADMISSION_V1 = 1;
+  HOSTED_WITNESS_PURPOSE_AUTHORITY_FIRST_ADMISSION_V1 = 2;
+  HOSTED_WITNESS_PURPOSE_IMPORT_COMMITTED_PUBLICATION_V1 = 3;
+  HOSTED_WITNESS_PURPOSE_HOSTED_LANDING_V1 = 4;
+}
+enum HostedWitnessState {
+  HOSTED_WITNESS_STATE_UNSPECIFIED = 0;
+  HOSTED_WITNESS_STATE_CURRENT = 1;
+  HOSTED_WITNESS_STATE_RETIRED = 2;
+  HOSTED_WITNESS_STATE_REVOKED = 3;
+}
+// Deliberately no JOB arm. Also reject any member public key present in the
+// receiver/issuer's persistent job-key associations (including old job keys).
+enum HostedWitnessKeyRole {
+  HOSTED_WITNESS_KEY_ROLE_UNSPECIFIED = 0;
+  HOSTED_WITNESS_KEY_ROLE_HOST_WITNESS = 1;
+}
+message HostedWitnessEntryV1 {
+  bytes executor_id = 1; // SHA256("heddle-hosted-witness-key-v1\0" || public_key).
+  bytes public_key = 2; // 32 raw Ed25519 bytes.
+  HostedWitnessKeyRole role = 3;
+  HostedWitnessState state = 4;
+  repeated HostedWitnessPurpose purposes = 5; // Sorted, unique, nonempty.
+  int64 active_from_unix_millis = 6;
+  int64 active_until_unix_millis = 7; // Exclusive, including CURRENT.
+  bytes archive_root = 8; // 32 bytes for RETIRED; empty for CURRENT.
+  uint64 archive_leaf_count = 9;
+  int64 revoked_at_unix_millis = 10; // Positive only for REVOKED.
+}
+message HostedWitnessSetV1 {
+  uint32 format_version = 1; // Exactly 1.
+  string deployment_authority = 2; // Canonical HTTPS origin, no path/credentials.
+  string descriptor_root_id = 3; // Exact independently pinned descriptor context ID.
+  uint64 generation = 4; // Positive; freshness renewal also advances it.
+  int64 issued_at_unix_millis = 5;
+  int64 valid_until_unix_millis = 6; // Exclusive; maximum five minutes.
+  bytes current_executor_id = 7;
+  repeated HostedWitnessEntryV1 entries = 8; // Bytewise executor-ID order; complete history.
+}
+message SignedHostedWitnessSetV1 {
+  HostedWitnessSetV1 body = 1;
+  bytes body_digest = 2; // SHA256(set signing input).
+  bytes root_signature = 3; // Ed25519 over domain-with-NUL || canonical_body (NOT digest).
+}
+message HostedWitnessHistoryProofV1 {
+  bytes executor_id = 1;
+  HostedWitnessPurpose purpose = 2; // Also the Merkle leaf kind u32be.
+  uint64 leaf_index = 3;
+  uint64 leaf_count = 4;
+  repeated bytes siblings = 5; // Bottom-up; exact shape, at most 64 32-byte hashes.
+}
+enum HostedWitnessAdmissionBasis {
+  HOSTED_WITNESS_ADMISSION_BASIS_UNSPECIFIED = 0;
+  HOSTED_WITNESS_ADMISSION_BASIS_ORIGINAL_AUTHORITY = 1;
+  HOSTED_WITNESS_ADMISSION_BASIS_BOUNDARY_ACCEPTANCE = 2;
+}
+// New format: never reinterpret any legacy admission/HostedIntegration bytes.
+// Payloads are exactly ImportGenesisWitnessV1 (1), ImportAuthorityWitnessV1 (2),
+// ImportPublicationWitnessV1 (3), HostedLandingWitnessV1 (4), with no prefix. Receivers
+// parse the declared purpose and verify all original signatures independently.
+message HostedWitnessStatementV1 {
+  uint32 format_version = 1;
+  bytes executor_id = 2;
+  HostedWitnessPurpose purpose = 3;
+  bytes spool_uuid = 4;
+  bytes spool_genesis_digest = 5;
+  bytes owner_id = 6;
+  bytes owner_state_hash = 7;
+  uint64 ownership_transfer_sequence = 8;
+  bytes policy_state_hash = 9;
+  uint64 policy_sequence = 10;
+  HostedWitnessAdmissionBasis basis = 11;
+  bytes publisher_key_id = 12;
+  bytes authority_digest = 13;
+  bytes original_signatures_digest = 14;
+  bytes host_transaction_id = 15; // 16 bytes; durable transaction identity.
+  uint64 admission_order = 16; // Serialized authority/issuance order, positive.
+  int64 observed_at_unix_millis = 17; // Assigned under the host fence.
+  bytes canonical_payload = 18; // At most 64 KiB, exact originals/dependencies.
+}
+message SignedHostedWitnessStatementV1 {
+  HostedWitnessStatementV1 body = 1;
+  bytes signature = 2;
+}

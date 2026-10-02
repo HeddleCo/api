@@ -14,6 +14,7 @@ struct Method {
     route: String,
     streaming: &'static str,
     live_stream: bool,
+    mandatory_features: Vec<String>,
     effect: String,
     retry: String,
     signing: String,
@@ -89,6 +90,11 @@ pub fn write(
                 route: format!("{}{}", service.name(), method.name()),
                 streaming,
                 live_stream,
+                mandatory_features: enum_variants(
+                    &options,
+                    "mandatory_features",
+                    "MANDATORY_PROTOCOL_FEATURE_",
+                )?,
                 effect: enum_variant(&options, "effect", "RPC_EFFECT_")?,
                 retry: enum_variant(&options, "retry_behavior", "RETRY_BEHAVIOR_")?,
                 signing: enum_variant(&options, "signing_tier", "SIGNING_TIER_")?,
@@ -319,6 +325,7 @@ fn render(methods: &[Method], complete_policy: bool) -> String {
          pub output: &'static str,\n\
          pub streaming: StreamingShape,\n\
          pub live_stream: bool,\n\
+         pub mandatory_features: &'static [crate::heddle::api::common::MandatoryProtocolFeature],\n\
          pub effect: RpcEffect,\n\
          pub retry_behavior: RetryBehavior,\n\
          pub signing_tier: SigningTier,\n\
@@ -361,12 +368,13 @@ fn render(methods: &[Method], complete_policy: bool) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         output.push_str(&format!(
-            "MethodDescriptor {{ {policy}path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, live_stream: {}, effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, client_operation_id_field_number: {:?}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
+            "MethodDescriptor {{ {policy}path: {:?}, input: {:?}, output: {:?}, streaming: StreamingShape::{}, live_stream: {}, mandatory_features: &[{}], effect: RpcEffect::{}, retry_behavior: RetryBehavior::{}, signing_tier: SigningTier::{}, authorization_access: AuthorizationAccess::{}, client_operation_id_required: {}, client_operation_id_field_number: {:?}, maturity: ServiceMaturity::{}, deployment_targets: &[{}], route: MethodRoute::{} }},\n",
             method.path,
             method.input,
             method.output,
             method.streaming,
             method.live_stream,
+            method.mandatory_features.iter().map(|value| format!("crate::heddle::api::common::MandatoryProtocolFeature::{value}")).collect::<Vec<_>>().join(", "),
             method.effect,
             method.retry,
             method.signing,

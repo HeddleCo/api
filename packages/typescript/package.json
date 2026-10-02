@@ -49,6 +49,8 @@
     "./v2/pairing": "./dist/v1alpha2/pairing.js",
     "./v2/thread-control": "./dist/v1alpha2/thread-control.js",
     "./v2/thread-genesis": "./dist/v1alpha2/thread-genesis.js",
+    "./v2/import-authority": "./dist/v1alpha2/import-authority.js",
+    "./v2/witness-trust": "./dist/v1alpha2/witness-trust.js",
     "./v2/evidence": "./dist/v1alpha2/evidence.js"
   },
   "dependencies": {

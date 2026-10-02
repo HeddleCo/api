@@ -59,6 +59,8 @@ pub trait RpcTransport: Send + Sync {
 pub enum ClientError<E: std::error::Error> {
     #[error("endpoint does not implement {0}")]
     NotImplemented(&'static str),
+    #[error("incompatible peer for {0}")]
+    Protocol(&'static str),
     #[error("{0} requires a stable client operation ID")]
     MissingOperationId(&'static str),
     #[error("invalid request metadata: {0}")]
@@ -72,6 +74,7 @@ pub enum ClientError<E: std::error::Error> {
 pub struct Client<T> {
     transport: T,
     implemented: BTreeSet<String>,
+    protocol: Option<crate::heddle::api::common::ProtocolCompatibility>,
 }
 
 impl<T: RpcTransport> Client<T> {
@@ -81,7 +84,19 @@ impl<T: RpcTransport> Client<T> {
         Self {
             transport,
             implemented: implemented.into_iter().collect(),
+            protocol: None,
         }
+    }
+
+    /// Set support obtained from DescribeEndpoint on this authenticated endpoint.
+    /// Discard the client on endpoint/connection replacement; never reuse support
+    /// across peers. Missing support keeps all gated routes closed.
+    pub fn with_protocol(
+        mut self,
+        protocol: crate::heddle::api::common::ProtocolCompatibility,
+    ) -> Self {
+        self.protocol = Some(protocol);
+        self
     }
 
     fn encode<M: Rpc>(&self, request: &M::Request) -> Result<Vec<u8>, ClientError<T::Error>> {
@@ -89,7 +104,13 @@ impl<T: RpcTransport> Client<T> {
         if !self.implemented.contains(method.path) {
             return Err(ClientError::NotImplemented(method.path));
         }
+        if !method.mandatory_features.is_empty() {
+            crate::import_authority::require_hybrid_peer(self.protocol.as_ref())
+                .map_err(|_| ClientError::Protocol(method.path))?;
+        }
         let bytes = request.encode_to_vec();
+        validate_stream_protocol(method, &bytes, true, true)
+            .map_err(|_| ClientError::Protocol(method.path))?;
         if method.client_operation_id_required {
             let Some(field) = method.client_operation_id_field_number else {
                 return Err(ClientError::MissingOperationId(method.path));
@@ -125,6 +146,8 @@ impl<T: RpcTransport> Client<T> {
             .map_err(ClientError::Transport)?;
         Ok(Messages {
             reader,
+            method: M::METHOD,
+            first: true,
             done: false,
             message: PhantomData,
         })
@@ -149,11 +172,14 @@ impl<T: RpcTransport> Client<T> {
         Ok((
             Sender {
                 writer,
+                method: M::METHOD,
                 finished: false,
                 message: PhantomData,
             },
             Messages {
                 reader,
+                method: M::METHOD,
+                first: true,
                 done: false,
                 message: PhantomData,
             },
@@ -163,6 +189,8 @@ impl<T: RpcTransport> Client<T> {
 
 pub struct Messages<R: MessageReader, O> {
     reader: R,
+    method: &'static MethodDescriptor,
+    first: bool,
     done: bool,
     message: PhantomData<O>,
 }
@@ -184,12 +212,23 @@ impl<R: MessageReader, O: Message + Default> Messages<R, O> {
             return Ok(None);
         }
         let decoded = match self.reader.next().await {
-            Ok(Some(bytes)) => O::decode(bytes.as_slice())
-                .map(Some)
-                .map_err(ClientError::Decode),
+            Ok(Some(bytes)) => {
+                if validate_stream_protocol(self.method, &bytes, false, self.first).is_err() {
+                    Err(ClientError::Protocol(self.method.path))
+                } else {
+                    self.first = false;
+                    O::decode(bytes.as_slice())
+                        .map(Some)
+                        .map_err(ClientError::Decode)
+                }
+            }
             Ok(None) => {
-                self.done = true;
-                Ok(None)
+                if self.first && is_hybrid_stream(self.method) {
+                    Err(ClientError::Protocol(self.method.path))
+                } else {
+                    self.done = true;
+                    Ok(None)
+                }
             }
             Err(error) => Err(ClientError::Transport(error)),
         };
@@ -209,13 +248,20 @@ impl<R: MessageReader, O> Drop for Messages<R, O> {
 
 pub struct Sender<W: MessageWriter, I> {
     writer: W,
+    method: &'static MethodDescriptor,
     finished: bool,
     message: PhantomData<I>,
 }
 
 impl<W: MessageWriter, I: Message> Sender<W, I> {
-    pub async fn send(&mut self, message: &I) -> Result<(), W::Error> {
-        self.writer.send(message.encode_to_vec()).await
+    pub async fn send(&mut self, message: &I) -> Result<(), ClientError<W::Error>> {
+        let bytes = message.encode_to_vec();
+        validate_stream_protocol(self.method, &bytes, true, false)
+            .map_err(|_| ClientError::Protocol(self.method.path))?;
+        self.writer
+            .send(bytes)
+            .await
+            .map_err(ClientError::Transport)
     }
     pub async fn finish(mut self) -> Result<(), W::Error> {
         self.writer.finish().await?;
@@ -229,5 +275,56 @@ impl<W: MessageWriter, I> Drop for Sender<W, I> {
         if !self.finished {
             self.writer.abort();
         }
+    }
+}
+
+fn is_hybrid_stream(method: &MethodDescriptor) -> bool {
+    method.path.starts_with("/heddle.api.v1alpha2.SyncService/")
+        && !method.mandatory_features.is_empty()
+}
+/// Validate openings and ready frames before exposing any bytes to consumers.
+fn validate_stream_protocol(
+    method: &MethodDescriptor,
+    bytes: &[u8],
+    request: bool,
+    first: bool,
+) -> Result<(), crate::hybrid_codec::Reject> {
+    use crate::heddle::api::v1alpha2::*;
+    use crate::hybrid_codec::Reject;
+    use crate::import_authority::require_hybrid_peer;
+    if !is_hybrid_stream(method) {
+        return Ok(());
+    }
+    macro_rules! frame {
+        ($ty:ty, $variant:path) => {{
+            let value = <$ty>::decode(bytes).map_err(|_| Reject::Protocol)?;
+            match value.body {
+                Some($variant(open)) => require_hybrid_peer(open.protocol.as_ref()),
+                _ if first => Err(Reject::Protocol),
+                _ => Ok(()),
+            }
+        }};
+    }
+    match (method.path.rsplit('/').next(), request) {
+        (Some("Fetch"), true) => {
+            frame!(FetchClientFrame, fetch_client_frame::Body::Open)
+        }
+        (Some("Fetch"), false) => frame!(FetchServerFrame, fetch_server_frame::Body::Ready),
+        (Some("PublishContent"), true) => frame!(
+            PublishContentClientFrame,
+            publish_content_client_frame::Body::Open
+        ),
+        (Some("PublishContent"), false) => frame!(
+            PublishContentServerFrame,
+            publish_content_server_frame::Body::Ready
+        ),
+        (Some("ReplicateThread"), true) => {
+            frame!(ReplicateThreadRequest, replicate_thread_request::Body::Open)
+        }
+        (Some("ReplicateThread"), false) => frame!(
+            ReplicateThreadResponse,
+            replicate_thread_response::Body::Ready
+        ),
+        _ => Err(Reject::Protocol),
     }
 }

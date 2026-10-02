@@ -4,6 +4,7 @@ package heddle.api.v1alpha2;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/import_authority.proto";
 import "heddle/api/v1alpha2/stream.proto";
 
 message ProviderConnection {
@@ -165,6 +166,7 @@ message ImportBranchGenesis {
   string ref_name = 1;
   SignedRecord thread_genesis = 2;
   bytes creator_authority = 3;
+  SignedImportGenesisAuthorityV1 genesis_authority = 4;
 }
 
 message ImportSourceRequest {
@@ -180,9 +182,11 @@ message ImportSourceRequest {
   // source closures use SyncService publication instead. Each creator signature
   // binds this base.
   bytes initial_base_state = 7;
-  // Import never fabricates a creator signature. The hosted executor signs its
-  // later import receipt and preserves Git attribution in the Capture.
+  // Import preserves creator signatures. A scoped job key signs converted
+  // content; a separate host witness signs admission/publication receipts.
+  // Git attribution remains in the Capture.
   repeated ImportBranchGenesis branches = 8;
+  ImportPublicProofBundleV1 import_authority = 9;
 }
 // Retry a failed native source fetch/adoption into its original Thread. The
 // original operation remains immutable; this command creates a new operation
@@ -191,10 +195,17 @@ message RetryImportSourceRequest {
   string client_operation_id = 1;
   RecordRef original_operation = 2;
   bytes expected_operation_version = 3;
+  // Resolves retry_original_operation to this ORIGINAL logical job, not the
+  // new physical operation UUID. Current same-key retry needs no new signature;
+  // expired/cancelled authority needs explicit RenewImportJob first.
+  bytes logical_job_id = 4;
+  bytes active_delegation_digest = 5;
+  uint64 expected_authority_epoch = 6;
 }
 message SynchronizeRemoteRequest {
   string client_operation_id = 1;
   RecordRef remote = 2;
   RemoteLinkRecord.Direction direction = 3;
   bytes expected_version = 4;
+  ImportPublicProofBundleV1 import_authority = 5; // Own explicit recurring-sync scope.
 }

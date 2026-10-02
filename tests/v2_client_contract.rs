@@ -288,3 +288,203 @@ fn failed_reducer_leaves_the_last_resumable_checkpoint() {
     .expect("apply checkpoint");
     assert_eq!(state.cursor(), b"s0");
 }
+
+#[test]
+fn old_peer_advertising_existing_method_never_reaches_transport() {
+    use heddle_api::heddle::api::{common::ProtocolCompatibility, v1alpha2::*};
+    for protocol in [
+        None,
+        Some(ProtocolCompatibility {
+            protocol_version: 1,
+            mandatory_features: vec![1],
+        }),
+        Some(ProtocolCompatibility {
+            protocol_version: 2,
+            mandatory_features: vec![],
+        }),
+        Some(ProtocolCompatibility {
+            protocol_version: 2,
+            mandatory_features: vec![1, 2],
+        }),
+    ] {
+        let transport = TestTransport::default();
+        let calls = transport.calls.clone();
+        let mut client = Client::new(
+            transport,
+            [
+                "/heddle.api.v1alpha2.IntegrationService/ImportSource".into(),
+                "/heddle.api.v1alpha2.SyncService/Fetch".into(),
+                "/heddle.api.v1alpha2.SyncService/ReplicateThread".into(),
+            ],
+        );
+        if let Some(p) = protocol {
+            client = client.with_protocol(p);
+        }
+        assert!(matches!(
+            completed(
+                client.call::<rpc::IntegrationServiceImportSource>(&ImportSourceRequest {
+                    client_operation_id: "import-1".into(),
+                    ..Default::default()
+                })
+            ),
+            Err(ClientError::Protocol(_))
+        ));
+        assert!(matches!(
+            completed(client.exchange::<rpc::SyncServiceFetch>(&FetchClientFrame::default())),
+            Err(ClientError::Protocol(_))
+        ));
+        assert!(matches!(
+                completed(client.exchange::<rpc::SyncServiceReplicateThread>(
+                    &ReplicateThreadRequest::default()
+                )),
+                Err(ClientError::Protocol(_))
+            ));
+        assert!(calls.lock().expect("transport calls").is_empty());
+    }
+}
+
+#[derive(Clone)]
+struct GateTransport {
+    frames: Vec<Vec<u8>>,
+    trace: TestTransport,
+}
+impl RpcTransport for GateTransport {
+    type Error = io::Error;
+    type Reader = TestReader;
+    type Writer = TestWriter;
+    fn unary(
+        &self,
+        method: &'static MethodDescriptor,
+        _: Vec<u8>,
+    ) -> impl Future<Output = Result<Vec<u8>, io::Error>> {
+        self.trace
+            .calls
+            .lock()
+            .expect("trace")
+            .push(method.path.into());
+        ready(Ok(Vec::new()))
+    }
+    fn observe(
+        &self,
+        method: &'static MethodDescriptor,
+        _: Vec<u8>,
+    ) -> impl Future<Output = Result<TestReader, io::Error>> {
+        self.trace
+            .calls
+            .lock()
+            .expect("trace")
+            .push(method.path.into());
+        ready(Ok(TestReader {
+            messages: self.frames.clone().into(),
+            cancelled: self.trace.cancelled.clone(),
+        }))
+    }
+    fn exchange(
+        &self,
+        method: &'static MethodDescriptor,
+        _: Vec<u8>,
+    ) -> impl Future<Output = Result<(TestWriter, TestReader), io::Error>> {
+        self.trace
+            .calls
+            .lock()
+            .expect("trace")
+            .push(method.path.into());
+        ready(Ok((
+            TestWriter,
+            TestReader {
+                messages: self.frames.clone().into(),
+                cancelled: self.trace.cancelled.clone(),
+            },
+        )))
+    }
+}
+#[test]
+fn authenticated_negotiation_and_stream_ready_are_required_before_exposing_records() {
+    use heddle_api::heddle::api::{common::ProtocolCompatibility, v1alpha2::*};
+    let protocol = ProtocolCompatibility {
+        protocol_version: 2,
+        mandatory_features: vec![1],
+    };
+    let open = ReplicateThreadRequest {
+        body: Some(replicate_thread_request::Body::Open(ReplicationOpen {
+            protocol: Some(protocol.clone()),
+            ..Default::default()
+        })),
+    };
+    for (frames, passes) in [
+        (
+            vec![
+                ReplicateThreadResponse {
+                    body: Some(replicate_thread_response::Body::Ready(ReplicationReady {
+                        protocol: Some(protocol.clone()),
+                        ..Default::default()
+                    })),
+                }
+                .encode_to_vec(),
+            ],
+            true,
+        ),
+        (
+            vec![
+                ReplicateThreadResponse {
+                    body: Some(replicate_thread_response::Body::Ready(
+                        ReplicationReady::default(),
+                    )),
+                }
+                .encode_to_vec(),
+            ],
+            false,
+        ),
+        (
+            vec![
+                ReplicateThreadResponse {
+                    body: Some(replicate_thread_response::Body::Have(
+                        ReplicationHave::default(),
+                    )),
+                }
+                .encode_to_vec(),
+            ],
+            false,
+        ),
+        (vec![], false),
+    ] {
+        let trace = TestTransport::default();
+        let cancelled = trace.cancelled.clone();
+        let client = Client::new(
+            GateTransport { frames, trace },
+            ["/heddle.api.v1alpha2.SyncService/ReplicateThread".into()],
+        )
+        .with_protocol(protocol.clone());
+        let (_send, mut messages) =
+            completed(client.exchange::<rpc::SyncServiceReplicateThread>(&open))
+                .expect("compatible opening");
+        let result = completed(messages.next());
+        if passes {
+            assert!(result.expect("ready response").is_some());
+        } else {
+            assert!(matches!(result, Err(ClientError::Protocol(_))));
+            assert!(cancelled.load(Ordering::SeqCst));
+        }
+    }
+    let trace = TestTransport::default();
+    let calls = trace.calls.clone();
+    let client = Client::new(
+        GateTransport {
+            frames: vec![],
+            trace,
+        },
+        ["/heddle.api.v1alpha2.SyncService/ReplicateThread".into()],
+    )
+    .with_protocol(protocol);
+    assert!(matches!(
+        completed(
+            client.exchange::<rpc::SyncServiceReplicateThread>(&ReplicateThreadRequest {
+                body: Some(replicate_thread_request::Body::Open(
+                    ReplicationOpen::default()
+                ))
+            })
+        ),
+        Err(ClientError::Protocol(_))
+    ));
+    assert!(calls.lock().expect("trace").is_empty());
+}

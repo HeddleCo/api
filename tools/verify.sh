@@ -22,9 +22,12 @@ cargo +nightly fmt --check
 cargo test --all-features
 cargo test --locked --manifest-path tests/custodial-verifier/Cargo.toml
 cargo clippy --all-features --all-targets -- -D warnings
+rustfmt +nightly --edition 2024 --check tools/hybrid-native/src/main.rs tools/generate-hybrid-native-biscuit.rs
+cargo test --locked --manifest-path tools/hybrid-native/Cargo.toml -- --nocapture
+cargo clippy --locked --manifest-path tools/hybrid-native/Cargo.toml --all-targets -- -D warnings
 npm run build
 npm run typecheck
 node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs
 node tools/verify-treadle-conformance.mjs
-node --test tests/v2-*.test.mjs
+npm test

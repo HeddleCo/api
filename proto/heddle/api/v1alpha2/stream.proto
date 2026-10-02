@@ -3,6 +3,8 @@ syntax = "proto3";
 package heddle.api.v1alpha2;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/common/contract.proto";
+import "heddle/api/common/hosted_witness.proto";
 
 // Shared observation protocol. Each RPC has a typed event payload alongside
 // StreamFrame. Only a data frame carries a payload. See docs/alpha-v2/streams.md.
@@ -58,7 +60,7 @@ enum EndpointKind {
 }
 
 message EndpointRef {
-  // Stable Iroh endpoint public key, exactly 32 bytes. Never a relay address.
+  // Transport-only Iroh public key, exactly 32 bytes. Never content/witness authority.
   bytes public_key = 1;
   EndpointKind kind = 2;
 }
@@ -74,6 +76,8 @@ message StreamOpen {
   // An observation cannot outlive its validated authority. Reconnect with fresh
   // proof and the last committed cursor; no authority widening within a stream.
   google.protobuf.Timestamp authority_valid_until = 5;
+  heddle.api.common.ProtocolCompatibility protocol = 6;
+  heddle.api.common.SignedHostedWitnessSetV1 witness_set = 7;
 }
 
 enum StreamDataKind {

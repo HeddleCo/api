@@ -52,6 +52,7 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
             ..evidence()
         }],
         boundary_acceptances: vec![evidence()],
+        import_authority: None,
     };
     let bytes = batch.encode_to_vec();
     let dynamic = DynamicMessage::decode(

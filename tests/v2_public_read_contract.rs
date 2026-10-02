@@ -58,7 +58,14 @@ fn public_catalog_has_no_account_or_private_collections() {
             .fields()
             .map(|field| field.name().to_owned())
             .collect::<Vec<_>>(),
-        ["frame", "spool", "status", "removal", "replace_section"]
+        [
+            "frame",
+            "spool",
+            "status",
+            "removal",
+            "replace_section",
+            "summary"
+        ]
     );
     let request = pool
         .get_message_by_name("heddle.api.v1alpha2.ObserveCatalogRequest")
@@ -68,7 +75,17 @@ fn public_catalog_has_no_account_or_private_collections() {
             .fields()
             .map(|field| field.name().to_owned())
             .collect::<Vec<_>>(),
-        ["query", "spools", "observe", "sort"]
+        ["query", "spools", "observe", "sort", "filter"]
+    );
+    let leader = pool
+        .get_message_by_name("heddle.api.v1alpha2.CatalogLeader")
+        .expect("public catalog leader");
+    assert_eq!(
+        leader
+            .fields()
+            .map(|field| field.name().to_owned())
+            .collect::<Vec<_>>(),
+        ["ref", "name", "path_segments", "count"]
     );
     let spool = pool
         .get_message_by_name("heddle.api.v1alpha2.SpoolOverview")

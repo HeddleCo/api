@@ -81,6 +81,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // PolicyDenial extension out of line so adding it does not inflate every
     // CallFailure and the response-frame enums that contain one.
     config.boxed(".heddle.api.common.PolicyDenial.billing_lock");
+    // Keep frozen attribution details out of line so adding the optional
+    // projection does not inflate every StateSummary/content stream frame.
+    config.boxed(".heddle.api.common.StateAttribution.evidence");
     config
         .file_descriptor_set_path(&descriptor)
         .compile_protos(&protos, &[proto_root])?;

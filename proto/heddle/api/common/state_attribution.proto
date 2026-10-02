@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package heddle.api.common;
+
+// Observation provenance, never provider execution attestation.
+enum AttributionBasis {
+  ATTRIBUTION_BASIS_UNSPECIFIED = 0;
+  ATTRIBUTION_BASIS_CONFIGURED = 1;
+  ATTRIBUTION_BASIS_EXPLICIT = 2;
+  ATTRIBUTION_BASIS_REQUEST_REPORTED = 3;
+  ATTRIBUTION_BASIS_RESPONSE_REPORTED = 4;
+  ATTRIBUTION_BASIS_OBSERVED = 5;
+  ATTRIBUTION_BASIS_LEGACY = 6;
+}
+
+enum AttributionSource {
+  ATTRIBUTION_SOURCE_UNSPECIFIED = 0;
+  ATTRIBUTION_SOURCE_HARNESS_HOOK = 1;
+  ATTRIBUTION_SOURCE_STATUS_LINE = 2;
+  ATTRIBUTION_SOURCE_TRANSCRIPT = 3;
+  ATTRIBUTION_SOURCE_SESSION_METADATA = 4;
+  ATTRIBUTION_SOURCE_REQUEST = 5;
+  ATTRIBUTION_SOURCE_RESPONSE = 6;
+  ATTRIBUTION_SOURCE_CONFIGURATION = 7;
+  ATTRIBUTION_SOURCE_ENVIRONMENT = 8;
+  ATTRIBUTION_SOURCE_EXPLICIT_ARGUMENT = 9;
+  ATTRIBUTION_SOURCE_PROCESS = 10;
+  ATTRIBUTION_SOURCE_LEGACY = 11;
+}
+
+// Exact accepted identity, bounded to 256 UTF-8 bytes by native admission.
+// Empty, sentinel, malformed, raw payload and credential values are invalid.
+// Custom model/provider IDs are supported; no public-model registry is needed.
+message AttributionClaim {
+  string value = 1;
+  AttributionBasis basis = 2;
+  AttributionSource source = 3;
+  optional string observation_id = 4;
+}
+
+message ModelAttribution {
+  // Selected: configured/request routing key. Response: explicitly reported
+  // backend only. Neither field is inferred from the model publisher/family.
+  AttributionClaim provider = 1;
+  AttributionClaim model = 2;
+  // Explicit separately reported revision, never split out of a model alias.
+  AttributionClaim version = 3;
+  AttributionClaim thought_level = 4;
+}
+
+enum HarnessVersionScope {
+  HARNESS_VERSION_SCOPE_UNSPECIFIED = 0;
+  HARNESS_VERSION_SCOPE_CURRENT_INVOCATION = 1;
+  HARNESS_VERSION_SCOPE_SESSION_CREATION = 2;
+  HARNESS_VERSION_SCOPE_INSTALLED_BINARY = 3;
+}
+
+// Opaque, bounded correlation labels in separate namespaces, not authenticated
+// principal/delegation IDs. Never fill missing fields from another actor/turn.
+message AttributionScope {
+  optional string heddle_session_id = 1;
+  optional string heddle_segment_id = 2;
+  optional string harness_instance_id = 3;
+  optional string harness_session_id = 4;
+  optional string actor_id = 5;
+  optional string parent_actor_id = 6;
+  optional string parent_harness_session_id = 7;
+  optional string turn_id = 8;
+  optional string request_id = 9;
+  optional string response_id = 10;
+  optional string attempt_id = 11;
+  optional string message_id = 12;
+  optional string root_turn_id = 13;
+  optional string tool_call_id = 14;
+}
+
+// How the operation observation was collected, distinct from each claim's
+// provenance source. A schema value does not imply a runtime adapter exists.
+enum AttributionCollectionMethod {
+  ATTRIBUTION_COLLECTION_METHOD_UNSPECIFIED = 0;
+  ATTRIBUTION_COLLECTION_METHOD_HOOK = 1;
+  ATTRIBUTION_COLLECTION_METHOD_EVENT_STREAM = 2;
+  ATTRIBUTION_COLLECTION_METHOD_OPEN_TELEMETRY = 3;
+  ATTRIBUTION_COLLECTION_METHOD_TRANSCRIPT = 4;
+  ATTRIBUTION_COLLECTION_METHOD_PROXY = 5;
+  ATTRIBUTION_COLLECTION_METHOD_EXPLICIT = 6;
+}
+
+// Identity observed for one operation, kept separate from the capture caller
+// and every other contributor. Missing fields never inherit another identity.
+// Native admission applies the same claim/scope invariants as the root record.
+message AttributionOperationIdentity {
+  AttributionClaim harness = 1;
+  AttributionClaim harness_version = 2;
+  optional HarnessVersionScope harness_version_scope = 3;
+  ModelAttribution selected = 4;
+  // Populated claims have RESPONSE_REPORTED basis; no selected-model fallback.
+  ModelAttribution response = 5;
+  AttributionScope scope = 6;
+  // At most six unique collector origins, preserving all origins when the
+  // same fact is coalesced. Empty stays unknown; never infer from claim sources.
+  repeated AttributionCollectionMethod collection_methods = 7;
+}
+
+// Exact 32-byte native typed Blob digest of file content. This is neither a
+// raw-content checksum nor the attribution evidence Blob's own identity.
+message AttributionBlobHash {
+  bytes value = 1;
+}
+
+message AttributionFileChange {
+  // Repository-relative normalized path, at most 1024 UTF-8 bytes. Native
+  // admission rejects absolute paths, empty/dot/parent components and escapes.
+  string path = 1;
+  // For content-bound transitions, absent before means creation and absent
+  // after means deletion: at least one endpoint is present and they differ.
+  // Unresolved observations may lack a proven transition. Present hashes
+  // contain exactly 32 bytes, validated by native admission before projection.
+  AttributionBlobHash before = 2;
+  AttributionBlobHash after = 3;
+}
+
+enum AttributionOperationResolution {
+  ATTRIBUTION_OPERATION_RESOLUTION_UNSPECIFIED = 0;
+  // Retained reported operation with no proven content transition. It must not
+  // be presented as an actual producer or line owner.
+  ATTRIBUTION_OPERATION_RESOLUTION_UNRESOLVED = 1;
+  // Native capture verified that the reported before/after transition reached
+  // the captured content. Requires identity.scope.tool_call_id. This does not
+  // attest model execution, sole authorship, or ownership of individual lines.
+  ATTRIBUTION_OPERATION_RESOLUTION_CONTENT_BOUND = 2;
+}
+
+message AttributionOperation {
+  AttributionOperationIdentity identity = 1;
+  // At most 32 distinct repository-relative file changes per operation.
+  repeated AttributionFileChange changes = 2;
+  AttributionOperationResolution resolution = 3;
+}
+
+// Exact typed projection of the immutable HAE1 canonical Blob. These protobuf
+// bytes are NOT the Blob hash preimage. Resolve and verify original State/Blob
+// bytes for independent integrity verification. Native validation owns the
+// canonical MessagePack codec, 256-KiB bound and cross-field invariants.
+message AttributionEvidenceV1 {
+  uint32 format_version = 1; // Exactly 1; missing/unknown is not valid evidence.
+  AttributionClaim harness = 2;
+  AttributionClaim harness_version = 3;
+  optional HarnessVersionScope harness_version_scope = 4;
+  ModelAttribution selected = 5;
+  // Populated claims have RESPONSE_REPORTED basis; no selected-model fallback.
+  ModelAttribution response = 6;
+  AttributionScope scope = 7;
+  // At most 64 separately scoped operation observations. Never flatten these
+  // into a single producer or fill gaps from the capture caller's identity.
+  repeated AttributionOperation operations = 8;
+  // True when additional operation evidence could not be retained. False is
+  // not proof of complete authorship coverage, including for older records.
+  bool operations_incomplete = 9;
+}
+
+// State-bound attribution carried with ordinary source, not a timeline opt-in.
+// Missing entire message means no new evidence reference (legacy or explicit
+// suppression), never proof that the change was entirely human-authored.
+message StateAttribution {
+  // Exact 32-byte native Blob hash committed by State.attribution_evidence.
+  bytes evidence_hash = 1;
+  // Absent while an authenticated State reference is retained but its required
+  // evidence Blob is unavailable. Keep the digest and show unavailable evidence,
+  // never human-only. Present only after native hash/schema/binding validation.
+  // Known harness + absent model means agent-assisted, model unknown.
+  AttributionEvidenceV1 evidence = 2;
+}

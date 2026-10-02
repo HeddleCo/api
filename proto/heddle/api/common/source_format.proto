@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package heddle.api.common;
+
+// Native source object capabilities, independent of signed operation envelopes.
+// Missing/empty advertisement supports none of these additions. It never
+// implies support merely because a peer understands a signed record format.
+enum NativeSourceFormat {
+  NATIVE_SOURCE_FORMAT_UNSPECIFIED = 0;
+  // Complete bundle: format-6 State hash/MessagePack, HCS3 compact states and
+  // canonical attribution-evidence v1 Blob validation/source-closure retention.
+  // Format-4/5 States and HCS1/HCS2 remain byte-identical. A supporting reader
+  // still verifies the original stored identity and signature of legacy states.
+  NATIVE_SOURCE_FORMAT_STATE_V6_ATTRIBUTION_V1 = 1;
+}

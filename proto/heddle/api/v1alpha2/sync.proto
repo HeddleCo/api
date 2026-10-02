@@ -3,6 +3,7 @@ package heddle.api.v1alpha2;
 
 import "google/protobuf/timestamp.proto";
 import "heddle/api/common/errors.proto";
+import "heddle/api/common/source_format.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
 import "heddle/api/v1alpha2/owner_views.proto";
@@ -53,6 +54,10 @@ message FetchOpen {
   Delivery delivery = 6;
   // Transport hints only. The connected peer identity remains authoritative.
   repeated ProviderDialRoute routes = 7;
+  // Bound by the opening proof. The sender must reject an unsupported required
+  // native format before sending its objects, including provider/inline paths.
+  // Empty means no support for evidence-bearing States; never strip evidence.
+  repeated heddle.api.common.NativeSourceFormat understood_native_source_formats = 8;
 }
 message PackExtent {
   ObjectAddress pack = 1;
@@ -155,6 +160,10 @@ message TransferReady {
   // Fetch inventory, present only for include_semantic_index and a usable,
   // authorized attachment. Same manifest/closure validation as PublishContent.
   repeated SemanticIndexPublication semantic_indexes = 18;
+  // Exact native additions required by this transfer plan, covered by its
+  // checkpoint/plan digest. The receiver verifies every value is understood;
+  // discovery alone is not agreement to a different or resumed plan.
+  repeated heddle.api.common.NativeSourceFormat native_source_formats = 19;
 }
 message ProviderExtent {
   EndpointRef provider = 1;
@@ -354,6 +363,11 @@ message PublishContentOpen {
   // Over-limit decode/walk fails with typed RESOURCE_EXHAUSTED, never partial
   // installation. Only exactly declared semantic extras may enter source packs.
   repeated SemanticIndexPublication semantic_indexes = 8;
+  // Opening proof binds required codecs/closure semantics. Preflight explicit
+  // peer support through discovery, then require Ready to agree before bytes.
+  // Admission must also derive requirements from actual decoded objects; an
+  // omitted declaration cannot smuggle a new State through a legacy opening.
+  repeated heddle.api.common.NativeSourceFormat required_native_source_formats = 9;
 }
 message PublishContentFinish {
   // Names the server's current committed transfer plan, not a caller assertion
@@ -474,6 +488,9 @@ message ReplicationOpen {
   // destination cannot open a stream under the captured credential.
   EndpointRef source = 8;
   EndpointRef destination = 9;
+  // Native States embedded in signed captures need this separate negotiation.
+  // Both directions require the peer's explicit support before such a record.
+  repeated heddle.api.common.NativeSourceFormat understood_native_source_formats = 10;
 }
 message ReplicationReady {
   EndpointRef endpoint = 1;
@@ -482,6 +499,7 @@ message ReplicationReady {
   bytes sharing_policy_version = 4;
   ReadBudget budget = 5;
   repeated string record_formats = 6;
+  repeated heddle.api.common.NativeSourceFormat understood_native_source_formats = 7;
 }
 message ReplicationHave {
   repeated CausalFrontier frontiers = 1;

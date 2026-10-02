@@ -3,6 +3,7 @@ syntax = "proto3";
 package heddle.api.common;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/common/state_attribution.proto";
 import "heddle/api/common/types.proto";
 
 message DiffSpan {
@@ -186,6 +187,9 @@ message StateSummary {
   ChangeId change_id = 10;
   // The agent run that produced this state, linking StateAgent attribution to run logs.
   optional string agent_run_id = 11;
+  // Authoritative frozen source attribution when present. `agent` above is a
+  // deterministic compatibility projection, never an independent claim.
+  StateAttribution attribution = 12;
 }
 
 message BlameOrigin {

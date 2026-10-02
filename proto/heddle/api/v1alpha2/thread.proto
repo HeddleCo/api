@@ -3,6 +3,7 @@ syntax = "proto3";
 package heddle.api.v1alpha2;
 
 import "google/protobuf/timestamp.proto";
+import "heddle/api/common/state_attribution.proto";
 import "heddle/api/v1alpha2/administration.proto";
 import "heddle/api/v1alpha2/collaboration.proto";
 import "heddle/api/v1alpha2/common.proto";
@@ -402,6 +403,10 @@ message CaptureSummary {
   // Exact parents of this capture's State. A merge names every head it
   // combined; these are revisions, not mutable source-head positions.
   repeated RevisionRef parent_revisions = 15;
+  // Same canonical source attribution as StateSummary. Existing provider/model
+  // labels are its deterministic compatibility projection when present. The
+  // State signature authenticates the recorder and binding, not model execution.
+  heddle.api.common.StateAttribution attribution = 16;
 }
 
 enum ResolutionKind {

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package heddle.api.v1alpha2;
 
+import "heddle/api/common/source_format.proto";
 import "heddle/api/v1alpha2/stream.proto";
 
 message DescribeEndpointRequest {
@@ -22,4 +23,7 @@ message DescribeEndpointResponse {
   uint32 max_cursor_bytes = 9;
   uint64 operation_deduplication_retention_seconds = 10;
   bool portable_root_attachment_verification = 11;
+  // Implemented native source codecs/closure validation only. Empty does not
+  // support evidence-bearing States; signed-record support above is separate.
+  repeated heddle.api.common.NativeSourceFormat understood_native_source_formats = 12;
 }

@@ -1,5 +1,15 @@
 # Compatibility policy
 
+Committed harness/model attribution adds shared typed source projections and
+explicit `NativeSourceFormat` negotiation, independent of signed-record formats.
+Existing field tags and the scrubbed timeline contract remain unchanged. Missing
+capabilities never authorize format-6/HCS3, and protobuf support alone must not
+enable new native writes. Historical State hashes/bytes remain unchanged; native
+consumers must coordinate the new source format before enabling it. See
+[committed attribution](docs/alpha-v2/committed-attribution.md). These are additive
+wire changes, with no breaking override or legacy migration-manifest change;
+package versions remain unchanged pending a coordinated release.
+
 Content and symbol search index only each Thread's current source tips
 (HeddleCo/weft#2433). `SearchRequest.source_scope` keeps its tags and
 `SEARCH_SOURCE_HISTORY_RETAINED` (2) stays defined, but both retained-history

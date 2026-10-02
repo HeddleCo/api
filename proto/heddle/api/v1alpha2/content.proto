@@ -180,11 +180,16 @@ enum SearchMatchKind {
 }
 
 // Which accepted source revisions participate in content and symbol search.
+// Content and symbol search index only the current source tips of each Thread
+// (weft#2433); full-history search is planned (weft#2470).
 enum SearchSourceHistory {
   SEARCH_SOURCE_HISTORY_UNSPECIFIED = 0;
   // All concurrent source heads of each selected Thread. A withheld head does
   // not fall back to an older visible revision.
   SEARCH_SOURCE_HISTORY_CURRENT = 1;
+  // Reserved for full-history search (weft#2470); retained revisions are not
+  // indexed. Rejected with CALL_FAILURE_CODE_FAILED_PRECONDITION ("only Thread
+  // tips are indexed"); no results from any revision are returned.
   SEARCH_SOURCE_HISTORY_RETAINED = 2;
 }
 
@@ -221,10 +226,15 @@ message SearchRequest {
   // cursors are bound to this selection. Neither scope grants source access.
   oneof source_scope {
     SearchSourceHistory source_history = 9;
-    // Search within one exact revision, intersected with the selected Threads
-    // and Spools. Requires nonempty threads belonging to this revision's Spool;
-    // each result must originate from that Thread's accepted source history.
-    // An unknown, unaccepted or withheld revision yields no visible candidates.
+    // Search within one exact current tip, intersected with the selected
+    // Threads and Spools. Requires nonempty threads belonging to this
+    // revision's Spool; each result originates from that exact revision. Only
+    // current Thread tips are indexed: a visible accepted revision that is not
+    // a current tip of a selected Thread is rejected with
+    // CALL_FAILURE_CODE_FAILED_PRECONDITION ("only Thread tips are indexed"),
+    // never answered from another revision. Full-history search is planned
+    // (weft#2470). An unknown, unaccepted or withheld revision yields no
+    // visible candidates.
     RevisionRef source_revision = 10;
   }
 }

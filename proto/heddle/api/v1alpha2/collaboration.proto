@@ -195,6 +195,11 @@ message DiscussionTurn {
   // These are separate from the addressable record ID and mutable view version.
   bytes causal_id = 8;
   repeated bytes causal_parents = 9;
+  // Server-derived live display name of the authenticated principal_id, even
+  // after membership ends. Empty for unresolved/deleted/withheld attribution.
+  // Imported labels never establish a verified identity; agent_id stays separate.
+  // Projection only, outside the original signed operation.
+  string author_display_name = 10;
 }
 
 // Structured context metadata. References describe a target; they grant no access
@@ -294,6 +299,9 @@ message ContextRecord {
   bytes causal_id = 12;
   repeated bytes causal_parents = 13;
   repeated bytes causal_heads = 14;
+  // Same live display-name semantics as DiscussionTurn.author_display_name.
+  // Historical context revisions resolve at observation time, not admission.
+  string author_display_name = 15;
 }
 
 // Write input. Actor attribution is carried by the signed canonical operation;

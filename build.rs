@@ -57,6 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "CheckoutEvent.payload",
         "PairingEvent.payload",
         "ThreadEvent.payload",
+        "SearchEvent.payload",
         "IdentityEvent.payload",
         "CatalogEvent.payload",
         "WorkspaceEvent.payload",

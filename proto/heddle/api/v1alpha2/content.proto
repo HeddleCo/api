@@ -134,6 +134,34 @@ message ContentEvent {
   // before FIN means interruption, not an empty file or exhausted collection.
 }
 
+// Finite, exact-revision leaf-path listing. No depth cap or Search tip restriction.
+// See docs/alpha-v2/cleanup-lane.md for matching, bounds and disclosure rules.
+message ListPathsRequest {
+  RevisionRef revision = 1;
+  // Required owning Thread; must own revision and have the same Spool.
+  ThreadRef thread = 2;
+  // Case-sensitive literal UTF-8 prefix, not substring/fuzzy/glob. Empty lists
+  // all leaf paths, ordered by unsigned UTF-8 bytes. Links are never followed.
+  string prefix = 3;
+  // Default 1000; maximum 4096, additionally shortened by the finite budget.
+  // Cursor binds caller, Thread, revision, prefix, ordering and accepted bounds.
+  PageRequest page = 4;
+  ReadBudget budget = 5;
+}
+
+message ListPathsEvent {
+  RevisionRef revision = 1;
+  oneof payload {
+    // Unique normalized root-relative leaf path. Apply all content-read,
+    // entry visibility and public-tip embargo gates before paging or handoff.
+    string path = 2;
+    // Exactly one terminal status, section "paths" and exact computed_for.
+    // COMPLETE describes the window; page.exhausted alone ends pagination.
+    // Missing completion before FIN means interruption, not exhaustion.
+    SectionStatus complete = 3;
+  }
+}
+
 message ReadArtifactRequest {
   RecordRef artifact = 1;
   uint64 offset = 2;
@@ -257,6 +285,12 @@ message SearchHit {
   SearchMatchKind match_kind = 8;
   // Human-readable symbol spelling; the stable symbol identity is in location.
   optional string symbol_name = 9;
+  // Live owning-Thread display name, only when readable by this caller.
+  // Empty means unavailable/withheld/older server, never a verified identity.
+  string thread_name = 10;
+  // Live owning-Spool path, only with independently disclosable segments.
+  // Empty never distinguishes unavailable from withheld metadata.
+  repeated string spool_path = 11;
 }
 
 // Per-domain readiness is independent of result count and hidden matches.

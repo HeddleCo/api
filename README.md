@@ -17,7 +17,8 @@ observation lifecycle helpers. Endpoints advertise only implemented handlers.
 Read the
 [streaming contract and integration gates](docs/alpha-v2/streams.md),
 [complete design](docs/alpha-v2/design.md),
-[operation, assessment status, and default Thread contract](docs/alpha-v2/observation-additions.md), and
+[operation, assessment status, and default Thread contract](docs/alpha-v2/observation-additions.md),
+[cleanup lane contract](docs/alpha-v2/cleanup-lane.md), and
 [v1 review inventory](docs/alpha-v2/v1-disposition.csv).
 
 ## Packages

@@ -33,6 +33,37 @@ message ProviderRepository {
   // spools. Scope is the caller-visible spools of the account, not only the
   // spools named in the ObserveIntegrations request.
   repeated SpoolRef linked_spools = 7;
+  // Current provider default branch, without refs/heads/. Empty means unknown,
+  // unavailable or no default; never guess main/master. Independent of refs.
+  string default_branch = 8;
+  // Opt-in bounded page, ordered by full ref-name UTF-8 bytes. No secrets.
+  repeated ProviderRef refs = 9;
+  // Absent when unrequested. Section "provider_refs"; coverage plus PageInfo
+  // distinguishes an exhausted known-empty page from partial/unavailable data.
+  SectionStatus refs_status = 10;
+}
+
+message ProviderRef {
+  // Fully qualified refs/heads/... or refs/tags/..., unique within a page.
+  string name = 1;
+  // Exact lowercase Git object ID of the ref target; tags are not peeled.
+  string head_oid = 2;
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_BRANCH = 1;
+    KIND_TAG = 2;
+  }
+  // Zero/unknown means unknown, never implicitly a branch.
+  Kind kind = 3;
+}
+
+message ProviderRefsRequest {
+  // Select by exact connection and repository ID, not an ambiguous bare ID.
+  RecordRef connection = 1;
+  string provider_repository_id = 2;
+  // Default 128, maximum 512. Cursor binds caller, connection, repository,
+  // accepted bounds and provider snapshot; a changed snapshot invalidates it.
+  PageRequest page = 3;
 }
 message RemoteLinkRecord {
   RecordRef ref = 1;
@@ -65,6 +96,11 @@ message ObserveIntegrationsRequest {
   bool include_repositories = 3;
   PageRequest page = 4;
   ObserveOptions observe = 5;
+  // Requires include_repositories; at most eight unique authorized pairs.
+  // Only emitted inventory rows load refs; inventory paging remains independent.
+  // At most 4096 refs per snapshot/batch, bounded by observe.budget.
+  // Oversized or duplicate selectors/pages are INVALID_ARGUMENT, not truncation.
+  repeated ProviderRefsRequest include_refs_for = 6;
 }
 message IntegrationEvent {
   StreamFrame frame = 1;

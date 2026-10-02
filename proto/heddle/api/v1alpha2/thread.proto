@@ -45,6 +45,11 @@ message ThreadRelationship {
     KIND_SUPERSEDES = 4;
   }
   Kind kind = 2;
+  // Current readable related-Thread metadata. Omit the whole relationship if
+  // its reference would disclose an unreadable Thread; no hidden ID stub.
+  string name = 3;
+  // UNSPECIFIED/unknown means unknown, never landing permission.
+  ThreadLifecycle lifecycle = 4;
 }
 
 message ThreadOverview {

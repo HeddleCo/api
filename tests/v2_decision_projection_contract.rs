@@ -198,6 +198,7 @@ fn blocked_landing_receipt_preserves_typed_conflict() {
                 landing_kind: LandingRequirementKind::ConflictMultipleHeads as i32,
                 ..Default::default()
             }],
+            error: None,
         })),
         ..Default::default()
     };

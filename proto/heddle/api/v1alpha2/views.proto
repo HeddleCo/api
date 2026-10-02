@@ -108,6 +108,9 @@ message ThreadEvent {
 
 message SpoolOverview {
   SpoolRef ref = 1;
+  // Actual immediate parent, always set on emitted nested overviews. If the
+  // parent identity is unreadable, withhold the whole overview without a
+  // placeholder or distinct reason; never substitute a visible outer ancestor.
   SpoolRef parent = 2;
   string name = 3;
   bytes version = 4;
@@ -144,6 +147,11 @@ message SpoolOverview {
   google.protobuf.Timestamp last_activity_at = 17;
   // Catalog counts only. Absent when unavailable; see CatalogActivitySummary.
   CatalogActivitySummary catalog_activity = 18;
+  // Current readable ancestry, root -> parent, excluding self. Omit unreadable
+  // entries entirely, with no placeholders, hidden segments/counts or reasons.
+  // Each address must have a readable ID and independently disclosable path.
+  // This visible subsequence does not assert adjacency or a physical root.
+  repeated SpoolAddress ancestors = 19;
 }
 
 // Counts of public activity on one catalog Spool. A server deriving these from

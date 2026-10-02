@@ -2298,7 +2298,6 @@ service SyncService {
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
   rpc Fetch(stream FetchClientFrame) returns (stream FetchServerFrame) {
@@ -2322,7 +2321,6 @@ service SyncService {
       }
       authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
   // Separately bounded bulk streams keep large source transfers from delaying
@@ -2348,7 +2346,6 @@ service SyncService {
       }
       authorization_multi_target: true
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
   rpc ReadProviderExtent(ReadProviderExtentRequest) returns (stream ProviderExtentEvent) {

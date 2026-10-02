@@ -51,6 +51,8 @@ export function createServiceClient<S extends DescService>(
   for (const method of service.methods) {
     const path = methodPath(method);
     const contract = getOption(method, rpc_contract);
+    // Native opening/ready checks follow RpcContract. The Sync gate is deferred
+    // until heddle and weft ship HYBRID support (api#307).
     function streamProtocol(message: object, request: boolean, first: boolean): void {
       if (method.parent.typeName !== "heddle.api.v1alpha2.SyncService" || !contract.mandatoryFeatures.length) return;
       const body = Reflect.get(message, "body");

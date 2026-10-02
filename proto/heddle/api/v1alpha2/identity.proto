@@ -870,6 +870,9 @@ message RecoveryAttempt {
   bool vetoed = 5;
   bool completed = 6;
   repeated Requirement requirements = 7;
+  // Present only for explicitly selected Weft 1-of-1 custody. Observation
+  // never includes the email secret, a private key or an account credential.
+  CustodialRecoveryDetails custodial = 8;
 }
 message BeginRecoveryResponse {
   MutationReceipt receipt = 1;
@@ -902,7 +905,112 @@ message SubmitRecoveryProofRequest {
     // First paper stage: bounded method verification unlocks the current
     // owner history needed to sign the portable transition on a lost device.
     PaperCodeUnlock paper_unlock = 4;
+    // Distinct verified-email factor bound to this account, attempt and root.
+    // Never a paper unlock, signup email reservation or portable authority.
+    // Reject raw messages with multiple proof tags before oneof decoding.
+    CustodialEmailProof custodial_email = 5;
   }
+}
+
+// Fixed-width canonical v1: u32 version, raw16 account UUID, raw16 attempt
+// UUID, raw32 proposed Ed25519 root, raw32 challenge, i64 expiry (big endian).
+// Email possession authorizes only this attempt, never account/spool access.
+message CustodialEmailBinding {
+  uint32 format_version = 1; // Exactly 1.
+  bytes account_uuid = 2;
+  bytes attempt_uuid = 3;
+  bytes proposed_root_public_key = 4;
+  bytes challenge = 5;
+  int64 expires_at_unix_seconds = 6;
+}
+message CustodialEmailProof {
+  CustodialEmailBinding binding = 1;
+  // Exactly 32 random bytes, delivered only to the already verified email.
+  // One use; never log, return from begin, or include in observations.
+  bytes email_secret = 2;
+}
+enum CustodialRecoveryState {
+  CUSTODIAL_RECOVERY_STATE_UNSPECIFIED = 0;
+  CUSTODIAL_RECOVERY_STATE_EMAIL_PENDING = 1;
+  CUSTODIAL_RECOVERY_STATE_TIME_LOCKED = 2;
+  CUSTODIAL_RECOVERY_STATE_READY = 3;
+  CUSTODIAL_RECOVERY_STATE_PREPARED = 4;
+  CUSTODIAL_RECOVERY_STATE_VETOED = 5;
+  CUSTODIAL_RECOVERY_STATE_EXPIRED = 6;
+  CUSTODIAL_RECOVERY_STATE_SUPERSEDED = 7;
+  CUSTODIAL_RECOVERY_STATE_COMPLETED = 8;
+}
+message CustodialRecoveryDetails {
+  CustodialEmailBinding binding = 1;
+  CustodialRecoveryState state = 2;
+  // Set only when email proof and first notification intent commit together.
+  google.protobuf.Timestamp started_at = 3;
+  // Email pending: challenge expiry. Verified: eligible_at plus 24 hours.
+  google.protobuf.Timestamp expires_at = 4;
+  // Empty before proof; otherwise the independently admitted owner tip.
+  bytes owner_state_hash = 5;
+  // Captured nonzero effective signed window; never caller-selected.
+  uint64 effective_window_secs = 6;
+}
+message BeginCustodialRecoveryRequest {
+  string client_operation_id = 1;
+  string account_id = 2; // Immutable UUID; not an email address or handle.
+  // Fresh 32-byte Ed25519 root. Exact CallContext PoP proves this key.
+  bytes proposed_root_public_key = 3;
+}
+message BeginCustodialRecoveryResponse {
+  MutationReceipt receipt = 1;
+  // Synthetic and real begin records are indistinguishable before proof.
+  RecoveryAttempt recovery = 2;
+}
+message GetCustodialRecoveryAttemptRequest {
+  RecordRef recovery = 1; // Unscoped UUID; exact attempt, no listing.
+}
+message GetCustodialRecoveryAttemptResponse {
+  RecoveryAttempt recovery = 1;
+}
+message PrepareCustodialRecoverRequest {
+  string client_operation_id = 1;
+  RecordRef recovery = 2;
+  bytes expected_version = 3; // Exactly the observed 32-byte attempt version.
+}
+message CustodialRecoverProposal {
+  // Version after preparation; submit uses this version, not the prior one.
+  RecoveryAttempt recovery = 1;
+  OwnerState ownership = 2; // Original admitted history, independently verified.
+  // Immutable Recover with old guardian authorization and fresh next-guardian
+  // possession proof. next_authority_key_proof is absent until the client signs.
+  SignedOwnerKeyTransition recover = 3;
+  // canonical_owner_key_transition_v1, not protobuf serialization.
+  bytes canonical_transition = 4;
+  // SHA256("heddle-owner-key-transition-v1" || canonical_transition).
+  // Client recomputes this from the typed body before signing.
+  bytes signing_digest = 5;
+}
+message PrepareCustodialRecoverResponse {
+  MutationReceipt receipt = 1;
+  CustodialRecoverProposal proposal = 2;
+}
+message SubmitCustodialRecoverRequest {
+  string client_operation_id = 1;
+  RecordRef recovery = 2;
+  bytes expected_version = 3;
+  // Exact prepared body/signatures plus only the new root's portable proof.
+  // Host checks time, veto, expiry, CAS, consent, email and shared verifier
+  // atomically with fresh-key activation and old-key retirement.
+  SignedOwnerKeyTransition recover = 4;
+}
+message SubmitCustodialRecoverResponse {
+  MutationReceipt receipt = 1;
+  OwnerState ownership = 2; // Accepted evidence; no credential/access grant.
+}
+message VetoCustodialRecoveryRequest {
+  string client_operation_id = 1;
+  RecordRef recovery = 2;
+  bytes expected_version = 3;
+  // Current root signs identity_management::recovery_action in the distinct
+  // heddle.custodial-recovery-veto.v1 domain. No email/session substitute.
+  SignedRecord veto = 4;
 }
 message SubmitRecoveryProofResponse {
   MutationReceipt receipt = 1;

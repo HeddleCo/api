@@ -148,7 +148,7 @@ bounded owner history, subject to any stricter shared-verifier limits).
 | RPC/message | Authorization | Recommended rate/bounds | Durable audit |
 | --- | --- | --- | --- |
 | BeginCustodialRecovery | Public; exact request PoP by proposed R1. Only existing verified email may receive delivery. | 3/account/hour, 10/source/hour, 3/key/hour; UUID selector and 32-byte R1; synthetic accounts consume equal quotas. | Attempt/selector hash, proved key, delivery intent, outcome; no token/email. |
-| SubmitRecoveryProof.custodial_email | R1 request PoP AND exact unexpired binding/token. | 5 tries/attempt lifetime; 10/source/hour; lock challenge on exhaustion; secret exactly32, binding exactly132 canonical bytes. | Consumption or rejection reason, captured tip, window, notification outbox ID. |
+| SubmitRecoveryProof.custodial_email | R1 request PoP AND exact unexpired binding/token. | 5 tries/attempt lifetime; 10/source/hour; lock challenge on exhaustion; secret exactly32, binding exactly108 canonical bytes. | Consumption or rejection reason, captured tip, window, notification outbox ID. |
 | GetCustodialRecoveryAttempt | Public; request PoP by this attempt's R1 or separately verified current root. Wrong key/missing ref are existence-hidden. | 6/attempt/minute, 60/source/minute; single record, no listing or secrets. | Bounded access log keyed to attempt and proof key; no durable mutation. |
 | PrepareCustodialRecover | R1 request PoP; exact version, email admitted, window elapsed, still opted in/current tip. | 3/attempt/hour, 10/account/day; one immutable proposal per attempt, one reserved fresh key. | Proposal digest, W0/W1 key IDs, HSM operation/reservation IDs, release timestamp. |
 | SubmitCustodialRecover | R1 request PoP plus R1 portable proof; exact prepared proposal; all transaction gates. | 5/attempt/hour; 1 transition, 1 old authorization, 1 next guardian proof; accepted retry is a no-op. | Original Recover, old/new tips, key retirement/activation IDs, receipt and commit time. |
@@ -178,7 +178,9 @@ W0/W1 are per-account recovery-only Ed25519 keys held by an isolated KMS/HSM.
 They cannot sign capabilities, spool operations, owner roots as authority keys,
 or arbitrary caller-supplied bytes. The signer validates the captured account
 tip, pending attempt and exact canonical Recover independently of the HTTP
-handler. Separate email-delivery, state-admission and signing permissions.
+handler. The enrollment signer separately permits guardian possession proofs
+and authorized policy changes needed for opt-in/out; it never signs those
+records as the owner authority. Separate email-delivery, state-admission and signing permissions.
 The reviewed versioned custody warning and digest gate remain mandatory.
 
 Lifecycle: `reserved -> active -> retired -> destroyed`; a key is active only
@@ -235,3 +237,19 @@ submit. These are contract checks, not evidence of shipped Weft transactions,
 notification delivery or HSM deletion. Those implementation tests must accompany
 weft#1521/#1527. Portable signatures continue to use the shared verifier's
 canonical transition digest, never a custody-specific transition signature.
+
+The additive Rust `v2::custodial_recovery` and TypeScript
+`@heddleco/api/v2/custodial-recovery` helpers encode the email intent, derive the
+stored secret hash, recompute the restricted custody Recover canonical body and
+digest, and check structural submission prerequisites. They do not verify email
+delivery/secret equality, request proofs, owner history or Ed25519 signatures.
+They never turn a client-carried proposal or observation into trusted state.
+The caller supplies the persisted current attempt/proposal and independently
+resolved old guardian. Hosts still enforce the complete transaction obligations
+above and the shared verifier; clients still verify original portable evidence.
+
+Run `node tests/generate-custodial-recovery-fixture.mjs` after `npm run build`
+to reproduce `tests/fixtures/custodial-recovery-v1.json`. Fixture seeds are public
+test data. The Node harness and Rust tests round-trip these same wire bytes and
+check every negative for its specific rejection reason. The reflection suite's
+state vector and descriptor tests all fail against the original schema.

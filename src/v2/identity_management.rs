@@ -204,6 +204,7 @@ pub fn signing_bytes(format: &str, canonical: &[u8]) -> Result<Vec<u8>, Error> {
     if !matches!(
         format,
         DELEGATION
+            | super::custodial_recovery::CUSTODIAL_VETO
             | ISSUE_AUTHORITY
             | ISSUE_POSSESSION
             | REVOKE_DELEGATION

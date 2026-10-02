@@ -856,6 +856,85 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  // Opt-in custody only. Proposed-root PoP binds begin, proof, prepare and
+  // submit. Poll also admits independently proved current-root possession;
+  // veto requires that current root's exact signed action. These exceptions
+  // never admit a session, claim or attribution as owner authority.
+  rpc BeginCustodialRecovery(BeginCustodialRecoveryRequest) returns (BeginCustodialRecoveryResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc GetCustodialRecoveryAttempt(GetCustodialRecoveryAttemptRequest) returns (GetCustodialRecoveryAttemptResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      client_operation_id_required: false
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc PrepareCustodialRecover(PrepareCustodialRecoverRequest) returns (PrepareCustodialRecoverResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc SubmitCustodialRecover(SubmitCustodialRecoverRequest) returns (SubmitCustodialRecoverResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  rpc VetoCustodialRecovery(VetoCustodialRecoveryRequest) returns (MutationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   rpc BeginRecovery(BeginRecoveryRequest) returns (BeginRecoveryResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

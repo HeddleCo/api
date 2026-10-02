@@ -1,5 +1,6 @@
 //! Shared v2 client behavior. Transport adapters retain key and connection ownership.
 pub mod client;
+pub mod custodial_recovery;
 pub mod identity_management;
 pub mod invitation;
 pub mod passkey_label;

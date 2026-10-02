@@ -336,6 +336,31 @@ message ImportReport {
   repeated SkippedImportRef skipped_refs = 5;
 }
 
+// Typed operation identity. Same resource as OperationRecord.ref and existing
+// RecordRef command inputs; links never confer permission to observe it.
+message OperationRef {
+  SpoolRef spool = 1;
+  string id = 2;
+}
+
+// Extensible subject union. Absent/unknown case means unavailable, not a guess
+// from the destination spool's name or current remotes.
+message OperationSubject {
+  oneof subject {
+    ImportOperationSubject import = 1;
+  }
+}
+
+message ImportOperationSubject {
+  // Source admitted for this attempt. Credential-free URL: never project
+  // userinfo, secret query parameters, or a source hidden from this caller.
+  string source_url = 1;
+  // ProviderConnection.provider + ProviderRepository.provider_repository_id.
+  // Both populated or both empty; source_url or this pair must be nonempty.
+  string provider = 2;
+  string provider_repository_id = 3;
+}
+
 message OperationRecord {
   RecordRef ref = 1;
   string client_operation_id = 2;
@@ -365,6 +390,22 @@ message OperationRecord {
   // exact version; the server rechecks authorization at command admission.
   repeated ActionAvailability actions = 13;
   ImportReport import_report = 14;
+  OperationSubject subject = 15;
+  // Admission, first execution, and terminal completion/failure/cancellation.
+  // Omit unknown times; queued cancellation may finish without ever starting.
+  // When present: created <= started <= finished. Pause/resume retains start.
+  // Display times never establish causality or replace this record's CAS.
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp started_at = 17;
+  google.protobuf.Timestamp finished_at = 18;
+  // Direct predecessor/replacement, recorded atomically at retry admission.
+  // Same subject/destination; no cycles/self-links. Original execution history
+  // stays intact; updating supersession metadata advances the observed version.
+  OperationRef retry_of = 19;
+  // A superseded failure is historical, not live, even if the retry is queued
+  // or fails. At most one direct replacement; historical attempts offer no
+  // further retry. Omit unreadable links; absence then means unknown.
+  OperationRef superseded_by = 20;
 }
 
 // A durable, versioned record. Its format defines canonical bytes, domain,

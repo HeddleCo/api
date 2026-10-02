@@ -921,7 +921,7 @@ dependencies = [
 
 [[package]]
 name = "heddle-api"
-version = "0.31.0-alpha.17"
+version = "0.31.0-alpha.18"
 dependencies = [
  "blake3",
  "bytes",
@@ -1114,7 +1114,7 @@ dependencies = [
  "anyhow",
  "biscuit-auth",
  "heddle-api 0.31.0-alpha.16",
- "heddle-api 0.31.0-alpha.17",
+ "heddle-api 0.31.0-alpha.18",
  "heddle-biscuit-verifier",
  "heddle-crypto",
  "heddle-object-model",

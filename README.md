@@ -18,7 +18,8 @@ Read the
 [streaming contract and integration gates](docs/alpha-v2/streams.md),
 [complete design](docs/alpha-v2/design.md),
 [operation, assessment status, and default Thread contract](docs/alpha-v2/observation-additions.md),
-[cleanup lane contract](docs/alpha-v2/cleanup-lane.md), and
+[cleanup lane contract](docs/alpha-v2/cleanup-lane.md),
+[catalog filters and summary contract](docs/alpha-v2/catalog.md), and
 [v1 review inventory](docs/alpha-v2/v1-disposition.csv).
 
 ## Packages

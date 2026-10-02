@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
-import { AnnotationSourceReferenceSchema, SourceTargetReferenceSchema, AnnotationTagSchema, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference, type SourceAnchor } from "./collaboration_pb.js";
+import { AnnotationSourceReferenceSchema, SourceTargetReferenceSchema, AnnotationTagSchema, SourcePathKind, SourcePathKindSource, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference, type SourceAnchor } from "./collaboration_pb.js";
 import type { EntityRef } from "./common_pb.js";
 import { Audience } from "./common_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
@@ -26,7 +26,9 @@ export type CollaborationMention =
 export type PortableCollaborationAnchor =
   | { kind: "repository" }
   | { kind: "source"; revision: { kind: "state"; stateId: Uint8Array } | { kind: "git_commit"; oid: string };
-      path: string; symbolId?: string; startLine?: number; endLine?: number; target?: SourceTargetReference };
+      path: string; symbolId?: string; startLine?: number; endLine?: number; target?: SourceTargetReference;
+      /** Client-recorded kind at the exact revision. Unknown omits the signed key. */
+      pathKind?: "file" | "directory" };
 export type CollaborationVisibility = "public" | "internal"
   | { kind: "private"; label: string };
 /** Typed native audiences map losslessly to canonical visibility. Labels are
@@ -224,7 +226,7 @@ const RECORD_KINDS = new Set(["discussion", "context", "operation", "run", "poli
 /** Intern original source evidence once; materialized locations preserve the existing
  * identity. The binding chooses a resolver, never grants access to that scope. */
 export function sourceTargetReference(source: SourceAnchor, binding: SourceTargetReference["binding"]): SourceTargetReference {
-  const evidence = annotationSourceValue(create(AnnotationSourceReferenceSchema, { source }));
+  const evidence = annotationSourceValue(create(AnnotationSourceReferenceSchema, { source: { ...source, pathKind: SourcePathKind.UNSPECIFIED, pathKindSource: SourcePathKindSource.UNSPECIFIED } }));
   const anchor = map(evidence.source);
   if (source.symbolId && !source.symbolId.trim()) throw new Error("Invalid source symbol address");
   let targetId = source.target?.targetId;
@@ -288,9 +290,11 @@ function anchorValue(anchor: PortableCollaborationAnchor): MapValue {
   for (const line of [anchor.startLine, anchor.endLine]) if (line !== undefined && (!Number.isInteger(line) || line < 1 || line > 4294967295)) throw new Error("Invalid source line");
   if ((!anchor.path && (anchor.symbolId || anchor.startLine !== undefined || anchor.endLine !== undefined))
     || (anchor.endLine !== undefined && (anchor.startLine === undefined || anchor.endLine < anchor.startLine))) throw new Error("Invalid source span");
+  if (anchor.pathKind !== undefined && anchor.pathKind !== "file" && anchor.pathKind !== "directory") throw new Error("Invalid recorded source path kind");
+  if (anchor.pathKind && (!anchor.path || (anchor.pathKind === "directory" && (anchor.symbolId || anchor.startLine !== undefined || anchor.endLine !== undefined)))) throw new Error("Invalid recorded source path kind coordinates");
   const revision: MapValue = anchor.revision.kind === "state" ? { kind: "state", state_id: Array.from(fixed(anchor.revision.stateId, 32)) }
     : { kind: "git_commit", oid: gitOid(anchor.revision.oid) };
-  return { kind: "source", source: { revision, path: anchor.path, symbol_id: anchor.symbolId ?? "", start_line: anchor.startLine ?? null, end_line: anchor.endLine ?? null, ...(anchor.target ? { target: sourceTargetValue(anchor.target) } : {}) } };
+  return { kind: "source", source: { revision, path: anchor.path, symbol_id: anchor.symbolId ?? "", start_line: anchor.startLine ?? null, end_line: anchor.endLine ?? null, ...(anchor.target ? { target: sourceTargetValue(anchor.target) } : {}), ...(anchor.pathKind ? { path_kind: anchor.pathKind } : {}) } };
 }
 function actionValue(action: DiscussionAction): MapValue {
   const turn = (body: string) => { text(body, 256 * 1024); return { body, content_hash: Array.from(typedHash("collaboration-turn", utf8.encode(body))) }; };
@@ -448,8 +452,9 @@ function validateAnchor(value: Value | undefined) {
   if (anchor.kind === "repository") { keys(anchor, ["kind"]); return; }
   if (anchor.kind !== "source") throw new Error("Unsupported collaboration anchor");
   keys(anchor, ["kind", "source"]);
-  const source = map(anchor.source); keys(source, ["revision", "path", "symbol_id", "start_line", "end_line", ...(Object.hasOwn(source, "target") ? ["target"] : [])]);
+  const source = map(anchor.source); keys(source, ["revision", "path", "symbol_id", "start_line", "end_line", ...(Object.hasOwn(source, "target") ? ["target"] : []), ...(Object.hasOwn(source, "path_kind") ? ["path_kind"] : [])]);
   if (Object.hasOwn(source, "target")) validateSourceTarget(source.target);
+  if (Object.hasOwn(source, "path_kind") && source.path_kind !== "file" && source.path_kind !== "directory") throw new Error("Invalid recorded source path kind");
   const revision = map(source.revision);
   let typedRevision: Extract<PortableCollaborationAnchor, { kind: "source" }>["revision"];
   if (revision.kind === "state") { keys(revision, ["kind", "state_id"]); typedRevision = { kind: "state", stateId: byteArray(revision.state_id, 32) }; }
@@ -460,7 +465,7 @@ function validateAnchor(value: Value | undefined) {
     if (typeof value !== "number") throw new Error("Invalid source line");
     return value;
   };
-  anchorValue({ kind: "source", revision: typedRevision, path: string(source.path), symbolId: string(source.symbol_id), startLine: line(source.start_line), endLine: line(source.end_line) });
+  anchorValue({ kind: "source", revision: typedRevision, path: string(source.path), symbolId: string(source.symbol_id), startLine: line(source.start_line), endLine: line(source.end_line), pathKind: source.path_kind as "file" | "directory" | undefined });
 }
 
 function validateMention(item: Value) {
@@ -490,6 +495,17 @@ function annotationPath(value: string) {
   text(value, 4096, true);
   if (/[\\:]/.test(value) || value.split("/").some(part => part === "" || part === "." || part === "..")) throw new Error("Expected canonical relative annotation path");
 }
+function recordedPathKind(source: SourceAnchor): "file" | "directory" | undefined {
+  if (source.pathKindSource === SourcePathKindSource.DERIVED) throw new Error("Derived source path kind cannot be signed");
+  if (source.pathKindSource !== SourcePathKindSource.UNSPECIFIED && source.pathKindSource !== SourcePathKindSource.RECORDED) throw new Error("Unknown source path kind provenance");
+  if (source.pathKindSource === SourcePathKindSource.RECORDED) {
+    if (source.pathKind === SourcePathKind.FILE) return "file";
+    if (source.pathKind === SourcePathKind.DIRECTORY) return "directory";
+    throw new Error("Recorded source path kind must be known");
+  }
+  if (source.pathKind !== SourcePathKind.UNSPECIFIED) throw new Error("Known source path kind requires provenance");
+  return undefined;
+}
 function annotationSourceValue(reference: AnnotationSourceReference): MapValue {
   const source = reference.source;
   if (!source?.revision?.spool) throw new Error("Annotation source requires scoped revision");
@@ -500,7 +516,7 @@ function annotationSourceValue(reference: AnnotationSourceReference): MapValue {
   const anchor: PortableCollaborationAnchor = { kind: "source", revision: revision.case === "state"
     ? { kind: "state", stateId: revision.value.value } : revision.case === "gitCommitOid"
       ? { kind: "git_commit", oid: revision.value } : (() => { throw new Error("Exact annotation revision required"); })(),
-    path: source.path, symbolId: source.symbolId, startLine: source.startLine, endLine: source.endLine, target: source.target };
+    path: source.path, symbolId: source.symbolId, startLine: source.startLine, endLine: source.endLine, target: source.target, pathKind: recordedPathKind(source) };
   annotationPath(source.path);
   if ((source.startLine === undefined) !== (source.endLine === undefined)) throw new Error("Annotation lines require both endpoints");
   return { scope: { spool, thread: thread ? Array.from(fixed(thread.id!.value, 32)) : null }, source: map(anchorValue(anchor).source) };

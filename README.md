@@ -19,7 +19,8 @@ Read the
 [complete design](docs/alpha-v2/design.md),
 [operation, assessment status, and default Thread contract](docs/alpha-v2/observation-additions.md),
 [cleanup lane contract](docs/alpha-v2/cleanup-lane.md),
-[catalog filters and summary contract](docs/alpha-v2/catalog.md), and
+[catalog filters and summary contract](docs/alpha-v2/catalog.md),
+[saved timestamps and signed source kinds](docs/alpha-v2/saved-source.md), and
 [v1 review inventory](docs/alpha-v2/v1-disposition.csv).
 
 ## Packages

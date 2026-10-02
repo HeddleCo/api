@@ -59,7 +59,18 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
 test('frozen descriptor fields and public proof-only lookup',()=>{
   for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length);for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
   for(const descriptor of fixture.enums){const schema=(descriptor.name.includes(".common.")?common:api)[`${descriptor.name.split(".").at(-1)}Schema`];assert.deepEqual(schema.values.map(v=>({name:v.name,number:v.number})),descriptor.values);}
-  assert.equal(fixture.protocol.gated_methods.length,11);
+  const expected = ['CancelImportJob', 'CommitImportJob', 'GetHostedWitnessHistoryProof', 'ImportSource',
+    'PrepareImportJob', 'RenewImportJob', 'RetryImportSource', 'SynchronizeRemote']
+    .map(name => `/heddle.api.v1alpha2.IntegrationService/${name}`);
+  const actual = Object.values(api).filter(value => value?.kind === "service").flatMap(service => service.methods)
+    .filter(method => getOption(method, common.rpc_contract).mandatoryFeatures.length)
+    .map(method => `/${method.parent.typeName}/${method.name}`).sort();
+  assert.deepEqual(actual, expected);
+  assert.deepEqual(fixture.protocol.gated_methods, expected);
+  for (const method of api.IntegrationService.methods.filter(method => expected.includes(`/${method.parent.typeName}/${method.name}`)))
+    assert.deepEqual(getOption(method, common.rpc_contract).mandatoryFeatures, [1]);
+  for (const method of [api.SyncService.method.fetch, api.SyncService.method.publishContent, api.SyncService.method.replicateThread])
+    assert.deepEqual(getOption(method, common.rpc_contract).mandatoryFeatures, []);
   const rpc=api.IntegrationService.method.getHostedWitnessHistoryProof,contract=getOption(rpc,common.rpc_contract);
   assert.equal(contract.authorizationAccess,common.AuthorizationAccess.PUBLIC);assert.equal(contract.signingTier,common.SigningTier.NONE);assert.equal(contract.effect,common.RpcEffect.READ_ONLY);assert.deepEqual(contract.mandatoryFeatures,[1]);
   const response=vector('lookup_response');assert.equal(api.GetHostedWitnessHistoryProofResponseSchema.fields.length,1);assert.ok(response.proof);assert.ok(toBinary(api.GetHostedWitnessHistoryProofResponseSchema,response).length<=4096);witness.validateWitnessLookup(vector('lookup_request'));
@@ -121,13 +132,23 @@ test('unknown fields and bounds fail closed before trust or archive lookup',()=>
   assert.throws(()=>witness.validateWitnessLookup({executorId:new Uint8Array(31),statementLeafDigest:new Uint8Array(32)}),expected('Canonical'));
   const proof=vector('publication_proof');proof.siblings=Array.from({length:65},()=>new Uint8Array(32));const entry=vector('retired_set').body.entries.find(e=>e.state===2);assert.throws(()=>witness.verifyWitnessInclusion(bytes(fixture.wire_vectors.lookup_request.wire_hex).subarray(0,32),proof,entry),expected('Bounds'));
 });
-test('mandatory protocol/version gate blocks incompatible client before transport',async()=>{
-  let calls=0;const transport={unary:async()=>{calls++;return new Uint8Array();}},path='/heddle.api.v1alpha2.IntegrationService/PrepareImportJob';
-  const client=createServiceClient(api.IntegrationService,transport,new Set([path]));await assert.rejects(client.prepareImportJob({clientOperationId:'test'}),expected('Protocol'));assert.equal(calls,0);
-  for(const value of [undefined,create(common.ProtocolCompatibilitySchema,{protocolVersion:1,mandatoryFeatures:[1]}),create(common.ProtocolCompatibilitySchema,{protocolVersion:2}),create(common.ProtocolCompatibilitySchema,{protocolVersion:2,mandatoryFeatures:[1,2]})])assert.throws(()=>authority.requireHybridPeer(value),expected('Protocol'));
-  const sync=createServiceClient(api.SyncService,{open:async function*(){calls++;}},new Set(['/heddle.api.v1alpha2.SyncService/ReplicateThread']));
-  await assert.rejects(async()=>{for await(const frame of sync.replicateThread((async function*(){yield {body:{case:'open',value:{}}};})())){}},expected('Protocol'));assert.equal(calls,0);
-  authority.requireHybridPeer(create(common.ProtocolCompatibilitySchema,{protocolVersion:2,mandatoryFeatures:[1]}));
+test('mandatory import protocol/version gate blocks every incompatible client before transport', async () => {
+  let calls = 0;
+  const transport = { unary: async () => { calls++; return new Uint8Array(); } };
+  const methods = ['importSource', 'retryImportSource', 'synchronizeRemote', 'prepareImportJob',
+    'commitImportJob', 'renewImportJob', 'cancelImportJob', 'getHostedWitnessHistoryProof'];
+  const implemented = new Set(methods.map(name => `/heddle.api.v1alpha2.IntegrationService/${api.IntegrationService.method[name].name}`));
+  for (const protocol of [undefined,
+    create(common.ProtocolCompatibilitySchema, { protocolVersion: 1, mandatoryFeatures: [1] }),
+    create(common.ProtocolCompatibilitySchema, { protocolVersion: 2 }),
+    create(common.ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1, 2] }),
+  ]) {
+    assert.throws(() => authority.requireHybridPeer(protocol), expected('Protocol'));
+    const client = createServiceClient(api.IntegrationService, transport, implemented, protocol);
+    for (const name of methods) await assert.rejects(client[name]({ clientOperationId: 'test' }), expected('Protocol'));
+  }
+  assert.equal(calls, 0);
+  authority.requireHybridPeer(create(common.ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1] }));
 });
 
 test('verification snapshots exclude asynchronous DTO and pin mutation',async()=>{const set=vector('current_set'),e=setContext(),pending=witness.verifyWitnessSet(set,e);set.body.generation=999n;e.rootEpoch=2n;const checked=await pending;assert.equal(checked.body.generation,10n);assert.equal(checked.rootEpoch,1n);const copy=checked.body;copy.generation=999n;assert.equal(checked.body.generation,10n);const member=vector('permission'),d=vector('delegation'),promise=authority.verifyImportDelegation(d,member,ownerContext());member.body.scope.maxOperations=256;d.body.scope.sourceUrl='https://other.example.test/repo.git';const verified=await promise;assert.equal(verified.body.scope.sourceUrl,'https://github.com/heddleco/example.git');});
@@ -189,5 +210,5 @@ test('genuine legacy HostedImport signature cannot enter hybrid import dispatch'
 
 test('root ID multibyte shared vectors enforce 256 UTF-8 bytes',async()=>{const good=vector('root_id_boundary'),bad=vector('root_id_over_boundary');assert.equal(Buffer.byteLength(good.body.descriptorRootId),256);assert.equal(Buffer.byteLength(bad.body.descriptorRootId),258);await witness.verifyWitnessSet(good,{...setContext(),rootId:good.body.descriptorRootId});await assert.rejects(witness.verifyWitnessSet(bad,{...setContext(),rootId:bad.body.descriptorRootId}),expected('Bounds'));});
 
-test('negotiated native client validates mandatory openings and ready responses',async()=>{const protocol=create(common.ProtocolCompatibilitySchema,{protocolVersion:2,mandatoryFeatures:[1]}),path='/heddle.api.v1alpha2.SyncService/ReplicateThread';let calls=0;const transport={open:async function*(_method,requests){calls++;for await(const _ of requests){}yield toBinary(api.ReplicateThreadResponseSchema,create(api.ReplicateThreadResponseSchema,{body:{case:'ready',value:{}}}));}};const client=createServiceClient(api.SyncService,transport,new Set([path]),protocol);await assert.rejects(async()=>{for await(const _ of client.replicateThread((async function*(){yield {body:{case:'open',value:{protocol}}};})())){}},expected('Protocol'));assert.equal(calls,1);});
+
 for(const [name,v] of Object.entries(fixture.raw_commitment_vectors))test(`frozen raw commitment: ${name}`,async()=>{const preimage=Buffer.concat([Buffer.from(v.domain),Buffer.from(bytes(v.canonical_hex))]);assert.deepEqual(preimage,Buffer.from(bytes(v.preimage_hex)));assert.deepEqual(new Uint8Array((await import('@noble/hashes/sha2.js')).sha256(preimage)),bytes(v.digest_hex));});

@@ -52,13 +52,30 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
             assert_eq!(value.name(), expected["name"].as_str().expect("value name"));
         }
     }
-    for path in fixture["protocol"]["gated_methods"]
-        .as_array()
-        .expect("gated methods")
-    {
-        let method = heddle_api::v2::method_descriptor(path.as_str().expect("path"))
-            .expect("generated method");
-        assert_eq!(method.mandatory_features,[heddle_api::heddle::api::common::MandatoryProtocolFeature::ImportAuthorityHostWitnessV1]);
+    let expected = [
+        "CancelImportJob",
+        "CommitImportJob",
+        "GetHostedWitnessHistoryProof",
+        "ImportSource",
+        "PrepareImportJob",
+        "RenewImportJob",
+        "RetryImportSource",
+        "SynchronizeRemote",
+    ]
+    .map(|name| format!("/heddle.api.v1alpha2.IntegrationService/{name}"));
+    let actual: Vec<_> = heddle_api::v2::ALL_METHODS
+        .iter()
+        .filter(|method| !method.mandatory_features.is_empty())
+        .map(|method| method.path)
+        .collect();
+    assert_eq!(actual, expected);
+    assert_eq!(
+        fixture["protocol"]["gated_methods"],
+        serde_json::json!(expected)
+    );
+    for path in &expected {
+        let method = heddle_api::v2::method_descriptor(path).expect("generated method");
+        assert_eq!(method.mandatory_features, [heddle_api::heddle::api::common::MandatoryProtocolFeature::ImportAuthorityHostWitnessV1]);
         assert_eq!(
             method.verify_protocol(&Default::default()),
             Err(heddle_api::hybrid_codec::Reject::Protocol)
@@ -72,6 +89,15 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
                 ..Default::default()
             })
             .expect("explicit compatible protocol");
+    }
+    for name in ["Fetch", "PublishContent", "ReplicateThread"] {
+        let method =
+            heddle_api::v2::method_descriptor(&format!("/heddle.api.v1alpha2.SyncService/{name}"))
+                .expect("Sync method");
+        assert!(method.mandatory_features.is_empty(), "{name}");
+        method
+            .verify_protocol(&Default::default())
+            .expect("ordinary Sync without HYBRID");
     }
     let service = pool
         .get_service_by_name("heddle.api.v1alpha2.IntegrationService")

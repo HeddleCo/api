@@ -385,25 +385,46 @@ release; exact seals defend witness-key-only compromise under honest-root/journa
 assumptions, not whole-replica compromise. Fence issuance, replace the root out of
 band and fail closed on unprovable history; isolate the issuer after launch.
 
-`ProtocolCompatibility` explicitly requires **protocol_version = 2** and the
-sorted unique mandatory feature list containing exactly
-**IMPORT_AUTHORITY_HOST_WITNESS_V1 (1)** for these v1 semantics. Missing/unknown
+Per the **OWNER DECISION of 2026-10-03**, `ProtocolCompatibility` requires
+**protocol_version = 2** and the sorted unique mandatory feature list containing
+exactly **IMPORT_AUTHORITY_HOST_WITNESS_V1 (1)** on these eight
+**IntegrationService** RPCs only: **ImportSource**, **RetryImportSource**,
+**SynchronizeRemote**, **PrepareImportJob**, **CommitImportJob**, **RenewImportJob**,
+**CancelImportJob** and **GetHostedWitnessHistoryProof**. Missing/unknown
 version/features reject with FAILED_PRECONDITION / incompatible peer BEFORE
-staging or mutation, not merely after ignored additive proof fields. New import
-RPCs and existing ImportSource/RetryImportSource/SynchronizeRemote plus
-SyncService Fetch/PublishContent/ReplicateThread declare that
-feature in `RpcContract`. `createServiceClient` checks the negotiated feature
-before transport. Rust generated MethodDescriptor retains the same mandatory
-features and exposes `verify_protocol` for server dispatch before body parsing.
-Servers enforce CallContext/opening protocol gates; clients
-check authenticated ready/stream responses. HTTPS equivalents advertise/require
+staging or mutation, not merely after ignored additive proof fields.
+`RpcContract` and the generated Rust `MethodDescriptor` declare that exact gate
+set; Rust `Client` and TS `createServiceClient` check negotiated support before
+transport. `MethodDescriptor.verify_protocol` provides the server dispatch gate
+before body parsing. HTTPS equivalents advertise/require
 `Heddle-Protocol-Version: 2` and
-`Heddle-Mandatory-Features: import-authority-host-witness-v1` on HYBRID routes.
-Capability/method listing alone does not establish semantic support. Native
-Fetch/Publish/replication openings and ready replies carry the same gate and public
-proofs. An old peer cannot install/serve HYBRID records by silently ignoring fields.
-No bridge, old-key enrollment, automatic owner/root replacement or immutable
-receipt re-signing is allowed. Operational reset/re-import is a separate task.
+`Heddle-Mandatory-Features: import-authority-host-witness-v1` on those import routes.
+Capability/method listing alone does not establish semantic support.
+
+**SyncService Fetch, PublishContent and ReplicateThread do not declare or enforce
+that mandatory feature in this release.** Their native Fetch/Publish/replication
+openings and ready replies likewise do not require HYBRID protocol negotiation.
+The optional protocol and public proof fields remain additive in the schema.
+The Sync gate is deferred to the **same release that ships real HYBRID support
+in both heddle and weft**, tracked by
+[api#307](https://github.com/HeddleCo/api/issues/307). There is no bridge. This
+narrowing is safe because no HYBRID-imported records exist anywhere yet: only the
+still-gated import RPCs can create them, and no peer can serve those RPCs until
+HYBRID support ships.
+
+Until that release, **peers MUST NOT create or serve HYBRID records over Sync**.
+A non-HYBRID peer **MUST reject any Sync record/frame carrying `import_authority`
+before staging, installation, relay or publication, never silently ignore it**;
+this includes an empty-but-present bundle. The existing message fields on
+TransferReady, PublishContentOpen, PublicationReceipt, ReplicationOpen,
+ReplicationReady and ReplicationOperations expose presence as Rust
+`Option<ImportPublicProofBundleV1>` / TS `importAuthority !== undefined`, so this
+rejection needs no schema change. Generated clients and generic proof helpers do
+not automatically enforce that consumer support policy; consumers must implement
+the presence check in their Sync dispatch/record handlers. Keeping the fields
+optional does not authorize ignoring imported authority.
+No old-key enrollment, automatic owner/root replacement or immutable receipt
+re-signing is allowed. Operational reset/re-import is a separate task.
 
 Rust errors and the TS `HybridContractError.reason` use the same rejection names
 in the fixed fixture: Signature, Semantic, HighWater, JobAsWitness, Scope,

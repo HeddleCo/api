@@ -1902,10 +1902,7 @@
       "/heddle.api.v1alpha2.IntegrationService/PrepareImportJob",
       "/heddle.api.v1alpha2.IntegrationService/RenewImportJob",
       "/heddle.api.v1alpha2.IntegrationService/RetryImportSource",
-      "/heddle.api.v1alpha2.IntegrationService/SynchronizeRemote",
-      "/heddle.api.v1alpha2.SyncService/Fetch",
-      "/heddle.api.v1alpha2.SyncService/PublishContent",
-      "/heddle.api.v1alpha2.SyncService/ReplicateThread"
+      "/heddle.api.v1alpha2.IntegrationService/SynchronizeRemote"
     ]
   },
   "keys": {

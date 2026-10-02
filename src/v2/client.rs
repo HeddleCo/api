@@ -278,6 +278,8 @@ impl<W: MessageWriter, I> Drop for Sender<W, I> {
     }
 }
 
+// Native opening/ready checks follow the RpcContract gate. Ordinary Sync
+// remains ungated until heddle and weft ship HYBRID support (api#307).
 fn is_hybrid_stream(method: &MethodDescriptor) -> bool {
     method.path.starts_with("/heddle.api.v1alpha2.SyncService/")
         && !method.mandatory_features.is_empty()

@@ -290,8 +290,18 @@ fn failed_reducer_leaves_the_last_resumable_checkpoint() {
 }
 
 #[test]
-fn old_peer_advertising_existing_method_never_reaches_transport() {
+fn old_peer_advertising_import_methods_never_reaches_transport() {
     use heddle_api::heddle::api::{common::ProtocolCompatibility, v1alpha2::*};
+    let paths = [
+        "ImportSource",
+        "RetryImportSource",
+        "SynchronizeRemote",
+        "PrepareImportJob",
+        "CommitImportJob",
+        "RenewImportJob",
+        "CancelImportJob",
+        "GetHostedWitnessHistoryProof",
+    ];
     for protocol in [
         None,
         Some(ProtocolCompatibility {
@@ -307,38 +317,50 @@ fn old_peer_advertising_existing_method_never_reaches_transport() {
             mandatory_features: vec![1, 2],
         }),
     ] {
-        let transport = TestTransport::default();
-        let calls = transport.calls.clone();
+        let trace = TestTransport::default();
+        let calls = trace.calls.clone();
         let mut client = Client::new(
-            transport,
-            [
-                "/heddle.api.v1alpha2.IntegrationService/ImportSource".into(),
-                "/heddle.api.v1alpha2.SyncService/Fetch".into(),
-                "/heddle.api.v1alpha2.SyncService/ReplicateThread".into(),
-            ],
+            GateTransport {
+                frames: vec![],
+                trace,
+            },
+            paths.map(|name| format!("/heddle.api.v1alpha2.IntegrationService/{name}")),
         );
-        if let Some(p) = protocol {
-            client = client.with_protocol(p);
+        if let Some(protocol) = protocol {
+            client = client.with_protocol(protocol);
         }
-        assert!(matches!(
-            completed(
-                client.call::<rpc::IntegrationServiceImportSource>(&ImportSourceRequest {
-                    client_operation_id: "import-1".into(),
-                    ..Default::default()
-                })
-            ),
-            Err(ClientError::Protocol(_))
-        ));
-        assert!(matches!(
-            completed(client.exchange::<rpc::SyncServiceFetch>(&FetchClientFrame::default())),
-            Err(ClientError::Protocol(_))
-        ));
-        assert!(matches!(
-                completed(client.exchange::<rpc::SyncServiceReplicateThread>(
-                    &ReplicateThreadRequest::default()
-                )),
-                Err(ClientError::Protocol(_))
-            ));
+        macro_rules! rejects {
+            ($rpc:ty, $request:ty) => {
+                assert!(matches!(completed(client.call::<$rpc>(&<$request>::default())),
+                    Err(ClientError::Protocol(path)) if path == <$rpc as heddle_api::v2::client::Rpc>::METHOD.path));
+            };
+        }
+        rejects!(rpc::IntegrationServiceImportSource, ImportSourceRequest);
+        rejects!(
+            rpc::IntegrationServiceRetryImportSource,
+            RetryImportSourceRequest
+        );
+        rejects!(
+            rpc::IntegrationServiceSynchronizeRemote,
+            SynchronizeRemoteRequest
+        );
+        rejects!(
+            rpc::IntegrationServicePrepareImportJob,
+            PrepareImportJobRequest
+        );
+        rejects!(
+            rpc::IntegrationServiceCommitImportJob,
+            CommitImportJobRequest
+        );
+        rejects!(rpc::IntegrationServiceRenewImportJob, RenewImportJobRequest);
+        rejects!(
+            rpc::IntegrationServiceCancelImportJob,
+            CancelImportJobRequest
+        );
+        rejects!(
+            rpc::IntegrationServiceGetHostedWitnessHistoryProof,
+            GetHostedWitnessHistoryProofRequest
+        );
         assert!(calls.lock().expect("transport calls").is_empty());
     }
 }
@@ -398,97 +420,6 @@ impl RpcTransport for GateTransport {
         )))
     }
 }
-#[test]
-fn authenticated_negotiation_and_stream_ready_are_required_before_exposing_records() {
-    use heddle_api::heddle::api::{common::ProtocolCompatibility, v1alpha2::*};
-    let protocol = ProtocolCompatibility {
-        protocol_version: 2,
-        mandatory_features: vec![1],
-    };
-    let open = ReplicateThreadRequest {
-        body: Some(replicate_thread_request::Body::Open(ReplicationOpen {
-            protocol: Some(protocol.clone()),
-            ..Default::default()
-        })),
-    };
-    for (frames, passes) in [
-        (
-            vec![
-                ReplicateThreadResponse {
-                    body: Some(replicate_thread_response::Body::Ready(ReplicationReady {
-                        protocol: Some(protocol.clone()),
-                        ..Default::default()
-                    })),
-                }
-                .encode_to_vec(),
-            ],
-            true,
-        ),
-        (
-            vec![
-                ReplicateThreadResponse {
-                    body: Some(replicate_thread_response::Body::Ready(
-                        ReplicationReady::default(),
-                    )),
-                }
-                .encode_to_vec(),
-            ],
-            false,
-        ),
-        (
-            vec![
-                ReplicateThreadResponse {
-                    body: Some(replicate_thread_response::Body::Have(
-                        ReplicationHave::default(),
-                    )),
-                }
-                .encode_to_vec(),
-            ],
-            false,
-        ),
-        (vec![], false),
-    ] {
-        let trace = TestTransport::default();
-        let cancelled = trace.cancelled.clone();
-        let client = Client::new(
-            GateTransport { frames, trace },
-            ["/heddle.api.v1alpha2.SyncService/ReplicateThread".into()],
-        )
-        .with_protocol(protocol.clone());
-        let (_send, mut messages) =
-            completed(client.exchange::<rpc::SyncServiceReplicateThread>(&open))
-                .expect("compatible opening");
-        let result = completed(messages.next());
-        if passes {
-            assert!(result.expect("ready response").is_some());
-        } else {
-            assert!(matches!(result, Err(ClientError::Protocol(_))));
-            assert!(cancelled.load(Ordering::SeqCst));
-        }
-    }
-    let trace = TestTransport::default();
-    let calls = trace.calls.clone();
-    let client = Client::new(
-        GateTransport {
-            frames: vec![],
-            trace,
-        },
-        ["/heddle.api.v1alpha2.SyncService/ReplicateThread".into()],
-    )
-    .with_protocol(protocol);
-    assert!(matches!(
-        completed(
-            client.exchange::<rpc::SyncServiceReplicateThread>(&ReplicateThreadRequest {
-                body: Some(replicate_thread_request::Body::Open(
-                    ReplicationOpen::default()
-                ))
-            })
-        ),
-        Err(ClientError::Protocol(_))
-    ));
-    assert!(calls.lock().expect("trace").is_empty());
-}
-
 #[test]
 fn sync_without_hybrid_encodes_openings_and_accepts_ready() {
     use heddle_api::heddle::api::{common::ProtocolCompatibility, v1alpha2::*};

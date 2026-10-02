@@ -117,3 +117,38 @@ test("agent tools distinguish live subscriptions from finite resumable uploads",
     assert.equal(tool.contract.liveStream, !tool.path.endsWith("/PublishContent"), tool.path);
   }
 });
+
+for (const method of [SyncService.method.fetch, SyncService.method.publishContent, SyncService.method.replicateThread]) {
+  test(`Sync without HYBRID encodes ${method.name} openings and accepts ready`, async () => {
+    for (const protocol of [undefined,
+      create(ProtocolCompatibilitySchema, { protocolVersion: 1 }),
+      create(ProtocolCompatibilitySchema, { protocolVersion: 2 }),
+      create(ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1] }),
+    ]) {
+      let calls = 0;
+      let encoded = 0;
+      const opening = create(method.input, {
+        ...(method.name === "PublishContent" ? { clientOperationId: "publish-1" } : {}),
+        body: { case: "open", value: { protocol } },
+      });
+      const ready = create(method.output, { body: { case: "ready", value: { protocol } } });
+      const transport = {
+        async *open(actual, requests) {
+          calls++;
+          assert.equal(actual, method);
+          for await (const bytes of requests) {
+            assert.deepEqual(fromBinary(method.input, bytes), opening);
+            encoded++;
+          }
+          yield toBinary(method.output, ready);
+        },
+      };
+      const client = createServiceClient(SyncService, transport, new Set([`/${method.parent.typeName}/${method.name}`]), protocol);
+      const responses = [];
+      for await (const response of client[method.localName]((async function* () { yield opening; yield opening; })())) responses.push(response);
+      assert.deepEqual(responses, [ready]);
+      assert.equal(calls, 1);
+      assert.equal(encoded, 2);
+    }
+  });
+}

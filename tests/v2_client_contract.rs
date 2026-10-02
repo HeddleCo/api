@@ -488,3 +488,99 @@ fn authenticated_negotiation_and_stream_ready_are_required_before_exposing_recor
     ));
     assert!(calls.lock().expect("trace").is_empty());
 }
+
+#[test]
+fn sync_without_hybrid_encodes_openings_and_accepts_ready() {
+    use heddle_api::heddle::api::{common::ProtocolCompatibility, v1alpha2::*};
+    for protocol in [
+        None,
+        Some(ProtocolCompatibility {
+            protocol_version: 1,
+            mandatory_features: vec![],
+        }),
+        Some(ProtocolCompatibility {
+            protocol_version: 2,
+            mandatory_features: vec![],
+        }),
+        Some(ProtocolCompatibility {
+            protocol_version: 2,
+            mandatory_features: vec![1],
+        }),
+    ] {
+        macro_rules! exchange {
+            ($rpc:ty, $request:expr, $response:expr) => {{
+                use heddle_api::v2::client::Rpc;
+                let response = $response;
+                let trace = TestTransport::default();
+                let calls = trace.calls.clone();
+                let mut client = Client::new(
+                    GateTransport {
+                        frames: vec![response.encode_to_vec()],
+                        trace,
+                    },
+                    [<$rpc>::METHOD.path.into()],
+                );
+                if let Some(protocol) = protocol.clone() {
+                    client = client.with_protocol(protocol);
+                }
+                let (mut sender, mut messages) = completed(client.exchange::<$rpc>(&$request))
+                    .expect("ordinary Sync opening without mandatory HYBRID");
+                completed(sender.send(&$request))
+                    .expect("subsequent frame without mandatory HYBRID");
+                assert_eq!(
+                    completed(messages.next()).expect("ordinary Sync ready"),
+                    Some(response)
+                );
+                assert_eq!(*calls.lock().expect("trace"), [<$rpc>::METHOD.path]);
+            }};
+        }
+        exchange!(
+            rpc::SyncServiceFetch,
+            FetchClientFrame {
+                body: Some(fetch_client_frame::Body::Open(FetchOpen {
+                    protocol: protocol.clone(),
+                    ..Default::default()
+                }))
+            },
+            FetchServerFrame {
+                body: Some(fetch_server_frame::Body::Ready(TransferReady {
+                    protocol: protocol.clone(),
+                    ..Default::default()
+                }))
+            }
+        );
+        exchange!(
+            rpc::SyncServicePublishContent,
+            PublishContentClientFrame {
+                client_operation_id: "publish-1".into(),
+                body: Some(publish_content_client_frame::Body::Open(
+                    PublishContentOpen {
+                        protocol: protocol.clone(),
+                        ..Default::default()
+                    }
+                )),
+                ..Default::default()
+            },
+            PublishContentServerFrame {
+                body: Some(publish_content_server_frame::Body::Ready(
+                    TransferReady::default()
+                ))
+            }
+        );
+        exchange!(
+            rpc::SyncServiceReplicateThread,
+            ReplicateThreadRequest {
+                body: Some(replicate_thread_request::Body::Open(ReplicationOpen {
+                    protocol: protocol.clone(),
+                    ..Default::default()
+                }))
+            },
+            ReplicateThreadResponse {
+                body: Some(replicate_thread_response::Body::Ready(ReplicationReady {
+                    protocol: protocol.clone(),
+                    ..Default::default()
+                }))
+            }
+        );
+    }
+}

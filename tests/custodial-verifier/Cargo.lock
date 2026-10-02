@@ -374,7 +374,7 @@ version = "0.0.0"
 dependencies = [
  "ed25519-dalek 3.0.0",
  "heddle-api 0.31.0-alpha.16",
- "heddle-api 0.31.0-alpha.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heddle-api 0.31.0-alpha.17",
  "heddleco-capability-verifier",
  "hex",
  "prost 0.14.1",
@@ -740,6 +740,8 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "heddle-api"
 version = "0.31.0-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f4b3f7373352cf7341f19d6684735b924df85b8eef47afd37f7cb632d1edce"
 dependencies = [
  "blake3",
  "bytes",
@@ -760,9 +762,7 @@ dependencies = [
 
 [[package]]
 name = "heddle-api"
-version = "0.31.0-alpha.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2f4b3f7373352cf7341f19d6684735b924df85b8eef47afd37f7cb632d1edce"
+version = "0.31.0-alpha.17"
 dependencies = [
  "blake3",
  "bytes",
@@ -810,7 +810,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek 3.0.0",
  "getrandom 0.2.17",
- "heddle-api 0.31.0-alpha.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heddle-api 0.31.0-alpha.16",
  "heddle-biscuit-verifier",
  "hex",
  "p256 0.14.0",

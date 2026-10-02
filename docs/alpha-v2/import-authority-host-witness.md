@@ -22,10 +22,10 @@ maintenance generator requires built bindings and explicit fixture review.
 | Owner-authorized genesis and delegation | `ImportIdentityV1`, `ImportOwnerChainV1`, `ImportBranchLimitV1`, `ImportPermissionScopeV1`, `ImportMemberPermissionV1`, `SignedImportMemberPermissionV1`, `ImportGenesisAuthorityV1`, `SignedImportGenesisAuthorityV1`, `ImportBranchManifestV1`, `ImportJobDelegationV1`, `SignedImportJobDelegationV1` |
 | Job preparation, encrypted custody, expiry, and retries | `ImportCommittedSlotV1`, `ImportResultManifestV1`, `ImportJobRenewalV1`, `SignedImportJobRenewalV1`, `PrepareImportJobRequest`, `PrepareImportJobResponse`, `CommitImportJobRequest`, `RenewImportJobRequest`, `CancelImportJobRequest` |
 | Owner-authorized genesis and delegation: converted content | `DelegatedImportOperationV1`, `SignedDelegatedImportOperationV1` |
-| What the host witness attests | `ImportPublicationWitnessV1`, `HostedWitnessStatementV1`, `SignedHostedWitnessStatementV1` |
+| What the host witness attests | `ImportGenesisWitnessV1`, `ImportAuthorityRecordKind`, `ImportAuthorityWitnessV1`, `HostedLandingRequestProofV1`, `HostedLandingWitnessV1`, `ImportPublicationWitnessV1`, `HostedWitnessStatementV1`, `SignedHostedWitnessStatementV1` |
 | Complete authenticated witness set and exact retirement archive | `HostedWitnessEntryV1`, `HostedWitnessSetV1`, `SignedHostedWitnessSetV1`, `HostedWitnessHistoryProofV1` |
 | Proof lookup after loss of Thread access | `GetHostedWitnessHistoryProofRequest`, `GetHostedWitnessHistoryProofResponse` |
-| Verification at the mutation boundary / cross-repo proof transport | `ImportPublicProofBundleV1` |
+| Verification at the mutation boundary / cross-repo proof transport | `ImportPublicProofBundleV1`, `ImportFrontierV1`, `ImportContentV1`, `ImportJobCasStateV1` |
 | Planned cascade: incompatible-peer rejection | `ProtocolCompatibility` |
 
 ## Canonical framing and domains
@@ -353,6 +353,8 @@ endpoint. Mirror/backup the public archive independently of Thread storage.
 | Import branches/operations | 256 each; one result slot per branch in v1 |
 | Owner histories / ownership transfers / delegation lineage | 64 each; 63 renewals |
 | Policy records / original geneses / creator envelopes | 256 each |
+| Member permissions / retained manifest snapshots | 64 / 320, digest-sorted unique |
+| Typed genesis/authority/landing payload sidecars | 256 each, inside the bundle byte budget |
 | Witness dependencies / retirement proofs | 1024 each, also inside bundle byte budget |
 | Inclusion siblings / encoded lookup response | 64 / 4096 bytes |
 | Source URL / full ref / root ID | 2048 / 1024 / 256 UTF-8 bytes |
@@ -405,7 +407,7 @@ receipt re-signing is allowed. Operational reset/re-import is a separate task.
 
 Rust errors and the TS `HybridContractError.reason` use the same rejection names
 in the fixed fixture: Signature, Semantic, HighWater, JobAsWitness, Scope,
-Expired, RenewalFork, ImportPermission, StaleContext, Proof, Revoked, Protocol,
+Expired, RenewalFork, ImportPermission, StaleContext, Proof, Revoked, Protocol, StaleManifest, CommittedSlot,
 Canonical, Bounds, Transition, KeyRole, Root and SlotConflict. Map wire failures
 through the existing CallFailure vocabulary; sensitive lookup misses remain
 uniform. No package-wide error enum is reinterpreted.
@@ -417,3 +419,249 @@ Heed this split in object-model/crypto/repo/thread-api/hosted-client. Weft admis
 initial/subsequent finalize AND `integration_v2/import_retry.rs` consume the same
 formats under storage fences; tapestry signs the same TS canonical bytes and
 reviews the ref promise/remaining scope with the existing device key.
+
+## Review round 1: historical closure and frozen purpose payloads
+
+The authoritative history in `ImportPublicProofBundleV1` is now
+`member_permissions` (at most 64) and `manifests` (at most 320: 256 publication
+snapshots plus 63 renewal snapshots and one empty/terminal snapshot). Each
+collection is strictly sorted by its **recomputed** 32-byte canonical digest;
+duplicate digests, conflicting bytes, missing references and truncation reject.
+The existing singular permission field is an optional alias; the terminal field
+is the required final-snapshot selector. Both must equal their exact collection
+entries. Delegations and accepted renewals are in activation order, at
+most 64/63; each replacement equals the next original signed delegation and its
+predecessor digest equals the previous original. Genesis proofs always resolve
+their original parent, even when later delegations retain those genesis digests.
+
+Resolve every nonzero parent permission digest from this collection, including
+those in original genesis bindings. Zero32 denotes direct active owner authority
+and never triggers lookup. Resolve every renewal manifest digest, each publication
+payload's manifest digest, and the final snapshot from the manifest collection.
+Every manifest slot resolves exactly one original signed operation and its
+unchanged result frontier/byte count. Every committed original operation resolves
+its original signed delegation and an exact publication statement/snapshot. All
+snapshots are cumulative subsets of the final snapshot; they cannot select a
+second result for one logical job/ref/slot. Keep complete earlier permissions,
+accepted owner histories, transfers, policies, native geneses, envelopes and
+receipts even after expiry or permission/owner replacement. No earlier receipt
+is compared with a later manifest or re-signed. Exact reference matching is
+mandatory before independent signature/authority verification; collections are
+carriers, never independent trust anchors. `validate_public_bundle` and
+`validatePublicBundle` implement this closure check; resolution has no retrieval
+fallback. Native creator/owner verification remains mandatory.
+
+The frozen renewed export contains two original permissions (the first expires
+at 1300 seconds), predecessor and successor certificates, accepted renewal,
+two operations, both publication snapshots, and both unchanged receipts. A fresh
+receiver at 1350 seconds uses independently selected roots and the export plus
+later exact retirement paths. It verifies the predecessor at its witnessed
+publication time and the successor at its witnessed publication time. Checking
+an expired permission as current authority correctly fails. This is the contract
+oracle for a complete post-renewal Fetch, including permission replacement.
+
+Each statement payload is **exactly** the canonical encoding of the following
+message, with no domain prefix, protobuf encoding or trailing bytes. Field order
+below is frozen, including default values; nested fields flatten in place using
+the framing above. Sidecar DTOs in the bundle retain the same exact objects so
+native verifiers can construct the expected payload independently.
+
+| Purpose / typed payload | Exact canonical field order |
+| --- | --- |
+| 1 / `ImportGenesisWitnessV1` | `format_version:u32`, `binding:SignedImportGenesisAuthorityV1`, `original_genesis:SignedRecord`, `creator_authority_envelope:bytes` |
+| 2 / `ImportAuthorityWitnessV1` | `format_version:u32`, `kind:u32`, `original:SignedRecord`, `dependencies:list<SignedRecord>`, `authority_envelope:bytes` |
+| 3 / `ImportPublicationWitnessV1` | `format_version:u32`, `signed_operation_digest:bytes`, `delegation_digest:bytes`, `logical_job_id:bytes`, `retry_lineage_id:bytes`, `physical_operation_id:bytes`, `ref_name:UTF8`, `slot_id:u64`, `hash_algorithm:u32`, `observed_commit_oid:bytes`, `expected_frontier_digest:bytes`, `resulting_frontier_digest:bytes`, `terminal_manifest_digest:bytes` |
+| 4 / `HostedLandingWitnessV1` | `format_version:u32`, `execution:SignedRecord`, `request:HostedLandingRequestProofV1`, `source_operation:SignedRecord`, `review_evidence:list<SignedRecord>`, `authority_envelope:bytes` |
+| `HostedLandingRequestProofV1` | `format_version:u32`, `signing_identity:UTF8`, `method_path:UTF8`, `timestamp_millis:i64`, `nonce:bytes`, `request_body:bytes`, `signature:RecordSignature` |
+| `SignedRecord` transport commitment | `format:UTF8`, `canonical_record:bytes`, `signatures:list<RecordSignature>` |
+| `RecordSignature` | `public_key:bytes`, `signature:bytes` |
+
+All format versions above are exactly 1. Native record bodies are the already
+versioned **named MessagePack** formats: `heddle-thread-genesis-v1`,
+`heddle-thread-operation-v1`, `heddle-thread-ownership-claim-v1`, and
+`heddle-thread-ownership-resolution-v1`. This does not introduce another native
+record encoding. Signatures verify raw `UTF8(format) || 0x00 || canonical_record`.
+Each record has 1–16 signatures, sorted uniquely by raw public key; claims and
+resolutions require both the original local-owner and accepting-publisher
+signatures. Each native body is at most 64 KiB within the payload's 64-KiB budget.
+Dependencies/evidence have at most 128 entries, sorted uniquely by
+H(`heddle-signed-native-record-v1` || canonical SignedRecord); every entry is
+independently verified and must be part of the native causal/authority closure.
+Never use a dependency signature to authorize its neighboring original.
+
+Purpose 2's kind discriminator selects exactly **1 = ThreadOperation v1,
+2 = ownership claim v1, 3 = ownership resolution v1**; unknown/zero rejects.
+Kind 1 retains original source/control records, never a hosted execution as a
+source-author grant. Claims resolve their original local-key genesis, complete
+source frontier and account acceptance; resolutions additionally resolve every
+conflicting original claim, the winning member and complete accepted frontier.
+Neither a witness nor an incoming kind selector supplies this authority.
+
+Purpose 4 retains the existing native `HostedIntegration` v1 inside the original
+ThreadOperation v1 **Integration** body. The enclosing operation binds target,
+parents and executor. Its named MessagePack fields, in native order, are
+`version`, `spool`, `spool_genesis`, `executor`, `source_thread`, `source_operation`,
+`source_revision`, `target_thread`, `expected_target_frontier`, `result`,
+`initiating_request_proof`, `review_policy_version`, `review_evidence`,
+`executed_at_ms`. UUIDs use MessagePack bin16; native 32-byte IDs/keys and Vec<u8>
+use arrays of integer bytes; sets are bytewise sorted arrays. `result` is native
+Capture v1, described below. This selects the existing
+`heddle-hosted-integration-v1` meaning; HostedImport is explicitly ineligible.
+The native landing verifier still checks exact source State, target ancestry,
+policy and all review/evidence originals. Request proof is the original
+`signing::unary_bytes` / `unarySigningBytes` input for
+`/heddle.api.v1alpha2.ThreadService/LandThread`, positive millisecond timestamp,
+16-byte nonce, deterministic `LandThreadRequest` protobuf bytes and signature.
+`signing_identity` is `principal:device-key:` followed by lowercase hex of its
+32-byte signer. It uses the unchanged `heddle-req-sig-v1` counted textual
+request framing, not the witness digest; the payload retains the full preimage.
+Retain the existing native initiating-proof typed ID and never compute State IDs
+by hashing MessagePack: State's existing versioned field hash remains unchanged.
+
+For account-native originals, `authority_envelope` is exact canonical protobuf
+`ThreadControlAuthority` format 1 from `identity.proto`, including its verified
+owner history, owner/passkey mint-root association and **sealed** signature-v1
+Biscuit. Its existing dual-oneof-tag rejection and ordinary action/scope/PoP
+checks remain mandatory. The native vectors include a real sealed device-minted
+signature-v1 Biscuit, a genuine owner-signed device mint-root attachment, source
+and control operations, a co-signed claim/resolution and an original landing
+request, review and execution. The token uses only published fixture seeds and
+contains no appendable proof secret. Its maintenance input is the frozen
+`hybrid-native-biscuit-v1.binpb`; it is never minted during verification. The
+creator envelope in the import-specific genesis vector is exact
+`UTF8("heddle-signed-import-member-permission-v1\0") || canonical signed permission`;
+this proof grants the scoped genesis/import rights only, never metadata/landing.
+
+Common field matching is also frozen:
+
+- Purpose 1 `authority_digest` is the signed genesis-binding digest;
+  publisher is its creator key ID. Match the binding's exact identity and
+  native Thread genesis ID, original creator signature and H(raw creator
+  envelope). Independently verify that envelope and the native genesis.
+- Purposes 2 and 4 `authority_digest` is
+  H(`heddle-hosted-authority-envelope-v1` || counted exact envelope).
+  Purpose 2's publisher is the original native actor/acceptor; purpose 4's
+  publisher is the original landing requester. Both require independent native
+  authority at the statement's accepted state/order/time.
+- Purposes 1/2/4 `original_signatures_digest` is
+  H(`heddle-hosted-original-signatures-v1` || u32be(signature_count) || each
+  canonical RecordSignature). Traversal order is genesis original; or purpose 2
+  original then digest-sorted dependencies; or landing execution, source,
+  digest-sorted review/evidence, then original request signature. Native
+  signature order inside each record is raw-key order. Purpose 3 remains
+  H(raw original 64-byte job signature), bound by its exact signed operation.
+
+`verify_witness_payload` / `verifyWitnessPayload` verify these original signatures
+and purpose-specific exact matching independently of `resolve_statement` /
+`resolveWitnessStatement`. Their payload argument must be built from the native
+verifier's independently verified originals and accepted owner/policy/landing
+context. Signature/matching success alone does not establish causal or landing
+eligibility. Genuine witness statements with a missing owner signature, and a
+genuine witness signature substituted for a job/request signature, fail the
+original-evidence check. No legacy HostedImport fallback exists.
+
+## Review round 1: cross-model commitment preimages
+
+These are SHA-256 **transport commitments**, distinct from native typed IDs.
+A native model recomputes its existing object IDs and validates original object
+bytes, then constructs these preimages. There is no frontier inferred from a
+branch name, author timestamp, host tip projection or repeated constant bytes.
+
+| Commitment | Exact preimage and bounds |
+| --- | --- |
+| Expected/result frontier | `UTF8("heddle-import-frontier-v1") || u32be(1) || counted(thread_id32) || u32be(count) || each counted(native_operation_id32)`; 0–128 sorted unique IDs, complete source frontier |
+| Resulting content | `UTF8("heddle-import-content-v1") || u32be(1) || counted(exact canonical Capture v1 bytes)`; full native State/source-target/visibility bindings, never just an unhashed mutable projection |
+| Conversion options | H(`heddle-import-conversion-options-v1` || counted exact converter-version UTF8 || counted converter-defined canonical option octets); the v1 `git-converter/1.0` vector uses the explicit empty options sequence, not a JSON object or omitted commitment |
+| Destination version | An opaque 32-byte producer-issued destination CAS token, returned by authenticated preparation; it is not a hash or a native object ID and has no hash preimage |
+| Creator authority envelope | Exact H(raw complete envelope bytes); no normalization or protobuf reserialization |
+| Signed native dependency | `UTF8("heddle-signed-native-record-v1") || canonical SignedRecord` |
+| Authority envelope / original signatures | Exact layouts in the preceding section |
+| Policy/owner/Spool/native object IDs | Existing named versioned formats in `owner_records.proto`, `ThreadControlAuthority` and native Thread model; their algorithms and identities are unchanged |
+
+Capture v1 is named MessagePack with exactly `state`, `source_targets`,
+`visibility`, in that order. `state` is an integer-byte array containing exact
+canonical native State bytes; `source_targets` is null or a native 32-byte ID
+array; `visibility` is null or a named map with exactly `state`, `embargo_until`,
+`entries`. `state` is null or native VisibilityTier; `embargo_until` is null or
+canonical chrono UTC RFC3339 text. Entries are sorted unique `(tree_id32,
+leaf_hash32)` maps with exactly `tree_id`, `leaf_hash`, `tier`, at most 4096.
+VisibilityTier is native MessagePack string `Public`/`Internal`, or singleton
+map `TeamScoped:{team_id:UTF8}`, `Restricted:{scope_label:UTF8}` or
+`Private:{scope_label:UTF8}`. Labels are nonempty after trim, no control
+characters, at most 256 UTF-8 bytes. Do not silently rename native variant keys.
+Use the native capture parser's strict parse/re-encode check; v1's complete
+visibility encoding above is selected, never invented by a receiver. Its
+State and source-target closure remain required even though their contents are
+not copied into a signed witness payload. The new commitment does not redefine
+native BLAKE3 typed IDs, native State field hashes or converter correctness.
+`result_bytes` accounts for the retained canonical converted result closure,
+with native sharing/deduplication fixed by the converter version; it is bounded
+by the original logical-job budgets. Fixed vectors include empty expected
+frontiers, nonempty actual result-operation frontiers, complete native Capture
+bytes, every purpose payload and original signed-wrapper digest preimages.
+
+## Review round 1: wire CAS state, peer negotiation and isolated controls
+
+`PrepareImportJobRequest.renew_logical_job_id` uses the existing authorized
+prepare path. Its response MUST include `renewal_state:ImportJobCasStateV1`
+with format 1, logical job and original retry lineage, exact active signed
+predecessor, current positive `authority_epoch`, and complete committed manifest.
+Read this state and the remaining delegation proposal in **one transaction**.
+The response grants no authority. Verify proposal/state identities, predecessor
+and snapshot; sign the exact snapshot epoch and manifest digest; activation
+still performs transactional CAS. A stale state or publication race requires
+another Prepare and another user signature. There is no separate state service.
+
+Initial Commit installs epoch **1**. Successful renewal increments it exactly
+once; successful Cancel increments it exactly once and makes the job terminal.
+Failed CAS, Prepare, physical retries and exact replays never increment it.
+Publication changes the cumulative manifest atomically while preserving the
+current authority epoch; its slot/manifest CAS is separate from that epoch.
+Expiry closes issuance without silently incrementing epoch. Overflow rejects.
+No renewal after explicit cancellation may reactivate the job. The signed
+predecessor digest, epoch, committed manifest and current policy/authority fences
+are all required. A response lost after activation is reread through Prepare;
+it never causes another activation of the original CAS candidate.
+
+`DescribeEndpointResponse.protocol` supplies native negotiated semantic support
+on the already authenticated endpoint connection. Retain it with that endpoint,
+never infer it from methods/packages or reuse it on reconnection to another
+peer. Rust's additive `Client::with_protocol` takes this response; the default
+constructor fails closed on every gated route. TypeScript's optional negotiated
+protocol has the same rule. Both clients check the exact version/features before
+transport, plus native Fetch/PublishContent/ReplicateThread openings and the
+first required ready response before exposing/staging records. Missing ready,
+data before ready, missing/unknown/duplicate features and wrong version reject.
+The transport binds its advertised protocol to the actual peer and supplies the
+same protocol in CallContext; HTTPS uses the equivalent authenticated headers.
+
+The fixed controls name the **first failing check**, with a passing neighboring
+control and otherwise valid original signatures/context:
+
+| Control | First failing check / rejection |
+| --- | --- |
+| Actual signed PURGE v1 / timeline v3 / ordinary role offered to parent selector | Typed permission-format selection / `ImportPermission` |
+| Replacement includes committed dev slot, signed against the supplied dev snapshot | Committed-slot exclusion / `CommittedSlot`; remaining budgets independently fit |
+| Paused predecessor at 1250, inside its [1000,1300) interval | Active certificate/authority epoch fence / `StaleContext` |
+| Publication wins at epoch 1 before activating a signature over the earlier snapshot | Manifest digest CAS / `StaleManifest` |
+| Actual legacy HostedImport operation signed by the witness | Hybrid import-format dispatch / `Protocol` |
+| Authentic 128/129 `é` root IDs, with independently matching selected IDs | 256-byte UTF-8 bound / pass, `Bounds` |
+
+Every existing negative vector also names `first_failing_check` in the shared
+fixture. The root-signed invalid-current control isolates the forbidden archive
+seal on CURRENT, rather than combining different current-member errors.
+`StaleManifest` and `CommittedSlot` have distinct errors so earlier digest failure
+cannot masquerade as slot exclusion. The contract harness remains an event/byte
+oracle; actual PG transaction, lease, crash and storage execution is still weft's
+required downstream gate.
+
+The native named encodings reused here are pinned to
+[heddle's Thread formats at 5b76f7f](https://github.com/HeddleCo/heddle/tree/5b76f7f61f1a2f8033a2328dfc178e49d8a7af0e/crates/object-model/src/object/thread_replication),
+including `source_author.rs`, `ownership_claim.rs`, `ownership_resolution.rs`,
+`metadata.rs`, `integration.rs` and `capture_visibility.rs`. Native State IDs
+use `state_core.rs`'s versioned field hash. Changes to those immutable encodings
+require new native format names and new vectors, never reinterpretation of these
+signed payloads. Root-ID is the only unrestricted Unicode string in the new
+witness set. Import refs/providers/converter versions, HTTPS origins and native
+format/method/signing selectors are ASCII; manifest refs now enforce that same
+ASCII restriction. All permitted Unicode bounds measure encoded UTF-8 bytes.

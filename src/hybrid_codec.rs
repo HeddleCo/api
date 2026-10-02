@@ -34,6 +34,10 @@ pub enum Reject {
     ImportPermission,
     #[error("renewal forks the logical job or widens remaining scope")]
     RenewalFork,
+    #[error("committed manifest changed before renewal")]
+    StaleManifest,
+    #[error("replacement includes an already committed slot")]
+    CommittedSlot,
     #[error("context is stale at mutation boundary")]
     StaleContext,
     #[error("missing or invalid exact retirement inclusion proof")]
@@ -151,6 +155,15 @@ macro_rules! field {
                     .map_err(|_| $crate::hybrid_codec::Reject::Canonical)?
                     .to_be_bytes(),
             );
+        }
+    };
+    ($out:ident, $v:expr, h) => {
+        if $v.len() > 128 {
+            return Err($crate::hybrid_codec::Reject::Bounds);
+        }
+        $out.extend_from_slice(&($v.len() as u32).to_be_bytes());
+        for value in &$v {
+            $crate::hybrid_codec::counted($out, value)?;
         }
     };
     ($out:ident, $v:expr, q) => {

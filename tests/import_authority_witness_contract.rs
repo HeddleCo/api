@@ -119,6 +119,121 @@ struct Context {
     root: Vec<u8>,
 }
 impl Context {
+    // This root-only history is verified from the export. Only the owner and
+    // descriptor root keys are independently selected; no fixture identity or
+    // precomputed chain digest supplies the renewing receiver's context.
+    fn from_export(f: &Value, bundle: &api::ImportPublicProofBundleV1) -> Self {
+        fn key(out: &mut Vec<u8>, value: &api::AuthorizationVerificationKey) {
+            assert_eq!(value.algorithm, 1);
+            out.extend_from_slice(&1_u32.to_be_bytes());
+            codec::counted(out, &value.public_key).expect("key");
+        }
+        let history = &bundle.owner_histories[0];
+        assert!(history.accepted_transitions.is_empty());
+        let signed = history.root.as_ref().expect("exported owner root");
+        let root = signed.root.as_ref().expect("root body");
+        let owner = bytes(&f["keys"]["owner"]["public_key_hex"]);
+        let owner_key = root.authority_key.as_ref().expect("owner key");
+        assert_eq!(owner_key.public_key, owner);
+        let recovery = root.recovery_policy.as_ref().expect("recovery");
+        let mut without_id = root.format_version.to_be_bytes().to_vec();
+        codec::counted(&mut without_id, &root.account_uuid).expect("account");
+        key(&mut without_id, owner_key);
+        without_id.extend_from_slice(&recovery.threshold.to_be_bytes());
+        without_id.extend_from_slice(&(recovery.guardians.len() as u32).to_be_bytes());
+        for guardian in &recovery.guardians {
+            without_id.extend_from_slice(&(guardian.kind as u32).to_be_bytes());
+            key(&mut without_id, guardian.key.as_ref().expect("guardian"));
+        }
+        without_id.extend_from_slice(&recovery.window_secs.unwrap_or(604800).to_be_bytes());
+        without_id.push(u8::from(root.claimable_deferred_human));
+        codec::counted(&mut without_id, &root.nonce).expect("nonce");
+        without_id.extend_from_slice(&root.claimable_until_unix_seconds.to_be_bytes());
+        assert_eq!(
+            root.owner_id,
+            codec::hash(&[b"heddle-owner-root-v1", &without_id])
+        );
+        let mut canonical = root.format_version.to_be_bytes().to_vec();
+        codec::counted(&mut canonical, &root.owner_id).expect("owner ID");
+        canonical.extend_from_slice(&without_id[4..]);
+        let state_hash = codec::hash(&[b"heddle-owner-root-v1", &canonical]);
+        assert_eq!(history.state_hash, state_hash);
+        let proof = signed.authority_proof.as_ref().expect("owner proof");
+        assert_eq!(proof.signer_key_id, codec::key_id(&owner));
+        codec::verify(&owner, &state_hash, &proof.signature).expect("independent owner root");
+        assert_eq!(signed.recovery_key_proofs.len(), recovery.guardians.len());
+        for (guardian, proof) in recovery.guardians.iter().zip(&signed.recovery_key_proofs) {
+            let public = &guardian.key.as_ref().expect("guardian key").public_key;
+            assert_eq!(proof.signer_key_id, codec::key_id(public));
+            codec::verify(public, &state_hash, &proof.signature).expect("original guardian");
+        }
+        let signed_genesis = bundle.owner_genesis.as_ref().expect("Spool genesis");
+        let genesis = signed_genesis.genesis.as_ref().expect("genesis");
+        assert_eq!(genesis.owner_public_key.as_ref(), Some(owner_key));
+        let proof = signed_genesis
+            .owner_signature
+            .as_ref()
+            .expect("owner signature");
+        assert_eq!(proof.signer_key_id, codec::key_id(&owner));
+        codec::verify(
+            &owner,
+            &codec::hash(&[&owner, &genesis.spool_uuid]),
+            &proof.signature,
+        )
+        .expect("original owner-signed Spool");
+        let mut canonical = Vec::new();
+        codec::counted(&mut canonical, &genesis.spool_uuid).expect("Spool");
+        key(&mut canonical, owner_key);
+        let spool_digest = codec::hash(&[b"heddle-spool-owner-genesis-v1", &canonical]);
+        let identity = bundle.delegations[0]
+            .body
+            .as_ref()
+            .expect("delegation")
+            .identity
+            .as_ref()
+            .expect("identity")
+            .clone();
+        assert_eq!(identity.spool_uuid, genesis.spool_uuid);
+        assert_eq!(identity.spool_genesis_digest, spool_digest);
+        assert_eq!(identity.owner_id, root.owner_id);
+        assert_eq!(identity.owner_account_uuid, root.account_uuid);
+        assert_eq!(identity.owner_state_hash, state_hash);
+        let chain = bundle.owner_chain.as_ref().expect("exported chain");
+        assert_eq!(chain.spool_genesis_digest, spool_digest);
+        assert_eq!(chain.owner_state_hashes, [state_hash]);
+        let root_key = bytes(&f["keys"]["root"]["public_key_hex"]);
+        let mut forbidden = vec![owner.clone(), root_key.clone()];
+        forbidden.extend(
+            bundle
+                .original_geneses
+                .iter()
+                .flat_map(|g| g.signatures.iter().map(|s| s.public_key.clone())),
+        );
+        forbidden.extend(
+            bundle
+                .witness_set
+                .as_ref()
+                .expect("set")
+                .body
+                .as_ref()
+                .expect("set body")
+                .entries
+                .iter()
+                .map(|e| e.public_key.clone()),
+        );
+        Self {
+            identity,
+            owner,
+            chain: import::owner_chain_digest(chain).expect("verified exported owner chain"),
+            forbidden,
+            job_keys: bundle
+                .delegations
+                .iter()
+                .map(|d| d.body.as_ref().expect("delegation").job_public_key.clone())
+                .collect(),
+            root: root_key,
+        }
+    }
     fn new(f: &Value) -> Self {
         Self {
             identity: record(f, "identity"),
@@ -293,6 +408,10 @@ fn negative_vectors_isolate_their_named_gate() {
     let c = Context::new(&f);
     let d = delegation(&f, &c);
     for v in f["negative_vectors"].as_array().expect("negative vectors") {
+        assert!(
+            v["first_failing_check"].as_str().is_some(),
+            "named first check"
+        );
         let wire = bytes(&v["wire_hex"]);
         let result = match v["type"].as_str().expect("gate") {
             "set" => {
@@ -334,7 +453,7 @@ fn negative_vectors_isolate_their_named_gate() {
                 v["now_seconds"].as_i64().expect("now"),
             ),
             "renewal" => {
-                let member: api::SignedImportMemberPermissionV1 = record(&f, "permission");
+                let member: api::SignedImportMemberPermissionV1 = record(&f, "renewed_permission");
                 import::verify_renewal(
                     &codec::strict_decode(&wire, import::MAX_RECORD_BYTES).expect("renewal"),
                     &d,
@@ -356,8 +475,61 @@ fn negative_vectors_isolate_their_named_gate() {
                 "{:?}",
                 result.expect_err(v["id"].as_str().expect("negative id"))
             ),
-            v["expected"].as_str().expect("expected named gate")
+            v["expected"].as_str().expect("expected named gate"),
+            "{}: first failing check {}",
+            v["id"],
+            v["first_failing_check"]
         );
+        match v["type"].as_str().expect("gate") {
+            "set" => {
+                let previous = v["previous"].as_str().map(|n| {
+                    witness::verify_set(&record(&f, n), &c.set(1_100_000), None).expect("previous")
+                });
+                witness::verify_set(
+                    &record(&f, v["control"].as_str().expect("passing control")),
+                    &c.set(1_100_000),
+                    previous.as_ref(),
+                )
+                .expect("passing neighboring set");
+            }
+            "statement" => {
+                let fresh = v["new_work"] == true;
+                let now = if fresh { 1_100_000 } else { 1_350_000 };
+                let set = witness::verify_set(
+                    &record(&f, if fresh { "current_set" } else { "retired_set" }),
+                    &c.set(now),
+                    None,
+                )
+                .expect("passing control set");
+                let proof: host::HostedWitnessHistoryProofV1 = record(&f, "publication_proof");
+                witness::resolve_statement(
+                    &set,
+                    &record(&f, "publication_statement"),
+                    if fresh { None } else { Some(&proof) },
+                    fresh,
+                    now,
+                )
+                .expect("passing neighboring testimony");
+            }
+            "operation" => import::verify_operation(&record(&f, "operation_main"), &d)
+                .expect("passing operation"),
+            "new_operation" => {
+                import::verify_new_operation(&record(&f, "operation_main"), &d, 1299)
+                    .expect("otherwise valid before expiry")
+            }
+            "renewal" => {
+                import::verify_renewal(
+                    &record(&f, "renewal"),
+                    &d,
+                    &record(&f, "partial_manifest"),
+                    1,
+                    Some(&record(&f, "renewed_permission")),
+                    &c.owner(1200),
+                )
+                .expect("passing renewal");
+            }
+            _ => panic!("unknown control"),
+        }
     }
 }
 #[test]
@@ -374,16 +546,27 @@ fn unrelated_correctly_signed_capabilities_do_not_supply_import_permission() {
         if !v["wire_hex"].is_null() {
             let value: api::SignedOwnerCapability =
                 codec::strict_decode(&bytes(&v["wire_hex"]), import::MAX_RECORD_BYTES)
-                    .expect("actual existing capability wire");
+                    .expect("actual authority format");
             assert_eq!(
-                value.signature.expect("owner signature").signature,
-                bytes(&v["signature_hex"])
+                import::select_import_permission(
+                    import::ImportPermissionEvidence::OwnerCapability(&value)
+                ),
+                Err(codec::Reject::ImportPermission)
+            );
+        } else {
+            assert_eq!(
+                import::select_import_permission(import::ImportPermissionEvidence::OnlineRole(
+                    "Developer"
+                )),
+                Err(codec::Reject::ImportPermission)
             );
         }
-        assert_eq!(
-            import::verify_delegation(&record(&f, "delegation"), None, &c.owner(1100)),
-            Err(codec::Reject::ImportPermission)
-        );
+        let parent: api::SignedImportMemberPermissionV1 = record(&f, "permission");
+        let selected =
+            import::select_import_permission(import::ImportPermissionEvidence::Import(&parent))
+                .expect("passing format control");
+        import::verify_delegation(&record(&f, "delegation"), Some(selected), &c.owner(1100))
+            .expect("valid surrounding authority");
     }
 }
 #[test]
@@ -451,7 +634,7 @@ fn concurrent_renewals_and_paused_old_worker_obey_retry_contract_fixture() {
                     &old,
                     &committed,
                     epoch,
-                    Some(&record(&f, "permission")),
+                    Some(&record(&f, "renewed_permission")),
                     &c.owner(1200),
                 );
                 if event["result"] == "OK" {
@@ -464,6 +647,8 @@ fn concurrent_renewals_and_paused_old_worker_obey_retry_contract_fixture() {
             "publish_paused_worker" => {
                 let stale: api::SignedDelegatedImportOperationV1 =
                     record(&f, event["operation"].as_str().expect("paused operation"));
+                import::verify_new_operation(&stale, &old, 1250)
+                    .expect("otherwise time-valid old worker");
                 let stale = stale.body.as_ref().expect("paused body");
                 assert_eq!(
                     import::check_job_fence(
@@ -518,14 +703,14 @@ fn concurrent_renewals_and_paused_old_worker_obey_retry_contract_fixture() {
     );
     assert_eq!(
         import::verify_renewal(
-            &record(&f, "renewal"),
+            &record(&f, "completed_slot_renewal"),
             &old,
-            &final_manifest,
+            &record(&f, "completed_slot_manifest"),
             1,
-            Some(&record(&f, "permission")),
+            Some(&record(&f, "renewed_permission")),
             &c.owner(1200)
         ),
-        Err(codec::Reject::RenewalFork)
+        Err(codec::Reject::CommittedSlot)
     );
 }
 #[test]
@@ -680,4 +865,382 @@ fn incompatible_peer_requires_semantic_feature_and_exact_protocol_version() {
         mandatory_features: vec![1],
     }))
     .expect("explicit compatible peer");
+}
+
+#[test]
+fn frozen_unsigned_payloads_and_cross_model_commitments() {
+    let f = fixture();
+    for (name, v) in f["commitment_vectors"].as_object().expect("preimages") {
+        macro_rules! canonical {
+            ($ty:ty) => {
+                codec::canonical(
+                    &codec::strict_decode::<$ty>(&bytes(&v["wire_hex"]), import::MAX_BUNDLE_BYTES)
+                        .expect("wire"),
+                )
+                .expect("canonical")
+            };
+        }
+        let canonical = match v["schema"]
+            .as_str()
+            .expect("schema")
+            .rsplit('.')
+            .next()
+            .expect("name")
+        {
+            "ImportFrontierV1" => {
+                let value: api::ImportFrontierV1 =
+                    codec::strict_decode(&bytes(&v["wire_hex"]), import::MAX_BUNDLE_BYTES)
+                        .expect("frontier");
+                assert_eq!(
+                    import::frontier_digest(&value).expect("frontier hash"),
+                    bytes(&v["digest_hex"])
+                );
+                canonical!(api::ImportFrontierV1)
+            }
+            "ImportContentV1" => canonical!(api::ImportContentV1),
+            "ImportGenesisWitnessV1" => canonical!(api::ImportGenesisWitnessV1),
+            "ImportAuthorityWitnessV1" => canonical!(api::ImportAuthorityWitnessV1),
+            "HostedLandingWitnessV1" => canonical!(api::HostedLandingWitnessV1),
+            "ImportOwnerChainV1" => canonical!(api::ImportOwnerChainV1),
+            "ImportResultManifestV1" => canonical!(api::ImportResultManifestV1),
+            "ImportPublicationWitnessV1" => canonical!(api::ImportPublicationWitnessV1),
+            "SignedImportMemberPermissionV1" => canonical!(api::SignedImportMemberPermissionV1),
+            "SignedImportGenesisAuthorityV1" => canonical!(api::SignedImportGenesisAuthorityV1),
+            "SignedImportJobDelegationV1" => canonical!(api::SignedImportJobDelegationV1),
+            "SignedDelegatedImportOperationV1" => canonical!(api::SignedDelegatedImportOperationV1),
+            unknown => panic!("unhandled {unknown}"),
+        };
+        assert_eq!(canonical, bytes(&v["canonical_hex"]), "{name}");
+        let preimage = [v["domain"].as_str().expect("domain").as_bytes(), &canonical].concat();
+        assert_eq!(preimage, bytes(&v["preimage_hex"]));
+        assert_eq!(codec::hash(&[&preimage]), bytes(&v["digest_hex"]));
+    }
+}
+#[test]
+fn purpose_specific_original_signatures_are_independent_of_witness_trust() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let set =
+        witness::verify_set(&record(&f, "current_set"), &c.set(1_100_000), None).expect("witness");
+    let s: host::SignedHostedWitnessStatementV1 = record(&f, "genesis_admission");
+    let p: api::ImportGenesisWitnessV1 = record(&f, "genesis_payload");
+    witness::resolve_statement(&set, &s, None, false, 1_100_000).expect("witness signature");
+    import::verify_witness_payload(
+        s.body.as_ref().expect("statement"),
+        import::WitnessPayload::Genesis(&p),
+    )
+    .expect("actual creator and binding");
+    for name in [
+        "authority_admission",
+        "ownership_admission",
+        "resolution_admission",
+    ] {
+        let s: host::SignedHostedWitnessStatementV1 = record(&f, name);
+        let p: api::ImportAuthorityWitnessV1 = record(&f, &format!("{name}_payload"));
+        witness::resolve_statement(&set, &s, None, false, 1_100_000).expect("witness signature");
+        import::verify_witness_payload(
+            s.body.as_ref().expect("statement"),
+            import::WitnessPayload::Authority(&p),
+        )
+        .expect("actual original authority signatures");
+        let mut replaced = p.clone();
+        replaced.original.as_mut().expect("original").signatures[0].signature = s.signature.clone();
+        assert_eq!(
+            import::verify_witness_payload(
+                s.body.as_ref().expect("statement"),
+                import::WitnessPayload::Authority(&replaced)
+            ),
+            Err(codec::Reject::Signature)
+        );
+    }
+    let s: host::SignedHostedWitnessStatementV1 = record(&f, "landing_statement");
+    let mut p: api::HostedLandingWitnessV1 = record(&f, "landing_payload");
+    witness::resolve_statement(&set, &s, None, false, 1_100_000).expect("witness signature");
+    import::verify_witness_payload(
+        s.body.as_ref().expect("statement"),
+        import::WitnessPayload::Landing(&p),
+    )
+    .expect("original landing request/execution/source");
+    p.request
+        .as_mut()
+        .expect("request")
+        .signature
+        .as_mut()
+        .expect("signature")
+        .signature = s.signature.clone();
+    assert_eq!(
+        import::verify_witness_payload(
+            s.body.as_ref().expect("statement"),
+            import::WitnessPayload::Landing(&p)
+        ),
+        Err(codec::Reject::Signature)
+    );
+    let s: host::SignedHostedWitnessStatementV1 = record(&f, "witness_without_owner");
+    let p: api::ImportAuthorityWitnessV1 = record(&f, "missing_owner_payload");
+    witness::resolve_statement(&set, &s, None, false, 1_100_000)
+        .expect("genuine witness even without owner");
+    assert_eq!(
+        import::verify_witness_payload(
+            s.body.as_ref().expect("statement"),
+            import::WitnessPayload::Authority(&p)
+        ),
+        Err(codec::Reject::Signature)
+    );
+    assert_eq!(
+        import::verify_operation(&record(&f, "witness_without_job"), &delegation(&f, &c)),
+        Err(codec::Reject::Signature)
+    );
+}
+#[test]
+fn fresh_export_contains_replaced_expired_permissions_and_each_original_manifest() {
+    let f = fixture();
+    let b: api::ImportPublicProofBundleV1 = record(&f, "complete_renewed_export");
+    let c = Context::from_export(&f, &b);
+    import::validate_public_bundle(&b).expect("complete renewed closure");
+    let old = &b.delegations[0];
+    let successor = &b.delegations[1];
+    let p0 = import::resolve_bundle_permission(
+        &b,
+        &old.body.as_ref().expect("old").parent_permission_digest,
+    )
+    .expect("parent");
+    let p1 = import::resolve_bundle_permission(
+        &b,
+        &successor
+            .body
+            .as_ref()
+            .expect("new")
+            .parent_permission_digest,
+    )
+    .expect("replacement parent");
+    assert_ne!(p0, p1);
+    assert_eq!(
+        import::verify_member_permission(p0.expect("member"), &c.owner(1350)),
+        Err(codec::Reject::Expired)
+    );
+    let previous = import::verify_delegation(old, p0, &c.owner(1100))
+        .expect("historical authority at original publication");
+    for genesis in &b.genesis_authorities {
+        let binding = genesis.body.as_ref().expect("genesis binding");
+        let original = b
+            .original_geneses
+            .iter()
+            .find(|record| {
+                let mut hash = blake3::Hasher::new();
+                hash.update(record.format.as_bytes());
+                hash.update(&(record.canonical_record.len() as u64).to_le_bytes());
+                hash.update(b"\0");
+                hash.update(&record.canonical_record);
+                hash.finalize().as_bytes().as_slice() == binding.genesis_digest
+            })
+            .expect("exported original genesis");
+        assert_eq!(original.format, "heddle-thread-genesis-v1");
+        let signature = original
+            .signatures
+            .iter()
+            .find(|s| s.public_key == binding.creator_public_key)
+            .expect("original creator");
+        codec::verify(
+            &signature.public_key,
+            &[
+                original.format.as_bytes(),
+                b"\0",
+                &original.canonical_record,
+            ]
+            .concat(),
+            &signature.signature,
+        )
+        .expect("original native signature");
+        let envelope = b
+            .creator_authority_envelopes
+            .iter()
+            .find(|e| codec::hash(&[e]) == binding.creator_authority_envelope_digest)
+            .expect("exported original envelope");
+        import::verify_genesis_authority(
+            genesis,
+            &previous,
+            &binding.genesis_digest,
+            &signature.signature,
+            &codec::hash(&[envelope]),
+        )
+        .expect("original genesis context, never replacement parent");
+    }
+    let renewal = &b.renewals[0];
+    let committed = import::resolve_bundle_manifest(
+        &b,
+        &renewal
+            .body
+            .as_ref()
+            .expect("renewal")
+            .committed_manifest_digest,
+    )
+    .expect("original partial snapshot");
+    let next = import::verify_renewal(renewal, &previous, committed, 1, p1, &c.owner(1250))
+        .expect("renewal at successor witnessed time");
+    let set = witness::verify_set(
+        b.witness_set.as_ref().expect("set"),
+        &c.set(1_350_000),
+        None,
+    )
+    .expect("fresh independently rooted witness set");
+    for o in &b.operations {
+        let is_old = o.body.as_ref().expect("operation").delegation_digest == previous.digest();
+        let active = if is_old { &previous } else { &next };
+        let proof: host::HostedWitnessHistoryProofV1 = record(
+            &f,
+            if is_old {
+                "publication_proof"
+            } else {
+                "renewed_publication_proof"
+            },
+        );
+        let (manifest, statement) = b
+            .manifests
+            .iter()
+            .find_map(|m| {
+                let payload =
+                    codec::canonical(&import::publication_payload(o, m).expect("payload"))
+                        .expect("canonical");
+                b.statements
+                    .iter()
+                    .find(|s| {
+                        s.body
+                            .as_ref()
+                            .is_some_and(|s| s.purpose == 3 && s.canonical_payload == payload)
+                    })
+                    .map(|s| (m, s))
+            })
+            .expect("each exact immutable publication manifest");
+        import::verify_publication(
+            o,
+            active,
+            manifest,
+            statement,
+            &set,
+            Some(&proof),
+            1_350_000,
+        )
+        .expect("original publication after expiry and retirement");
+    }
+    let mut missing = b.clone();
+    missing.member_permissions.clear();
+    assert_eq!(
+        import::validate_public_bundle(&missing),
+        Err(codec::Reject::ImportPermission)
+    );
+    let mut missing = b.clone();
+    missing.manifests.clear();
+    assert_eq!(
+        import::validate_public_bundle(&missing),
+        Err(codec::Reject::StaleManifest)
+    );
+    let mut duplicated = b.clone();
+    duplicated.manifests.push(duplicated.manifests[0].clone());
+    assert_eq!(
+        import::validate_public_bundle(&duplicated),
+        Err(codec::Reject::Canonical)
+    );
+}
+#[test]
+fn preparation_wire_state_and_publication_wins_manifest_cas() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let mut response: api::PrepareImportJobResponse = record(&f, "renewal_preparation");
+    import::validate_renewal_preparation(&response).expect("coherent snapshot");
+    let renewal: api::SignedImportJobRenewalV1 = record(&f, "renewal");
+    let state = response.renewal_state.as_ref().expect("CAS state");
+    let r = renewal.body.as_ref().expect("renewal");
+    assert_eq!(state.authority_epoch, r.expected_authority_epoch);
+    assert_eq!(
+        import::manifest_digest(state.committed_manifest.as_ref().expect("manifest"))
+            .expect("hash"),
+        r.committed_manifest_digest
+    );
+    response
+        .renewal_state
+        .as_mut()
+        .expect("state")
+        .logical_job_id = vec![0; 16];
+    assert_eq!(
+        import::validate_renewal_preparation(&response),
+        Err(codec::Reject::StaleContext)
+    );
+    let renewal: api::SignedImportJobRenewalV1 = record(&f, "publication_wins_renewal");
+    let old = delegation(&f, &c);
+    let p: api::SignedImportMemberPermissionV1 = record(&f, "renewed_permission");
+    import::verify_new_operation(&record(&f, "operation_main"), &old, 1250)
+        .expect("time-valid publication wins");
+    import::verify_renewal(
+        &renewal,
+        &old,
+        &record(&f, "empty_manifest"),
+        1,
+        Some(&p),
+        &c.owner(1250),
+    )
+    .expect("passing unchanged CAS control");
+    assert_eq!(
+        import::verify_renewal(
+            &renewal,
+            &old,
+            &record(&f, "partial_manifest"),
+            1,
+            Some(&p),
+            &c.owner(1250)
+        ),
+        Err(codec::Reject::StaleManifest)
+    );
+}
+#[test]
+fn authentic_legacy_hosted_import_fails_hybrid_dispatch() {
+    let f = fixture();
+    let record: api::SignedRecord = record(&f, "legacy_hosted_import");
+    for s in &record.signatures {
+        codec::verify(
+            &s.public_key,
+            &[record.format.as_bytes(), b"\0", &record.canonical_record].concat(),
+            &s.signature,
+        )
+        .expect("genuine witness on legacy operation");
+    }
+    assert_eq!(
+        import::require_import_operation_format(&record.format),
+        Err(codec::Reject::Protocol)
+    );
+    import::require_import_operation_format(import::OPERATION_DOMAIN)
+        .expect("new dispatch control");
+}
+#[test]
+fn shared_multibyte_root_id_boundary_uses_utf8_octets() {
+    let f = fixture();
+    let c = Context::new(&f);
+    for (name, result) in [("root_id_boundary", true), ("root_id_over_boundary", false)] {
+        let set: host::SignedHostedWitnessSetV1 = record(&f, name);
+        let root_id = &set.body.as_ref().expect("body").descriptor_root_id;
+        assert_eq!(root_id.len(), if result { 256 } else { 258 });
+        let mut e = c.set(1_100_000);
+        e.root_id = root_id;
+        let actual = witness::verify_set(&set, &e, None);
+        if result {
+            actual.expect("256-byte root ID passes");
+        } else {
+            assert_eq!(actual, Err(codec::Reject::Bounds));
+        }
+    }
+}
+#[test]
+fn raw_commitment_domains_and_preimages_are_frozen() {
+    let f = fixture();
+    for (_, v) in f["raw_commitment_vectors"]
+        .as_object()
+        .expect("raw preimages")
+    {
+        let preimage = [
+            v["domain"].as_str().expect("domain").as_bytes(),
+            &bytes(&v["canonical_hex"]),
+        ]
+        .concat();
+        assert_eq!(preimage, bytes(&v["preimage_hex"]));
+        assert_eq!(codec::hash(&[&preimage]), bytes(&v["digest_hex"]));
+    }
 }

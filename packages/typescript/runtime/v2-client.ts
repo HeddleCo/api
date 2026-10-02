@@ -51,10 +51,18 @@ export function createServiceClient<S extends DescService>(
   for (const method of service.methods) {
     const path = methodPath(method);
     const contract = getOption(method, rpc_contract);
+    function streamProtocol(message: object, request: boolean, first: boolean): void {
+      if (method.parent.typeName !== "heddle.api.v1alpha2.SyncService" || !contract.mandatoryFeatures.length) return;
+      const body = Reflect.get(message, "body");
+      const kind = request ? "open" : "ready";
+      if (body?.case === kind) requireHybridPeer(body.value.protocol);
+      else if (first) requireHybridPeer(undefined);
+    }
     function encode(input: MessageInitShape<typeof method.input>, first: boolean): Uint8Array {
       if (!implemented.has(path)) throw new ContractClientError("not_implemented", path);
       if (contract.mandatoryFeatures.length) requireHybridPeer(negotiatedProtocol);
       const message = create(method.input, input);
+      streamProtocol(message, true, first);
       if (first && contract.clientOperationIdRequired) {
         const id = Reflect.get(message, "clientOperationId");
         if (typeof id !== "string" || id.trim().length === 0) {
@@ -86,9 +94,14 @@ export function createServiceClient<S extends DescService>(
           if (first && contract.clientOperationIdRequired) throw new ContractClientError("operation_id_missing", path);
         }
       };
+      let firstResponse = true;
       for await (const bytes of transport.open(method, requests(), options)) {
-        yield fromBinary(method.output, bytes);
+        const message = fromBinary(method.output, bytes);
+        streamProtocol(message, false, firstResponse);
+        firstResponse = false;
+        yield message;
       }
+      if (firstResponse && method.parent.typeName === "heddle.api.v1alpha2.SyncService" && contract.mandatoryFeatures.length) requireHybridPeer(undefined);
     };
     methods[method.localName] = method.methodKind === "client_streaming"
       ? async (input: AsyncIterable<MessageInitShape<typeof method.input>>, options?: CallOptions) => {

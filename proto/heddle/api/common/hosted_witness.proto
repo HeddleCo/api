@@ -62,8 +62,8 @@ enum HostedWitnessAdmissionBasis {
   HOSTED_WITNESS_ADMISSION_BASIS_BOUNDARY_ACCEPTANCE = 2;
 }
 // New format: never reinterpret any legacy admission/HostedIntegration bytes.
-// The payload is exact canonical typed genesis binding, authority/ownership
-// evidence, ImportPublicationWitnessV1, or hosted landing evidence. Receivers
+// Payloads are exactly ImportGenesisWitnessV1 (1), ImportAuthorityWitnessV1 (2),
+// ImportPublicationWitnessV1 (3), HostedLandingWitnessV1 (4), with no prefix. Receivers
 // parse the declared purpose and verify all original signatures independently.
 message HostedWitnessStatementV1 {
   uint32 format_version = 1;

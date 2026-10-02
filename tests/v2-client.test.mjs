@@ -74,12 +74,13 @@ test("observation is pull-based and returns the endpoint stream on early exit", 
 });
 
 test("bidirectional transfer pulls client frames as the endpoint consumes them", async () => {
+  const protocol = create(ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1] });
   let produced = 0;
   let sourceClosed = false;
   const source = async function* () {
     try {
       produced++;
-      yield { body: { case: "open", value: {} } };
+      yield { body: { case: "open", value: { protocol } } };
       produced++;
       yield { body: { case: "have", value: {} } };
     } finally { sourceClosed = true; }
@@ -88,11 +89,11 @@ test("bidirectional transfer pulls client frames as the endpoint consumes them",
     async *open(_method, requests) {
       for await (const _ of requests) {
         assert.equal(produced, 1);
-        yield toBinary(ReplicateThreadResponseSchema, create(ReplicateThreadResponseSchema, { body: { case: "ready", value: {} } }));
+        yield toBinary(ReplicateThreadResponseSchema, create(ReplicateThreadResponseSchema, { body: { case: "ready", value: { protocol } } }));
       }
     },
   };
-  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v1alpha2.SyncService/ReplicateThread"]), create(ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1] }));
+  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v1alpha2.SyncService/ReplicateThread"]), protocol);
   for await (const _ of client.replicateThread(source())) break;
   assert.equal(produced, 1);
   assert.equal(sourceClosed, true);

@@ -47,7 +47,7 @@ message ImportBranchLimitV1 {
   bytes pinned_commit_oid = 4; // Raw 20/32 bytes; empty only for OBSERVE.
   bytes genesis_digest = 5;
   bytes target_thread_id = 6;
-  bytes expected_frontier_digest = 7;
+  bytes expected_frontier_digest = 7; // ImportFrontierV1 commitment.
   uint64 slot_id = 8;
   uint64 max_result_bytes = 9;
 }
@@ -168,7 +168,7 @@ message DelegatedImportOperationV1 {
   bytes target_thread_id = 13;
   bytes expected_frontier_digest = 14;
   bytes resulting_frontier_digest = 15;
-  bytes resulting_content_digest = 16;
+  bytes resulting_content_digest = 16; // ImportContentV1 commitment.
   uint64 result_bytes = 17;
   bytes options_digest = 18;
   string converter_version = 19;
@@ -213,6 +213,15 @@ message ImportPublicProofBundleV1 {
   repeated SignedRecord original_geneses = 15;
   repeated bytes creator_authority_envelopes = 16;
   ImportOwnerChainV1 owner_chain = 17;
+  // Authoritative digest-sorted unique history. Field 5 is an optional alias;
+  // field 10 is the required terminal selector. Both MUST equal exact entries.
+  // Never rewrite old signed records.
+  repeated SignedImportMemberPermissionV1 member_permissions = 18; // At most 64.
+  repeated ImportResultManifestV1 manifests = 19; // At most 320.
+  // Exact statement payloads, indexed by H(purpose-domain || canonical payload).
+  repeated ImportGenesisWitnessV1 genesis_witnesses = 20;
+  repeated ImportAuthorityWitnessV1 authority_witnesses = 21;
+  repeated HostedLandingWitnessV1 landing_witnesses = 22;
 }
 message PrepareImportJobRequest {
   string client_operation_id = 1;
@@ -225,6 +234,9 @@ message PrepareImportJobRequest {
 message PrepareImportJobResponse {
   ImportJobDelegationV1 proposal = 1;
   int64 reservation_expires_at_unix_seconds = 2; // Prepare time + 3600, exclusive.
+  // Mandatory for renew_logical_job_id; absent for initial preparation. Read in
+  // one authorized transaction with proposal, never assembled from stale reads.
+  ImportJobCasStateV1 renewal_state = 3;
 }
 message CommitImportJobRequest {
   string client_operation_id = 1;
@@ -254,4 +266,64 @@ message GetHostedWitnessHistoryProofRequest {
 // At most 64 siblings and 4096 encoded bytes, no original/resource identifiers.
 message GetHostedWitnessHistoryProofResponse {
   heddle.api.common.HostedWitnessHistoryProofV1 proof = 1;
+}
+
+// Frozen cross-model SHA256 preimages, not native object IDs. Operation IDs are
+// original native Thread operation IDs; complete sorted unique source frontier.
+message ImportFrontierV1 {
+  uint32 format_version = 1;
+  bytes thread_id = 2;
+  repeated bytes operation_ids = 3; // At most 128; empty frontier is explicit.
+}
+message ImportContentV1 {
+  uint32 format_version = 1;
+  bytes canonical_capture = 2; // Native Capture v1 named MessagePack; see contract.
+}
+// Typed purpose payloads use the same fixed-order canonical framing. SignedRecord
+// flattens counted format, counted original native bytes, signature count then
+// counted key/signature pairs, sorted by raw key. Native bytes are never changed.
+message ImportGenesisWitnessV1 {
+  uint32 format_version = 1;
+  SignedImportGenesisAuthorityV1 binding = 2;
+  SignedRecord original_genesis = 3;
+  bytes creator_authority_envelope = 4;
+}
+enum ImportAuthorityRecordKind {
+  IMPORT_AUTHORITY_RECORD_KIND_UNSPECIFIED = 0;
+  IMPORT_AUTHORITY_RECORD_KIND_THREAD_OPERATION_V1 = 1;
+  IMPORT_AUTHORITY_RECORD_KIND_OWNERSHIP_CLAIM_V1 = 2;
+  IMPORT_AUTHORITY_RECORD_KIND_OWNERSHIP_RESOLUTION_V1 = 3;
+}
+message ImportAuthorityWitnessV1 {
+  uint32 format_version = 1;
+  ImportAuthorityRecordKind kind = 2;
+  SignedRecord original = 3;
+  repeated SignedRecord dependencies = 4; // Sorted signed-native-record digests.
+  bytes authority_envelope = 5;
+}
+// Retained exact Tier-1 signing preimage + original signature; no bearer secret.
+message HostedLandingRequestProofV1 {
+  uint32 format_version = 1;
+  string signing_identity = 2;
+  string method_path = 3;
+  int64 timestamp_millis = 4;
+  bytes nonce = 5;
+  bytes request_body = 6;
+  RecordSignature signature = 7;
+}
+message HostedLandingWitnessV1 {
+  uint32 format_version = 1;
+  SignedRecord execution = 2; // ThreadOperation v1 Integration body, never HostedImport.
+  HostedLandingRequestProofV1 request = 3;
+  SignedRecord source_operation = 4;
+  repeated SignedRecord review_evidence = 5; // Sorted signed-native-record digests.
+  bytes authority_envelope = 6;
+}
+message ImportJobCasStateV1 {
+  uint32 format_version = 1;
+  bytes logical_job_id = 2;
+  bytes retry_lineage_id = 3;
+  SignedImportJobDelegationV1 active_predecessor = 4;
+  uint64 authority_epoch = 5;
+  ImportResultManifestV1 committed_manifest = 6;
 }

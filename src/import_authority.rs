@@ -20,6 +20,15 @@ pub const MAX_RESULT_BYTES: u64 = 1 << 30;
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
 
 record!(AuthorizationSignature, signer_key_id:b, signature:b);
+record!(RecordSignature, public_key:b, signature:b);
+record!(SignedRecord, format:s, canonical_record:b, signatures:l);
+record!(ImportFrontierV1, format_version:u, thread_id:b, operation_ids:h);
+record!(ImportContentV1, format_version:u, canonical_capture:b);
+record!(ImportGenesisWitnessV1, format_version:u, binding:m, original_genesis:m, creator_authority_envelope:b);
+record!(ImportAuthorityWitnessV1, format_version:u, kind:e, original:m, dependencies:l, authority_envelope:b);
+record!(HostedLandingRequestProofV1, format_version:u, signing_identity:s, method_path:s, timestamp_millis:u, nonce:b, request_body:b, signature:m);
+record!(HostedLandingWitnessV1, format_version:u, execution:m, request:m, source_operation:m, review_evidence:l, authority_envelope:b);
+record!(ImportJobCasStateV1, format_version:u, logical_job_id:b, retry_lineage_id:b, active_predecessor:m, authority_epoch:u, committed_manifest:m);
 record!(ImportIdentityV1, spool_uuid:b, spool_genesis_digest:b, owner_id:b,
     owner_account_uuid:b, owner_state_hash:b, ownership_transfer_sequence:u);
 record!(ImportOwnerChainV1, spool_genesis_digest:b, owner_state_hashes:q, transfer_audit_hashes:q);
@@ -565,6 +574,9 @@ pub fn validate_manifest(m: &ImportResultManifestV1) -> Result<(), Reject> {
     for (i, s) in m.slots.iter().enumerate() {
         width(&s.signed_operation_digest, 32)?;
         width(&s.resulting_frontier_digest, 32)?;
+        if !s.ref_name.starts_with("refs/heads/") || !s.ref_name.is_ascii() {
+            return Err(Reject::Canonical);
+        }
         if s.ref_name.len() > 1024 || s.result_bytes == 0 || s.result_bytes > MAX_RESULT_BYTES {
             return Err(Reject::Bounds);
         }
@@ -592,10 +604,11 @@ pub fn verify_renewal(
     if r.expected_authority_epoch != authority_epoch {
         return Err(Reject::StaleContext);
     }
-    if r.predecessor_delegation_digest != previous.digest
-        || r.committed_manifest_digest != manifest_digest(committed)?
-    {
+    if r.predecessor_delegation_digest != previous.digest {
         return Err(Reject::RenewalFork);
+    }
+    if r.committed_manifest_digest != manifest_digest(committed)? {
+        return Err(Reject::StaleManifest);
     }
     let signed_next = r.replacement.as_ref().ok_or(Reject::Canonical)?;
     let next = verify_delegation(signed_next, member, expected)?;
@@ -642,7 +655,7 @@ pub fn verify_renewal(
             .iter()
             .any(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
         {
-            return Err(Reject::RenewalFork);
+            return Err(Reject::CommittedSlot);
         }
     }
     let removed = old_slots
@@ -819,8 +832,538 @@ pub fn validate_public_bundle(bundle: &ImportPublicProofBundleV1) -> Result<(), 
         || bundle.policies.len() > 256
         || bundle.original_geneses.len() > MAX_BRANCHES
         || bundle.creator_authority_envelopes.len() > MAX_BRANCHES
+        || bundle.member_permissions.len() > 64
+        || bundle.manifests.len() > 320
+        || bundle.genesis_witnesses.len() > 256
+        || bundle.authority_witnesses.len() > 256
+        || bundle.landing_witnesses.len() > 256
     {
         return Err(Reject::Bounds);
+    }
+    validate_bundle_history(bundle)
+}
+
+/// Typed adapter boundary: an authentic unrelated capability/online role must
+/// never be selected as the parent of an import certificate.
+pub enum ImportPermissionEvidence<'a> {
+    Import(&'a SignedImportMemberPermissionV1),
+    OwnerCapability(&'a SignedOwnerCapability),
+    OnlineRole(&'a str),
+}
+pub fn select_import_permission(
+    evidence: ImportPermissionEvidence<'_>,
+) -> Result<&SignedImportMemberPermissionV1, Reject> {
+    match evidence {
+        ImportPermissionEvidence::Import(p) => Ok(p),
+        ImportPermissionEvidence::OwnerCapability(_) | ImportPermissionEvidence::OnlineRole(_) => {
+            Err(Reject::ImportPermission)
+        }
+    }
+}
+/// Hybrid dispatch has no legacy execution arm, even for an authentic witness.
+pub fn require_import_operation_format(format: &str) -> Result<(), Reject> {
+    if format != OPERATION_DOMAIN {
+        return Err(Reject::Protocol);
+    }
+    Ok(())
+}
+pub fn frontier_digest(frontier: &ImportFrontierV1) -> Result<Vec<u8>, Reject> {
+    if frontier.format_version != 1 {
+        return Err(Reject::Version);
+    }
+    width(&frontier.thread_id, 32)?;
+    if frontier.operation_ids.len() > 128 {
+        return Err(Reject::Bounds);
+    }
+    for id in &frontier.operation_ids {
+        width(id, 32)?;
+    }
+    if frontier.operation_ids.windows(2).any(|w| w[0] >= w[1]) {
+        return Err(Reject::Canonical);
+    }
+    signing_digest("heddle-import-frontier-v1", frontier)
+}
+pub fn content_digest(content: &ImportContentV1) -> Result<Vec<u8>, Reject> {
+    if content.format_version != 1 {
+        return Err(Reject::Version);
+    }
+    if content.canonical_capture.is_empty()
+        || content.canonical_capture.len() > MAX_RESULT_BYTES as usize
+    {
+        return Err(Reject::Bounds);
+    }
+    signing_digest("heddle-import-content-v1", content)
+}
+pub fn signed_native_digest(record: &SignedRecord) -> Result<Vec<u8>, Reject> {
+    signing_digest("heddle-signed-native-record-v1", record)
+}
+fn verify_native(record: &SignedRecord, format: &str) -> Result<(), Reject> {
+    if record.format != format {
+        return Err(Reject::Version);
+    }
+    if record.canonical_record.is_empty()
+        || record.canonical_record.len() > MAX_RECORD_BYTES
+        || record.signatures.is_empty()
+        || record.signatures.len() > 16
+    {
+        return Err(Reject::Bounds);
+    }
+    let mut previous: Option<&[u8]> = None;
+    let input = [format.as_bytes(), b"\0", &record.canonical_record].concat();
+    for s in &record.signatures {
+        if previous.is_some_and(|p| p >= s.public_key.as_slice()) {
+            return Err(Reject::Canonical);
+        }
+        verify(&s.public_key, &input, &s.signature)?;
+        previous = Some(&s.public_key);
+    }
+    Ok(())
+}
+fn native_dependencies(records: &[SignedRecord]) -> Result<(), Reject> {
+    if records.len() > 128 {
+        return Err(Reject::Bounds);
+    }
+    let mut previous = None;
+    for record in records {
+        if ![
+            "heddle-thread-genesis-v1",
+            "heddle-thread-operation-v1",
+            "heddle-thread-ownership-claim-v1",
+            "heddle-thread-ownership-resolution-v1",
+        ]
+        .contains(&record.format.as_str())
+        {
+            return Err(Reject::Version);
+        }
+        verify_native(record, &record.format)?;
+        let digest = signed_native_digest(record)?;
+        if previous.as_ref().is_some_and(|p| p >= &digest) {
+            return Err(Reject::Canonical);
+        }
+        previous = Some(digest);
+    }
+    Ok(())
+}
+fn original_signatures(
+    records: &[&SignedRecord],
+    extra: &[RecordSignature],
+) -> Result<Vec<u8>, Reject> {
+    let signatures = records
+        .iter()
+        .flat_map(|r| r.signatures.iter())
+        .chain(extra.iter())
+        .collect::<Vec<_>>();
+    let mut out = (signatures.len() as u32).to_be_bytes().to_vec();
+    for s in signatures {
+        s.write(&mut out)?;
+    }
+    Ok(hash(&[b"heddle-hosted-original-signatures-v1", &out]))
+}
+use crate::hybrid_codec::Canonical;
+/// Caller constructs this from independently verified native originals and
+/// accepted owner/policy/landing context. This matching layer verifies original
+/// signatures and exact payload commitments separately from witness trust; it
+/// does not replace native causal, authority or landing-model verification.
+pub enum WitnessPayload<'a> {
+    Genesis(&'a ImportGenesisWitnessV1),
+    Authority(&'a ImportAuthorityWitnessV1),
+    Landing(&'a HostedLandingWitnessV1),
+}
+pub fn verify_witness_payload(
+    statement: &crate::heddle::api::common::HostedWitnessStatementV1,
+    payload: WitnessPayload<'_>,
+) -> Result<(), Reject> {
+    let (purpose, bytes, authority, signatures, publisher) = match payload {
+        WitnessPayload::Genesis(p) => {
+            if p.format_version != 1 {
+                return Err(Reject::Version);
+            }
+            let original = p.original_genesis.as_ref().ok_or(Reject::Canonical)?;
+            let binding = p.binding.as_ref().ok_or(Reject::Canonical)?;
+            let b = binding.body.as_ref().ok_or(Reject::Canonical)?;
+            verify_native(original, "heddle-thread-genesis-v1")?;
+            if native_id(original) != b.genesis_digest {
+                return Err(Reject::Scope);
+            }
+            if let Some(id) = &b.identity {
+                if statement.spool_uuid != id.spool_uuid
+                    || statement.spool_genesis_digest != id.spool_genesis_digest
+                    || statement.owner_id != id.owner_id
+                    || statement.owner_state_hash != id.owner_state_hash
+                    || statement.ownership_transfer_sequence != id.ownership_transfer_sequence
+                {
+                    return Err(Reject::Scope);
+                }
+            } else {
+                return Err(Reject::Canonical);
+            }
+            let creator = original
+                .signatures
+                .iter()
+                .find(|s| s.public_key == b.creator_public_key)
+                .ok_or(Reject::Signature)?;
+            if b.original_creator_signature != creator.signature
+                || b.creator_authority_envelope_digest != hash(&[&p.creator_authority_envelope])
+            {
+                return Err(Reject::Scope);
+            }
+            verify_authorization_signature(
+                &b.creator_public_key,
+                GENESIS_DOMAIN,
+                b,
+                binding
+                    .creator_signature
+                    .as_ref()
+                    .ok_or(Reject::Signature)?,
+            )?;
+            (
+                1,
+                canonical(p)?,
+                signed_genesis_digest(binding)?,
+                original_signatures(&[original], &[])?,
+                key_id(&b.creator_public_key),
+            )
+        }
+        WitnessPayload::Authority(p) => {
+            if p.format_version != 1 {
+                return Err(Reject::Version);
+            }
+            let original = p.original.as_ref().ok_or(Reject::Canonical)?;
+            let format = match p.kind {
+                1 => "heddle-thread-operation-v1",
+                2 => "heddle-thread-ownership-claim-v1",
+                3 => "heddle-thread-ownership-resolution-v1",
+                _ => return Err(Reject::Version),
+            };
+            verify_native(original, format)?;
+            if (p.kind == 2 || p.kind == 3) && original.signatures.len() != 2 {
+                return Err(Reject::Signature);
+            }
+            if !original
+                .signatures
+                .iter()
+                .any(|s| key_id(&s.public_key) == statement.publisher_key_id)
+            {
+                return Err(Reject::Signature);
+            }
+            if p.authority_envelope.is_empty() || p.authority_envelope.len() > MAX_RECORD_BYTES {
+                return Err(Reject::Bounds);
+            }
+            native_dependencies(&p.dependencies)?;
+            let records = std::iter::once(original)
+                .chain(p.dependencies.iter())
+                .collect::<Vec<_>>();
+            (
+                2,
+                canonical(p)?,
+                hash(&[
+                    b"heddle-hosted-authority-envelope-v1",
+                    &(p.authority_envelope.len() as u32).to_be_bytes(),
+                    &p.authority_envelope,
+                ]),
+                original_signatures(&records, &[])?,
+                statement.publisher_key_id.clone(),
+            )
+        }
+        WitnessPayload::Landing(p) => {
+            if p.format_version != 1 {
+                return Err(Reject::Version);
+            }
+            let execution = p.execution.as_ref().ok_or(Reject::Canonical)?;
+            let source = p.source_operation.as_ref().ok_or(Reject::Canonical)?;
+            let request = p.request.as_ref().ok_or(Reject::Canonical)?;
+            if request.format_version != 1
+                || request.method_path != "/heddle.api.v1alpha2.ThreadService/LandThread"
+            {
+                return Err(Reject::Version);
+            }
+            verify_native(execution, "heddle-thread-operation-v1")?;
+            verify_native(source, "heddle-thread-operation-v1")?;
+            native_dependencies(&p.review_evidence)?;
+            let signature = request.signature.as_ref().ok_or(Reject::Signature)?;
+            if request.signing_identity
+                != format!(
+                    "principal:device-key:{}",
+                    hex::encode(&signature.public_key)
+                )
+            {
+                return Err(Reject::Signature);
+            }
+            width(&request.nonce, 16)?;
+            if request.timestamp_millis <= 0
+                || request.request_body.is_empty()
+                || request.request_body.len() > MAX_RECORD_BYTES
+                || p.authority_envelope.is_empty()
+                || p.authority_envelope.len() > MAX_RECORD_BYTES
+            {
+                return Err(Reject::Bounds);
+            }
+            let input = crate::signing::unary_bytes(
+                &request.signing_identity,
+                &request.method_path,
+                request.timestamp_millis,
+                &request.nonce,
+                &request.request_body,
+            );
+            verify(&signature.public_key, &input, &signature.signature)?;
+            let records = [execution, source]
+                .into_iter()
+                .chain(p.review_evidence.iter())
+                .collect::<Vec<_>>();
+            (
+                4,
+                canonical(p)?,
+                hash(&[
+                    b"heddle-hosted-authority-envelope-v1",
+                    &(p.authority_envelope.len() as u32).to_be_bytes(),
+                    &p.authority_envelope,
+                ]),
+                original_signatures(&records, std::slice::from_ref(signature))?,
+                key_id(&signature.public_key),
+            )
+        }
+    };
+    if bytes.len() > MAX_RECORD_BYTES {
+        return Err(Reject::Bounds);
+    }
+    if statement.purpose != purpose
+        || statement.canonical_payload != bytes
+        || statement.authority_digest != authority
+        || statement.original_signatures_digest != signatures
+        || statement.publisher_key_id != publisher
+    {
+        return Err(Reject::Scope);
+    }
+    Ok(())
+}
+
+pub fn resolve_bundle_permission<'a>(
+    bundle: &'a ImportPublicProofBundleV1,
+    digest: &[u8],
+) -> Result<Option<&'a SignedImportMemberPermissionV1>, Reject> {
+    width(digest, 32)?;
+    if digest == [0; 32] {
+        return Ok(None);
+    }
+    bundle
+        .member_permissions
+        .iter()
+        .find(|p| signed_permission_digest(p).is_ok_and(|d| d == digest))
+        .map(Some)
+        .ok_or(Reject::ImportPermission)
+}
+pub fn resolve_bundle_manifest<'a>(
+    bundle: &'a ImportPublicProofBundleV1,
+    digest: &[u8],
+) -> Result<&'a ImportResultManifestV1, Reject> {
+    width(digest, 32)?;
+    bundle
+        .manifests
+        .iter()
+        .find(|m| manifest_digest(m).is_ok_and(|d| d == digest))
+        .ok_or(Reject::StaleManifest)
+}
+pub fn publication_payload(
+    operation: &SignedDelegatedImportOperationV1,
+    manifest: &ImportResultManifestV1,
+) -> Result<ImportPublicationWitnessV1, Reject> {
+    let o = operation.body.as_ref().ok_or(Reject::Canonical)?;
+    Ok(ImportPublicationWitnessV1 {
+        format_version: 1,
+        signed_operation_digest: signed_operation_digest(operation)?,
+        delegation_digest: o.delegation_digest.clone(),
+        logical_job_id: o.logical_job_id.clone(),
+        retry_lineage_id: o.retry_lineage_id.clone(),
+        physical_operation_id: o.physical_operation_id.clone(),
+        ref_name: o.ref_name.clone(),
+        slot_id: o.slot_id,
+        hash_algorithm: o.hash_algorithm,
+        observed_commit_oid: o.observed_commit_oid.clone(),
+        expected_frontier_digest: o.expected_frontier_digest.clone(),
+        resulting_frontier_digest: o.resulting_frontier_digest.clone(),
+        terminal_manifest_digest: manifest_digest(manifest)?,
+    })
+}
+/// Completeness and digest addressing only. Trust/signature verification still
+/// uses independently selected owner contexts at each witnessed historical time.
+fn validate_bundle_history(bundle: &ImportPublicProofBundleV1) -> Result<(), Reject> {
+    fn sorted<T>(
+        values: &[T],
+        digest: impl Fn(&T) -> Result<Vec<u8>, Reject>,
+    ) -> Result<(), Reject> {
+        let mut previous = None;
+        for value in values {
+            let d = digest(value)?;
+            if previous.as_ref().is_some_and(|p| p >= &d) {
+                return Err(Reject::Canonical);
+            }
+            previous = Some(d);
+        }
+        Ok(())
+    }
+    sorted(&bundle.member_permissions, signed_permission_digest)?;
+    sorted(&bundle.manifests, manifest_digest)?;
+    if let Some(p) = &bundle.member_permission
+        && resolve_bundle_permission(bundle, &signed_permission_digest(p)?)? != Some(p)
+    {
+        return Err(Reject::ImportPermission);
+    }
+    let terminal = bundle.terminal_manifest.as_ref().ok_or(Reject::Canonical)?;
+    if resolve_bundle_manifest(bundle, &manifest_digest(terminal)?)? != terminal {
+        return Err(Reject::Canonical);
+    }
+    if bundle.delegations.is_empty() || bundle.renewals.len() + 1 != bundle.delegations.len() {
+        return Err(Reject::Canonical);
+    }
+    for (i, d) in bundle.delegations.iter().enumerate() {
+        let body = d.body.as_ref().ok_or(Reject::Canonical)?;
+        resolve_bundle_permission(bundle, &body.parent_permission_digest)?;
+        if i == 0 {
+            if body.predecessor_delegation_digest != [0; 32] {
+                return Err(Reject::RenewalFork);
+            }
+        } else {
+            let r = bundle.renewals[i - 1]
+                .body
+                .as_ref()
+                .ok_or(Reject::Canonical)?;
+            if r.replacement.as_ref() != Some(d)
+                || r.predecessor_delegation_digest
+                    != signed_delegation_digest(&bundle.delegations[i - 1])?
+                || body.predecessor_delegation_digest != r.predecessor_delegation_digest
+                || r.expected_authority_epoch != i as u64
+            {
+                return Err(Reject::RenewalFork);
+            }
+            resolve_bundle_manifest(bundle, &r.committed_manifest_digest)?;
+        }
+        for branch in &body.branch_manifest {
+            let g = bundle
+                .genesis_authorities
+                .iter()
+                .find(|g| {
+                    signed_genesis_digest(g).is_ok_and(|h| h == branch.genesis_authority_digest)
+                })
+                .ok_or(Reject::Scope)?;
+            let b = g.body.as_ref().ok_or(Reject::Canonical)?;
+            resolve_bundle_permission(bundle, &b.parent_permission_digest)?;
+            if !bundle
+                .original_geneses
+                .iter()
+                .any(|o| native_id(o) == b.genesis_digest)
+                || !bundle
+                    .creator_authority_envelopes
+                    .iter()
+                    .any(|e| hash(&[e]) == b.creator_authority_envelope_digest)
+            {
+                return Err(Reject::Scope);
+            }
+        }
+    }
+    for manifest in &bundle.manifests {
+        validate_manifest(manifest)?;
+        if manifest.logical_job_id != terminal.logical_job_id
+            || manifest.retry_lineage_id != terminal.retry_lineage_id
+        {
+            return Err(Reject::Scope);
+        }
+        for slot in &manifest.slots {
+            let operation = bundle
+                .operations
+                .iter()
+                .find(|o| {
+                    signed_operation_digest(o).is_ok_and(|d| d == slot.signed_operation_digest)
+                })
+                .ok_or(Reject::Scope)?;
+            if !check_slot_replay(manifest, operation)? || !check_slot_replay(terminal, operation)?
+            {
+                return Err(Reject::Scope);
+            }
+        }
+    }
+    for operation in &bundle.operations {
+        let o = operation.body.as_ref().ok_or(Reject::Canonical)?;
+        if !bundle
+            .delegations
+            .iter()
+            .any(|d| signed_delegation_digest(d).is_ok_and(|h| h == o.delegation_digest))
+            || !check_slot_replay(terminal, operation)?
+        {
+            return Err(Reject::Scope);
+        }
+        if !bundle.manifests.iter().any(|m| {
+            check_slot_replay(m, operation) == Ok(true)
+                && publication_payload(operation, m)
+                    .and_then(|p| canonical(&p))
+                    .is_ok_and(|p| {
+                        bundle.statements.iter().any(|s| {
+                            s.body
+                                .as_ref()
+                                .is_some_and(|s| s.purpose == 3 && s.canonical_payload == p)
+                        })
+                    })
+        }) {
+            return Err(Reject::Scope);
+        }
+    }
+    for statement in &bundle.statements {
+        let s = statement.body.as_ref().ok_or(Reject::Canonical)?;
+        let found = match s.purpose {
+            1 => bundle
+                .genesis_witnesses
+                .iter()
+                .any(|p| canonical(p).is_ok_and(|p| p == s.canonical_payload)),
+            2 => bundle
+                .authority_witnesses
+                .iter()
+                .any(|p| canonical(p).is_ok_and(|p| p == s.canonical_payload)),
+            3 => bundle.operations.iter().any(|o| {
+                bundle.manifests.iter().any(|m| {
+                    publication_payload(o, m)
+                        .and_then(|p| canonical(&p))
+                        .is_ok_and(|p| p == s.canonical_payload)
+                })
+            }),
+            4 => bundle
+                .landing_witnesses
+                .iter()
+                .any(|p| canonical(p).is_ok_and(|p| p == s.canonical_payload)),
+            _ => return Err(Reject::Version),
+        };
+        if !found {
+            return Err(Reject::Scope);
+        }
+    }
+    Ok(())
+}
+fn native_id(record: &SignedRecord) -> Vec<u8> {
+    let mut h = blake3::Hasher::new();
+    h.update(record.format.as_bytes());
+    h.update(&(record.canonical_record.len() as u64).to_le_bytes());
+    h.update(b"\0");
+    h.update(&record.canonical_record);
+    h.finalize().as_bytes().to_vec()
+}
+/// Prepare response is a coherent proposal, never authority. Caller must compare
+/// the IDs, predecessor and manifest before asking its device to sign renewal.
+pub fn validate_renewal_preparation(response: &PrepareImportJobResponse) -> Result<(), Reject> {
+    let state = response.renewal_state.as_ref().ok_or(Reject::Canonical)?;
+    let proposal = response.proposal.as_ref().ok_or(Reject::Canonical)?;
+    let previous = state.active_predecessor.as_ref().ok_or(Reject::Canonical)?;
+    let p = previous.body.as_ref().ok_or(Reject::Canonical)?;
+    let manifest = state.committed_manifest.as_ref().ok_or(Reject::Canonical)?;
+    validate_manifest(manifest)?;
+    if state.format_version != 1
+        || state.authority_epoch == 0
+        || state.logical_job_id != p.logical_job_id
+        || state.retry_lineage_id != p.retry_lineage_id
+        || proposal.logical_job_id != state.logical_job_id
+        || proposal.retry_lineage_id != state.retry_lineage_id
+        || manifest.logical_job_id != state.logical_job_id
+        || manifest.retry_lineage_id != state.retry_lineage_id
+        || proposal.predecessor_delegation_digest != signed_delegation_digest(previous)?
+    {
+        return Err(Reject::StaleContext);
     }
     Ok(())
 }

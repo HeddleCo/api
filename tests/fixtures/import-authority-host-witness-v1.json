@@ -5,6 +5,7 @@
     "heddle.api.common.HostedWitnessHistoryProofV1",
     "heddle.api.common.HostedWitnessSetV1",
     "heddle.api.common.HostedWitnessStatementV1",
+    "heddle.api.common.ProtocolCompatibility",
     "heddle.api.common.SignedHostedWitnessSetV1",
     "heddle.api.common.SignedHostedWitnessStatementV1",
     "heddle.api.v1alpha2.CancelImportJobRequest",
@@ -1436,8 +1437,180 @@
           "list": false
         }
       ]
+    },
+    {
+      "name": "heddle.api.common.ProtocolCompatibility",
+      "fields": [
+        {
+          "name": "protocol_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "mandatory_features",
+          "number": 2,
+          "type": "heddle.api.common.MandatoryProtocolFeature",
+          "list": true
+        }
+      ]
     }
   ],
+  "enums": [
+    {
+      "name": "heddle.api.common.HostedWitnessAdmissionBasis",
+      "values": [
+        {
+          "name": "HOSTED_WITNESS_ADMISSION_BASIS_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "HOSTED_WITNESS_ADMISSION_BASIS_ORIGINAL_AUTHORITY",
+          "number": 1
+        },
+        {
+          "name": "HOSTED_WITNESS_ADMISSION_BASIS_BOUNDARY_ACCEPTANCE",
+          "number": 2
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.HostedWitnessKeyRole",
+      "values": [
+        {
+          "name": "HOSTED_WITNESS_KEY_ROLE_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "HOSTED_WITNESS_KEY_ROLE_HOST_WITNESS",
+          "number": 1
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.HostedWitnessPurpose",
+      "values": [
+        {
+          "name": "HOSTED_WITNESS_PURPOSE_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "HOSTED_WITNESS_PURPOSE_GENESIS_FIRST_ADMISSION_V1",
+          "number": 1
+        },
+        {
+          "name": "HOSTED_WITNESS_PURPOSE_AUTHORITY_FIRST_ADMISSION_V1",
+          "number": 2
+        },
+        {
+          "name": "HOSTED_WITNESS_PURPOSE_IMPORT_COMMITTED_PUBLICATION_V1",
+          "number": 3
+        },
+        {
+          "name": "HOSTED_WITNESS_PURPOSE_HOSTED_LANDING_V1",
+          "number": 4
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.HostedWitnessState",
+      "values": [
+        {
+          "name": "HOSTED_WITNESS_STATE_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "HOSTED_WITNESS_STATE_CURRENT",
+          "number": 1
+        },
+        {
+          "name": "HOSTED_WITNESS_STATE_RETIRED",
+          "number": 2
+        },
+        {
+          "name": "HOSTED_WITNESS_STATE_REVOKED",
+          "number": 3
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportDelegationPurpose",
+      "values": [
+        {
+          "name": "IMPORT_DELEGATION_PURPOSE_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "IMPORT_DELEGATION_PURPOSE_IMPORT_CONVERSION_V1",
+          "number": 1
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportGitHashAlgorithm",
+      "values": [
+        {
+          "name": "IMPORT_GIT_HASH_ALGORITHM_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "IMPORT_GIT_HASH_ALGORITHM_SHA1",
+          "number": 1
+        },
+        {
+          "name": "IMPORT_GIT_HASH_ALGORITHM_SHA256",
+          "number": 2
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportRefMode",
+      "values": [
+        {
+          "name": "IMPORT_REF_MODE_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "IMPORT_REF_MODE_PINNED_COMMIT",
+          "number": 1
+        },
+        {
+          "name": "IMPORT_REF_MODE_OBSERVE_AT_EXECUTION",
+          "number": 2
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.MandatoryProtocolFeature",
+      "values": [
+        {
+          "name": "MANDATORY_PROTOCOL_FEATURE_UNSPECIFIED",
+          "number": 0
+        },
+        {
+          "name": "MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1",
+          "number": 1
+        }
+      ]
+    }
+  ],
+  "protocol": {
+    "version": 2,
+    "feature": 1,
+    "gated_methods": [
+      "/heddle.api.v1alpha2.IntegrationService/CancelImportJob",
+      "/heddle.api.v1alpha2.IntegrationService/CommitImportJob",
+      "/heddle.api.v1alpha2.IntegrationService/GetHostedWitnessHistoryProof",
+      "/heddle.api.v1alpha2.IntegrationService/ImportSource",
+      "/heddle.api.v1alpha2.IntegrationService/PrepareImportJob",
+      "/heddle.api.v1alpha2.IntegrationService/RenewImportJob",
+      "/heddle.api.v1alpha2.IntegrationService/RetryImportSource",
+      "/heddle.api.v1alpha2.IntegrationService/SynchronizeRemote",
+      "/heddle.api.v1alpha2.SyncService/Fetch",
+      "/heddle.api.v1alpha2.SyncService/PublishContent",
+      "/heddle.api.v1alpha2.SyncService/ReplicateThread"
+    ]
+  },
   "keys": {
     "owner": {
       "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",

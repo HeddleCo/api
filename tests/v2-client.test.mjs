@@ -4,6 +4,7 @@ import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { createServiceClient, describeTools, ContractClientError } from "../packages/typescript/dist/v1alpha2/client.js";
 import { ThreadService, SyncService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
 import { StartThreadRequestSchema, ThreadMutationResponseSchema, ThreadListEventSchema } from "../packages/typescript/dist/v1alpha2/thread_pb.js";
+import { ProtocolCompatibilitySchema } from "../packages/typescript/dist/common/contract_pb.js";
 import { ReplicateThreadResponseSchema } from "../packages/typescript/dist/v1alpha2/sync_pb.js";
 
 const startPath = "/heddle.api.v1alpha2.ThreadService/StartThread";
@@ -91,7 +92,7 @@ test("bidirectional transfer pulls client frames as the endpoint consumes them",
       }
     },
   };
-  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v1alpha2.SyncService/ReplicateThread"]));
+  const client = createServiceClient(SyncService, transport, new Set(["/heddle.api.v1alpha2.SyncService/ReplicateThread"]), create(ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1] }));
   for await (const _ of client.replicateThread(source())) break;
   assert.equal(produced, 1);
   assert.equal(sourceClosed, true);

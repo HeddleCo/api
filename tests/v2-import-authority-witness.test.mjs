@@ -39,6 +39,8 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
 });
 test('frozen descriptor fields and public proof-only lookup',()=>{
   for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length);for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
+  for(const descriptor of fixture.enums){const schema=(descriptor.name.includes(".common.")?common:api)[`${descriptor.name.split(".").at(-1)}Schema`];assert.deepEqual(schema.values.map(v=>({name:v.name,number:v.number})),descriptor.values);}
+  assert.equal(fixture.protocol.gated_methods.length,11);
   const rpc=api.IntegrationService.method.getHostedWitnessHistoryProof,contract=getOption(rpc,common.rpc_contract);
   assert.equal(contract.authorizationAccess,common.AuthorizationAccess.PUBLIC);assert.equal(contract.signingTier,common.SigningTier.NONE);assert.equal(contract.effect,common.RpcEffect.READ_ONLY);assert.deepEqual(contract.mandatoryFeatures,[1]);
   const response=vector('lookup_response');assert.equal(api.GetHostedWitnessHistoryProofResponseSchema.fields.length,1);assert.ok(response.proof);assert.ok(toBinary(api.GetHostedWitnessHistoryProofResponseSchema,response).length<=4096);witness.validateWitnessLookup(vector('lookup_request'));
@@ -101,5 +103,9 @@ test('mandatory protocol/version gate blocks incompatible client before transpor
   let calls=0;const transport={unary:async()=>{calls++;return new Uint8Array();}},path='/heddle.api.v1alpha2.IntegrationService/PrepareImportJob';
   const client=createServiceClient(api.IntegrationService,transport,new Set([path]));await assert.rejects(client.prepareImportJob({clientOperationId:'test'}),expected('Protocol'));assert.equal(calls,0);
   for(const value of [undefined,create(common.ProtocolCompatibilitySchema,{protocolVersion:1,mandatoryFeatures:[1]}),create(common.ProtocolCompatibilitySchema,{protocolVersion:2}),create(common.ProtocolCompatibilitySchema,{protocolVersion:2,mandatoryFeatures:[1,2]})])assert.throws(()=>authority.requireHybridPeer(value),expected('Protocol'));
+  const sync=createServiceClient(api.SyncService,{open:async function*(){calls++;}},new Set(['/heddle.api.v1alpha2.SyncService/ReplicateThread']));
+  await assert.rejects(async()=>{for await(const frame of sync.replicateThread((async function*(){yield {body:{case:'open',value:{}}};})())){}},expected('Protocol'));assert.equal(calls,0);
   authority.requireHybridPeer(create(common.ProtocolCompatibilitySchema,{protocolVersion:2,mandatoryFeatures:[1]}));
 });
+
+test('verification snapshots exclude asynchronous DTO and pin mutation',async()=>{const set=vector('current_set'),e=setContext(),pending=witness.verifyWitnessSet(set,e);set.body.generation=999n;e.rootEpoch=2n;const checked=await pending;assert.equal(checked.body.generation,10n);assert.equal(checked.rootEpoch,1n);const copy=checked.body;copy.generation=999n;assert.equal(checked.body.generation,10n);const member=vector('permission'),d=vector('delegation'),promise=authority.verifyImportDelegation(d,member,ownerContext());member.body.scope.maxOperations=256;d.body.scope.sourceUrl='https://other.example.test/repo.git';const verified=await promise;assert.equal(verified.body.scope.sourceUrl,'https://github.com/heddleco/example.git');});

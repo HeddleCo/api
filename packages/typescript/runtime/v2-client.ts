@@ -73,6 +73,7 @@ export function createServiceClient<S extends DescService>(
       options?: CallOptions,
     ) {
       if (!implemented.has(path)) throw new ContractClientError("not_implemented", path);
+      if (contract.mandatoryFeatures.length) requireHybridPeer(negotiatedProtocol);
       const requests = async function* () {
         if (method.methodKind === "server_streaming") {
           yield encode(input as MessageInitShape<typeof method.input>, true);

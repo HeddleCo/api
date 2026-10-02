@@ -15,6 +15,64 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
         let name = name.as_str().expect("message name");
         assert!(pool.get_message_by_name(name).is_some(), "missing {name}");
     }
+    for descriptor in fixture["descriptors"]
+        .as_array()
+        .expect("frozen descriptors")
+    {
+        let message = pool
+            .get_message_by_name(descriptor["name"].as_str().expect("name"))
+            .expect("message");
+        assert_eq!(
+            message.fields().count(),
+            descriptor["fields"].as_array().expect("fields").len()
+        );
+        for expected in descriptor["fields"].as_array().expect("fields") {
+            let field = message
+                .get_field(expected["number"].as_u64().expect("tag") as u32)
+                .expect("frozen tag");
+            assert_eq!(field.name(), expected["name"].as_str().expect("field name"));
+            assert_eq!(
+                field.is_list(),
+                expected["list"].as_bool().expect("cardinality")
+            );
+        }
+    }
+    for descriptor in fixture["enums"].as_array().expect("frozen enums") {
+        let enumeration = pool
+            .get_enum_by_name(descriptor["name"].as_str().expect("enum name"))
+            .expect("enum");
+        assert_eq!(
+            enumeration.values().count(),
+            descriptor["values"].as_array().expect("values").len()
+        );
+        for expected in descriptor["values"].as_array().expect("values") {
+            let value = enumeration
+                .get_value(expected["number"].as_i64().expect("number") as i32)
+                .expect("enum value");
+            assert_eq!(value.name(), expected["name"].as_str().expect("value name"));
+        }
+    }
+    for path in fixture["protocol"]["gated_methods"]
+        .as_array()
+        .expect("gated methods")
+    {
+        let method = heddle_api::v2::method_descriptor(path.as_str().expect("path"))
+            .expect("generated method");
+        assert_eq!(method.mandatory_features,[heddle_api::heddle::api::common::MandatoryProtocolFeature::ImportAuthorityHostWitnessV1]);
+        assert_eq!(
+            method.verify_protocol(&Default::default()),
+            Err(heddle_api::hybrid_codec::Reject::Protocol)
+        );
+        method
+            .verify_protocol(&heddle_api::heddle::api::common::CallContext {
+                protocol: Some(heddle_api::heddle::api::common::ProtocolCompatibility {
+                    protocol_version: 2,
+                    mandatory_features: vec![1],
+                }),
+                ..Default::default()
+            })
+            .expect("explicit compatible protocol");
+    }
     let service = pool
         .get_service_by_name("heddle.api.v1alpha2.IntegrationService")
         .expect("integration service");

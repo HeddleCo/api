@@ -182,8 +182,9 @@ message ImportSourceRequest {
   // source closures use SyncService publication instead. Each creator signature
   // binds this base.
   bytes initial_base_state = 7;
-  // Import never fabricates a creator signature. The hosted executor signs its
-  // later import receipt and preserves Git attribution in the Capture.
+  // Import preserves creator signatures. A scoped job key signs converted
+  // content; a separate host witness signs admission/publication receipts.
+  // Git attribution remains in the Capture.
   repeated ImportBranchGenesis branches = 8;
   ImportPublicProofBundleV1 import_authority = 9;
 }

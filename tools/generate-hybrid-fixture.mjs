@@ -2,10 +2,12 @@
 // regenerate expected bytes/signatures. Review every fixture change as contract.
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
-import { create, clone, toBinary } from '@bufbuild/protobuf';
+import { create, clone, toBinary, getOption } from '@bufbuild/protobuf';
 import * as api from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
 import * as common from '../packages/typescript/dist/common/hosted_witness_pb.js';
 import { canonicalThreadGenesis, threadGenesisId } from '../packages/typescript/dist/v1alpha2/thread-genesis.js';
+import { IntegrationService, SyncService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
+import { ProtocolCompatibilitySchema, MandatoryProtocolFeatureSchema, rpc_contract } from '../packages/typescript/dist/common/contract_pb.js';
 import * as owner from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
 import { canonicalHybridV1, signingDigest, signedPermissionDigest, signedGenesisDigest, signedDelegationDigest, signedOperationDigest, manifestDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import { setSigningBytes, witnessId, statementSigningDigest, leafDigest, merkleRoot, purposeDomain } from '../packages/typescript/dist/v1alpha2/witness-trust.js';
@@ -14,8 +16,9 @@ const hex=v=>Buffer.from(v).toString('hex'),raw=(n,s=32)=>new Uint8Array(s).fill
 const keys=Object.fromEntries(['owner','device','job','renew_job','witness','next_witness','root','wrong_root','guardian_a','guardian_b','direct_job','competing_job'].map((name,i)=>{const seed=raw(i+1),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'}),publicKey=new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32));return [name,{seed,privateKey,publicKey}];}));
 const sig=(name,input)=>new Uint8Array(sign(null,input,keys[name].privateKey));
 const auth=(name,input)=>({signerKeyId:keyId(keys[name].publicKey),signature:sig(name,input)});
-const artifact={format_version:1,messages:[...Object.values(common),...Object.values(api)].filter(v=>v?.kind==='message').map(v=>v.typeName).sort(),descriptors:[],keys:Object.fromEntries(Object.entries(keys).map(([n,k])=>[n,{seed_hex:hex(k.seed),public_key_hex:hex(k.publicKey)}])),signed_vectors:{},wire_vectors:{},negative_vectors:[],trees:[],retry_scenarios:[]};
-for(const schema of [...Object.values(common),...Object.values(api)].filter(v=>v?.kind==='message'))artifact.descriptors.push({name:schema.typeName,fields:schema.fields.map(f=>({name:f.name,number:f.number,type:f.message?.typeName??f.enum?.typeName??String(f.scalar),list:f.fieldKind==='list'}))});
+const artifact={format_version:1,messages:[...Object.values(common),...Object.values(api),ProtocolCompatibilitySchema].filter(v=>v?.kind==='message').map(v=>v.typeName).sort(),descriptors:[],enums:[],protocol:{version:2,feature:1,gated_methods:[...IntegrationService.methods,...SyncService.methods].filter(m=>getOption(m,rpc_contract).mandatoryFeatures.includes(1)).map(m=>`/${m.parent.typeName}/${m.name}`).sort()},keys:Object.fromEntries(Object.entries(keys).map(([n,k])=>[n,{seed_hex:hex(k.seed),public_key_hex:hex(k.publicKey)}])),signed_vectors:{},wire_vectors:{},negative_vectors:[],trees:[],retry_scenarios:[]};
+for(const schema of [...Object.values(common),...Object.values(api),ProtocolCompatibilitySchema].filter(v=>v?.kind==='message'))artifact.descriptors.push({name:schema.typeName,fields:schema.fields.map(f=>({name:f.name,number:f.number,type:f.message?.typeName??f.enum?.typeName??String(f.scalar),list:f.fieldKind==='list'}))});
+for(const schema of [...Object.values(common),...Object.values(api),MandatoryProtocolFeatureSchema].filter(v=>v?.kind==='enum'))artifact.enums.push({name:schema.typeName,values:schema.values.map(v=>({name:v.name,number:v.number}))});
 function wire(name,schema,value){artifact.wire_vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,value))};return value;}
 function signed(name,bodySchema,body,signedSchema,signatureField,key,domain){const input=signingDigest(domain,bodySchema,body),signature=auth(key,input),value=create(signedSchema,{body,[signatureField]:signature});artifact.signed_vectors[name]={schema:signedSchema.typeName,body_schema:bodySchema.typeName,wire_hex:hex(toBinary(signedSchema,value)),canonical_hex:hex(canonicalHybridV1(bodySchema,body)),signing_input_hex:hex(input),domain,public_key_hex:hex(keys[key].publicKey),signature_hex:hex(signature.signature)};return value;}
 // Portable existing owner records, using their unchanged canonical contract.

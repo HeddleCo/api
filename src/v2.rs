@@ -44,6 +44,22 @@ impl<'a> RoutedCall<'a> {
 }
 
 impl MethodDescriptor {
+    /// Mandatory semantic gate before decoding/staging an authenticated route.
+    pub fn verify_protocol(
+        &self,
+        context: &CallContext,
+    ) -> Result<(), crate::hybrid_codec::Reject> {
+        if self.mandatory_features.is_empty() {
+            return Ok(());
+        }
+        if self.mandatory_features
+            != [crate::heddle::api::common::MandatoryProtocolFeature::ImportAuthorityHostWitnessV1]
+        {
+            return Err(crate::hybrid_codec::Reject::Protocol);
+        }
+        crate::import_authority::require_hybrid_peer(context.protocol.as_ref())
+    }
+
     /// Only safe reads can be sent on replayable 0-RTT connections.
     pub const fn allows_zero_rtt(&self) -> bool {
         matches!(self.effect, RpcEffect::ReadOnly)

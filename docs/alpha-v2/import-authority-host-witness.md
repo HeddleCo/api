@@ -15,6 +15,19 @@ and TypeScript read its original bytes, digests and signatures, including the
 negative records; they never generate expected signatures during a test. The
 maintenance generator requires built bindings and explicit fixture review.
 
+## Message inventory
+
+| Accepted design section | Additive messages |
+| --- | --- |
+| Owner-authorized genesis and delegation | `ImportIdentityV1`, `ImportOwnerChainV1`, `ImportBranchLimitV1`, `ImportPermissionScopeV1`, `ImportMemberPermissionV1`, `SignedImportMemberPermissionV1`, `ImportGenesisAuthorityV1`, `SignedImportGenesisAuthorityV1`, `ImportBranchManifestV1`, `ImportJobDelegationV1`, `SignedImportJobDelegationV1` |
+| Job preparation, encrypted custody, expiry, and retries | `ImportCommittedSlotV1`, `ImportResultManifestV1`, `ImportJobRenewalV1`, `SignedImportJobRenewalV1`, `PrepareImportJobRequest`, `PrepareImportJobResponse`, `CommitImportJobRequest`, `RenewImportJobRequest`, `CancelImportJobRequest` |
+| Owner-authorized genesis and delegation: converted content | `DelegatedImportOperationV1`, `SignedDelegatedImportOperationV1` |
+| What the host witness attests | `ImportPublicationWitnessV1`, `HostedWitnessStatementV1`, `SignedHostedWitnessStatementV1` |
+| Complete authenticated witness set and exact retirement archive | `HostedWitnessEntryV1`, `HostedWitnessSetV1`, `SignedHostedWitnessSetV1`, `HostedWitnessHistoryProofV1` |
+| Proof lookup after loss of Thread access | `GetHostedWitnessHistoryProofRequest`, `GetHostedWitnessHistoryProofResponse` |
+| Verification at the mutation boundary / cross-repo proof transport | `ImportPublicProofBundleV1` |
+| Planned cascade: incompatible-peer rejection | `ProtocolCompatibility` |
+
 ## Canonical framing and domains
 
 Reuse [owner_records.proto](../../proto/heddle/api/v1alpha2/owner_records.proto#L22):
@@ -375,9 +388,12 @@ sorted unique mandatory feature list containing exactly
 **IMPORT_AUTHORITY_HOST_WITNESS_V1 (1)** for these v1 semantics. Missing/unknown
 version/features reject with FAILED_PRECONDITION / incompatible peer BEFORE
 staging or mutation, not merely after ignored additive proof fields. New import
-RPCs and existing ImportSource/RetryImportSource/SynchronizeRemote declare that
+RPCs and existing ImportSource/RetryImportSource/SynchronizeRemote plus
+SyncService Fetch/PublishContent/ReplicateThread declare that
 feature in `RpcContract`. `createServiceClient` checks the negotiated feature
-before transport. Servers enforce CallContext/opening protocol gates; clients
+before transport. Rust generated MethodDescriptor retains the same mandatory
+features and exposes `verify_protocol` for server dispatch before body parsing.
+Servers enforce CallContext/opening protocol gates; clients
 check authenticated ready/stream responses. HTTPS equivalents advertise/require
 `Heddle-Protocol-Version: 2` and
 `Heddle-Mandatory-Features: import-authority-host-witness-v1` on HYBRID routes.

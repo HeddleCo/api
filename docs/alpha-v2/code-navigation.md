@@ -255,6 +255,9 @@ nodes, bytes or depth with typed `RESOURCE_EXHAUSTED/QUOTA_EXCEEDED`, identifyin
 the offending request field without exposing unrelated objects. Absent limits
 means this profile is unsupported: reject a nonempty manifest with
 `UNIMPLEMENTED`, never ignore it and return a source-only successful receipt.
+Clients must also check Ready before uploading or sending Finish: absent limits
+require aborting an index publication. This prevents an older server that ignores
+unknown opening fields from being mistaken for a successful index installation.
 
 Finish validates current authority, policy and all closures before one atomic
 storage/projection publication. Install attachment and closure durably with a

@@ -1,9 +1,10 @@
+use contract::{heddle::api::v1alpha2 as api, v2::custodial_recovery as custody};
 use ed25519_dalek::{Signer, SigningKey};
-use heddle_api::{heddle::api::v1alpha2 as api, v2::custodial_recovery as custody};
 use heddleco_capability_verifier::{
     Error, VerificationLimits, VerifiedOwnerState, apply_transition,
     apply_transition_with_timelock, verify_owner_root,
 };
+use native_api::heddle::api::v1alpha2 as native;
 use prost::Message;
 use serde_json::Value;
 
@@ -17,17 +18,23 @@ fn decode<M: Message + Default>(f: &Value, field: &str) -> M {
     let bytes = hex::decode(f[field].as_str().expect("hex field")).expect("hex");
     M::decode(bytes.as_slice()).expect("wire")
 }
+// The published verifier is compiled against the published `native_api` types
+// and this branch's contract types are a different crate version, so the two
+// are crossed only through protobuf bytes (the same boundary as hybrid-native).
+fn to_native<M: Message, N: Message + Default>(message: &M) -> N {
+    N::decode(message.encode_to_vec().as_slice()).expect("contract bytes decode as published type")
+}
 fn state(f: &Value) -> VerifiedOwnerState {
     let p: api::CustodialRecoverProposal = decode(f, "proposal_wire_hex");
-    verify_owner_root(
+    let root: native::SignedOwnerRoot = to_native(
         p.ownership
             .as_ref()
             .expect("history")
             .root
             .as_ref()
             .expect("root"),
-    )
-    .expect("admitted original root")
+    );
+    verify_owner_root(&root).expect("admitted original root")
 }
 fn limits() -> VerificationLimits {
     VerificationLimits::new(2592000).expect("30-day capability ceiling")
@@ -49,7 +56,7 @@ fn error(f: &Value) -> Error {
 fn published_verifier_admits_only_the_completed_fresh_policy() {
     let f = fixture();
     let state = state(&f);
-    let completed: api::SignedOwnerKeyTransition = decode(&f, "completed_recover_wire_hex");
+    let completed: native::SignedOwnerKeyTransition = decode(&f, "completed_recover_wire_hex");
     let next = apply_transition_with_timelock(&state, &completed, NOW, START, limits())
         .expect("published admission");
     assert_eq!(next.sequence(), 1);
@@ -79,7 +86,7 @@ fn focused_portable_negative_matrix_checks_specific_published_errors() {
     let f = fixture();
     let state = state(&f);
     for vector in f["verifier_negatives"].as_array().expect("matrix") {
-        let signed: api::SignedOwnerKeyTransition = decode(vector, "recover_wire_hex");
+        let signed: native::SignedOwnerKeyTransition = decode(vector, "recover_wire_hex");
         let now = vector["now"]
             .as_str()
             .map(|v| v.parse().expect("seconds"))
@@ -113,7 +120,7 @@ fn retained_w0_reaches_the_published_retained_policy_error() {
         .iter()
         .find(|v| v["name"] == "retained_old_guardian")
         .expect("retained W0");
-    let signed: api::SignedOwnerKeyTransition = decode(vector, "recover_wire_hex");
+    let signed: native::SignedOwnerKeyTransition = decode(vector, "recover_wire_hex");
     assert_eq!(
         apply_transition_with_timelock(&state(&f), &signed, NOW, START, limits()).err(),
         Some(Error::Invalid(
@@ -162,7 +169,8 @@ fn prepare_then_winning_veto_cannot_assemble_portable_recover() {
             );
         }
         if outcome["private_signing"] == true || outcome["committed"] == true {
-            let private: api::SignedOwnerKeyTransition = decode(&f, "completed_recover_wire_hex");
+            let private: native::SignedOwnerKeyTransition =
+                decode(&f, "completed_recover_wire_hex");
             apply_transition(&state, &private, NOW, limits()).expect("private W0 signature exists");
             if outcome["committed"] == true {
                 // Submit won: the completed result is portable; a subsequent veto
@@ -172,7 +180,13 @@ fn prepare_then_winning_veto_cannot_assemble_portable_recover() {
             }
         }
         assert_eq!(
-            apply_transition(&state, &client, now, limits()).err(),
+            apply_transition(
+                &state,
+                &to_native::<_, native::SignedOwnerKeyTransition>(&client),
+                now,
+                limits()
+            )
+            .err(),
             Some(Error::RecoveryThreshold {
                 required: 1,
                 actual: 0

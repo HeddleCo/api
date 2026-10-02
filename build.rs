@@ -49,6 +49,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "OwnershipEvent.payload",
         "ReplicateThreadRequest.body",
         "FetchClientFrame.body",
+        "StreamFrame.body",
+        "PublishContentClientFrame.body",
         "FetchServerFrame.body",
         "PublishContentServerFrame.body",
         "CreateSpoolRequest.ownership",

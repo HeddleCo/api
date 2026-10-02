@@ -1,0 +1,257 @@
+syntax = "proto3";
+package heddle.api.v1alpha2;
+
+import "heddle/api/common/hosted_witness.proto";
+import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/owner_records.proto";
+
+// Fixed field order, counted bytes, BE integers and domain-separated digests
+// follow owner_records.proto, not protobuf serialization. See the normative
+// contract and the ONE fixed Rust/TS fixture in tests/fixtures/.
+enum ImportDelegationPurpose {
+  IMPORT_DELEGATION_PURPOSE_UNSPECIFIED = 0;
+  IMPORT_DELEGATION_PURPOSE_IMPORT_CONVERSION_V1 = 1;
+}
+enum ImportRefMode {
+  IMPORT_REF_MODE_UNSPECIFIED = 0;
+  IMPORT_REF_MODE_PINNED_COMMIT = 1;
+  IMPORT_REF_MODE_OBSERVE_AT_EXECUTION = 2; // Explicitly disclosed weaker promise.
+}
+enum ImportGitHashAlgorithm {
+  IMPORT_GIT_HASH_ALGORITHM_UNSPECIFIED = 0;
+  IMPORT_GIT_HASH_ALGORITHM_SHA1 = 1;
+  IMPORT_GIT_HASH_ALGORITHM_SHA256 = 2;
+}
+message ImportIdentityV1 {
+  bytes spool_uuid = 1; // 16 bytes.
+  bytes spool_genesis_digest = 2;
+  bytes owner_id = 3;
+  bytes owner_account_uuid = 4; // 16 bytes; importing member is NOT this owner.
+  bytes owner_state_hash = 5;
+  uint64 ownership_transfer_sequence = 6;
+}
+// Recomputed from independently verified owner histories and handoff audits,
+// not an incoming digest. State hashes are sorted unique, transfer hashes are
+// in accepted sequence order. The histories retain every original signature.
+message ImportOwnerChainV1 {
+  bytes spool_genesis_digest = 1;
+  repeated bytes owner_state_hashes = 2;
+  repeated bytes transfer_audit_hashes = 3;
+}
+// One authorized result slot. First release permits one result per branch;
+// slot_id is stable across physical retries, certificates and signing keys.
+message ImportBranchLimitV1 {
+  string ref_name = 1; // Full refs/heads/...; sorted unique UTF-8 bytes.
+  ImportGitHashAlgorithm hash_algorithm = 2;
+  ImportRefMode ref_mode = 3;
+  bytes pinned_commit_oid = 4; // Raw 20/32 bytes; empty only for OBSERVE.
+  bytes genesis_digest = 5;
+  bytes target_thread_id = 6;
+  bytes expected_frontier_digest = 7;
+  uint64 slot_id = 8;
+  uint64 max_result_bytes = 9;
+}
+message ImportPermissionScopeV1 {
+  string provider = 1; // Canonical lowercase provider ID.
+  string source_url = 2; // Credential-free canonical HTTPS URL.
+  repeated ImportBranchLimitV1 branches = 3;
+  bytes destination_version = 4;
+  bytes options_digest = 5;
+  string converter_version = 6;
+  uint32 max_operations = 7; // Logical-job total; never reset by renewal/retry.
+  uint64 max_result_bytes = 8; // Logical-job total.
+}
+// P2 #1: NEW direct owner -> device permission, unrelated to PURGE, timeline,
+// self-PoP or online Developer/Admin grants. Exactly one logical job/lineage;
+// grants genesis binding and bounded IMPORT_CONVERSION delegation, no device
+// subdelegation. Durable accounting is (permission digest, logical job) and
+// (logical job, branch, slot), never certificate/key/retry-row counters.
+message ImportMemberPermissionV1 {
+  uint32 format_version = 1;
+  ImportIdentityV1 identity = 2;
+  bytes logical_job_id = 3; // 16 bytes.
+  bytes retry_lineage_id = 4; // 16 bytes, original operation UUID.
+  bytes subject_public_key = 5;
+  ImportDelegationPurpose purpose = 6;
+  ImportPermissionScopeV1 scope = 7;
+  int64 not_before_unix_seconds = 8;
+  int64 expires_at_unix_seconds = 9;
+  bytes cancellation_id = 10; // 32 random bytes; namespace heddle-import-cancel-v1.
+  bytes owner_chain_digest = 11; // Exact independently verified public chain digest.
+  bytes nonce = 12;
+}
+message SignedImportMemberPermissionV1 {
+  ImportMemberPermissionV1 body = 1;
+  AuthorizationSignature owner_signature = 2;
+}
+message ImportGenesisAuthorityV1 {
+  uint32 format_version = 1;
+  ImportIdentityV1 identity = 2;
+  bytes genesis_digest = 3;
+  bytes original_creator_signature = 4; // 64 bytes, preserved unchanged.
+  bytes creator_public_key = 5;
+  bytes creator_authority_envelope_digest = 6;
+  bytes parent_permission_digest = 7; // Zero32 only for direct active owner authority.
+  bytes owner_chain_digest = 8;
+}
+message SignedImportGenesisAuthorityV1 {
+  ImportGenesisAuthorityV1 body = 1;
+  AuthorizationSignature creator_signature = 2;
+}
+message ImportBranchManifestV1 {
+  ImportBranchLimitV1 limit = 1;
+  bytes genesis_authority_digest = 2; // Exact signed genesis-binding digest.
+}
+message ImportJobDelegationV1 {
+  uint32 format_version = 1;
+  ImportIdentityV1 identity = 2;
+  bytes delegation_id = 3; // Unique random 16 bytes, renewed certificates get new IDs.
+  bytes logical_job_id = 4;
+  bytes retry_lineage_id = 5;
+  bytes job_public_key = 6;
+  bytes job_key_id = 7; // heddle-key-v1(ED25519 u32be, raw key).
+  bytes delegating_public_key = 8;
+  bytes parent_permission_digest = 9;
+  bytes owner_chain_digest = 10;
+  ImportDelegationPurpose purpose = 11;
+  ImportPermissionScopeV1 scope = 12;
+  repeated ImportBranchManifestV1 branch_manifest = 13;
+  int64 not_before_unix_seconds = 14;
+  int64 expires_at_unix_seconds = 15;
+  bytes cancellation_id = 16;
+  bytes predecessor_delegation_digest = 17; // Zero32 initially.
+}
+message SignedImportJobDelegationV1 {
+  ImportJobDelegationV1 body = 1;
+  AuthorizationSignature delegating_signature = 2;
+}
+message ImportCommittedSlotV1 {
+  string ref_name = 1;
+  uint64 slot_id = 2;
+  bytes signed_operation_digest = 3;
+  bytes resulting_frontier_digest = 4;
+  uint64 result_bytes = 5;
+}
+message ImportResultManifestV1 {
+  uint32 format_version = 1;
+  bytes logical_job_id = 2;
+  bytes retry_lineage_id = 3;
+  repeated ImportCommittedSlotV1 slots = 4; // Sorted by ref UTF-8, slot; unique.
+}
+// P2 #2: replacement includes only uncommitted slots, preserves original
+// geneses/envelopes/first receipts and uses a fresh key. expected_authority_epoch
+// and committed_manifest_digest CAS serialize two renewals with publication.
+message ImportJobRenewalV1 {
+  uint32 format_version = 1;
+  bytes predecessor_delegation_digest = 2;
+  uint64 expected_authority_epoch = 3;
+  bytes committed_manifest_digest = 4;
+  SignedImportJobDelegationV1 replacement = 5;
+}
+message SignedImportJobRenewalV1 {
+  ImportJobRenewalV1 body = 1;
+  AuthorizationSignature delegating_signature = 2;
+}
+message DelegatedImportOperationV1 {
+  uint32 format_version = 1;
+  bytes spool_uuid = 2;
+  bytes spool_genesis_digest = 3;
+  bytes logical_job_id = 4;
+  bytes retry_lineage_id = 5;
+  bytes physical_operation_id = 6; // NEW retry row ID, never logical identity.
+  bytes delegation_digest = 7;
+  string ref_name = 8;
+  uint64 slot_id = 9;
+  ImportGitHashAlgorithm hash_algorithm = 10;
+  bytes observed_commit_oid = 11;
+  bytes genesis_digest = 12;
+  bytes target_thread_id = 13;
+  bytes expected_frontier_digest = 14;
+  bytes resulting_frontier_digest = 15;
+  bytes resulting_content_digest = 16;
+  uint64 result_bytes = 17;
+  bytes options_digest = 18;
+  string converter_version = 19;
+}
+message SignedDelegatedImportOperationV1 {
+  DelegatedImportOperationV1 body = 1;
+  AuthorizationSignature job_signature = 2;
+}
+message ImportPublicationWitnessV1 {
+  uint32 format_version = 1;
+  bytes signed_operation_digest = 2;
+  bytes delegation_digest = 3;
+  bytes logical_job_id = 4;
+  bytes retry_lineage_id = 5;
+  bytes physical_operation_id = 6;
+  string ref_name = 7;
+  uint64 slot_id = 8;
+  ImportGitHashAlgorithm hash_algorithm = 9;
+  bytes observed_commit_oid = 10;
+  bytes expected_frontier_digest = 11;
+  bytes resulting_frontier_digest = 12;
+  bytes terminal_manifest_digest = 13;
+}
+// Owner verification belongs to heddle capability-verifier: independently
+// select the immutable lineage, verify owner histories/handoffs and current or
+// witnessed historical authority. This public carrier cannot enroll its owner.
+message ImportPublicProofBundleV1 {
+  uint32 format_version = 1;
+  SignedSpoolOwnerGenesis owner_genesis = 2;
+  repeated OwnerHistory owner_histories = 3;
+  repeated ResourceTransferAuditRecord ownership_transfers = 4;
+  SignedImportMemberPermissionV1 member_permission = 5; // Absent for direct owner.
+  repeated SignedImportGenesisAuthorityV1 genesis_authorities = 6;
+  repeated SignedImportJobDelegationV1 delegations = 7; // Initial plus accepted renewals.
+  repeated SignedImportJobRenewalV1 renewals = 8;
+  repeated SignedDelegatedImportOperationV1 operations = 9;
+  ImportResultManifestV1 terminal_manifest = 10;
+  heddle.api.common.SignedHostedWitnessSetV1 witness_set = 11;
+  repeated heddle.api.common.SignedHostedWitnessStatementV1 statements = 12;
+  repeated heddle.api.common.HostedWitnessHistoryProofV1 history_proofs = 13;
+  repeated SignedSpoolPolicyRecord policies = 14;
+  repeated SignedRecord original_geneses = 15;
+  repeated bytes creator_authority_envelopes = 16;
+  ImportOwnerChainV1 owner_chain = 17;
+}
+message PrepareImportJobRequest {
+  string client_operation_id = 1;
+  SpoolRef destination = 2;
+  ImportIdentityV1 identity = 3;
+  ImportPermissionScopeV1 proposed_scope = 4;
+  bytes retry_lineage_id = 5;
+  bytes renew_logical_job_id = 6; // Empty initially; no execution authority.
+}
+message PrepareImportJobResponse {
+  ImportJobDelegationV1 proposal = 1;
+  int64 reservation_expires_at_unix_seconds = 2; // Prepare time + 3600, exclusive.
+}
+message CommitImportJobRequest {
+  string client_operation_id = 1;
+  SpoolRef destination = 2;
+  ImportPublicProofBundleV1 proof = 3;
+}
+message RenewImportJobRequest {
+  string client_operation_id = 1;
+  SpoolRef destination = 2;
+  SignedImportJobRenewalV1 renewal = 3;
+  ImportPublicProofBundleV1 proof = 4;
+}
+message CancelImportJobRequest {
+  string client_operation_id = 1;
+  SpoolRef destination = 2;
+  bytes logical_job_id = 3;
+  bytes cancellation_id = 4;
+  uint64 expected_authority_epoch = 5;
+}
+// Public digest-holder policy, survives deletion and lost read grant. No batch,
+// listing, prefix or pagination. Validate exactly 64 bytes before archive I/O.
+message GetHostedWitnessHistoryProofRequest {
+  bytes executor_id = 1;
+  bytes statement_leaf_digest = 2;
+}
+// Proof ONLY. Uniform NOT_FOUND for unknown ID, leaf or unsealed archive.
+// At most 64 siblings and 4096 encoded bytes, no original/resource identifiers.
+message GetHostedWitnessHistoryProofResponse {
+  heddle.api.common.HostedWitnessHistoryProofV1 proof = 1;
+}

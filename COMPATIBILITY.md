@@ -86,3 +86,15 @@ wider origin. Older messages decode as empty (server default), and older
 consumers may ignore the field. No breaking override or legacy
 migration-manifest change is required. Package versions remain unchanged; the
 next release is cut separately.
+
+HYBRID import authority and host witness (api#296, weft#2469) add new messages,
+RPCs and proof fields without changing existing tags or capability signature
+formats. Protocol version 2 with mandatory semantic feature
+`IMPORT_AUTHORITY_HOST_WITNESS_V1` is required before HYBRID execution, Fetch,
+publication or relay; missing support fails closed before staging/mutation. An
+old peer may decode protobuf but must never ignore the new authority requirements.
+See the [wire/verification contract](docs/alpha-v2/import-authority-host-witness.md).
+The release/cutover cascade is api → heddle → weft → tapestry, coordinated with
+new-format import and native reinitialization; no legacy proof conversion or
+immutable receipt re-signing is permitted. This additive schema PR bumps no
+package version and creates no tag. The eventual release is a separate step.

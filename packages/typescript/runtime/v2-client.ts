@@ -2,6 +2,8 @@ import {
   create, fromBinary, getOption, toBinary,
   type DescMethod, type DescService, type MessageInitShape, type MessageShape,
 } from "@bufbuild/protobuf";
+import { requireHybridPeer } from "./import-authority.js";
+import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { rpc_contract } from "../common/contract_pb.js";
 
 export interface CallOptions {
@@ -43,7 +45,7 @@ export function methodPath(method: DescMethod): string {
  * result, never from service maturity or the compiled method list.
  */
 export function createServiceClient<S extends DescService>(
-  service: S, transport: RpcTransport, implemented: ReadonlySet<string>,
+  service: S, transport: RpcTransport, implemented: ReadonlySet<string>, negotiatedProtocol?: ProtocolCompatibility,
 ): ServiceClient<S> {
   const methods: Record<string, unknown> = {};
   for (const method of service.methods) {
@@ -51,6 +53,7 @@ export function createServiceClient<S extends DescService>(
     const contract = getOption(method, rpc_contract);
     function encode(input: MessageInitShape<typeof method.input>, first: boolean): Uint8Array {
       if (!implemented.has(path)) throw new ContractClientError("not_implemented", path);
+      if (contract.mandatoryFeatures.length) requireHybridPeer(negotiatedProtocol);
       const message = create(method.input, input);
       if (first && contract.clientOperationIdRequired) {
         const id = Reflect.get(message, "clientOperationId");

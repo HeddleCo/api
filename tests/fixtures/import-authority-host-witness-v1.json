@@ -1,20 +1,2212 @@
 {
+  "format_version": 1,
   "messages": [
-    "heddle.api.common.HostedWitnessSetV1",
     "heddle.api.common.HostedWitnessEntryV1",
-    "heddle.api.common.SignedHostedWitnessSetV1",
     "heddle.api.common.HostedWitnessHistoryProofV1",
+    "heddle.api.common.HostedWitnessSetV1",
     "heddle.api.common.HostedWitnessStatementV1",
+    "heddle.api.common.SignedHostedWitnessSetV1",
     "heddle.api.common.SignedHostedWitnessStatementV1",
-    "heddle.api.v1alpha2.ImportMemberPermissionV1",
-    "heddle.api.v1alpha2.SignedImportMemberPermissionV1",
-    "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
-    "heddle.api.v1alpha2.ImportJobDelegationV1",
-    "heddle.api.v1alpha2.SignedImportJobDelegationV1",
-    "heddle.api.v1alpha2.ImportJobRenewalV1",
-    "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+    "heddle.api.v1alpha2.CancelImportJobRequest",
+    "heddle.api.v1alpha2.CommitImportJobRequest",
     "heddle.api.v1alpha2.DelegatedImportOperationV1",
+    "heddle.api.v1alpha2.GetHostedWitnessHistoryProofRequest",
+    "heddle.api.v1alpha2.GetHostedWitnessHistoryProofResponse",
+    "heddle.api.v1alpha2.ImportBranchLimitV1",
+    "heddle.api.v1alpha2.ImportBranchManifestV1",
+    "heddle.api.v1alpha2.ImportCommittedSlotV1",
+    "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+    "heddle.api.v1alpha2.ImportIdentityV1",
+    "heddle.api.v1alpha2.ImportJobDelegationV1",
+    "heddle.api.v1alpha2.ImportJobRenewalV1",
+    "heddle.api.v1alpha2.ImportMemberPermissionV1",
+    "heddle.api.v1alpha2.ImportOwnerChainV1",
+    "heddle.api.v1alpha2.ImportPermissionScopeV1",
+    "heddle.api.v1alpha2.ImportPublicProofBundleV1",
     "heddle.api.v1alpha2.ImportPublicationWitnessV1",
-    "heddle.api.v1alpha2.ImportPublicProofBundleV1"
+    "heddle.api.v1alpha2.ImportResultManifestV1",
+    "heddle.api.v1alpha2.PrepareImportJobRequest",
+    "heddle.api.v1alpha2.PrepareImportJobResponse",
+    "heddle.api.v1alpha2.RenewImportJobRequest",
+    "heddle.api.v1alpha2.SignedDelegatedImportOperationV1",
+    "heddle.api.v1alpha2.SignedImportGenesisAuthorityV1",
+    "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+    "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+    "heddle.api.v1alpha2.SignedImportMemberPermissionV1"
+  ],
+  "descriptors": [
+    {
+      "name": "heddle.api.common.HostedWitnessEntryV1",
+      "fields": [
+        {
+          "name": "executor_id",
+          "number": 1,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "public_key",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "role",
+          "number": 3,
+          "type": "heddle.api.common.HostedWitnessKeyRole",
+          "list": false
+        },
+        {
+          "name": "state",
+          "number": 4,
+          "type": "heddle.api.common.HostedWitnessState",
+          "list": false
+        },
+        {
+          "name": "purposes",
+          "number": 5,
+          "type": "heddle.api.common.HostedWitnessPurpose",
+          "list": true
+        },
+        {
+          "name": "active_from_unix_millis",
+          "number": 6,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "active_until_unix_millis",
+          "number": 7,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "archive_root",
+          "number": 8,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "archive_leaf_count",
+          "number": 9,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "revoked_at_unix_millis",
+          "number": 10,
+          "type": "3",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.HostedWitnessHistoryProofV1",
+      "fields": [
+        {
+          "name": "executor_id",
+          "number": 1,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "purpose",
+          "number": 2,
+          "type": "heddle.api.common.HostedWitnessPurpose",
+          "list": false
+        },
+        {
+          "name": "leaf_index",
+          "number": 3,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "leaf_count",
+          "number": 4,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "siblings",
+          "number": 5,
+          "type": "12",
+          "list": true
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.HostedWitnessSetV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "deployment_authority",
+          "number": 2,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "descriptor_root_id",
+          "number": 3,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "generation",
+          "number": 4,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "issued_at_unix_millis",
+          "number": 5,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "valid_until_unix_millis",
+          "number": 6,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "current_executor_id",
+          "number": 7,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "entries",
+          "number": 8,
+          "type": "heddle.api.common.HostedWitnessEntryV1",
+          "list": true
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.HostedWitnessStatementV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "executor_id",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "purpose",
+          "number": 3,
+          "type": "heddle.api.common.HostedWitnessPurpose",
+          "list": false
+        },
+        {
+          "name": "spool_uuid",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "spool_genesis_digest",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_id",
+          "number": 6,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_state_hash",
+          "number": 7,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "ownership_transfer_sequence",
+          "number": 8,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "policy_state_hash",
+          "number": 9,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "policy_sequence",
+          "number": 10,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "basis",
+          "number": 11,
+          "type": "heddle.api.common.HostedWitnessAdmissionBasis",
+          "list": false
+        },
+        {
+          "name": "publisher_key_id",
+          "number": 12,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "authority_digest",
+          "number": 13,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "original_signatures_digest",
+          "number": 14,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "host_transaction_id",
+          "number": 15,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "admission_order",
+          "number": 16,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "observed_at_unix_millis",
+          "number": 17,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "canonical_payload",
+          "number": 18,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.SignedHostedWitnessSetV1",
+      "fields": [
+        {
+          "name": "body",
+          "number": 1,
+          "type": "heddle.api.common.HostedWitnessSetV1",
+          "list": false
+        },
+        {
+          "name": "body_digest",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "root_signature",
+          "number": 3,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.common.SignedHostedWitnessStatementV1",
+      "fields": [
+        {
+          "name": "body",
+          "number": 1,
+          "type": "heddle.api.common.HostedWitnessStatementV1",
+          "list": false
+        },
+        {
+          "name": "signature",
+          "number": 2,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.CancelImportJobRequest",
+      "fields": [
+        {
+          "name": "client_operation_id",
+          "number": 1,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "destination",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.SpoolRef",
+          "list": false
+        },
+        {
+          "name": "logical_job_id",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "cancellation_id",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "expected_authority_epoch",
+          "number": 5,
+          "type": "4",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.CommitImportJobRequest",
+      "fields": [
+        {
+          "name": "client_operation_id",
+          "number": 1,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "destination",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.SpoolRef",
+          "list": false
+        },
+        {
+          "name": "proof",
+          "number": 3,
+          "type": "heddle.api.v1alpha2.ImportPublicProofBundleV1",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.DelegatedImportOperationV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "spool_uuid",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "spool_genesis_digest",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "logical_job_id",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "retry_lineage_id",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "physical_operation_id",
+          "number": 6,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "delegation_digest",
+          "number": 7,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "ref_name",
+          "number": 8,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "slot_id",
+          "number": 9,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "hash_algorithm",
+          "number": 10,
+          "type": "heddle.api.v1alpha2.ImportGitHashAlgorithm",
+          "list": false
+        },
+        {
+          "name": "observed_commit_oid",
+          "number": 11,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "genesis_digest",
+          "number": 12,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "target_thread_id",
+          "number": 13,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "expected_frontier_digest",
+          "number": 14,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "resulting_frontier_digest",
+          "number": 15,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "resulting_content_digest",
+          "number": 16,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "result_bytes",
+          "number": 17,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "options_digest",
+          "number": 18,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "converter_version",
+          "number": 19,
+          "type": "9",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.GetHostedWitnessHistoryProofRequest",
+      "fields": [
+        {
+          "name": "executor_id",
+          "number": 1,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "statement_leaf_digest",
+          "number": 2,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.GetHostedWitnessHistoryProofResponse",
+      "fields": [
+        {
+          "name": "proof",
+          "number": 1,
+          "type": "heddle.api.common.HostedWitnessHistoryProofV1",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportBranchLimitV1",
+      "fields": [
+        {
+          "name": "ref_name",
+          "number": 1,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "hash_algorithm",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.ImportGitHashAlgorithm",
+          "list": false
+        },
+        {
+          "name": "ref_mode",
+          "number": 3,
+          "type": "heddle.api.v1alpha2.ImportRefMode",
+          "list": false
+        },
+        {
+          "name": "pinned_commit_oid",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "genesis_digest",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "target_thread_id",
+          "number": 6,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "expected_frontier_digest",
+          "number": 7,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "slot_id",
+          "number": 8,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "max_result_bytes",
+          "number": 9,
+          "type": "4",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportBranchManifestV1",
+      "fields": [
+        {
+          "name": "limit",
+          "number": 1,
+          "type": "heddle.api.v1alpha2.ImportBranchLimitV1",
+          "list": false
+        },
+        {
+          "name": "genesis_authority_digest",
+          "number": 2,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportCommittedSlotV1",
+      "fields": [
+        {
+          "name": "ref_name",
+          "number": 1,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "slot_id",
+          "number": 2,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "signed_operation_digest",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "resulting_frontier_digest",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "result_bytes",
+          "number": 5,
+          "type": "4",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "identity",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.ImportIdentityV1",
+          "list": false
+        },
+        {
+          "name": "genesis_digest",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "original_creator_signature",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "creator_public_key",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "creator_authority_envelope_digest",
+          "number": 6,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "parent_permission_digest",
+          "number": 7,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_chain_digest",
+          "number": 8,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportIdentityV1",
+      "fields": [
+        {
+          "name": "spool_uuid",
+          "number": 1,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "spool_genesis_digest",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_id",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_account_uuid",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_state_hash",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "ownership_transfer_sequence",
+          "number": 6,
+          "type": "4",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportJobDelegationV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "identity",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.ImportIdentityV1",
+          "list": false
+        },
+        {
+          "name": "delegation_id",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "logical_job_id",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "retry_lineage_id",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "job_public_key",
+          "number": 6,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "job_key_id",
+          "number": 7,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "delegating_public_key",
+          "number": 8,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "parent_permission_digest",
+          "number": 9,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_chain_digest",
+          "number": 10,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "purpose",
+          "number": 11,
+          "type": "heddle.api.v1alpha2.ImportDelegationPurpose",
+          "list": false
+        },
+        {
+          "name": "scope",
+          "number": 12,
+          "type": "heddle.api.v1alpha2.ImportPermissionScopeV1",
+          "list": false
+        },
+        {
+          "name": "branch_manifest",
+          "number": 13,
+          "type": "heddle.api.v1alpha2.ImportBranchManifestV1",
+          "list": true
+        },
+        {
+          "name": "not_before_unix_seconds",
+          "number": 14,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "expires_at_unix_seconds",
+          "number": 15,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "cancellation_id",
+          "number": 16,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "predecessor_delegation_digest",
+          "number": 17,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportJobRenewalV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "predecessor_delegation_digest",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "expected_authority_epoch",
+          "number": 3,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "committed_manifest_digest",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "replacement",
+          "number": 5,
+          "type": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportMemberPermissionV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "identity",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.ImportIdentityV1",
+          "list": false
+        },
+        {
+          "name": "logical_job_id",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "retry_lineage_id",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "subject_public_key",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "purpose",
+          "number": 6,
+          "type": "heddle.api.v1alpha2.ImportDelegationPurpose",
+          "list": false
+        },
+        {
+          "name": "scope",
+          "number": 7,
+          "type": "heddle.api.v1alpha2.ImportPermissionScopeV1",
+          "list": false
+        },
+        {
+          "name": "not_before_unix_seconds",
+          "number": 8,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "expires_at_unix_seconds",
+          "number": 9,
+          "type": "3",
+          "list": false
+        },
+        {
+          "name": "cancellation_id",
+          "number": 10,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_chain_digest",
+          "number": 11,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "nonce",
+          "number": 12,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportOwnerChainV1",
+      "fields": [
+        {
+          "name": "spool_genesis_digest",
+          "number": 1,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "owner_state_hashes",
+          "number": 2,
+          "type": "12",
+          "list": true
+        },
+        {
+          "name": "transfer_audit_hashes",
+          "number": 3,
+          "type": "12",
+          "list": true
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportPermissionScopeV1",
+      "fields": [
+        {
+          "name": "provider",
+          "number": 1,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "source_url",
+          "number": 2,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "branches",
+          "number": 3,
+          "type": "heddle.api.v1alpha2.ImportBranchLimitV1",
+          "list": true
+        },
+        {
+          "name": "destination_version",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "options_digest",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "converter_version",
+          "number": 6,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "max_operations",
+          "number": 7,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "max_result_bytes",
+          "number": 8,
+          "type": "4",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportPublicProofBundleV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "owner_genesis",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.SignedSpoolOwnerGenesis",
+          "list": false
+        },
+        {
+          "name": "owner_histories",
+          "number": 3,
+          "type": "heddle.api.v1alpha2.OwnerHistory",
+          "list": true
+        },
+        {
+          "name": "ownership_transfers",
+          "number": 4,
+          "type": "heddle.api.v1alpha2.ResourceTransferAuditRecord",
+          "list": true
+        },
+        {
+          "name": "member_permission",
+          "number": 5,
+          "type": "heddle.api.v1alpha2.SignedImportMemberPermissionV1",
+          "list": false
+        },
+        {
+          "name": "genesis_authorities",
+          "number": 6,
+          "type": "heddle.api.v1alpha2.SignedImportGenesisAuthorityV1",
+          "list": true
+        },
+        {
+          "name": "delegations",
+          "number": 7,
+          "type": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+          "list": true
+        },
+        {
+          "name": "renewals",
+          "number": 8,
+          "type": "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+          "list": true
+        },
+        {
+          "name": "operations",
+          "number": 9,
+          "type": "heddle.api.v1alpha2.SignedDelegatedImportOperationV1",
+          "list": true
+        },
+        {
+          "name": "terminal_manifest",
+          "number": 10,
+          "type": "heddle.api.v1alpha2.ImportResultManifestV1",
+          "list": false
+        },
+        {
+          "name": "witness_set",
+          "number": 11,
+          "type": "heddle.api.common.SignedHostedWitnessSetV1",
+          "list": false
+        },
+        {
+          "name": "statements",
+          "number": 12,
+          "type": "heddle.api.common.SignedHostedWitnessStatementV1",
+          "list": true
+        },
+        {
+          "name": "history_proofs",
+          "number": 13,
+          "type": "heddle.api.common.HostedWitnessHistoryProofV1",
+          "list": true
+        },
+        {
+          "name": "policies",
+          "number": 14,
+          "type": "heddle.api.v1alpha2.SignedSpoolPolicyRecord",
+          "list": true
+        },
+        {
+          "name": "original_geneses",
+          "number": 15,
+          "type": "heddle.api.v1alpha2.SignedRecord",
+          "list": true
+        },
+        {
+          "name": "creator_authority_envelopes",
+          "number": 16,
+          "type": "12",
+          "list": true
+        },
+        {
+          "name": "owner_chain",
+          "number": 17,
+          "type": "heddle.api.v1alpha2.ImportOwnerChainV1",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportPublicationWitnessV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "signed_operation_digest",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "delegation_digest",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "logical_job_id",
+          "number": 4,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "retry_lineage_id",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "physical_operation_id",
+          "number": 6,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "ref_name",
+          "number": 7,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "slot_id",
+          "number": 8,
+          "type": "4",
+          "list": false
+        },
+        {
+          "name": "hash_algorithm",
+          "number": 9,
+          "type": "heddle.api.v1alpha2.ImportGitHashAlgorithm",
+          "list": false
+        },
+        {
+          "name": "observed_commit_oid",
+          "number": 10,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "expected_frontier_digest",
+          "number": 11,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "resulting_frontier_digest",
+          "number": 12,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "terminal_manifest_digest",
+          "number": 13,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.ImportResultManifestV1",
+      "fields": [
+        {
+          "name": "format_version",
+          "number": 1,
+          "type": "13",
+          "list": false
+        },
+        {
+          "name": "logical_job_id",
+          "number": 2,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "retry_lineage_id",
+          "number": 3,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "slots",
+          "number": 4,
+          "type": "heddle.api.v1alpha2.ImportCommittedSlotV1",
+          "list": true
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.PrepareImportJobRequest",
+      "fields": [
+        {
+          "name": "client_operation_id",
+          "number": 1,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "destination",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.SpoolRef",
+          "list": false
+        },
+        {
+          "name": "identity",
+          "number": 3,
+          "type": "heddle.api.v1alpha2.ImportIdentityV1",
+          "list": false
+        },
+        {
+          "name": "proposed_scope",
+          "number": 4,
+          "type": "heddle.api.v1alpha2.ImportPermissionScopeV1",
+          "list": false
+        },
+        {
+          "name": "retry_lineage_id",
+          "number": 5,
+          "type": "12",
+          "list": false
+        },
+        {
+          "name": "renew_logical_job_id",
+          "number": 6,
+          "type": "12",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.PrepareImportJobResponse",
+      "fields": [
+        {
+          "name": "proposal",
+          "number": 1,
+          "type": "heddle.api.v1alpha2.ImportJobDelegationV1",
+          "list": false
+        },
+        {
+          "name": "reservation_expires_at_unix_seconds",
+          "number": 2,
+          "type": "3",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.RenewImportJobRequest",
+      "fields": [
+        {
+          "name": "client_operation_id",
+          "number": 1,
+          "type": "9",
+          "list": false
+        },
+        {
+          "name": "destination",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.SpoolRef",
+          "list": false
+        },
+        {
+          "name": "renewal",
+          "number": 3,
+          "type": "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+          "list": false
+        },
+        {
+          "name": "proof",
+          "number": 4,
+          "type": "heddle.api.v1alpha2.ImportPublicProofBundleV1",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.SignedDelegatedImportOperationV1",
+      "fields": [
+        {
+          "name": "body",
+          "number": 1,
+          "type": "heddle.api.v1alpha2.DelegatedImportOperationV1",
+          "list": false
+        },
+        {
+          "name": "job_signature",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.AuthorizationSignature",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.SignedImportGenesisAuthorityV1",
+      "fields": [
+        {
+          "name": "body",
+          "number": 1,
+          "type": "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+          "list": false
+        },
+        {
+          "name": "creator_signature",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.AuthorizationSignature",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+      "fields": [
+        {
+          "name": "body",
+          "number": 1,
+          "type": "heddle.api.v1alpha2.ImportJobDelegationV1",
+          "list": false
+        },
+        {
+          "name": "delegating_signature",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.AuthorizationSignature",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+      "fields": [
+        {
+          "name": "body",
+          "number": 1,
+          "type": "heddle.api.v1alpha2.ImportJobRenewalV1",
+          "list": false
+        },
+        {
+          "name": "delegating_signature",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.AuthorizationSignature",
+          "list": false
+        }
+      ]
+    },
+    {
+      "name": "heddle.api.v1alpha2.SignedImportMemberPermissionV1",
+      "fields": [
+        {
+          "name": "body",
+          "number": 1,
+          "type": "heddle.api.v1alpha2.ImportMemberPermissionV1",
+          "list": false
+        },
+        {
+          "name": "owner_signature",
+          "number": 2,
+          "type": "heddle.api.v1alpha2.AuthorizationSignature",
+          "list": false
+        }
+      ]
+    }
+  ],
+  "keys": {
+    "owner": {
+      "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+    },
+    "device": {
+      "seed_hex": "0202020202020202020202020202020202020202020202020202020202020202",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+    },
+    "job": {
+      "seed_hex": "0303030303030303030303030303030303030303030303030303030303030303",
+      "public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+    },
+    "renew_job": {
+      "seed_hex": "0404040404040404040404040404040404040404040404040404040404040404",
+      "public_key_hex": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c"
+    },
+    "witness": {
+      "seed_hex": "0505050505050505050505050505050505050505050505050505050505050505",
+      "public_key_hex": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1"
+    },
+    "next_witness": {
+      "seed_hex": "0606060606060606060606060606060606060606060606060606060606060606",
+      "public_key_hex": "8a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17"
+    },
+    "root": {
+      "seed_hex": "0707070707070707070707070707070707070707070707070707070707070707",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+    },
+    "wrong_root": {
+      "seed_hex": "0808080808080808080808080808080808080808080808080808080808080808",
+      "public_key_hex": "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca"
+    },
+    "guardian_a": {
+      "seed_hex": "0909090909090909090909090909090909090909090909090909090909090909",
+      "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618"
+    },
+    "guardian_b": {
+      "seed_hex": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "public_key_hex": "43a72e714401762df66b68c26dfbdf2682aaec9f2474eca4613e424a0fbafd3c"
+    },
+    "direct_job": {
+      "seed_hex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "public_key_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
+    },
+    "competing_job": {
+      "seed_hex": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+      "public_key_hex": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+    }
+  },
+  "signed_vectors": {
+    "permission": {
+      "schema": "heddle.api.v1alpha2.SignedImportMemberPermissionV1",
+      "body_schema": "heddle.api.v1alpha2.ImportMemberPermissionV1",
+      "wire_hex": "0a80060801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10242424242424242424242424242424242210252525252525252525252525252525252a208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39430013aba030a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e8071a94010a0f726566732f68656164732f6d61696e10011801221431313131313131313131313131313131313131312a20a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3a20414141414141414141414141414141414141414141414141414141414141414148e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380240d00f40e80748ec0e522050505050505050505050505050505050505050505050505050505050505050505a204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d0816220515151515151515151515151515151515151515151515151515151515151515112640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240c729fc6b1ea47cdaddd2aeb38612342d293e6fc02823f6b6e2e4142ae6c762e58b807ba8f6fd539830c501404c283a290db4bd29bb7f342c34a458d45591c80f",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010242424242424242424242424242424240000001025252525252525252525252525252525000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39400000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000020000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000000f726566732f68656164732f6d61696e000000010000000100000014313131313131313131313131313131313131313100000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd00000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd000000204141414141414141414141414141414141414141414141414141414141414141000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000200000000000007d000000000000003e8000000000000076c000000205050505050505050505050505050505050505050505050505050505050505050000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081000000205151515151515151515151515151515151515151515151515151515151515151",
+      "signing_input_hex": "017b6189de2327e5a1b240e888c40ec2605602f39f6fd81291bf54b1e40c84ee",
+      "domain": "heddle-import-member-permission-v1",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "signature_hex": "c729fc6b1ea47cdaddd2aeb38612342d293e6fc02823f6b6e2e4142ae6c762e58b807ba8f6fd539830c501404c283a290db4bd29bb7f342c34a458d45591c80f"
+    },
+    "genesis_dev": {
+      "schema": "heddle.api.v1alpha2.SignedImportGenesisAuthorityV1",
+      "body_schema": "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+      "wire_hex": "0afb020801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf2240077a1bbbba99a08d6df7b451e3910b52b3325be26e28e6f517537d31bffcdd451c7edf84d16bc05caa155b7798cbb64f48eb68513949e0c6125d9e54a8ec710a2a208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39432208c99ef263385104c96605acbf8011af80c4b0e1eb3ae0421289f1274b5be51703a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a42204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08112640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa71240bd2e26c5e56ff5ebabf765a9a0edc65cede2944b9afed4766a51234a04f5489ce2a492d94f69320ee7a1cc0b331f907e47c1d8c289517b7d8519c81d9e4dc404",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f0000000000000000000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf00000040077a1bbbba99a08d6df7b451e3910b52b3325be26e28e6f517537d31bffcdd451c7edf84d16bc05caa155b7798cbb64f48eb68513949e0c6125d9e54a8ec710a000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000208c99ef263385104c96605acbf8011af80c4b0e1eb3ae0421289f1274b5be5170000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081",
+      "signing_input_hex": "90d065ca13efb43bd5b7b31c72a11eec0a7c23548d32a7ddc83d244c923c56ca",
+      "domain": "heddle-import-genesis-authority-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "bd2e26c5e56ff5ebabf765a9a0edc65cede2944b9afed4766a51234a04f5489ce2a492d94f69320ee7a1cc0b331f907e47c1d8c289517b7d8519c81d9e4dc404"
+    },
+    "genesis_main": {
+      "schema": "heddle.api.v1alpha2.SignedImportGenesisAuthorityV1",
+      "body_schema": "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+      "wire_hex": "0afb020801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a20a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd2240ce2b09e2eaaf2b13443be24c500b9b0650a84ac345d6ee3a0ec41e14dc37b95aa275d1b5bd21cdd2279afaf88d4526f9699868a1aabf269622e58109849b3e0c2a208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3943220ae4835ebb3bfb36bf5de3182a370f920a0852acbdae1b020a39e98c3b7c0579a3a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a42204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08112640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa712409fda7f9865b1614afc5ff31db406743bb9cea1fa2e655b97a0fb219c7e34b5d526e69af382e9ecff7ae1e30c8f83e59a4b64e10a295d45a53f87cb506ef85806",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd00000040ce2b09e2eaaf2b13443be24c500b9b0650a84ac345d6ee3a0ec41e14dc37b95aa275d1b5bd21cdd2279afaf88d4526f9699868a1aabf269622e58109849b3e0c000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39400000020ae4835ebb3bfb36bf5de3182a370f920a0852acbdae1b020a39e98c3b7c0579a000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081",
+      "signing_input_hex": "7d6291160ac4b7711e70cd461092ed2d4075b8b669836720406ac35ce59fe869",
+      "domain": "heddle-import-genesis-authority-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "9fda7f9865b1614afc5ff31db406743bb9cea1fa2e655b97a0fb219c7e34b5d526e69af382e9ecff7ae1e30c8f83e59a4b64e10a295d45a53f87cb506ef85806"
+    },
+    "delegation": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobDelegationV1",
+      "wire_hex": "0af1090801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10525252525252525252525252525252522210242424242424242424242424242424242a10252525252525252525252525252525253220ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d13a203ca22b30daca520cf3bbc2a0db59ab486efadca04d7cf094befd0414f9a4ec9c42208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162ba030a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e8071a94010a0f726566732f68656164732f6d61696e10011801221431313131313131313131313131313131313131312a20a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3a20414141414141414141414141414141414141414141414141414141414141414148e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380240d00f6ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa6ab9010a94010a0f726566732f68656164732f6d61696e10011801221431313131313131313131313131313131313131312a20a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3a20414141414141414141414141414141414141414141414141414141414141414148e807122032488f3d6a03e48e3903ecc358487768636c035fcd5e9d29d12f4ac743ee0b1170e80778b00982012053535353535353535353535353535353535353535353535353535353535353538a0120000000000000000000000000000000000000000000000000000000000000000012640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa712405255049ad3a9d8f3e8c3f28db5987c37e5aad42bfa48880206055f9290067870c606f0a59a12433fc04ce0e7b3fbcb82bfb62c86e6a05b7fdd92a6afc04bf10c",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010525252525252525252525252525252520000001024242424242424242424242424242424000000102525252525252525252525252525252500000020ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1000000203ca22b30daca520cf3bbc2a0db59ab486efadca04d7cf094befd0414f9a4ec9c000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000020000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000000f726566732f68656164732f6d61696e000000010000000100000014313131313131313131313131313131313131313100000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd00000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd000000204141414141414141414141414141414141414141414141414141414141414141000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000200000000000007d0000000020000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa0000000f726566732f68656164732f6d61696e000000010000000100000014313131313131313131313131313131313131313100000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd00000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd000000204141414141414141414141414141414141414141414141414141414141414141000000000000000000000000000003e80000002032488f3d6a03e48e3903ecc358487768636c035fcd5e9d29d12f4ac743ee0b1100000000000003e800000000000004b0000000205353535353535353535353535353535353535353535353535353535353535353000000200000000000000000000000000000000000000000000000000000000000000000",
+      "signing_input_hex": "084efe32b57b49e875be6911224d0e62d00fafaed1cfe6c739885a75c6b65442",
+      "domain": "heddle-import-job-delegation-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "5255049ad3a9d8f3e8c3f28db5987c37e5aad42bfa48880206055f9290067870c606f0a59a12433fc04ce0e7b3fbcb82bfb62c86e6a05b7fdd92a6afc04bf10c"
+    },
+    "direct_genesis_0": {
+      "schema": "heddle.api.v1alpha2.SignedImportGenesisAuthorityV1",
+      "body_schema": "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+      "wire_hex": "0afb020801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a2018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c92240de405f1aefc581216a02a1f13c25c403e65f8b045ae6d09546059982811ed196f79f71b3cda1f4f7d723cf4254c1f9961ff44f1a5797f3c7986c93e408c2da0d2a208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c3220578fef66ddfa72bc7b884136ce2deeb97c66b754066d9d13376f723ff96e579a3a20000000000000000000000000000000000000000000000000000000000000000042204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08112640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a12400dabf77f88581857d6241324172b547fa01df3571eb123c7c7a6bcacd78df01dc135f03879ae16e9d11c402fa1a054415ad669b2edb70f6e4d3f71c9efdadc0a",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000002018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c900000040de405f1aefc581216a02a1f13c25c403e65f8b045ae6d09546059982811ed196f79f71b3cda1f4f7d723cf4254c1f9961ff44f1a5797f3c7986c93e408c2da0d000000208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c00000020578fef66ddfa72bc7b884136ce2deeb97c66b754066d9d13376f723ff96e579a000000200000000000000000000000000000000000000000000000000000000000000000000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081",
+      "signing_input_hex": "95d8014ebd79d5fe288e7323d1282d379aa9a79fbba6d595cb44aa8c22405309",
+      "domain": "heddle-import-genesis-authority-v1",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "signature_hex": "0dabf77f88581857d6241324172b547fa01df3571eb123c7c7a6bcacd78df01dc135f03879ae16e9d11c402fa1a054415ad669b2edb70f6e4d3f71c9efdadc0a"
+    },
+    "direct_genesis_1": {
+      "schema": "heddle.api.v1alpha2.SignedImportGenesisAuthorityV1",
+      "body_schema": "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+      "wire_hex": "0afb020801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a2012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c922407e2ec424539d2ccf322ed61dba2196bf0cb321051d4f80e452c146694c18ac710ad331e2cf2e8556655ecb558ad6f531fe83d0f0b019ecaf495854b70b47b0032a208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c3220578fef66ddfa72bc7b884136ce2deeb97c66b754066d9d13376f723ff96e579a3a20000000000000000000000000000000000000000000000000000000000000000042204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08112640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a124095125f07be02a3df4067bf65f717e1501ce3801eded16740258511b4982dc3e7709f2bafa091f19967ef5c9ce92a12fac8ea5e0d0d184e652ca2ed6398ed4b0b",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000002012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c9000000407e2ec424539d2ccf322ed61dba2196bf0cb321051d4f80e452c146694c18ac710ad331e2cf2e8556655ecb558ad6f531fe83d0f0b019ecaf495854b70b47b003000000208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c00000020578fef66ddfa72bc7b884136ce2deeb97c66b754066d9d13376f723ff96e579a000000200000000000000000000000000000000000000000000000000000000000000000000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081",
+      "signing_input_hex": "462b4de2bf50c8d230841d6f585e4c953f297254c711e6032d8bc7742d897e47",
+      "domain": "heddle-import-genesis-authority-v1",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "signature_hex": "95125f07be02a3df4067bf65f717e1501ce3801eded16740258511b4982dc3e7709f2bafa091f19967ef5c9ce92a12fac8ea5e0d0d184e652ca2ed6398ed4b0b"
+    },
+    "direct_owner": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobDelegationV1",
+      "wire_hex": "0af1090801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10555555555555555555555555555555552210545454545454545454545454545454542a1025252525252525252525252525252525322066be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a3a2034aa6e8f829f59224269b6c0e3547e12d90bb17e4e2d40babc528cf0d0b0d84f42208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c4a20000000000000000000000000000000000000000000000000000000000000000052204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162ba030a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a2018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c9322018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c93a20404040404040404040404040404040404040404040404040404040404040404048e8071a94010a0f726566732f68656164732f6d61696e10011801221431313131313131313131313131313131313131312a2012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c9322012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c93a20414141414141414141414141414141414141414141414141414141414141414148e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380240d00f6ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a2018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c9322018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c93a20404040404040404040404040404040404040404040404040404040404040404048e807122074c2f68f4a84709fb77b618a2394687f2527ebde2f949c204240748ac00fcf646ab9010a94010a0f726566732f68656164732f6d61696e10011801221431313131313131313131313131313131313131312a2012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c9322012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c93a20414141414141414141414141414141414141414141414141414141414141414148e8071220f467e90342e225977161619980fa211771ad6e38cdb55f0dfe5175eaa6e7071f70e80778b00982012053535353535353535353535353535353535353535353535353535353535353538a0120000000000000000000000000000000000000000000000000000000000000000012640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240317ad1ad71c8be72970a002351ed65085ca688017004a7c8ddb731f36f5c805be0d96b53dd3a7a7027b7e22084cc4316eccbdcce406eab562f9d263130ccfc09",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000001055555555555555555555555555555555000000105454545454545454545454545454545400000010252525252525252525252525252525250000002066be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a0000002034aa6e8f829f59224269b6c0e3547e12d90bb17e4e2d40babc528cf0d0b0d84f000000208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000200000000000000000000000000000000000000000000000000000000000000000000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000020000000e726566732f68656164732f64657600000001000000010000001430303030303030303030303030303030303030300000002018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c90000002018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c9000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000000f726566732f68656164732f6d61696e00000001000000010000001431313131313131313131313131313131313131310000002012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c90000002012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c9000000204141414141414141414141414141414141414141414141414141414141414141000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000200000000000007d0000000020000000e726566732f68656164732f64657600000001000000010000001430303030303030303030303030303030303030300000002018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c90000002018fa6fcb6a2317df4ab989377ff39606ee974ec39a04019569c58461c2d618c9000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002074c2f68f4a84709fb77b618a2394687f2527ebde2f949c204240748ac00fcf640000000f726566732f68656164732f6d61696e00000001000000010000001431313131313131313131313131313131313131310000002012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c90000002012483cae72736c9d7addf02b4ad5f0886af2273217199c4db26e76e28af0e9c9000000204141414141414141414141414141414141414141414141414141414141414141000000000000000000000000000003e800000020f467e90342e225977161619980fa211771ad6e38cdb55f0dfe5175eaa6e7071f00000000000003e800000000000004b0000000205353535353535353535353535353535353535353535353535353535353535353000000200000000000000000000000000000000000000000000000000000000000000000",
+      "signing_input_hex": "9139d91432993d4ffefc6094bca7303e2437b720fcdc5e7709027f5b5e8ef989",
+      "domain": "heddle-import-job-delegation-v1",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "signature_hex": "317ad1ad71c8be72970a002351ed65085ca688017004a7c8ddb731f36f5c805be0d96b53dd3a7a7027b7e22084cc4316eccbdcce406eab562f9d263130ccfc09"
+    },
+    "operation_dev": {
+      "schema": "heddle.api.v1alpha2.SignedDelegatedImportOperationV1",
+      "body_schema": "heddle.api.v1alpha2.DelegatedImportOperationV1",
+      "wire_hex": "0a9c0308011210232323232323232323232323232323231a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47332210242424242424242424242424242424242a10252525252525252525252525252525253210565656565656565656565656565656563a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d420e726566732f68656164732f64657650015a14303030303030303030303030303030303030303062201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf6a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf722040404040404040404040404040404040404040404040404040404040404040407a205858585858585858585858585858585858585858585858585858585858585858820120e29f0eab1b5f56d37baf4da617be5ddf3da3d5f514677c255acf5c56260546a08801a00692012042424242424242424242424242424242424242424242424242424242424242429a01116769742d636f6e7665727465722f312e3012640a203ca22b30daca520cf3bbc2a0db59ab486efadca04d7cf094befd0414f9a4ec9c1240e0752bf9d554bd865eacf6fdfc3281398256e235ad3a7ebfe2865cfe58175075d225181757fb198419a14db4e5265c49329a20da603add0371ca4477a009f50f",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000010242424242424242424242424242424240000001025252525252525252525252525252525000000105656565656565656565656565656565600000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000000e726566732f68656164732f646576000000000000000000000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf00000020404040404040404040404040404040404040404040404040404040404040404000000020585858585858585858585858585858585858585858585858585858585858585800000020e29f0eab1b5f56d37baf4da617be5ddf3da3d5f514677c255acf5c56260546a00000000000000320000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e30",
+      "signing_input_hex": "3084120dd9407463ed33884013948474f032a9874ae7efe2732910d6b400d9ed",
+      "domain": "heddle-delegated-import-operation-v1",
+      "public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+      "signature_hex": "e0752bf9d554bd865eacf6fdfc3281398256e235ad3a7ebfe2865cfe58175075d225181757fb198419a14db4e5265c49329a20da603add0371ca4477a009f50f"
+    },
+    "operation_main": {
+      "schema": "heddle.api.v1alpha2.SignedDelegatedImportOperationV1",
+      "body_schema": "heddle.api.v1alpha2.DelegatedImportOperationV1",
+      "wire_hex": "0a9d0308011210232323232323232323232323232323231a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47332210242424242424242424242424242424242a10252525252525252525252525252525253210565656565656565656565656565656563a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d420f726566732f68656164732f6d61696e50015a1431313131313131313131313131313131313131316220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd6a20a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd722041414141414141414141414141414141414141414141414141414141414141417a2057575757575757575757575757575757575757575757575757575757575757578201204d0f13c6cb72fdcfb0dc02717fbab35d32ce8930e2e7c3976c110ae6feba28cf8801a00692012042424242424242424242424242424242424242424242424242424242424242429a01116769742d636f6e7665727465722f312e3012640a203ca22b30daca520cf3bbc2a0db59ab486efadca04d7cf094befd0414f9a4ec9c12407d41f27e526a14101a616414ccd90bcfaa3c493db623e3f277a031082bc068e510d5fd69bb3edfabfd3dd338a1c6dae4c928db7e596c90e0115eb79c379aca09",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000010242424242424242424242424242424240000001025252525252525252525252525252525000000105656565656565656565656565656565600000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000000f726566732f68656164732f6d61696e00000000000000000000000100000014313131313131313131313131313131313131313100000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd00000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd000000204141414141414141414141414141414141414141414141414141414141414141000000205757575757575757575757575757575757575757575757575757575757575757000000204d0f13c6cb72fdcfb0dc02717fbab35d32ce8930e2e7c3976c110ae6feba28cf0000000000000320000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e30",
+      "signing_input_hex": "cc8fbbb993ef5c6978170312f3fbf85f88ff5be5608880a8bee780c2c25aa4bb",
+      "domain": "heddle-delegated-import-operation-v1",
+      "public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+      "signature_hex": "7d41f27e526a14101a616414ccd90bcfaa3c493db623e3f277a031082bc068e510d5fd69bb3edfabfd3dd338a1c6dae4c928db7e596c90e0115eb79c379aca09"
+    },
+    "renewed_delegation": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobDelegationV1",
+      "wire_hex": "0a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210242424242424242424242424242424242a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380140e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa7124074b97c18438ad483aa15e8494e7573ba6e0b38b1d49db1b022858c9678fe8e50afd85d851ae8110794f9bc1e74c12378818c22b2a3b75292b6a10200d7b5a604",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010595959595959595959595959595959590000001024242424242424242424242424242424000000102525252525252525252525252525252500000020ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c0000002004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae9000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000100000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d",
+      "signing_input_hex": "2b8a50b6cb567cd92a1249059b5e781dbdf6c87d52579191cd210cfd1e65308d",
+      "domain": "heddle-import-job-delegation-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "74b97c18438ad483aa15e8494e7573ba6e0b38b1d49db1b022858c9678fe8e50afd85d851ae8110794f9bc1e74c12378818c22b2a3b75292b6a10200d7b5a604"
+    },
+    "renewal": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobRenewalV1",
+      "wire_hex": "0ad20808011220adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d18012220845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe92a87080a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210242424242424242424242424242424242a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380140e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa7124074b97c18438ad483aa15e8494e7573ba6e0b38b1d49db1b022858c9678fe8e50afd85d851ae8110794f9bc1e74c12378818c22b2a3b75292b6a10200d7b5a60412640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa71240d02a22008da3997958303448cb65f2ba467690bc36bd894042f40f68674d2e476a3f3744f482863d3129995f126800c93cdb8b4abfd32263e29517cae21c3700",
+      "canonical_hex": "0000000100000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d000000000000000100000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe900000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010595959595959595959595959595959590000001024242424242424242424242424242424000000102525252525252525252525252525252500000020ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c0000002004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae9000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000100000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa70000004074b97c18438ad483aa15e8494e7573ba6e0b38b1d49db1b022858c9678fe8e50afd85d851ae8110794f9bc1e74c12378818c22b2a3b75292b6a10200d7b5a604",
+      "signing_input_hex": "52c26d9b13f563d212170e7bb1263038fa5cb57717449b04bab68ecacc5598d9",
+      "domain": "heddle-import-job-renewal-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "d02a22008da3997958303448cb65f2ba467690bc36bd894042f40f68674d2e476a3f3744f482863d3129995f126800c93cdb8b4abfd32263e29517cae21c3700"
+    },
+    "competing_delegation": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobDelegationV1",
+      "wire_hex": "0a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a105b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b2210242424242424242424242424242424242a102525252525252525252525252525252532200b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d3a20efdffdcb32d73d50b854fdade0299a5d3f9ef97bfb2846fdfe5fdbe404b497fd42208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380140e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa712400fde5a0881445736a9f3425a042d852f5e6954094bfe4bcafe34aa83f7d4bbfde2ca205478268ba304ce3a02638923a71fca283130b130a68a9290b91df36e0f",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f0000000000000000000000105b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b00000010242424242424242424242424242424240000001025252525252525252525252525252525000000200b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d00000020efdffdcb32d73d50b854fdade0299a5d3f9ef97bfb2846fdfe5fdbe404b497fd000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000100000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d",
+      "signing_input_hex": "1979e9c002ce07c1710fc669f6c3dbeb210c8841b7a55ba2eb30cd755274bcaa",
+      "domain": "heddle-import-job-delegation-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "0fde5a0881445736a9f3425a042d852f5e6954094bfe4bcafe34aa83f7d4bbfde2ca205478268ba304ce3a02638923a71fca283130b130a68a9290b91df36e0f"
+    },
+    "competing_renewal": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobRenewalV1",
+      "wire_hex": "0ad20808011220adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d18012220845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe92a87080a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a105b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b2210242424242424242424242424242424242a102525252525252525252525252525252532200b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d3a20efdffdcb32d73d50b854fdade0299a5d3f9ef97bfb2846fdfe5fdbe404b497fd42208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380140e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa712400fde5a0881445736a9f3425a042d852f5e6954094bfe4bcafe34aa83f7d4bbfde2ca205478268ba304ce3a02638923a71fca283130b130a68a9290b91df36e0f12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa7124012e8fdae03bb2f65067142714b3b33c85a95e5b6486abdc2207152da2e63776106835598e6f0b62ffd9dfb84e2c4a0caca1a569b7cbd0bb58d2e0d8a12ec9603",
+      "canonical_hex": "0000000100000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d000000000000000100000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe900000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f0000000000000000000000105b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b00000010242424242424242424242424242424240000001025252525252525252525252525252525000000200b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d00000020efdffdcb32d73d50b854fdade0299a5d3f9ef97bfb2846fdfe5fdbe404b497fd000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000100000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa7000000400fde5a0881445736a9f3425a042d852f5e6954094bfe4bcafe34aa83f7d4bbfde2ca205478268ba304ce3a02638923a71fca283130b130a68a9290b91df36e0f",
+      "signing_input_hex": "e7dbee7329ce6042f12889fdca564d355eaf474367b6a813c47e401de9e45533",
+      "domain": "heddle-import-job-renewal-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "12e8fdae03bb2f65067142714b3b33c85a95e5b6486abdc2207152da2e63776106835598e6f0b62ffd9dfb84e2c4a0caca1a569b7cbd0bb58d2e0d8a12ec9603"
+    },
+    "renewed_operation_dev": {
+      "schema": "heddle.api.v1alpha2.SignedDelegatedImportOperationV1",
+      "body_schema": "heddle.api.v1alpha2.DelegatedImportOperationV1",
+      "wire_hex": "0a9c0308011210232323232323232323232323232323231a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47332210242424242424242424242424242424242a102525252525252525252525252525252532105a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a3a2035de4fb9867edee32f2fc5755e81522b4ff753dc8caac951048ccbb877300b20420e726566732f68656164732f64657650015a14303030303030303030303030303030303030303062201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf6a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf722040404040404040404040404040404040404040404040404040404040404040407a205858585858585858585858585858585858585858585858585858585858585858820120e29f0eab1b5f56d37baf4da617be5ddf3da3d5f514677c255acf5c56260546a08801a00692012042424242424242424242424242424242424242424242424242424242424242429a01116769742d636f6e7665727465722f312e3012640a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae912406c1a1a9640d4fbb0514bc12d32150356be58857fb577d2cb5700faa9f321551d71dc9a0f8e32cae913eb25f5239d5b2b777f79922288a26dcb94e7078ca6e702",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000010242424242424242424242424242424240000001025252525252525252525252525252525000000105a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000002035de4fb9867edee32f2fc5755e81522b4ff753dc8caac951048ccbb877300b200000000e726566732f68656164732f646576000000000000000000000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf00000020404040404040404040404040404040404040404040404040404040404040404000000020585858585858585858585858585858585858585858585858585858585858585800000020e29f0eab1b5f56d37baf4da617be5ddf3da3d5f514677c255acf5c56260546a00000000000000320000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e30",
+      "signing_input_hex": "eadefc92d8a2a9aeb6ac63bb0c63d1291ae7aef4dc46cf4519e7752fd406dfb7",
+      "domain": "heddle-delegated-import-operation-v1",
+      "public_key_hex": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+      "signature_hex": "6c1a1a9640d4fbb0514bc12d32150356be58857fb577d2cb5700faa9f321551d71dc9a0f8e32cae913eb25f5239d5b2b777f79922288a26dcb94e7078ca6e702"
+    },
+    "genesis_admission": {
+      "schema": "heddle.api.common.SignedHostedWitnessStatementV1",
+      "body_schema": "heddle.api.common.HostedWitnessStatementV1",
+      "wire_hex": "0ae005080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318012210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10606060606060606060606060606060608001608801e091439201980300000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd00000040ce2b09e2eaaf2b13443be24c500b9b0650a84ac345d6ee3a0ec41e14dc37b95aa275d1b5bd21cdd2279afaf88d4526f9699868a1aabf269622e58109849b3e0c000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39400000020ae4835ebb3bfb36bf5de3182a370f920a0852acbdae1b020a39e98c3b7c0579a000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08112402cbcc94ae955cfad85be3337d32c415fd6157f241ca2c6b5fc082897dab9a7100fea02b51bd2a78987228e3dd97b82bd9fcbb38d42f5845b9a9ba25b1975ed08",
+      "canonical_hex": "00000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c00000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000002061616161616161616161616161616161616161616161616161616161616161610000000000000001000000010000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa700000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef15200000010606060606060606060606060606060600000000000000060000000000010c8e00000019800000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd00000040ce2b09e2eaaf2b13443be24c500b9b0650a84ac345d6ee3a0ec41e14dc37b95aa275d1b5bd21cdd2279afaf88d4526f9699868a1aabf269622e58109849b3e0c000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39400000020ae4835ebb3bfb36bf5de3182a370f920a0852acbdae1b020a39e98c3b7c0579a000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081",
+      "signing_input_hex": "dcffa6beb4168c827b5f5d9d22039cf03e3d4b9370c40991fb3ba041fe91106d",
+      "domain": "heddle-import-genesis-first-admission-witness-v1",
+      "public_key_hex": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+      "signature_hex": "2cbcc94ae955cfad85be3337d32c415fd6157f241ca2c6b5fc082897dab9a7100fea02b51bd2a78987228e3dd97b82bd9fcbb38d42f5845b9a9ba25b1975ed08"
+    },
+    "authority_admission": {
+      "schema": "heddle.api.common.SignedHostedWitnessStatementV1",
+      "body_schema": "heddle.api.common.HostedWitnessStatementV1",
+      "wire_hex": "0aff02080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318022210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10606060606060606060606060606060608001608801e091439201386f726967696e616c206f776e65727368697020616363657074616e636520616e64207369676e617475726520646570656e64656e6369657312404148efc1f74f1ec052b1b7c4f77f926deddb34b6215b3f3f5c679ae8d19a5d2fd86026d9b83f683edde0c4f9b3e5fd92a0ab0856e7acf25a3ffca071ce3c8b06",
+      "canonical_hex": "00000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000002000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c00000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000002061616161616161616161616161616161616161616161616161616161616161610000000000000001000000010000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa700000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef15200000010606060606060606060606060606060600000000000000060000000000010c8e0000000386f726967696e616c206f776e65727368697020616363657074616e636520616e64207369676e617475726520646570656e64656e63696573",
+      "signing_input_hex": "e5fccc6ba62dba399ba4eea0f01b034f41a2422bcddf7be6aa2e09cc162ab26b",
+      "domain": "heddle-import-authority-first-admission-witness-v1",
+      "public_key_hex": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+      "signature_hex": "4148efc1f74f1ec052b1b7c4f77f926deddb34b6215b3f3f5c679ae8d19a5d2fd86026d9b83f683edde0c4f9b3e5fd92a0ab0856e7acf25a3ffca071ce3c8b06"
+    },
+    "publication_statement": {
+      "schema": "heddle.api.common.SignedHostedWitnessStatementV1",
+      "body_schema": "heddle.api.common.HostedWitnessStatementV1",
+      "wire_hex": "0af304080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318032210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10606060606060606060606060606060608001608801e091439201ab020000000100000020f629dd465e8bce33529d678ba7df2fd8ddb53650c85ad2fb9065073d8a5f715c00000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000001024242424242424242424242424242424000000102525252525252525252525252525252500000010565656565656565656565656565656560000000f726566732f68656164732f6d61696e00000000000000000000000100000014313131313131313131313131313131313131313100000020414141414141414141414141414141414141414141414141414141414141414100000020575757575757575757575757575757575757575757575757575757575757575700000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe91240980b6f2a29c219063e2109300c96e3f5d1135d17d7e14b8b0031ce6209b1f3625218727653e4a720172491acdca15c1e4648f1df1061bb947e1f1a13c340ba0e",
+      "canonical_hex": "00000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000003000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c00000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000002061616161616161616161616161616161616161616161616161616161616161610000000000000001000000010000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa700000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef15200000010606060606060606060606060606060600000000000000060000000000010c8e00000012b0000000100000020f629dd465e8bce33529d678ba7df2fd8ddb53650c85ad2fb9065073d8a5f715c00000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000001024242424242424242424242424242424000000102525252525252525252525252525252500000010565656565656565656565656565656560000000f726566732f68656164732f6d61696e00000000000000000000000100000014313131313131313131313131313131313131313100000020414141414141414141414141414141414141414141414141414141414141414100000020575757575757575757575757575757575757575757575757575757575757575700000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe9",
+      "signing_input_hex": "db4509912463895d88ca57d6349969b838e17c206be722e2b2fa1e8707fe0772",
+      "domain": "heddle-import-publication-witness-v1",
+      "public_key_hex": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+      "signature_hex": "980b6f2a29c219063e2109300c96e3f5d1135d17d7e14b8b0031ce6209b1f3625218727653e4a720172491acdca15c1e4648f1df1061bb947e1f1a13c340ba0e"
+    },
+    "landing_statement": {
+      "schema": "heddle.api.common.SignedHostedWitnessStatementV1",
+      "body_schema": "heddle.api.common.HostedWitnessStatementV1",
+      "wire_hex": "0a8a03080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318042210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10636363636363636363636363636363638001638801e091439201436578616374206e617469766520686f73746564206c616e64696e672065766964656e63653b20766572696669656420627920746865206c616e64696e67206d6f64656c124050e57113f510df0fb634fa3a55eb3b65311ff7d99e2b23ba7213cec430e49bfb93f2117c15d2b1caf3c834ec22c2cbedba9d2ac6bbd45e5137bf3dd339e4db0e",
+      "canonical_hex": "00000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000004000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c00000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000002061616161616161616161616161616161616161616161616161616161616161610000000000000001000000010000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa700000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef15200000010636363636363636363636363636363630000000000000063000000000010c8e0000000436578616374206e617469766520686f73746564206c616e64696e672065766964656e63653b20766572696669656420627920746865206c616e64696e67206d6f64656c",
+      "signing_input_hex": "27a03226c7cbf2890be2042075417e3b141020780c01d62731ae0ba91639f2d0",
+      "domain": "heddle-hosted-landing-witness-v1",
+      "public_key_hex": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+      "signature_hex": "50e57113f510df0fb634fa3a55eb3b65311ff7d99e2b23ba7213cec430e49bfb93f2117c15d2b1caf3c834ec22c2cbedba9d2ac6bbd45e5137bf3dd339e4db0e"
+    },
+    "current_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120012a04010203043880897a122021b5ed087d85f3487fde30c9f89962e394ea43c341d7a72466f31ef8c9290fb61a406fee835d915438e9a0b01741bd7e46a081b4dfe5c909990613b4136ea8dfc860daf7c42dec9fe5938b79cccc7f5f5cf8a3485edf68af4cf681250bce8184ee0a",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "signature_hex": "6fee835d915438e9a0b01741bd7e46a081b4dfe5c909990613b4136ea8dfc860daf7c42dec9fe5938b79cccc7f5f5cf8a3485edf68af4cf681250bce8184ee0a"
+    },
+    "newer_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200b28a4853d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120012a04010203043880897a1220545f5770123170ef13fc706d2abc5fc64fce0168ba65536490bea67ba946ec1c1a400bf2fa140ec02de9214ac1e18036da039e276a000eee1f0efee5a3350041572c347e47f696e47a1404d8ae2aa3d37e2be86cb100e59871af5bdfe50fa7c9a207",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000b00000000000f42a4000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000b00000000000f42a4000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "signature_hex": "0bf2fa140ec02de9214ac1e18036da039e276a000eee1f0efee5a3350041572c347e47f696e47a1404d8ae2aa3d37e2be86cb100e59871af5bdfe50fa7c9a207"
+    },
+    "retired_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0aac020801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200c28a0ac4f3080d4613a20b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929542760a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120022a040102030438a0ac4f42205e353820838b331bde62fe47b376d3a3ced92d8d6f847a33a39656cc444c9e57480342560a20b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929512208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17180120012a040102030430a0ac4f3880897a12208f11f159b0bd37d8d39da7360d065c1b4b3a39fcff453bc8429bb559bbe4b5571a400bd7cba6069a9a2349ed974e8251946f21bd2517ef825968a4e31afb482b2b04281d557b476f96dda1f2a6aa90f9c66510a54196d79ea58d4008253aafb8fb0d",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000c000000000013d6200000000000186a0000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929500000002000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1000000010000000200000004000000010000000200000003000000040000000000000000000000000013d620000000205e353820838b331bde62fe47b376d3a3ced92d8d6f847a33a39656cc444c9e570000000000000003000000000000000000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b09295000000208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f1700000001000000010000000400000001000000020000000300000004000000000013d62000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000c000000000013d6200000000000186a0000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929500000002000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1000000010000000200000004000000010000000200000003000000040000000000000000000000000013d620000000205e353820838b331bde62fe47b376d3a3ced92d8d6f847a33a39656cc444c9e570000000000000003000000000000000000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b09295000000208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f1700000001000000010000000400000001000000020000000300000004000000000013d62000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "signature_hex": "0bd7cba6069a9a2349ed974e8251946f21bd2517ef825968a4e31afb482b2b04281d557b476f96dda1f2a6aa90f9c66510a54196d79ea58d4008253aafb8fb0d"
+    },
+    "revoked_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0ab0020801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200d2884ad4f3080d4613a20b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b09295427a0a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120032a040102030438a0ac4f42205e353820838b331bde62fe47b376d3a3ced92d8d6f847a33a39656cc444c9e5748035084ad4f42560a20b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929512208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17180120012a040102030430a0ac4f3880897a122018cbe6eff685aba2c36355733a57c11c843c5104bc9ec5689d252b0b88bbacbd1a402a33a73d7f89798f8b34f8ceb0ce9aa27d5eaab1a6c8eba7aa09e761cc8b5eaf65b31f478cd9468112720f4d92a6382ef7d590ecb9382a8620775d7cc7197b0d",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000d000000000013d6840000000000186a0000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929500000002000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1000000010000000300000004000000010000000200000003000000040000000000000000000000000013d620000000205e353820838b331bde62fe47b376d3a3ced92d8d6f847a33a39656cc444c9e570000000000000003000000000013d68400000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b09295000000208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f1700000001000000010000000400000001000000020000000300000004000000000013d62000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000d000000000013d6840000000000186a0000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929500000002000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1000000010000000300000004000000010000000200000003000000040000000000000000000000000013d620000000205e353820838b331bde62fe47b376d3a3ced92d8d6f847a33a39656cc444c9e570000000000000003000000000013d68400000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b09295000000208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f1700000001000000010000000400000001000000020000000300000004000000000013d62000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "signature_hex": "2a33a73d7f89798f8b34f8ceb0ce9aa27d5eaab1a6c8eba7aa09e761cc8b5eaf65b31f478cd9468112720f4d92a6382ef7d590ecb9382a8620775d7cc7197b0d"
+    },
+    "wrong_root_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120012a04010203043880897a122021b5ed087d85f3487fde30c9f89962e394ea43c341d7a72466f31ef8c9290fb61a402572c3352349868e96ef5db58d144d140745163607c78f16bc2770929d6175d7132e0eb30c4d24a4f77623838957796198b149191e70c18aa6f3239e03f9e00c",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca",
+      "signature_hex": "2572c3352349868e96ef5db58d144d140745163607c78f16bc2770929d6175d7132e0eb30c4d24a4f77623838957796198b149191e70c18aa6f3239e03f9e00c"
+    },
+    "semantic_invalid_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0a88020801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120012a04010203043880897a42560a20b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929512208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17180120012a040102030430a0ac4f3880897a12207425ec677c350a25261238d25369315464502aa821500ba4a6514d951007b64d1a406ff9d97bf183684beb4af66a33eda002f08a4780ceedb4d654bd1c3ca149256634356b574022eacb4be1aa5bf30081ce587d2a2940527b07b9c9858afdfb3208",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000002000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e8480000000000000000000000000000000000000000000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b09295000000208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f1700000001000000010000000400000001000000020000000300000004000000000013d62000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000002000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000001000000010000000400000001000000020000000300000004000000000000000000000000001e8480000000000000000000000000000000000000000000000020b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b09295000000208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f1700000001000000010000000400000001000000020000000300000004000000000013d62000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "signature_hex": "6ff9d97bf183684beb4af66a33eda002f08a4780ceedb4d654bd1c3ca149256634356b574022eacb4be1aa5bf30081ce587d2a2940527b07b9c9858afdfb3208"
+    },
+    "job_witness_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a20cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e542520a20cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e51220ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1180120012a04010203043880897a1220efa218fbed04edd28920b0d7261ab3c069ae22a5c49cd461956841e5a05018d31a407115b17454db07e365d3bb1d6b27526e2cc7cf4b629aa1f5a5e9cb8a10a617615f2759d58c1db4d3b2b69fae6e718a272a5831336c73920c704109628c32f104",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d62000000020cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e50000000100000020cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e500000020ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d62000000020cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e50000000100000020cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e500000020ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d100000001000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "signature_hex": "7115b17454db07e365d3bb1d6b27526e2cc7cf4b629aa1f5a5e9cb8a10a617615f2759d58c1db4d3b2b69fae6e718a272a5831336c73920c704109628c32f104"
+    },
+    "wrong_role_set": {
+      "schema": "heddle.api.common.SignedHostedWitnessSetV1",
+      "body_schema": "heddle.api.common.HostedWitnessSetV1",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180220012a04010203043880897a12209413b5df76d65bb2c8429fb39208b72ddbe4702a8d4852e20cc6f4d2363950751a40b766aadc51c793d5d9500b5940a348660ff342ea21fd3f7065beacdd39fc82b656a2bb7f36edf59f359f79a532c2ec4ee46b707910c1b23745c4cb9d54f3ac06",
+      "canonical_hex": "000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000002000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "signing_input_hex": "686564646c652d686f737465642d7769746e6573732d7365742d763100000000010000001968747470733a2f2f776566742e6578616d706c652e746573740000001164657363726970746f722d726f6f742d31000000000000000a00000000000f4240000000000013d620000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883000000206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf100000002000000010000000400000001000000020000000300000004000000000000000000000000001e84800000000000000000000000000000000000000000",
+      "domain": "heddle-hosted-witness-set-v1\u0000",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "signature_hex": "b766aadc51c793d5d9500b5940a348660ff342ea21fd3f7065beacdd39fc82b656a2bb7f36edf59f359f79a532c2ec4ee46b707910c1b23745c4cb9d54f3ac06"
+    },
+    "backdated_new_statement": {
+      "schema": "heddle.api.common.SignedHostedWitnessStatementV1",
+      "body_schema": "heddle.api.common.HostedWitnessStatementV1",
+      "wire_hex": "0af902080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318032210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10626262626262626262626262626262628001628801e0914392013261206e65776c7920696e76656e746564207075626c69636174696f6e207769746820616e206f6c642074696d657374616d7012400d88cf40a29dc4c9e5e831b83296e8338f2608cfef4755c5e1506736b647446a44c081887685dc4f2d033f942d72a51902a2851680bc8a4694ef59f298c7e109",
+      "canonical_hex": "00000001000000203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88300000003000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c00000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f00000000000000000000002061616161616161616161616161616161616161616161616161616161616161610000000000000001000000010000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa700000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef15200000010626262626262626262626262626262620000000000000062000000000010c8e00000003261206e65776c7920696e76656e746564207075626c69636174696f6e207769746820616e206f6c642074696d657374616d70",
+      "signing_input_hex": "1beec98825752a80c6a12aa180a7731a7d0281e3c073035f7178f8cfcc04c49e",
+      "domain": "heddle-import-publication-witness-v1",
+      "public_key_hex": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+      "signature_hex": "0d88cf40a29dc4c9e5e831b83296e8338f2608cfef4755c5e1506736b647446a44c081887685dc4f2d033f942d72a51902a2851680bc8a4694ef59f298c7e109"
+    },
+    "scope_violation": {
+      "schema": "heddle.api.v1alpha2.SignedDelegatedImportOperationV1",
+      "body_schema": "heddle.api.v1alpha2.DelegatedImportOperationV1",
+      "wire_hex": "0a9d0308011210232323232323232323232323232323231a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47332210242424242424242424242424242424242a10252525252525252525252525252525253210565656565656565656565656565656563a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d420f726566732f68656164732f6d61696e50015a1431313131313131313131313131313131313131316220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd6a207373737373737373737373737373737373737373737373737373737373737373722041414141414141414141414141414141414141414141414141414141414141417a2057575757575757575757575757575757575757575757575757575757575757578201204d0f13c6cb72fdcfb0dc02717fbab35d32ce8930e2e7c3976c110ae6feba28cf8801a00692012042424242424242424242424242424242424242424242424242424242424242429a01116769742d636f6e7665727465722f312e3012640a203ca22b30daca520cf3bbc2a0db59ab486efadca04d7cf094befd0414f9a4ec9c1240e8144aa7c4c720fd643310d77383ca6354abac1ea4f0202a44222ba4f74be13e7de1add1c4ac75375a5793a5a21bd23090e4bd21e99ba96dc26b83f2f91d0906",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000010242424242424242424242424242424240000001025252525252525252525252525252525000000105656565656565656565656565656565600000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000000f726566732f68656164732f6d61696e00000000000000000000000100000014313131313131313131313131313131313131313100000020a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd000000207373737373737373737373737373737373737373737373737373737373737373000000204141414141414141414141414141414141414141414141414141414141414141000000205757575757575757575757575757575757575757575757575757575757575757000000204d0f13c6cb72fdcfb0dc02717fbab35d32ce8930e2e7c3976c110ae6feba28cf0000000000000320000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e30",
+      "signing_input_hex": "fecf5a733c2cd8fc5b2ad4acb499dc3dd508ec594bfaefb2e7fbc006fda00f7d",
+      "domain": "heddle-delegated-import-operation-v1",
+      "public_key_hex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+      "signature_hex": "e8144aa7c4c720fd643310d77383ca6354abac1ea4f0202a44222ba4f74be13e7de1add1c4ac75375a5793a5a21bd23090e4bd21e99ba96dc26b83f2f91d0906"
+    },
+    "fork_delegation": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobDelegationV1",
+      "wire_hex": "0a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210747474747474747474747474747474742a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c4a20000000000000000000000000000000000000000000000000000000000000000052204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380140e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240fef798a5215ad3e14e05d39e32e4807f9c054caf129ffb2b1595efed77fd05a78c84873dfafc4899ecc5cc8f6a4e5795134ed030b9cafc91af56fe8d0f618a09",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010595959595959595959595959595959590000001074747474747474747474747474747474000000102525252525252525252525252525252500000020ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c0000002004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae9000000208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000200000000000000000000000000000000000000000000000000000000000000000000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000100000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d",
+      "signing_input_hex": "7c9c3c09c4c91518c1daaae1b6de2ffa1e01908cbc3df606f3393d1e78994072",
+      "domain": "heddle-import-job-delegation-v1",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "signature_hex": "fef798a5215ad3e14e05d39e32e4807f9c054caf129ffb2b1595efed77fd05a78c84873dfafc4899ecc5cc8f6a4e5795134ed030b9cafc91af56fe8d0f618a09"
+    },
+    "fork_renewal": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobRenewalV1",
+      "wire_hex": "0ad20808011220adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d18012220845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe92a87080a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210747474747474747474747474747474742a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c4a20000000000000000000000000000000000000000000000000000000000000000052204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380140e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240fef798a5215ad3e14e05d39e32e4807f9c054caf129ffb2b1595efed77fd05a78c84873dfafc4899ecc5cc8f6a4e5795134ed030b9cafc91af56fe8d0f618a0912640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a124053e6f56d52e68c9663f344f1650abb395d34cec1e40981683942f9007322de452c4a4fe1bcda55fb2182145ffbc908645edfc14fadeb2fee22ad29063d5e9601",
+      "canonical_hex": "0000000100000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d000000000000000100000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe900000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010595959595959595959595959595959590000001074747474747474747474747474747474000000102525252525252525252525252525252500000020ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c0000002004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae9000000208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c000000200000000000000000000000000000000000000000000000000000000000000000000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000100000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d00000020def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a00000040fef798a5215ad3e14e05d39e32e4807f9c054caf129ffb2b1595efed77fd05a78c84873dfafc4899ecc5cc8f6a4e5795134ed030b9cafc91af56fe8d0f618a09",
+      "signing_input_hex": "52dfe6f0119334bc634f817c86046f1732bdd9cd0e075d6249e109c79e57b279",
+      "domain": "heddle-import-job-renewal-v1",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "signature_hex": "53e6f56d52e68c9663f344f1650abb395d34cec1e40981683942f9007322de452c4a4fe1bcda55fb2182145ffbc908645edfc14fadeb2fee22ad29063d5e9601"
+    },
+    "wide_delegation": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobDelegationV1",
+      "wire_hex": "0a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210242424242424242424242424242424242a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380240e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa71240e8f65380d682fb81aeecd9d78be24aff57fd860051b462115ca1361d392a07ffcc4e8c7703b5abae798b11411c5ba8b727742b8b5debedaeeeaa517b1f286d07",
+      "canonical_hex": "00000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010595959595959595959595959595959590000001024242424242424242424242424242424000000102525252525252525252525252525252500000020ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c0000002004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae9000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000200000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d",
+      "signing_input_hex": "7b7455b1fb73c69a4f793fa474ecab4d6fd52ea96957b78c2c82d8c844af3c01",
+      "domain": "heddle-import-job-delegation-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "e8f65380d682fb81aeecd9d78be24aff57fd860051b462115ca1361d392a07ffcc4e8c7703b5abae798b11411c5ba8b727742b8b5debedaeeeaa517b1f286d07"
+    },
+    "wide_renewal": {
+      "schema": "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+      "body_schema": "heddle.api.v1alpha2.ImportJobRenewalV1",
+      "wire_hex": "0ad20808011220adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d18012220845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe92a87080a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210242424242424242424242424242424242a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380240e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa71240e8f65380d682fb81aeecd9d78be24aff57fd860051b462115ca1361d392a07ffcc4e8c7703b5abae798b11411c5ba8b727742b8b5debedaeeeaa517b1f286d0712640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa7124048570b063ab79201c5ba46999307c88e6cb80d44d2317678389f118ac7a8cc828cd0e3dd67758eec2b539656f3e079605112f0135f930c7ed0e83796cb5bb50e",
+      "canonical_hex": "0000000100000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d000000000000000100000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe900000001000000102323232323232323232323232323232300000020697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e473300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000000000010595959595959595959595959595959590000001024242424242424242424242424242424000000102525252525252525252525252525252500000020ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c0000002004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae9000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394000000203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a000000204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d08100000001000000066769746875620000002768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e676974000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e8000000204141414141414141414141414141414141414141414141414141414141414141000000204242424242424242424242424242424242424242424242424242424242424242000000116769742d636f6e7665727465722f312e300000000200000000000003e8000000010000000e726566732f68656164732f6465760000000100000001000000143030303030303030303030303030303030303030000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000204040404040404040404040404040404040404040404040404040404040404040000000000000000000000000000003e80000002092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa00000000000004b0000000000000070800000020535353535353535353535353535353535353535353535353535353535353535300000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000002010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa700000040e8f65380d682fb81aeecd9d78be24aff57fd860051b462115ca1361d392a07ffcc4e8c7703b5abae798b11411c5ba8b727742b8b5debedaeeeaa517b1f286d07",
+      "signing_input_hex": "6bcab4ebfe2e81e244dcfae9ae781006519b53fd47ccc88332d90d7056cb295f",
+      "domain": "heddle-import-job-renewal-v1",
+      "public_key_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "signature_hex": "48570b063ab79201c5ba46999307c88e6cb80d44d2317678389f118ac7a8cc828cd0e3dd67758eec2b539656f3e079605112f0135f930c7ed0e83796cb5bb50e"
+    }
+  },
+  "wire_vectors": {
+    "owner_history": {
+      "schema": "heddle.api.v1alpha2.OwnerHistory",
+      "wire_hex": "0a8b040ad60108011220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c1a10212121212121212121212121212121212224080112208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c2a56080212280801122408011220fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f6181228080112240801122043a72e714401762df66b68c26dfbdf2682aaec9f2474eca4613e424a0fbafd3c3a20222222222222222222222222222222222222222222222222222222222222222212640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240d92668469f385e9e28e655899892369355adfbda6cf972bcc83b78b4c6184d1b78f62a84fd3b22dc2ba09e4d6fbe7041cf5297e94a47b0de63ac6befd82ca70e1a640a20634b5461ba95649c714c6abfbdcbab53d49ca94addfc734e28b65fcce253506c1240588801a46fee46bd6760dd7727e86e56b69a78866b5ad9faa20fdaa5c24cc005eb50c76db58f5244c6a2b67f1c23b2a30dd3aee3d841a13d250ef66b329dc1041a640a20ccdcb32be904c92f5024dba6138f46f055eea3086b3147c2315150ccff1ef6c412403ca4048d88ee9028f1fcaf0851eaf4dc243a0aa61facea3fc20d6dbeb735a1322bcdf55632b12e9e37f6948a2f7a075cbfa858e6a002e34c1423e1188954b3021a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f"
+    },
+    "spool_owner_genesis": {
+      "schema": "heddle.api.v1alpha2.SignedSpoolOwnerGenesis",
+      "wire_hex": "0a380a10232323232323232323232323232323231224080112208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c12640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a12408adb71e2e231c52c47ef6a502647c447621cc755a333dcd2b0b7c8902def31c73ceecb032a18e047a37cc5979c044514922e44e92f71a888c36d6581bf9c870d"
+    },
+    "identity": {
+      "schema": "heddle.api.v1alpha2.ImportIdentityV1",
+      "wire_hex": "0a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f"
+    },
+    "owner_chain": {
+      "schema": "heddle.api.v1alpha2.ImportOwnerChainV1",
+      "wire_hex": "0a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331220c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f"
+    },
+    "scope": {
+      "schema": "heddle.api.v1alpha2.ImportPermissionScopeV1",
+      "wire_hex": "0a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e8071a94010a0f726566732f68656164732f6d61696e10011801221431313131313131313131313131313131313131312a20a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd3a20414141414141414141414141414141414141414141414141414141414141414148e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380240d00f"
+    },
+    "partial_manifest": {
+      "schema": "heddle.api.v1alpha2.ImportResultManifestV1",
+      "wire_hex": "08011210242424242424242424242424242424241a102525252525252525252525252525252522580a0f726566732f68656164732f6d61696e1a20f629dd465e8bce33529d678ba7df2fd8ddb53650c85ad2fb9065073d8a5f715c2220575757575757575757575757575757575757575757575757575757575757575728a006"
+    },
+    "terminal_manifest": {
+      "schema": "heddle.api.v1alpha2.ImportResultManifestV1",
+      "wire_hex": "08011210242424242424242424242424242424241a102525252525252525252525252525252522570a0e726566732f68656164732f6465761a2009c9c9e6aa65c1167cdacc464d1158f1be55398a0f453d1e03c2c0a7f64496d72220585858585858585858585858585858585858585858585858585858585858585828a00622580a0f726566732f68656164732f6d61696e1a20f629dd465e8bce33529d678ba7df2fd8ddb53650c85ad2fb9065073d8a5f715c2220575757575757575757575757575757575757575757575757575757575757575728a006"
+    },
+    "publication": {
+      "schema": "heddle.api.v1alpha2.ImportPublicationWitnessV1",
+      "wire_hex": "08011220f629dd465e8bce33529d678ba7df2fd8ddb53650c85ad2fb9065073d8a5f715c1a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d2210242424242424242424242424242424242a10252525252525252525252525252525253210565656565656565656565656565656563a0f726566732f68656164732f6d61696e4801521431313131313131313131313131313131313131315a204141414141414141414141414141414141414141414141414141414141414141622057575757575757575757575757575757575757575757575757575757575757576a20845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe9"
+    },
+    "genesis_proof": {
+      "schema": "heddle.api.common.HostedWitnessHistoryProofV1",
+      "wire_hex": "0a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf883100120032a20413b5d8bb1c15f502b3ef0ccc7ecdd6d96f2366571709f6e52bd317dd3fc8b242a20a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+    },
+    "authority_proof": {
+      "schema": "heddle.api.common.HostedWitnessHistoryProofV1",
+      "wire_hex": "0a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf8831002180120032a2027617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab7809362a20a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+    },
+    "publication_proof": {
+      "schema": "heddle.api.common.HostedWitnessHistoryProofV1",
+      "wire_hex": "0a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf8831003180220032a2008028d25f436b1f6f483f3eda655b929c8902c6377035a8939837ee404be5e63"
+    },
+    "lookup_request": {
+      "schema": "heddle.api.v1alpha2.GetHostedWitnessHistoryProofRequest",
+      "wire_hex": "0a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf8831220a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+    },
+    "lookup_response": {
+      "schema": "heddle.api.v1alpha2.GetHostedWitnessHistoryProofResponse",
+      "wire_hex": "0a4a0a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf8831003180220032a2008028d25f436b1f6f483f3eda655b929c8902c6377035a8939837ee404be5e63"
+    }
+  },
+  "negative_vectors": [
+    {
+      "id": "forged_wrong_root",
+      "type": "set",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120012a04010203043880897a122021b5ed087d85f3487fde30c9f89962e394ea43c341d7a72466f31ef8c9290fb61a402572c3352349868e96ef5db58d144d140745163607c78f16bc2770929d6175d7132e0eb30c4d24a4f77623838957796198b149191e70c18aa6f3239e03f9e00c",
+      "expected": "Signature",
+      "control": "current_set"
+    },
+    {
+      "id": "root_signed_invalid_current_set",
+      "type": "set",
+      "wire_hex": "0a88020801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120012a04010203043880897a42560a20b9655f6b34c8ffc0dfa4b38fd0bd4ee57f1fe913a780c3d476767c2467b0929512208a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17180120012a040102030430a0ac4f3880897a12207425ec677c350a25261238d25369315464502aa821500ba4a6514d951007b64d1a406ff9d97bf183684beb4af66a33eda002f08a4780ceedb4d654bd1c3ca149256634356b574022eacb4be1aa5bf30081ce587d2a2940527b07b9c9858afdfb3208",
+      "expected": "Semantic",
+      "control": "current_set"
+    },
+    {
+      "id": "job_key_as_witness",
+      "type": "set",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a20cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e542520a20cad36f8f4b2dd14abc83467beabff20aa530c1b49990f1c0885c664bafb815e51220ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1180120012a04010203043880897a1220efa218fbed04edd28920b0d7261ab3c069ae22a5c49cd461956841e5a05018d31a407115b17454db07e365d3bb1d6b27526e2cc7cf4b629aa1f5a5e9cb8a10a617615f2759d58c1db4d3b2b69fae6e718a272a5831336c73920c704109628c32f104",
+      "expected": "JobAsWitness",
+      "control": "current_set"
+    },
+    {
+      "id": "encoded_job_role_as_witness",
+      "type": "set",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180220012a04010203043880897a12209413b5df76d65bb2c8429fb39208b72ddbe4702a8d4852e20cc6f4d2363950751a40b766aadc51c793d5d9500b5940a348660ff342ea21fd3f7065beacdd39fc82b656a2bb7f36edf59f359f79a532c2ec4ee46b707910c1b23745c4cb9d54f3ac06",
+      "expected": "JobAsWitness",
+      "control": "current_set"
+    },
+    {
+      "id": "set_rollback_below_persisted_high_water",
+      "type": "set",
+      "wire_hex": "0ab0010801121968747470733a2f2f776566742e6578616d706c652e746573741a1164657363726970746f722d726f6f742d31200a28c0843d30a0ac4f3a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88342520a203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88312206e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1180120012a04010203043880897a122021b5ed087d85f3487fde30c9f89962e394ea43c341d7a72466f31ef8c9290fb61a406fee835d915438e9a0b01741bd7e46a081b4dfe5c909990613b4136ea8dfc860daf7c42dec9fe5938b79cccc7f5f5cf8a3485edf68af4cf681250bce8184ee0a",
+      "expected": "HighWater",
+      "control": "current_set",
+      "previous": "newer_set"
+    },
+    {
+      "id": "retired_seed_backdating_new_leaf",
+      "type": "statement",
+      "wire_hex": "0af902080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318032210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10626262626262626262626262626262628001628801e0914392013261206e65776c7920696e76656e746564207075626c69636174696f6e207769746820616e206f6c642074696d657374616d7012400d88cf40a29dc4c9e5e831b83296e8338f2608cfef4755c5e1506736b647446a44c081887685dc4f2d033f942d72a51902a2851680bc8a4694ef59f298c7e109",
+      "expected": "Proof",
+      "control": "delegation",
+      "set": "retired_set",
+      "proof": "publication_proof",
+      "now_ms": 1350000,
+      "new_work": false
+    },
+    {
+      "id": "retired_key_cannot_admit_new_work",
+      "type": "statement",
+      "wire_hex": "0af304080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318032210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10606060606060606060606060606060608001608801e091439201ab020000000100000020f629dd465e8bce33529d678ba7df2fd8ddb53650c85ad2fb9065073d8a5f715c00000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000001024242424242424242424242424242424000000102525252525252525252525252525252500000010565656565656565656565656565656560000000f726566732f68656164732f6d61696e00000000000000000000000100000014313131313131313131313131313131313131313100000020414141414141414141414141414141414141414141414141414141414141414100000020575757575757575757575757575757575757575757575757575757575757575700000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe91240980b6f2a29c219063e2109300c96e3f5d1135d17d7e14b8b0031ce6209b1f3625218727653e4a720172491acdca15c1e4648f1df1061bb947e1f1a13c340ba0e",
+      "expected": "Expired",
+      "control": "delegation",
+      "set": "retired_set",
+      "proof": "publication_proof",
+      "now_ms": 1350000,
+      "new_work": true
+    },
+    {
+      "id": "revoked_key_rejects_exact_history",
+      "type": "statement",
+      "wire_hex": "0af304080112203a4b36c09fa5258a8d08c4d3d1f6cd5f4da203ea013b6e75790aa791325cf88318032210232323232323232323232323232323232a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47333220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c3a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f4a20616161616161616161616161616161616161616161616161616161616161616150015801622010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa76a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d722033fa996ad3c591f9ea63d00cc2c723569c72113c023b9de899f58193777ef1527a10606060606060606060606060606060608001608801e091439201ab020000000100000020f629dd465e8bce33529d678ba7df2fd8ddb53650c85ad2fb9065073d8a5f715c00000020adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d0000001024242424242424242424242424242424000000102525252525252525252525252525252500000010565656565656565656565656565656560000000f726566732f68656164732f6d61696e00000000000000000000000100000014313131313131313131313131313131313131313100000020414141414141414141414141414141414141414141414141414141414141414100000020575757575757575757575757575757575757575757575757575757575757575700000020845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe91240980b6f2a29c219063e2109300c96e3f5d1135d17d7e14b8b0031ce6209b1f3625218727653e4a720172491acdca15c1e4648f1df1061bb947e1f1a13c340ba0e",
+      "expected": "Revoked",
+      "control": "delegation",
+      "set": "revoked_set",
+      "proof": "publication_proof",
+      "now_ms": 1350000,
+      "new_work": false
+    },
+    {
+      "id": "delegation_target_scope_violation",
+      "type": "operation",
+      "wire_hex": "0a9d0308011210232323232323232323232323232323231a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47332210242424242424242424242424242424242a10252525252525252525252525252525253210565656565656565656565656565656563a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d420f726566732f68656164732f6d61696e50015a1431313131313131313131313131313131313131316220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd6a207373737373737373737373737373737373737373737373737373737373737373722041414141414141414141414141414141414141414141414141414141414141417a2057575757575757575757575757575757575757575757575757575757575757578201204d0f13c6cb72fdcfb0dc02717fbab35d32ce8930e2e7c3976c110ae6feba28cf8801a00692012042424242424242424242424242424242424242424242424242424242424242429a01116769742d636f6e7665727465722f312e3012640a203ca22b30daca520cf3bbc2a0db59ab486efadca04d7cf094befd0414f9a4ec9c1240e8144aa7c4c720fd643310d77383ca6354abac1ea4f0202a44222ba4f74be13e7de1add1c4ac75375a5793a5a21bd23090e4bd21e99ba96dc26b83f2f91d0906",
+      "expected": "Scope",
+      "control": "operation_main"
+    },
+    {
+      "id": "expired_delegation",
+      "type": "new_operation",
+      "wire_hex": "0a9d0308011210232323232323232323232323232323231a20697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47332210242424242424242424242424242424242a10252525252525252525252525252525253210565656565656565656565656565656563a20adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d420f726566732f68656164732f6d61696e50015a1431313131313131313131313131313131313131316220a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd6a20a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd722041414141414141414141414141414141414141414141414141414141414141417a2057575757575757575757575757575757575757575757575757575757575757578201204d0f13c6cb72fdcfb0dc02717fbab35d32ce8930e2e7c3976c110ae6feba28cf8801a00692012042424242424242424242424242424242424242424242424242424242424242429a01116769742d636f6e7665727465722f312e3012640a203ca22b30daca520cf3bbc2a0db59ab486efadca04d7cf094befd0414f9a4ec9c12407d41f27e526a14101a616414ccd90bcfaa3c493db623e3f277a031082bc068e510d5fd69bb3edfabfd3dd338a1c6dae4c928db7e596c90e0115eb79c379aca09",
+      "expected": "Expired",
+      "control": "delegation",
+      "now_seconds": 1200
+    },
+    {
+      "id": "renewal_forks_logical_job",
+      "type": "renewal",
+      "wire_hex": "0ad20808011220adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d18012220845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe92a87080a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210747474747474747474747474747474742a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c4a20000000000000000000000000000000000000000000000000000000000000000052204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380140e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240fef798a5215ad3e14e05d39e32e4807f9c054caf129ffb2b1595efed77fd05a78c84873dfafc4899ecc5cc8f6a4e5795134ed030b9cafc91af56fe8d0f618a0912640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a124053e6f56d52e68c9663f344f1650abb395d34cec1e40981683942f9007322de452c4a4fe1bcda55fb2182145ffbc908645edfc14fadeb2fee22ad29063d5e9601",
+      "expected": "RenewalFork",
+      "control": "renewal",
+      "now_seconds": 1200,
+      "member": false
+    },
+    {
+      "id": "renewal_resets_result_budget",
+      "type": "renewal",
+      "wire_hex": "0ad20808011220adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d18012220845ad5d83c67d510c3b42f63fa7a5cd67b1f07762c1154311c573a173b017fe92a87080a9e070801128a010a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f1a10595959595959595959595959595959592210242424242424242424242424242424242a10252525252525252525252525252525253220ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c3a2004c35145eb4e66e8247e96ef11b94bf26a609863edbb142a43f2a84048e1cae942208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b3944a203e22693cd72a79d683400979fa3be39c4442473c6c5009cd5990dbf3279c8c6a52204af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081580162a3020a06676974687562122768747470733a2f2f6769746875622e636f6d2f686564646c65636f2f6578616d706c652e6769741a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807222041414141414141414141414141414141414141414141414141414141414141412a20424242424242424242424242424242424242424242424242424242424242424232116769742d636f6e7665727465722f312e30380240e8076ab8010a93010a0e726566732f68656164732f64657610011801221430303030303030303030303030303030303030302a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf3a20404040404040404040404040404040404040404040404040404040404040404048e807122092a69e9aeded57f93f3cc4616f3c8f6999691c3c06ad262f7f1011a6e49a46fa70b00978880e82012053535353535353535353535353535353535353535353535353535353535353538a0120adf4925bc63c9d4f69fcd7da4e5ad307d3aedb91971b00a7ff3d48b90a60e52d12640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa71240e8f65380d682fb81aeecd9d78be24aff57fd860051b462115ca1361d392a07ffcc4e8c7703b5abae798b11411c5ba8b727742b8b5debedaeeeaa517b1f286d0712640a2010d55ccb5bd45ae06674f6c10fc4dc50717b22102f92049c934ce0bca0889aa7124048570b063ab79201c5ba46999307c88e6cb80d44d2317678389f118ac7a8cc828cd0e3dd67758eec2b539656f3e079605112f0135f930c7ed0e83796cb5bb50e",
+      "expected": "RenewalFork",
+      "control": "renewal",
+      "now_seconds": 1200
+    }
+  ],
+  "trees": [
+    {
+      "count": 0,
+      "leaves_hex": [],
+      "root_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "paths": []
+    },
+    {
+      "count": 1,
+      "leaves_hex": [
+        "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936"
+      ],
+      "root_hex": "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936",
+      "paths": [
+        {
+          "index": 0,
+          "siblings_hex": []
+        }
+      ]
+    },
+    {
+      "count": 2,
+      "leaves_hex": [
+        "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936",
+        "413b5d8bb1c15f502b3ef0ccc7ecdd6d96f2366571709f6e52bd317dd3fc8b24"
+      ],
+      "root_hex": "08028d25f436b1f6f483f3eda655b929c8902c6377035a8939837ee404be5e63",
+      "paths": [
+        {
+          "index": 0,
+          "siblings_hex": [
+            "413b5d8bb1c15f502b3ef0ccc7ecdd6d96f2366571709f6e52bd317dd3fc8b24"
+          ]
+        },
+        {
+          "index": 1,
+          "siblings_hex": [
+            "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936"
+          ]
+        }
+      ]
+    },
+    {
+      "count": 3,
+      "leaves_hex": [
+        "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936",
+        "413b5d8bb1c15f502b3ef0ccc7ecdd6d96f2366571709f6e52bd317dd3fc8b24",
+        "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+      ],
+      "root_hex": "5e353820838b331bde62fe47b376d3a3ced92d8d6f847a33a39656cc444c9e57",
+      "paths": [
+        {
+          "index": 0,
+          "siblings_hex": [
+            "413b5d8bb1c15f502b3ef0ccc7ecdd6d96f2366571709f6e52bd317dd3fc8b24",
+            "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+          ]
+        },
+        {
+          "index": 1,
+          "siblings_hex": [
+            "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936",
+            "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+          ]
+        },
+        {
+          "index": 2,
+          "siblings_hex": [
+            "08028d25f436b1f6f483f3eda655b929c8902c6377035a8939837ee404be5e63"
+          ]
+        }
+      ]
+    },
+    {
+      "count": 5,
+      "leaves_hex": [
+        "021ae8258f62c79b0828ce452e29896899817c3126683fa614569397091838e8",
+        "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936",
+        "3cd60831f355b5009cca1b994a4b212363d6deab33ab97104b481c505ce3e137",
+        "413b5d8bb1c15f502b3ef0ccc7ecdd6d96f2366571709f6e52bd317dd3fc8b24",
+        "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+      ],
+      "root_hex": "0c5bdc4cdf451388c0f3d6cdd7eace4b912cc5618bc46e4bf7095258595c87b5",
+      "paths": [
+        {
+          "index": 0,
+          "siblings_hex": [
+            "27617af8f7eab837ab939b336b1a7626ff77b8a316ae08c83137bcdeab780936",
+            "1821b48d85d4049e18d672adb066a0407aeb3411bcc3ec6b8ee1bf160d96ef31",
+            "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+          ]
+        },
+        {
+          "index": 1,
+          "siblings_hex": [
+            "021ae8258f62c79b0828ce452e29896899817c3126683fa614569397091838e8",
+            "1821b48d85d4049e18d672adb066a0407aeb3411bcc3ec6b8ee1bf160d96ef31",
+            "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+          ]
+        },
+        {
+          "index": 2,
+          "siblings_hex": [
+            "413b5d8bb1c15f502b3ef0ccc7ecdd6d96f2366571709f6e52bd317dd3fc8b24",
+            "80822748ce92918308531c5006f1afdb6f7b45e5fc3d043351bcd1e87a12bd38",
+            "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+          ]
+        },
+        {
+          "index": 3,
+          "siblings_hex": [
+            "3cd60831f355b5009cca1b994a4b212363d6deab33ab97104b481c505ce3e137",
+            "80822748ce92918308531c5006f1afdb6f7b45e5fc3d043351bcd1e87a12bd38",
+            "a782090bfe1908fa34bbbc2489c51ec35a33d85d4849d9df0dc7f0dd267cf27a"
+          ]
+        },
+        {
+          "index": 4,
+          "siblings_hex": [
+            "cf86e8bd4aa1a4527feb82ddd96c1ce588045fde587e93a2e47a303a3ed2f5ee"
+          ]
+        }
+      ]
+    }
+  ],
+  "retry_scenarios": [
+    {
+      "id": "two_concurrent_renewals_and_paused_old_worker",
+      "route": "crates/weft-hosted/src/server/hosted/integration_v2/import_retry.rs::native_retry_import_source",
+      "initial_epoch": 1,
+      "committed_manifest": "partial_manifest",
+      "events": [
+        {
+          "action": "activate_renewal",
+          "certificate": "renewal",
+          "expected_epoch": 1,
+          "result": "OK",
+          "epoch_after": 2
+        },
+        {
+          "action": "activate_renewal",
+          "certificate": "competing_renewal",
+          "expected_epoch": 1,
+          "result": "StaleContext",
+          "epoch_after": 2
+        },
+        {
+          "action": "publish_paused_worker",
+          "operation": "operation_dev",
+          "expected_epoch": 1,
+          "result": "StaleContext",
+          "epoch_after": 2
+        },
+        {
+          "action": "publish",
+          "operation": "renewed_operation_dev",
+          "expected_epoch": 2,
+          "result": "OK",
+          "epoch_after": 2
+        }
+      ],
+      "final_manifest": "terminal_manifest",
+      "committed_slot_count": 2
+    },
+    {
+      "id": "commit_success_response_loss_retry_fresh_fetch",
+      "route": "crates/weft-hosted/src/server/hosted/integration_v2/import_retry.rs::native_retry_import_source",
+      "physical_retry_operation_id_hex": "7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+      "logical_job_id_hex": "24242424242424242424242424242424",
+      "retry_original_operation_hex": "25252525252525252525252525252525",
+      "original_operation": "operation_main",
+      "receipt": "publication_statement",
+      "manifest": "partial_manifest",
+      "events": [
+        "commit",
+        "lose_response",
+        "retry",
+        "fresh_fetch"
+      ],
+      "expected_replay": true,
+      "committed_slot_count": 1
+    }
+  ],
+  "owner_root_canonical_hex": "0000000100000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c000000102121212121212121212121212121212100000001000000208a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c0000000200000002000000010000000100000020fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f61800000001000000010000002043a72e714401762df66b68c26dfbdf2682aaec9f2474eca4613e424a0fbafd3c0000000000093a80000000002022222222222222222222222222222222222222222222222222222222222222220000000000000000",
+  "owner_root_signing_digest_hex": "c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f",
+  "context": {
+    "identity_wire_hex": "0a10232323232323232323232323232323231220697015f0a1aba858cceb26266abbf893cd30a735b4670fd8cfa876d1435e47331a20600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c2210212121212121212121212121212121212a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f",
+    "owner_chain_digest_hex": "4af54a6bd2103e6aef6f8b983d9e929555ae15468be4e6cb81065169da56d081",
+    "authority_expires_at_seconds": 2000,
+    "now_seconds": 1100,
+    "now_ms": 1100000,
+    "authority": "https://weft.example.test",
+    "root_id": "descriptor-root-1",
+    "root_epoch": 1,
+    "clock_floor_ms": 1000000,
+    "logical_job_id_hex": "24242424242424242424242424242424",
+    "retry_lineage_id_hex": "25252525252525252525252525252525"
+  },
+  "originals": {
+    "dev": {
+      "canonical_hex": "89a776657273696f6e01a573706f6f6cd92432333233323332332d323332332d323332332d323332332d323332333233323332333233a6706172656e74c0a462617365dc00202929292929292929292929292929292929292929292929292929292929292929a46e616d65a3646576a6696e74656e74b8496d706f72742074686973206578616374206272616e6368a56f776e657281a76163636f756e74c41021212121212121212121212121212121a763726561746f72dc0020cc8139770ecca87d175f56cca35466ccc34c7ecccccccbcc8dcc8acc91ccb4ccee37cca25dccf60f5bcc8fccc9ccb3cc94a56e6f6e6365dc00102a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "signature_hex": "077a1bbbba99a08d6df7b451e3910b52b3325be26e28e6f517537d31bffcdd451c7edf84d16bc05caa155b7798cbb64f48eb68513949e0c6125d9e54a8ec710a",
+      "envelope_hex": "65786163742d63726561746f722d617574686f726974792d656e76656c6f70653a646576",
+      "genesis_digest_hex": "1592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf"
+    },
+    "main": {
+      "canonical_hex": "89a776657273696f6e01a573706f6f6cd92432333233323332332d323332332d323332332d323332332d323332333233323332333233a6706172656e74c0a462617365dc00202929292929292929292929292929292929292929292929292929292929292929a46e616d65a46d61696ea6696e74656e74b8496d706f72742074686973206578616374206272616e6368a56f776e657281a76163636f756e74c41021212121212121212121212121212121a763726561746f72dc0020cc8139770ecca87d175f56cca35466ccc34c7ecccccccbcc8dcc8acc91ccb4ccee37cca25dccf60f5bcc8fccc9ccb3cc94a56e6f6e6365dc00102b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+      "signature_hex": "ce2b09e2eaaf2b13443be24c500b9b0650a84ac345d6ee3a0ec41e14dc37b95aa275d1b5bd21cdd2279afaf88d4526f9699868a1aabf269622e58109849b3e0c",
+      "envelope_hex": "65786163742d63726561746f722d617574686f726974792d656e76656c6f70653a6d61696e",
+      "genesis_digest_hex": "a133cef4531b2dcbe9a2d2d1a4da09bd5755b520ed95b7b53281bd81db13b2cd"
+    }
+  },
+  "unrelated_permissions": [
+    {
+      "format": "PURGE-v1",
+      "schema": "heddle.api.v1alpha2.SignedOwnerCapability",
+      "wire_hex": "0aed0108011220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c1a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f2a3a08011210777777777777777777777777777777771a24080112208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394321f0a1b0a102323232323232323232323232323232312076578616d706c65100138e80740ec0e4a207c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c52208eecd2ff783abff97d312817af59c03dbb290df26564afa4ea01020a80f588f412640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240efad0579cf25706630a3d2f7f0e7f17a55ad642e8fc3164301ab7356d478588793de8a5d51d25889c4a2a4effe8ca6d8556f50b00ee198108d031fed2189980a",
+      "canonical_hex": "0000000100000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c00000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000100000010777777777777777777777777777777770100000001000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39400000001000000102323232323232323232323232323232300000001000000076578616d706c65000000000100000000000003e8000000000000076c000000207c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c000000208eecd2ff783abff97d312817af59c03dbb290df26564afa4ea01020a80f588f4",
+      "signing_input_hex": "7918a0f61b5f542f7720372dbe67b90271756ff207b4d91403429499faa4a620",
+      "signature_hex": "efad0579cf25706630a3d2f7f0e7f17a55ad642e8fc3164301ab7356d478588793de8a5d51d25889c4a2a4effe8ca6d8556f50b00ee198108d031fed2189980a",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "expected": "ImportPermission"
+    },
+    {
+      "format": "timeline-acceptance-v3",
+      "schema": "heddle.api.v1alpha2.SignedOwnerCapability",
+      "wire_hex": "0a910308031220600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c1a20c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f2a3a08011210777777777777777777777777777777771a24080112208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39432c2010a1b0a102323232323232323232323232323232312076578616d706c6510021aa0010a102121212121212121212121212121212112240a220a2078787878787878787878787878787878787878787878787878787878787878781a20797979797979797979797979797979797979797979797979797979797979797920012a201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf32207b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b38e80740ec0e4a207c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c52206d581fffc9d610ce49ce12f9fbd5a105291eab717a847b03e52f467aeb77c0fa12640a20def88318e44a809464c1022f22230567bae6805d17b1ccfc2bebe5326232c58a1240768343437b8be77fd326145c2acbc203518616e4481c234df4414864183dff708094db31f9e603689df5e477c1c3ce43194896d53dde97c97e7bd00db3788707",
+      "canonical_hex": "0000000300000020600ff08d55f1191e6ac97bf7d4a470c8ee10a0854d841ff371cac359a559410c00000020c1e4e18bc4b63ef922ade58b888aedd931ca6e9726b3854c699a84fc403f8f5f000000000000000100000010777777777777777777777777777777770100000001000000208139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b39400000001000000102323232323232323232323232323232300000001000000076578616d706c6500000000020100000010212121212121212121212121212121210100000020787878787878787878787878787878787878787878787878787878787878787800000020797979797979797979797979797979797979797979797979797979797979797900000001000000201592d367f42abf4b0a06a9a10cdf0933e739b68b85b7b39f256e3239a1341ddf000000207b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b00000000000003e8000000000000076c000000207c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c000000206d581fffc9d610ce49ce12f9fbd5a105291eab717a847b03e52f467aeb77c0fa",
+      "signing_input_hex": "5589e83ac168846638e22787f8d7230e2bd097baf8b7290527a2494ed2fa9da9",
+      "signature_hex": "768343437b8be77fd326145c2acbc203518616e4481c234df4414864183dff708094db31f9e603689df5e477c1c3ce43194896d53dde97c97e7bd00db3788707",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "expected": "ImportPermission"
+    },
+    {
+      "format": "ordinary-Developer-role",
+      "canonical_hex": "446576656c6f706572",
+      "signing_input_hex": "f2c1462373e1051099d28c90a76b884fa1d818db6f8573a70ad4e5afef0755cf",
+      "signature_hex": "8e71de6c4a5064d72b4b915880c43385696e6d7dc6236cb1a1fc236f11e8190931f95b51a2ba0a79b92df10d241de121a83907727d7cbea18eb9209d4924e608",
+      "public_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "expected": "ImportPermission"
+    }
   ]
 }

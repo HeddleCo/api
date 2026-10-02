@@ -87,6 +87,18 @@ message CallContext {
   // against its independently pinned owner and current revocations. This
   // evidence cannot establish a new trusted owner or broaden any caveat.
   bytes bearer_authority_proof = 10;
+  ProtocolCompatibility protocol = 11;
+}
+
+// Semantic support, independent of package/release version. Missing/unknown
+// mandatory features reject before staging, signatures or durable mutation.
+enum MandatoryProtocolFeature {
+  MANDATORY_PROTOCOL_FEATURE_UNSPECIFIED = 0;
+  MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1 = 1;
+}
+message ProtocolCompatibility {
+  uint32 protocol_version = 1; // HYBRID peers require exactly 2.
+  repeated MandatoryProtocolFeature mandatory_features = 2; // Sorted unique.
 }
 
 enum DeploymentTarget {
@@ -257,6 +269,7 @@ message RpcContract {
   // apply. False retains finite-operation progress deadlines. Resumability
   // alone does not imply liveness: source transfers are finite streams.
   bool live_stream = 15;
+  repeated MandatoryProtocolFeature mandatory_features = 16;
 }
 
 // Machine-readable lifecycle semantics for the canonical Operation state enum.

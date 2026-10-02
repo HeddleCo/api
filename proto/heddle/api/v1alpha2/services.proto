@@ -13,6 +13,7 @@ import "heddle/api/v1alpha2/content.proto";
 import "heddle/api/v1alpha2/device.proto";
 import "heddle/api/v1alpha2/endpoint.proto";
 import "heddle/api/v1alpha2/identity.proto";
+import "heddle/api/v1alpha2/import_authority.proto";
 import "heddle/api/v1alpha2/integration.proto";
 import "heddle/api/v1alpha2/ownership.proto";
 import "heddle/api/v1alpha2/sync.proto";
@@ -2517,6 +2518,96 @@ service IntegrationService {
     deployment_targets: [DEPLOYMENT_TARGET_WEFT]
     maturity: SERVICE_MATURITY_PLANNED
   };
+  rpc PrepareImportJob(PrepareImportJobRequest) returns (PrepareImportJobResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "destination"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
+    };
+  }
+  rpc CommitImportJob(CommitImportJobRequest) returns (MutationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "destination"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
+    };
+  }
+  rpc RenewImportJob(RenewImportJobRequest) returns (MutationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "destination"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
+    };
+  }
+  rpc CancelImportJob(CancelImportJobRequest) returns (MutationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_DURABLE_WRITE
+      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
+      client_operation_id_required: true
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "destination"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
+    };
+  }
+  rpc GetHostedWitnessHistoryProof(GetHostedWitnessHistoryProofRequest) returns (GetHostedWitnessHistoryProofResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_NONE
+      signing_tier: SIGNING_TIER_NONE
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_NONE
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_NONE
+      authorization_existence: AUTHORIZATION_EXISTENCE_DISCLOSE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
+    };
+  }
   rpc BeginProviderConnection(BeginProviderConnectionRequest) returns (ProviderChallenge) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -2636,6 +2727,7 @@ service IntegrationService {
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
   rpc RetryImportSource(RetryImportSourceRequest) returns (MutationResponse) {
@@ -2654,6 +2746,7 @@ service IntegrationService {
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
   rpc SynchronizeRemote(SynchronizeRemoteRequest) returns (MutationResponse) {
@@ -2672,6 +2765,7 @@ service IntegrationService {
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
 }

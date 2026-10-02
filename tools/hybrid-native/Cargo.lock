@@ -898,9 +898,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "heddle-api"
-version = "0.31.0-alpha.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6de528f42914a401c94cbc23b80832b4f4c366b2dfa5cff7e19f899c95f0865"
+version = "0.31.0-alpha.16"
 dependencies = [
  "blake3",
  "bytes",
@@ -922,6 +920,8 @@ dependencies = [
 [[package]]
 name = "heddle-api"
 version = "0.31.0-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f4b3f7373352cf7341f19d6684735b924df85b8eef47afd37f7cb632d1edce"
 dependencies = [
  "blake3",
  "bytes",
@@ -942,9 +942,9 @@ dependencies = [
 
 [[package]]
 name = "heddle-biscuit-verifier"
-version = "0.28.1"
+version = "0.28.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58a938fa0e8541bcd184e68cae1646ef9580925c6c097c87a09d6e4a9be6a13f"
+checksum = "42cbd97e4d60ade802d8dd3e3f672d23f6a8420c8d6e1f98238890ab915db660"
 dependencies = [
  "base64 0.22.1",
  "biscuit-auth",
@@ -960,9 +960,9 @@ dependencies = [
 
 [[package]]
 name = "heddle-crypto"
-version = "0.28.1"
+version = "0.28.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a912051857c65a1231ae3ec981f7e0c35492b7ef568d04d61e82d2c55eda459a"
+checksum = "64707138f3245ab539e0e824f54c499293f01f810f1d0ab4bb61a1857b63fa2f"
 dependencies = [
  "aes-gcm 0.10.3",
  "base64 0.22.1",
@@ -994,9 +994,9 @@ dependencies = [
 
 [[package]]
 name = "heddle-object-model"
-version = "0.28.1"
+version = "0.28.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d28dae0703653a8036b5b2b6629d5f9d680d8eea58c55d03bf33a42de766c315"
+checksum = "d2243b26fc06b84f8fc556d3ae51fdc0cf1747beb268a1ce31fa2474845efe73"
 dependencies = [
  "anyhow",
  "base32",
@@ -1019,15 +1019,15 @@ dependencies = [
 
 [[package]]
 name = "heddle-thread-api"
-version = "0.28.1"
+version = "0.28.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dda93e70b990b1e5afc8ac29ddf6ceb5eb5e43b7049de5a552f10d9b52625a61"
+checksum = "28b9678acf9cdc95110ad918782e56ceedf4c4f365e8fad0995f45ed5798fd78"
 dependencies = [
  "base64 0.22.1",
  "blake3",
  "chrono",
  "getrandom 0.4.3",
- "heddle-api 0.31.0-alpha.12",
+ "heddle-api 0.31.0-alpha.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "heddle-biscuit-verifier",
  "heddle-crypto",
  "heddle-object-model",
@@ -1042,16 +1042,16 @@ dependencies = [
 
 [[package]]
 name = "heddleco-capability-verifier"
-version = "0.28.1"
+version = "0.28.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9336fad882df675bdd20296f563888146b56bc7f8b2a7e787d033c0c1982d0f"
+checksum = "f6ac4903929be362e565cb35349dbc9984238a9daf86d65cbe6d18be054020aa"
 dependencies = [
  "base64 0.22.1",
  "biscuit-auth",
  "chrono",
  "ed25519-dalek 3.0.0",
  "getrandom 0.2.17",
- "heddle-api 0.31.0-alpha.12",
+ "heddle-api 0.31.0-alpha.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "heddle-biscuit-verifier",
  "hex",
  "p256 0.14.0",
@@ -1113,8 +1113,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "biscuit-auth",
- "heddle-api 0.31.0-alpha.12",
  "heddle-api 0.31.0-alpha.16",
+ "heddle-api 0.31.0-alpha.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "heddle-biscuit-verifier",
  "heddle-crypto",
  "heddle-object-model",

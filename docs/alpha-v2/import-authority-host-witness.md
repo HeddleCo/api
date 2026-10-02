@@ -561,9 +561,10 @@ Never choose the representation from the semantic meaning of "bytes"; retain
 the pinned codec's representation and exact parse/re-encode equality.
 
 The locked `tools/hybrid-native` tool uses published `heddle-api
-0.31.0-alpha.12`, `heddle-thread-api 0.28.1`, `heddle-object-model 0.28.1`,
-`heddle-crypto 0.28.1`, and `heddleco-capability-verifier 0.28.1`, the set pinned
-by weft. Maintenance generation uses these codecs. `tools/verify.sh` runs its
+0.31.0-alpha.16`, `heddle-thread-api 0.28.5`, `heddle-object-model 0.28.5`,
+`heddle-crypto 0.28.5`, `heddleco-capability-verifier 0.28.5`, and
+`heddle-biscuit-verifier 0.28.5`, the published set selected for weft. Maintenance
+generation uses these codecs. `tools/verify.sh` runs its
 fixed-vector gate for native parsing, re-encoding, signatures, child ancestry,
 causal/claim closure, original authority and hosted request binding, plus fresh
 historical verification from the complete export, independently selected roots

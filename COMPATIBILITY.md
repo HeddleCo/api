@@ -1,5 +1,18 @@
 # Compatibility policy
 
+Content and symbol search index only each Thread's current source tips
+(HeddleCo/weft#2433). `SearchRequest.source_scope` keeps its tags and
+`SEARCH_SOURCE_HISTORY_RETAINED` (2) stays defined, but both retained-history
+scope and an exact `source_revision` naming a visible accepted revision that
+is not a current tip of a selected Thread fail with
+`CALL_FAILURE_CODE_FAILED_PRECONDITION` and a message beginning "only Thread
+tips are indexed". No results are returned from any other revision. Omitted or
+CURRENT scope, and an exact current tip, are unchanged; unknown, unaccepted or
+withheld revisions still yield no visible candidates, and the REVISION domain
+still resolves historical identifiers. Full-history search is planned
+(HeddleCo/weft#2470). This is a documentation change only: no tags, names or
+wire bytes change, and no breaking override is required.
+
 `SectionStatus.reason` (tag 6) and `SectionStatusReason` are additive for
 HeddleCo/api#277 and HeddleCo/weft#2423. Existing tags 1–5 are unchanged.
 An omitted reason decodes as UNSPECIFIED (0), preserving older servers;

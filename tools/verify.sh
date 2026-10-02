@@ -20,6 +20,7 @@ python3 -B -m unittest tests/test_v2_cutover_contract.py
 python3 tools/audit_contract.py
 cargo +nightly fmt --check
 cargo test --all-features
+cargo test --locked --manifest-path tests/custodial-verifier/Cargo.toml
 cargo clippy --all-features --all-targets -- -D warnings
 npm run build
 npm run typecheck

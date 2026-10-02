@@ -29,8 +29,8 @@ The Recover has zero old-authority overlap and preserves the effective signed
 
 ## OWNER DECISIONS
 
-Recommendations below are used throughout this proposed contract; owner review
-is pending. None weakens the retained-old-guardian rule.
+The [owner decisions on PR #302](https://github.com/HeddleCo/api/pull/302#issuecomment-5957524845)
+are accepted and govern this contract. None weakens the retained-old-guardian rule.
 
 1. **Delay:** preserve the current signed policy's nonzero window, default seven
    days. Begin the clock at successful email-proof admission and durable first
@@ -40,17 +40,16 @@ is pending. None weakens the retained-old-guardian rule.
 2. **Co-signing initiative:** require a fresh proposed-root request proof for
    `PrepareCustodialRecover` after the window. Weft must not autonomously
    co-sign, complete, or choose the replacement root because a timer fired.
-3. **Veto and signature release:** allow current-root veto until hosted completion,
-   including after preparation, but guarantee prevention of portable signature
-   release only until preparation wins its transaction. An already released
-   signature cannot be cryptographically recalled. Offline consumers must verify
-   current admitted history; an offline fork remains a residual custody risk.
-   A longer cancellable period after release needs a new verifier protocol,
-   not an assertion that email or hosted status can revoke portable signatures.
+3. **Veto and signature release:** allow current-root veto until completion
+   commits, including after preparation. Preparation releases no W0 authorization.
+   W0 signs privately only under the final account/attempt lock after all gates
+   pass. Release the completed signed history only after commit; veto, expiry
+   and rollback after signing never expose W0's signature. A veto that commits
+   first therefore prevents a portable Recover assembled from the prepared result.
 4. **Paper plus custody:** retain one paper-kit product ceremony and explicit
    opt-in. The present verifier supports one active custodial 1-of-1 policy or
    a noncustodial threshold policy; it rejects a 1-of-1 PAPER policy and a
-   threshold-one PAPER/WEFT union. Recommend offering custody as an explicitly
+   threshold-one PAPER/WEFT union. Offer custody as an explicitly
    selected active policy, with fresh paper recovery policy required on opt-out.
    One kit can encode multiple paper guardians, as the existing ceremony does.
    Simultaneous independent 1-of-1 paper and custody paths require a separately
@@ -58,7 +57,7 @@ is pending. None weakens the retained-old-guardian rule.
 5. **Lifetimes and limits:** email challenge lasts 15 minutes; a verified attempt
    expires 24 hours after eligibility; at most one email-verified pending attempt
    per account. Begun attempts must not occupy that slot. These bounds and the
-   rate limits below are recommended service defaults, subject to owner review.
+   rate limits below are service defaults under the accepted owner decisions.
 
 ## Flow and state machine
 
@@ -96,32 +95,38 @@ account session is inferred from it. Invalid supplied credentials fail closed.
    custody, never a previously used, pending or retired guardian key. Construct
    one canonical Recover with previous hash/sequence from the captured tip,
    next root R1, next policy `{W1}, threshold=1`, unchanged effective window,
-   `valid_from = eligible_at`, overlap zero and a random 32-byte nonce. W0 signs
-   the normal transition body; W1 signs the same body as possession proof.
+   `valid_from = eligible_at`, overlap zero and a random 32-byte nonce. Only W1
+   signs the body as possession proof; W0 authorization remains absent.
    Persist one immutable proposal and custody reservation atomically. Retries
    return exactly that proposal and do not mint more keys or refresh deadlines.
-5. The response has the typed `SignedOwnerKeyTransition`, canonical transition
-   body and SHA-256 signing digest, plus the exact admitted owner history needed
-   to check it. The next-authority proof is absent. The client independently
-   verifies the history, all fields, fresh policy, W0 signature, W1 proof and
-   canonical digest. It adds only R1's `next_authority_key_proof`; it does not
-   sign protobuf bytes or change the body or other signatures.
-6. `SubmitCustodialRecover` includes the exact attempt reference/version and the
-   now fully signed Recover, with a fresh R1 request proof. Under the same
-   account lock recheck veto, time, expiry, tip, email/consent and proposal
-   equality. Use the shared verifier's `apply_transition_with_timelock`, with
-   `pending_since = started_at`; do not invent a separate acceptance rule.
-   Atomic completion appends the transition, activates W1, retires W0, closes
-   the attempt and invalidates competing attempts/old authority credentials.
-   Return the accepted OwnerState and receipt, **no credential or access grant**.
-   Further credential enrollment proves its own key through existing contracts.
+5. The response has the immutable body, W1 possession proof, canonical bytes
+   and SHA-256 signing digest, plus the exact admitted owner history needed to
+   check it. Both W0 authorization and the next-authority proof are absent.
+   The client independently verifies the history, all fields, fresh policy,
+   W1 proof and canonical digest. It adds only R1's `next_authority_key_proof`;
+   it does not sign protobuf bytes or change the body or W1 proof. Even after
+   locally adding R1's proof, this result cannot satisfy the old-policy threshold.
+6. `SubmitCustodialRecover` includes the exact attempt reference/version, prepared
+   body and W1 proof plus R1's proof, with a fresh R1 request proof. Authorizations
+   must remain empty. Under the final account/attempt lock recheck veto, time,
+   expiry, tip, email/consent and proposal equality. Obtain/add W0's authorization
+   privately, then invoke the published `apply_transition_with_timelock` with
+   `pending_since = started_at`. Commit the owner transition, W1 activation,
+   logical W0 retirement and attempt completion atomically; invalidate competing
+   attempts/old authority credentials. Buffer all private signing results behind
+   this commit boundary. A failed verification, CAS or commit discards them and
+   returns no signed candidate, including through errors, logs or retry caches.
+   Release the completed signed OwnerState and receipt only after commit, with
+   **no credential or access grant**. Further credential enrollment proves its
+   own key through existing contracts.
 
 All state-changing RPCs have a nonempty client operation ID (1..128 UTF-8 bytes).
 Idempotency is scoped to method, proved key and attempt (begin: selector and key),
 and retains a hash of the exact request. Same ID/different bytes conflicts.
-Exact completed retries return the original receipt without a second mutation;
-fresh proofs are still required. Preparation changes the version and returns it
-in `proposal.recovery`; submission must use that returned version. A failed
+Exact completed retries return only the already committed history and original
+receipt under fresh authorization by the original R1, without another signature
+or mutation. Failed/rolled-back retries never return a private signing result.
+Preparation changes the version and returns it in `proposal.recovery`; submission must use that returned version. A failed
 veto does not fall back to email-secret veto or a session-authorized operation.
 
 ## Messages, RPC authorization, bounds and audit
@@ -150,8 +155,8 @@ bounded owner history, subject to any stricter shared-verifier limits).
 | BeginCustodialRecovery | Public; exact request PoP by proposed R1. Only existing verified email may receive delivery. | 3/account/hour, 10/source/hour, 3/key/hour; UUID selector and 32-byte R1; synthetic accounts consume equal quotas. | Attempt/selector hash, proved key, delivery intent, outcome; no token/email. |
 | SubmitRecoveryProof.custodial_email | R1 request PoP AND exact unexpired binding/token. | 5 tries/attempt lifetime; 10/source/hour; lock challenge on exhaustion; secret exactly32, binding exactly108 canonical bytes. | Consumption or rejection reason, captured tip, window, notification outbox ID. |
 | GetCustodialRecoveryAttempt | Public; request PoP by this attempt's R1 or separately verified current root. Wrong key/missing ref are existence-hidden. | 6/attempt/minute, 60/source/minute; single record, no listing or secrets. | Bounded access log keyed to attempt and proof key; no durable mutation. |
-| PrepareCustodialRecover | R1 request PoP; exact version, email admitted, window elapsed, still opted in/current tip. | 3/attempt/hour, 10/account/day; one immutable proposal per attempt, one reserved fresh key. | Proposal digest, W0/W1 key IDs, HSM operation/reservation IDs, release timestamp. |
-| SubmitCustodialRecover | R1 request PoP plus R1 portable proof; exact prepared proposal; all transaction gates. | 5/attempt/hour; 1 transition, 1 old authorization, 1 next guardian proof; accepted retry is a no-op. | Original Recover, old/new tips, key retirement/activation IDs, receipt and commit time. |
+| PrepareCustodialRecover | R1 request PoP; exact version, email admitted, window elapsed, still opted in/current tip. | 3/attempt/hour, 10/account/day; one immutable proposal per attempt, one reserved fresh key. | Proposal digest, W0/W1 key IDs, W1 possession operation/reservation IDs; no W0 signing or release. |
+| SubmitCustodialRecover | R1 request PoP plus R1 portable proof; exact prepared proposal; all transaction gates. | 5/attempt/hour; 1 transition, 0 client old authorizations, 1 next guardian proof; accepted retry is a no-op. | Committed Recover, old/new tips, W0 signing and key retirement/activation IDs, receipt and commit time. |
 | VetoCustodialRecovery | Public; current-root request PoP AND `heddle.custodial-recovery-veto.v1` SignedRecord. No agent, delegated key, attribution or email substitute. | 10/account/minute; per-source global abuse ceiling; owner veto has a reserved quota separate from recovering-client quotas. | Root key ID, attempt/version, signed reason-free veto, retirement of reservation, commit time. |
 
 The veto SignedRecord uses existing `identity_management::recovery_action` with
@@ -166,11 +171,44 @@ rate-limit responses use the standard typed failure/retry hint.
 
 After factor admission, wrong version is Conflict; early prepare/submit or a
 vetoed/expired/superseded attempt is FailedPrecondition; malformed/oversized input
-is InvalidArgument. Before factor admission, missing account/opt-in and bad
-binding/token are indistinguishable Unauthenticated outcomes. Request PoP failures
-are Unauthenticated. No failure returns a partial proposal or fresh-key secret.
+is InvalidArgument. Independently authenticated current owners retain their
+owner-authorized view/veto channel. Before factor admission the shared
+`SubmitRecoveryProof` method and all custody RPCs use existence `HIDE`:
+
+- Begin issues the same bounded EMAIL_PENDING record for real, synthetic,
+  opted-out and missing accounts; only email delivery differs. Get with that
+  attempt's proved R1 returns the same pre-factor shape, without owner history,
+  email, opt-in status or a pending-slot distinction. Missing attempt references
+  and unproved/wrong keys return the same Unauthenticated envelope.
+- Request-key resolution and PoP checking use the same lookup and verification
+  work for real and synthetic records. Missing/opted-out records take the same
+  bounded lookup path; neither the key lookup nor its failure can disclose the
+  selected account. Never substitute a session key or treat a proposed key as
+  a current owner for veto.
+- Invalid factor probes normalize bad binding/token, missing attempts,
+  consumed/expired challenges and exhausted challenge guesses to the same
+  Unauthenticated code, message, details and timing class. Include no
+  state-specific retry hint. Pre-factor prepare/submit/veto probes with no
+  admitted factor or independently verified current root use that same failure;
+  they return no partial proposal, history or W0 authorization.
+- Apply equal source/key/selector/attempt quotas, including synthetic records
+  and missing references. General rate limits may return the standard uniform
+  retry hint only at identical public quota boundaries, independent of existence
+  or private challenge state. Charge reserved owner-veto quota only after current
+  owner authentication; unauthenticated traffic cannot exhaust it.
+- A deployment-wide unsupported-feature FailedPrecondition is uniform across
+  every selected account and attempt, including the shared proof arm. It must
+  never depend on account existence, opt-in or whether the attempt is real.
+
+Weft must compare the full sequence begin -> get -> invalid proof -> get ->
+prepare -> submit -> veto across real/synthetic/opted-out/missing records, with
+fresh, consumed, expired and exhausted challenges and valid/wrong request keys.
+Compare status, message/details, record shape, quota charges, retry hints and
+response timing, not begin alone. Only proof of the actual bound factor (or
+independent current-owner authorization) permits detailed state errors.
 Audit retention follows the existing security-audit policy; log structured IDs,
-digests and verdicts, never tokens, email addresses, key material or credentials.
+digests and verdicts, never tokens, email addresses, private signing candidates,
+key material or credentials.
 
 ## Custody lifecycle and threats
 
@@ -184,18 +222,27 @@ records as the owner authority. Separate email-delivery, state-admission and sig
 The reviewed versioned custody warning and digest gate remain mandatory.
 
 Lifecycle: `reserved -> active -> retired -> destroyed`; a key is active only
-if named in the committed current policy. Persist HSM reservation and proposal
-before release; retries reuse them. Crashes reconcile reservations against the
+if named in the committed current policy. Persist the HSM reservation and W1-only proposal
+before preparation returns; retries reuse them. Private W0 signing candidates
+are never response or retry-cache artifacts before completion commits. Crashes reconcile reservations against the
 durable owner tip; uncertain state fails closed. On CAS failure/veto/expiry,
 destroy an unused W1; on completion retire W0 atomically with owner CAS and
 schedule secure destruction. Keep public keys/signatures for history. Restoring
 backups never reactivates a retired key. Operational rewrapping of an active HSM
 key does not change its public identity or substitute for fresh recovery keys.
 
-Email compromise can satisfy the factor: the nonzero delay, current-root
-notifications and veto are the defenses. Independently notify enrolled devices
+Email compromise can satisfy the factor and both explicit R1 requests: those
+requests prove intent/possession, not an additional factor. The nonzero delay,
+current-root notifications and veto are the defenses. Independently notify enrolled devices
 and existing account channels so an attacker controlling email cannot suppress
-every warning. Delivery outages never shorten the window or trigger fallback.
+every warning. An owner with an accessible current root can veto until completion
+commits, preventing W0 release. An offline owner, lost root or unusable alert
+leaves a patient mailbox holder able to recover at eligibility; outbox intent
+is not proof of delivery or observation. A stolen delegated/session key cannot
+veto, while a stolen usable current-owner private key already has owner authority
+and can veto legitimate recovery. The protocol cannot distinguish two holders
+of that same private key. Delivery outages never shorten the window or trigger
+fallback. These accepted policy limits remain in the custody warning.
 Weft compromise remains a custody risk: an attacker controlling the one guardian
 can produce a portable Recover. Key isolation, narrow signer admission and
 honest warning text bound this risk; email is not an offline verifier rule.
@@ -231,25 +278,54 @@ and window while replacing W0 with W1; it does not renew consent or enlarge scop
 ## Conformance boundary
 
 Shared Rust/TypeScript vectors exercise canonical email bindings, typed wire
-carriers, immutable proposals and admission gates. Required negatives: another
-attempt's email proof, missing fresh guardian/proof, early submit and vetoed
-submit. These are contract checks, not evidence of shipped Weft transactions,
-notification delivery or HSM deletion. Those implementation tests must accompany
-weft#1521/#1527. Portable signatures continue to use the shared verifier's
-canonical transition digest, never a custody-specific transition signature.
+carriers, immutable W1-only proposals and structural admission gates. The helper
+matrix covers missing/empty/wrong-kind next policies, missing/wrong-signer W1
+proofs, W1 equal to W0 or R1, absent/malformed R1 proof, attempts after veto or
+expiry, unknown state, fixed widths, zero/overflowing windows and timestamp
+addition. Raw proof vectors cover every pair of tags 3/4/5 in both orders and
+repeated same-arm tags. The bounded checked decoders reject those original bytes
+before ordinary protobuf decoding discards an arm. Already-decoded helpers do
+not enforce other RPC byte ceilings; Weft must enforce them before decoding.
 
 The additive Rust `v2::custodial_recovery` and TypeScript
 `@heddleco/api/v2/custodial-recovery` helpers encode the email intent, derive the
-stored secret hash, recompute the restricted custody Recover canonical body and
-digest, and check structural submission prerequisites. They do not verify email
-delivery/secret equality, request proofs, owner history or Ed25519 signatures.
-They never turn a client-carried proposal or observation into trusted state.
+stored secret hash, recompute the restricted canonical Recover body/digest,
+and check structural prerequisites. They do not verify email delivery/secret
+equality, request proofs, owner history or Ed25519 signatures. A well-shaped
+invalid signature can pass a helper; it must fail the published verifier.
 The caller supplies the persisted current attempt/proposal and independently
-resolved old guardian. Hosts still enforce the complete transaction obligations
-above and the shared verifier; clients still verify original portable evidence.
+resolved old guardian; client-carried observations never become trusted state.
 
 Run `node tests/generate-custodial-recovery-fixture.mjs` after `npm run build`
-to reproduce `tests/fixtures/custodial-recovery-v1.json`. Fixture seeds are public
-test data. The Node harness and Rust tests round-trip these same wire bytes and
-check every negative for its specific rejection reason. The reflection suite's
-state vector and descriptor tests all fail against the original schema.
+to reproduce `tests/fixtures/custodial-recovery-v1.json`. Seeds are public test
+data. `completed_recover_wire_hex` is the post-commit artifact, never a prepare
+response. The retained-W0 vector has a recomputed canonical digest, valid W0
+authorization, R1 proof and W0 next-guardian proof, and a corresponding W0-only
+persisted proposal for helper isolation.
+
+`cargo test --locked --manifest-path tests/custodial-verifier/Cargo.toml`
+runs the committed harness pinned to published capability-verifier 0.28.5,
+patching only its API types to this checkout. It asserts the exact retained-policy
+error, missing/empty/wrong-kind policy errors, missing/wrong/invalid W1 proof,
+W1 equal to R1, insufficient/invalid old authorization, missing/invalid R1 proof,
+and zero old-authority overlap. A fully signed backdated `valid_from` succeeds
+as portable history at `now >= valid_from` but fails trusted-start timelock
+admission. There is no second verifier implementation. `tools/verify.sh` runs
+this harness alongside API and TypeScript conformance.
+
+The release scenarios represent prepare followed by winning veto, expiry,
+rollback after private signing and both submit/veto commit orderings. Using only
+the returned proposal and R1 seed, the published portable verifier rejects the
+client-assembled Recover for missing old-policy authorization, regardless of
+hosted state errors. The completion-first fixture is portable and terminal.
+These are API boundary fixtures, not a Weft transaction or timing-equivalence
+implementation. Weft's host suite must inject failure after W0 signing/before
+commit, capture all response/error/retry-cache paths, and race actual submit/veto
+transactions under their shared lock. Veto-first, expiry and rollback must expose
+no W0 authorization; submit-first may return only the committed history under
+original-R1 retry authorization. It must also test durable secret consumption,
+email-version supersession, exact retry binding, notification intent, quotas,
+the full pre-factor probe sequence above, stricter raw/history bounds, key
+retirement/cleanup and backup restoration. These gates accompany weft#1521/#1527
+before custody is available. The reflection suite checks the shared proof RPC's
+HIDE metadata as well as the five custody RPCs.

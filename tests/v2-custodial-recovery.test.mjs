@@ -4,9 +4,9 @@ import { test } from 'node:test';
 import { createPublicKey, verify } from 'node:crypto';
 import { fromBinary, toBinary } from '@bufbuild/protobuf';
 import * as api from '../packages/typescript/dist/v1alpha2/identity_pb.js';
-import { AuthorizationVerificationKeySchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
+import { AuthorizationVerificationKeySchema, SignedOwnerKeyTransitionSchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
 import { canonicalCustodialEmailBinding, custodialEmailSecretHash, validateCustodialEmailProof,
-  canonicalCustodialRecover, custodialProposalSigningDigest, validateCustodialSubmission } from '../packages/typescript/dist/v1alpha2/custodial-recovery.js';
+  canonicalCustodialRecover, custodialProposalSigningDigest, validateCustodialSubmission, decodeCustodialRecoveryProof } from '../packages/typescript/dist/v1alpha2/custodial-recovery.js';
 
 const f = JSON.parse(readFileSync(new URL('./fixtures/custodial-recovery-v1.json', import.meta.url)));
 const bytes = hex => new Uint8Array(Buffer.from(hex, 'hex'));
@@ -42,7 +42,7 @@ test('canonical email proof binds account, attempt, proposed root and challenge'
 });
 
 test('Recover recomputes canonical bytes and verifies old guardian, fresh guardian and new root signatures', () => {
-  const p = proposal(), request = submit(), signed = request.recover, body = signed.transition;
+  const p = proposal(), request = submit(), signed = decode(SignedOwnerKeyTransitionSchema, f.completed_recover_wire_hex), body = signed.transition;
   assert.deepEqual(canonicalCustodialRecover(body), bytes(f.canonical_transition_hex));
   const digest = custodialProposalSigningDigest(p);
   assert.deepEqual(digest, bytes(f.signing_digest_hex));
@@ -71,7 +71,8 @@ for (const vector of f.negatives) test(vector.name, () => {
       attempt().custodial.binding, 1700000000n), new RegExp(vector.error));
   } else {
     assert.throws(() => validateCustodialSubmission(
-      vector.attempt_wire_hex ? decode(api.RecoveryAttemptSchema, vector.attempt_wire_hex) : attempt(), proposal(),
+      vector.attempt_wire_hex ? decode(api.RecoveryAttemptSchema, vector.attempt_wire_hex) : attempt(),
+      vector.proposal_wire_hex ? decode(api.CustodialRecoverProposalSchema, vector.proposal_wire_hex) : proposal(),
       vector.submit_wire_hex ? decode(api.SubmitCustodialRecoverRequestSchema, vector.submit_wire_hex) : submit(), old,
       BigInt(vector.now ?? '1700604800')), new RegExp(vector.error));
   }
@@ -82,4 +83,26 @@ test('absent custody and missing next guardian proof cannot submit', () => {
   assert.throws(() => validateCustodialSubmission(absent, proposal(), submit(), old, 1700604800n), /Binding/);
   const missing = submit(); missing.recover.nextRecoveryKeyProofs = [];
   assert.throws(() => validateCustodialSubmission(attempt(), proposal(), missing, old, 1700604800n), /FreshKey/);
+});
+
+test('prepare and client submission never contain W0 authorization', () => {
+  assert.equal(proposal().recover.authorizations.length, 0);
+  assert.equal(submit().recover.authorizations.length, 0);
+  assert.equal(decode(SignedOwnerKeyTransitionSchema, f.completed_recover_wire_hex).authorizations.length, 1);
+});
+
+test('raw duplicate proof tags reject before last-wins in both orders', () => {
+  const cases = { 3: 'signedTransition', 4: 'paperUnlock', 5: 'custodialEmail' };
+  for (const vector of f.ambiguous_proofs) {
+    assert.equal(decode(api.SubmitRecoveryProofRequestSchema, vector.raw_wire_hex).proof.case, cases[vector.last_tag]);
+    assert.throws(() => decodeCustodialRecoveryProof(bytes(vector.raw_wire_hex)), /Binding/, vector.name);
+  }
+  const proof = bytes(f.proof_request_wire_hex);
+  assert.deepEqual(toBinary(api.SubmitRecoveryProofRequestSchema, decodeCustodialRecoveryProof(proof)), proof);
+  const atLimit = new Uint8Array(8192), length = 8192 - proof.length - 4;
+  atLimit.set(proof); atLimit.set([0xa2, 0x06, (length & 0x7f) | 0x80, length >> 7], proof.length);
+  assert.doesNotThrow(() => decodeCustodialRecoveryProof(atLimit));
+  assert.throws(() => decodeCustodialRecoveryProof(new Uint8Array(8193)), /Binding/);
+  for (const malformed of [[0x28, 0], [0x2a, 0xff], [0]])
+    assert.throws(() => decodeCustodialRecoveryProof(new Uint8Array(malformed)), /Binding/);
 });

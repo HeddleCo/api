@@ -1,14 +1,38 @@
 // Intent encoding and preliminary gates only. Hosts additionally authenticate
 // the email secret/current state and use the shared portable capability verifier.
-import { toBinary } from "@bufbuild/protobuf";
+import { fromBinary, toBinary } from "@bufbuild/protobuf";
+import { BinaryReader, WireType } from "@bufbuild/protobuf/wire";
 import { sha256 } from "@noble/hashes/sha2.js";
-import type { CustodialEmailBinding, CustodialEmailProof, RecoveryAttempt,
-  CustodialRecoverProposal, SubmitCustodialRecoverRequest } from "./identity_pb.js";
-import { RecoveryAttemptSchema } from "./identity_pb.js";
-import { OwnerKeyTransitionSchema, AuthorizationSignatureSchema,
-  type AuthorizationSignature, type AuthorizationVerificationKey, type OwnerKeyTransition } from "./owner_records_pb.js";
+import type {
+  CustodialEmailBinding, CustodialEmailProof, RecoveryAttempt,
+  CustodialRecoverProposal, SubmitCustodialRecoverRequest, SubmitRecoveryProofRequest
+} from "./identity_pb.js";
+import { RecoveryAttemptSchema, SubmitRecoveryProofRequestSchema } from "./identity_pb.js";
+import {
+  OwnerKeyTransitionSchema, AuthorizationSignatureSchema,
+  type AuthorizationSignature, type AuthorizationVerificationKey, type OwnerKeyTransition
+} from "./owner_records_pb.js";
 
 export const CUSTODIAL_VETO = "heddle.custodial-recovery-veto.v1";
+/** Bound and check original proof tags before oneof decoding discards an arm. */
+export function decodeCustodialRecoveryProof(bytes: Uint8Array): SubmitRecoveryProofRequest {
+  if (bytes.length > 8192) throw new Error("Binding");
+  const reader = new BinaryReader(bytes);
+  let seen = false;
+  try {
+    while (reader.pos < reader.len) {
+      const [tag, wire] = reader.tag();
+      if (tag >= 3 && tag <= 5) {
+        if (seen || wire !== WireType.LengthDelimited) throw new Error("Binding");
+        seen = true;
+      }
+      reader.skip(wire, tag);
+    }
+    return fromBinary(SubmitRecoveryProofRequestSchema, bytes);
+  } catch {
+    throw new Error("Binding");
+  }
+}
 const utf8 = new TextEncoder();
 const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 function joined(...parts: Uint8Array[]): Uint8Array {
@@ -76,7 +100,7 @@ export function custodialProposalSigningDigest(proposal: CustodialRecoverProposa
   if (!equal(proposal.canonicalTransition, canonical) || !equal(proposal.signingDigest, digest)) throw new Error("Proposal");
   return digest;
 }
-/** This is not signature verification or authoritative transaction admission. */
+/** Structural admission only. W0 authorization stays private until commit. */
 export function validateCustodialSubmission(attempt: RecoveryAttempt, proposal: CustodialRecoverProposal,
   request: SubmitCustodialRecoverRequest, oldGuardian: AuthorizationVerificationKey, now: bigint): void {
   const details = attempt.custodial;
@@ -87,7 +111,7 @@ export function validateCustodialSubmission(attempt: RecoveryAttempt, proposal: 
   if (!attempt.ref || attempt.ref.spool || !attempt.ref.id || request.recovery?.spool
     || request.recovery?.id !== attempt.ref.id || now < 0n) throw new Error("Binding");
   if (attempt.version.length !== 32 || !equal(request.expectedVersion, attempt.version)) throw new Error("Version");
-  const seconds = (time: { seconds: bigint; nanos: number } | undefined): bigint => {
+  const seconds = (time: { seconds: bigint; nanos: number; } | undefined): bigint => {
     if (!time || time.nanos !== 0 || time.seconds <= 0n || time.seconds > 0x7fffffffffffffffn)
       throw new Error("Binding");
     return time.seconds;
@@ -115,8 +139,8 @@ export function validateCustodialSubmission(attempt: RecoveryAttempt, proposal: 
     || !proposal.ownership || !equal(proposal.ownership.version, details.ownerStateHash)
     || prepared.nextAuthorityKeyProof || !prepared.transition
     || !equal(toBinary(OwnerKeyTransitionSchema, prepared.transition), toBinary(OwnerKeyTransitionSchema, body))
-    || !signaturesEqual(signed.authorizations, prepared.authorizations)
+    || prepared.authorizations.length !== 0
     || !signaturesEqual(signed.nextRecoveryKeyProofs, prepared.nextRecoveryKeyProofs)
-    || signed.authorizations.length !== 1 || !signatureShape(signed.authorizations[0], oldGuardian)
+    || signed.authorizations.length !== 0
     || !signatureShape(signed.nextAuthorityKeyProof, nextRoot)) throw new Error("Proposal");
 }

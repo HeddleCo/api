@@ -65,6 +65,7 @@ fn custody_has_a_distinct_email_proof_and_typed_recover_proposal() {
 fn custody_rpc_metadata_requires_possession_and_idempotent_writes() {
     for method in [
         "BeginCustodialRecovery",
+        "SubmitRecoveryProof",
         "GetCustodialRecoveryAttempt",
         "PrepareCustodialRecover",
         "SubmitCustodialRecover",

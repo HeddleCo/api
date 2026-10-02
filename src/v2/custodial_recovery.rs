@@ -2,9 +2,35 @@
 //! These checks do not authenticate an email secret, verify portable signatures,
 //! consult current owner state, or replace the shared capability verifier.
 use crate::heddle::api::v1alpha2 as api;
+use prost::{
+    Message,
+    encoding::{DecodeContext, WireType, decode_key, skip_field},
+};
 use sha2::{Digest, Sha256};
 
 pub const CUSTODIAL_VETO: &str = "heddle.custodial-recovery-veto.v1";
+
+/// Enforce the proof's existing 8 KiB bound and exclusive raw proof tags before
+/// protobuf decoding can discard an earlier arm. This does not admit a factor.
+pub fn decode_recovery_proof(bytes: &[u8]) -> Result<api::SubmitRecoveryProofRequest, Error> {
+    if bytes.len() > 8192 {
+        return Err(Error::Binding);
+    }
+    let mut remaining = bytes;
+    let mut seen = false;
+    while !remaining.is_empty() {
+        let (tag, wire) = decode_key(&mut remaining).map_err(|_| Error::Binding)?;
+        if (3..=5).contains(&tag) {
+            if seen || wire != WireType::LengthDelimited {
+                return Err(Error::Binding);
+            }
+            seen = true;
+        }
+        skip_field(wire, tag, &mut remaining, DecodeContext::default())
+            .map_err(|_| Error::Binding)?;
+    }
+    api::SubmitRecoveryProofRequest::decode(bytes).map_err(|_| Error::Binding)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
@@ -171,6 +197,8 @@ pub fn proposal_signing_digest(
 /// Structural gates against the persisted attempt/proposal and independently
 /// resolved old guardian. Hosts MUST also enforce current tip, email, consent,
 /// request PoP and apply_transition_with_timelock in the completion transaction.
+/// Both proposal and submission MUST omit W0 authorization. Only the host adds
+/// it privately after the final locked gates; no signature may escape on abort.
 pub fn validate_submission(
     attempt: &api::RecoveryAttempt,
     proposal: &api::CustodialRecoverProposal,
@@ -253,10 +281,9 @@ pub fn validate_submission(
         || proposal.ownership.as_ref().map(|o| &o.version) != Some(&details.owner_state_hash)
         || prepared.next_authority_key_proof.is_some()
         || signed.transition != prepared.transition
-        || signed.authorizations != prepared.authorizations
+        || !prepared.authorizations.is_empty()
         || signed.next_recovery_key_proofs != prepared.next_recovery_key_proofs
-        || signed.authorizations.len() != 1
-        || !signature_shape(&signed.authorizations[0], old_guardian)
+        || !signed.authorizations.is_empty()
         || !signed
             .next_authority_key_proof
             .as_ref()

@@ -896,6 +896,11 @@ message PaperCodeUnlock {
   bytes argon2id_hash = 1;
 }
 message SubmitRecoveryProofRequest {
+  // Existence HIDE: before admitting the actual factor, normalize missing,
+  // synthetic and opted-out attempts, bad bindings/tokens, consumed/expired
+  // challenges and wrong request keys to uniform Unauthenticated failures.
+  // Equal public quotas/retry hints and request-key lookup work apply to real
+  // and synthetic records. Deployment-wide unsupported errors are uniform.
   string client_operation_id = 1;
   RecordRef recovery = 2;
   oneof proof {
@@ -978,8 +983,10 @@ message CustodialRecoverProposal {
   // Version after preparation; submit uses this version, not the prior one.
   RecoveryAttempt recovery = 1;
   OwnerState ownership = 2; // Original admitted history, independently verified.
-  // Immutable Recover with old guardian authorization and fresh next-guardian
-  // possession proof. next_authority_key_proof is absent until the client signs.
+  // Immutable body and fresh W1 possession proof, with NO W0 authorization.
+  // next_authority_key_proof is absent until the client signs. W0 signs only
+  // under the final account/attempt lock; its authorization is released only
+  // in the completed history after commit, never on veto, rollback or expiry.
   SignedOwnerKeyTransition recover = 3;
   // canonical_owner_key_transition_v1, not protobuf serialization.
   bytes canonical_transition = 4;
@@ -995,13 +1002,18 @@ message SubmitCustodialRecoverRequest {
   string client_operation_id = 1;
   RecordRef recovery = 2;
   bytes expected_version = 3;
-  // Exact prepared body/signatures plus only the new root's portable proof.
+  // Exact prepared body/W1 proof plus only the new root's portable proof.
+  // authorizations MUST be empty. Under the final account/attempt lock the host
+  // rechecks all gates, adds W0 authorization privately, verifies and commits.
   // Host checks time, veto, expiry, CAS, consent, email and shared verifier
   // atomically with fresh-key activation and old-key retirement.
   SignedOwnerKeyTransition recover = 4;
 }
 message SubmitCustodialRecoverResponse {
   MutationReceipt receipt = 1;
+  // Completed signed history is released only after commit. Abort responses
+  // never expose W0 authorization. Completed retries require the original R1
+  // authorization and return only the already committed result.
   OwnerState ownership = 2; // Accepted evidence; no credential/access grant.
 }
 message VetoCustodialRecoveryRequest {

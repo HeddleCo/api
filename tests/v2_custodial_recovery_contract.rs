@@ -93,7 +93,7 @@ fn recover_preserves_canonical_domain_and_all_three_signature_roles() {
     let proposal: api::CustodialRecoverProposal = decode(&f, "proposal_wire_hex");
     let request: api::SubmitCustodialRecoverRequest = decode(&f, "submit_wire_hex");
     let old: api::AuthorizationVerificationKey = decode(&f, "old_guardian_wire_hex");
-    let signed = request.recover.as_ref().expect("Recover");
+    let signed: api::SignedOwnerKeyTransition = decode(&f, "completed_recover_wire_hex");
     let body = signed.transition.as_ref().expect("body");
     assert_eq!(
         custody::canonical_recover(body).expect("canonical"),
@@ -221,7 +221,11 @@ fn negative(name: &str, expected: custody::Error) {
     } else {
         decode(&f, "attempt_wire_hex")
     };
-    let proposal: api::CustodialRecoverProposal = decode(&f, "proposal_wire_hex");
+    let proposal: api::CustodialRecoverProposal = if vector["proposal_wire_hex"].is_string() {
+        decode(vector, "proposal_wire_hex")
+    } else {
+        decode(&f, "proposal_wire_hex")
+    };
     let request: api::SubmitCustodialRecoverRequest = if vector["submit_wire_hex"].is_string() {
         decode(vector, "submit_wire_hex")
     } else {
@@ -298,4 +302,109 @@ fn absent_custody_details_and_missing_next_guardian_proof_fail_closed() {
         custody::validate_submission(&attempt, &proposal, &request, &old, 1700604800),
         Err(custody::Error::FreshKey)
     );
+}
+
+#[test]
+fn focused_helper_negative_matrix_checks_each_intended_error() {
+    let f = fixture();
+    for vector in f["negatives"].as_array().expect("negatives") {
+        let error = match vector["error"].as_str().expect("error") {
+            "Binding" => custody::Error::Binding,
+            "State" => custody::Error::State,
+            "Version" => custody::Error::Version,
+            "Early" => custody::Error::Early,
+            "Expired" => custody::Error::Expired,
+            "FreshKey" => custody::Error::FreshKey,
+            "Proposal" => custody::Error::Proposal,
+            other => panic!("unknown error {other}"),
+        };
+        negative(vector["name"].as_str().expect("name"), error);
+    }
+}
+
+#[test]
+fn prepare_and_client_submission_never_contain_w0_authorization() {
+    let f = fixture();
+    let proposal: api::CustodialRecoverProposal = decode(&f, "proposal_wire_hex");
+    let request: api::SubmitCustodialRecoverRequest = decode(&f, "submit_wire_hex");
+    assert!(
+        proposal
+            .recover
+            .as_ref()
+            .expect("prepared")
+            .authorizations
+            .is_empty()
+    );
+    assert!(
+        request
+            .recover
+            .as_ref()
+            .expect("client")
+            .authorizations
+            .is_empty()
+    );
+    assert!(
+        proposal
+            .recover
+            .as_ref()
+            .expect("prepared")
+            .next_authority_key_proof
+            .is_none()
+    );
+    let completed: api::SignedOwnerKeyTransition = decode(&f, "completed_recover_wire_hex");
+    assert_eq!(
+        completed.authorizations.len(),
+        1,
+        "only committed history releases W0"
+    );
+}
+
+#[test]
+fn raw_duplicate_proof_tags_reject_before_last_wins_in_both_orders() {
+    let f = fixture();
+    for vector in f["ambiguous_proofs"].as_array().expect("raw cases") {
+        let raw = bytes(vector, "raw_wire_hex");
+        let decoded = api::SubmitRecoveryProofRequest::decode(raw.as_slice()).expect("last wins");
+        let actual = match decoded.proof.expect("last proof") {
+            api::submit_recovery_proof_request::Proof::SignedTransition(_) => 3,
+            api::submit_recovery_proof_request::Proof::PaperUnlock(_) => 4,
+            api::submit_recovery_proof_request::Proof::CustodialEmail(_) => 5,
+        };
+        assert_eq!(actual, vector["last_tag"].as_u64().expect("tag"));
+        assert_eq!(
+            custody::decode_recovery_proof(&raw),
+            Err(custody::Error::Binding),
+            "{}",
+            vector["name"]
+        );
+    }
+    let proof = bytes(&f, "proof_request_wire_hex");
+    assert_eq!(
+        custody::decode_recovery_proof(&proof)
+            .expect("single arm")
+            .encode_to_vec(),
+        proof
+    );
+    // Unknown length-delimited padding takes a valid proof to the exact ceiling.
+    let mut at_limit = proof;
+    let length = 8192 - at_limit.len() - 4;
+    at_limit.extend([
+        0xa2,
+        0x06,
+        (length as u8 & 0x7f) | 0x80,
+        (length >> 7) as u8,
+    ]);
+    at_limit.resize(8192, 0);
+    assert!(custody::decode_recovery_proof(&at_limit).is_ok());
+    at_limit.push(0);
+    assert_eq!(
+        custody::decode_recovery_proof(&at_limit),
+        Err(custody::Error::Binding)
+    );
+    for malformed in [&[0x28, 0x00][..], &[0x2a, 0xff], &[0]] {
+        assert_eq!(
+            custody::decode_recovery_proof(malformed),
+            Err(custody::Error::Binding)
+        );
+    }
 }

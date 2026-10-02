@@ -20,6 +20,7 @@ python3 -B -m unittest tests/test_v2_cutover_contract.py
 python3 tools/audit_contract.py
 cargo +nightly fmt --check
 cargo test --all-features
+cargo test --locked --manifest-path tests/custodial-verifier/Cargo.toml
 cargo clippy --all-features --all-targets -- -D warnings
 rustfmt +nightly --edition 2024 --check tools/hybrid-native/src/main.rs tools/generate-hybrid-native-biscuit.rs
 cargo test --locked --manifest-path tools/hybrid-native/Cargo.toml -- --nocapture

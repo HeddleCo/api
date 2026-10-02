@@ -49,6 +49,7 @@ copyFileSync("packages/typescript/runtime/v2-password-owner.ts", join(v2Root, "p
 copyFileSync("packages/typescript/runtime/v2-mint-root-association.ts", join(v2Root, "mint-root-association.ts"));
 copyFileSync("packages/typescript/runtime/v2-spool-creation.ts", join(v2Root, "spool-creation.ts"));
 copyFileSync("packages/typescript/runtime/v2-owner-actions.ts", join(v2Root, "owner-actions.ts"));
+copyFileSync("packages/typescript/runtime/v2-custodial-recovery.ts", join(v2Root, "custodial-recovery.ts"));
 copyFileSync("packages/typescript/runtime/v2-provider.ts", join(v2Root, "provider.ts"));
 copyFileSync("packages/typescript/runtime/v2-pairing.ts", join(v2Root, "pairing.ts"));
 copyFileSync("packages/typescript/runtime/v2-thread-control.ts", join(v2Root, "thread-control.ts"));

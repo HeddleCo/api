@@ -5,9 +5,9 @@
   "type": "module",
   "packageManager": "npm@11.4.2",
   "scripts": {
-    "test": "node --test tests/v2-*.test.mjs",
     "generate": "buf generate && node tools/generate-attachment-authorization.mjs && node tools/generate-ts-exports.mjs",
     "build": "npm run generate && tsc -p packages/typescript/tsconfig.json",
+    "test": "node --test tests/v2-*.test.mjs",
     "typecheck": "tsc -p packages/typescript/tsconfig.json --noEmit && tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext tests/v2-client-types.ts",
     "pack:api": "npm pack --workspace @heddleco/api",
     "treadle-compile": "node packages/typescript/compile-treadle.mjs"

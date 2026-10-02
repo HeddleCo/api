@@ -40,6 +40,7 @@
     "./v2/mint-root-association": "./dist/v1alpha2/mint-root-association.js",
     "./v2/spool-creation": "./dist/v1alpha2/spool-creation.js",
     "./v2/owner-actions": "./dist/v1alpha2/owner-actions.js",
+    "./v2/custodial-recovery": "./dist/v1alpha2/custodial-recovery.js",
     "./v2/provider": "./dist/v1alpha2/provider.js",
     "./v2/collaboration": "./dist/v1alpha2/collaboration.js",
     "./v2/source-targets": "./dist/v1alpha2/source-targets.js",

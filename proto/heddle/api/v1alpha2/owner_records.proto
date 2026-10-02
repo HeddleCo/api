@@ -361,7 +361,9 @@ message OwnerKeyTransition {
 // Authorizations sign canonical_owner_key_transition_v1(transition).
 //
 // ROTATE requires the current authority and next key. RECOVER requires the
-// current recovery threshold and next key. RECOVERY_POLICY requires the
+// current recovery threshold and next key, a mandatory next recovery policy,
+// and possession proofs from every next guardian. Retained old guardians must
+// fall below the next threshold (heddle#1952). RECOVERY_POLICY requires the
 // current authority, current recovery threshold, and possession proofs from
 // every next guardian. CLAIM_DEFERRED_HUMAN requires the origin key, the next
 // human authority key, and every next guardian. These entries are appended to

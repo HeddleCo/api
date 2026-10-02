@@ -1,0 +1,23 @@
+[package]
+name = "custodial-recovery-verifier-conformance"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[test]]
+name = "conformance"
+path = "conformance.rs"
+
+[dev-dependencies]
+heddleco-capability-verifier = "=0.28.5"
+heddle-api = { path = "../.." }
+prost = "=0.14.1"
+serde_json = "=1.0.149"
+hex = "=0.4.3"
+ed25519-dalek = "=3.0.0"
+
+# Use this PR's generated types while exercising the unmodified released verifier.
+[patch.crates-io]
+heddle-api = { path = "../.." }
+
+[workspace]

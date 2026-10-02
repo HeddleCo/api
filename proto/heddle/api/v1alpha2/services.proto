@@ -6,6 +6,7 @@ import "heddle/api/v1alpha2/activity.proto";
 import "heddle/api/v1alpha2/administration.proto";
 import "heddle/api/v1alpha2/analysis.proto";
 import "heddle/api/v1alpha2/billing.proto";
+import "heddle/api/v1alpha2/code_navigation.proto";
 import "heddle/api/v1alpha2/collaboration.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/content.proto";
@@ -1565,6 +1566,74 @@ service ContentService {
     maturity: SERVICE_MATURITY_PLANNED
   };
   rpc ReadContent(ReadContentRequest) returns (stream ContentEvent) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_IF_AUTHENTICATED
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      authorization_request_targets: {
+        path: "revision.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+    };
+  }
+  rpc GetFileSymbols(GetFileSymbolsRequest) returns (GetFileSymbolsResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_IF_AUTHENTICATED
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      authorization_request_targets: {
+        path: "revision.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+    };
+  }
+  rpc GetDefinition(GetDefinitionRequest) returns (GetDefinitionResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_IF_AUTHENTICATED
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      authorization_request_targets: {
+        path: "revision.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+    };
+  }
+  rpc GetSemanticRefs(GetSemanticRefsRequest) returns (GetSemanticRefsResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_IF_AUTHENTICATED
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_REPOSITORY_INSPECTION
+      authorization_access: AUTHORIZATION_ACCESS_PUBLIC
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+      authorization_request_targets: {
+        path: "revision.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+    };
+  }
+  rpc GetSemanticImporters(GetSemanticImportersRequest) returns (GetSemanticImportersResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
       signing_tier: SIGNING_TIER_PROOF_IF_AUTHENTICATED

@@ -34,6 +34,10 @@ message TransferSelection {
   repeated RevisionRef exclude_revisions = 2;
   uint32 depth = 3;
   bool allow_partial = 4;
+  // Fetch the admitted client index and complete closure for this exact
+  // revision, if present and authorized. Default false keeps source-only Fetch.
+  // This selects no server-produced AnalysisArtifact and never runs parsing.
+  bool include_semantic_index = 5;
 }
 message FetchOpen {
   ThreadRef thread = 1;
@@ -87,6 +91,44 @@ message TransferSidecar {
   repeated SignedRecord owner_authorization = 6;
   // PURGE requires the independently verified owner authorization chain and
   // exact operation signature. Ordinary write cannot satisfy that requirement.
+  // KIND_ATTACHMENT generically carries native StateAttachments. SemanticIndex
+  // uses record_format "heddle-state-attachment-msgpack-v1" and original named
+  // MessagePack bytes, with typed native state-attachment identity in address.
+  // It requires a matching PublishContentOpen.semantic_indexes manifest and
+  // current spool-write plus per-author/provenance/predecessor validation.
+  // No AnalysisArtifact is accepted as a client attachment.
+}
+
+// Hard ingestion ceilings, independently of general source-transfer budgets.
+// Absent on Ready means client SemanticIndex ingestion is unsupported. A
+// supporting endpoint advertises positive limits no greater than 100000 nodes,
+// 67108864 decoded bytes and depth 64. See code-navigation.md for accounting.
+message SemanticIndexLimits {
+  uint32 max_nodes = 1;
+  uint64 max_bytes = 2;
+  uint32 max_depth = 3;
+}
+
+message SemanticClosureObject {
+  // Exactly 32 bytes, native Blob identity over the canonical object payload.
+  bytes hash = 1;
+  uint64 size = 2; // Decoded canonical payload byte length, not pack length.
+}
+
+// Signed opening inventory for one client-attested native StateAttachment.
+// At most one index for this exact opening Thread/revision. Original attachment
+// bytes travel in TransferSidecar; all semantic object bytes travel in the
+// declared native pack/index pair. The complete transitive closure includes
+// binding-delta parents, edge target file nodes and reverse dependencies.
+message SemanticIndexPublication {
+  ObjectAddress attachment = 1; // algorithm "state-attachment", native typed ID.
+  bytes root_hash = 2; // SemanticIndexRoot Blob hash, exactly 32 bytes.
+  // Exact State.tree native hash. SemanticIndexRoot.tree is a DIFFERENT hash
+  // naming the semantic tree; structural path/blob binding must also be checked.
+  bytes source_tree_hash = 3;
+  // Unique, lexicographically hash-sorted full closure including root_hash.
+  // No semantic reference may be satisfied from an unrelated hosted CAS object.
+  repeated SemanticClosureObject objects = 4;
 }
 message TransferReady {
   EndpointRef endpoint = 1;
@@ -109,6 +151,10 @@ message TransferReady {
   // before materializing source. Neither identity is minted by the receiver.
   OwnerState ownership = 15;
   ThreadGenesisRecord thread_genesis = 16;
+  SemanticIndexLimits semantic_index_limits = 17;
+  // Fetch inventory, present only for include_semantic_index and a usable,
+  // authorized attachment. Same manifest/closure validation as PublishContent.
+  repeated SemanticIndexPublication semantic_indexes = 18;
 }
 message ProviderExtent {
   EndpointRef provider = 1;
@@ -302,6 +348,12 @@ message PublishContentOpen {
   // A proof for one receiver cannot be forwarded to publish at another.
   EndpointRef source = 6;
   EndpointRef destination = 7;
+  // Optional explicit admission of client SemanticIndex closure. Empty preserves
+  // source-only transfer. The opening proof and plan bind this complete manifest;
+  // Finish atomically installs source, attachment, closure and lookup/projections.
+  // Over-limit decode/walk fails with typed RESOURCE_EXHAUSTED, never partial
+  // installation. Only exactly declared semantic extras may enter source packs.
+  repeated SemanticIndexPublication semantic_indexes = 8;
 }
 message PublishContentFinish {
   // Names the server's current committed transfer plan, not a caller assertion

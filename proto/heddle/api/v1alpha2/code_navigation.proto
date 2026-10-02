@@ -1,0 +1,224 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha2;
+
+import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/stream.proto";
+
+// Parse-free reads of an admitted client SemanticIndex. Every request requires
+// the exact owning Thread and revision, with identical live source, audience,
+// embargo and entry gates to ReadContent. See docs/alpha-v2/code-navigation.md.
+// Hidden targets are indistinguishable from absent ones, including readiness,
+// ambiguity, truncation, counts and page tokens. Never follow a spoollink.
+enum SemanticAttestation {
+  SEMANTIC_ATTESTATION_UNSPECIFIED = 0;
+  SEMANTIC_ATTESTATION_CLIENT_ATTESTED = 1;
+}
+
+enum CodeNavigationReason {
+  CODE_NAVIGATION_REASON_UNSPECIFIED = 0; // Successful collection query only.
+  CODE_NAVIGATION_REASON_NO_INDEX = 1;
+  CODE_NAVIGATION_REASON_NO_RESOLVER_FOR_LANGUAGE = 2;
+  CODE_NAVIGATION_REASON_AMBIGUOUS = 3;
+  CODE_NAVIGATION_REASON_NOT_FOUND = 4;
+  CODE_NAVIGATION_REASON_OUT_OF_BOUNDS = 5;
+}
+
+message LanguageResolverStatus {
+  // Canonical lowercase language: rust, typescript, javascript, python, etc.
+  string language = 1;
+  // Cross-file resolver used by this index, not merely installed server code.
+  // Initially only Rust and TS/JS; same-file facts may exist for other languages.
+  bool resolver_present = 2;
+}
+
+message CodeNavigationMetadata {
+  RevisionRef revision = 1;
+  ThreadRef thread = 2;
+  // A usable admitted attachment in this Thread/revision's authorized view.
+  // No ancestor fallback, search-table fallback or AnalysisArtifact fallback.
+  bool index_present = 3;
+  // For the requested file's language; false when it cannot be established.
+  bool resolver_present = 4;
+  string language = 5;
+  // CLIENT_ATTESTED iff index_present; UNSPECIFIED when no usable index exists.
+  // Admission proves integrity/binding, not agreement with a server parse.
+  SemanticAttestation attestation = 6;
+  // Sorted, unique statuses for the query language and visible result languages.
+  // Hidden files must never contribute a language or resolver status.
+  repeated LanguageResolverStatus resolvers = 7;
+  // Exact selected native StateAttachment ID, 32 bytes. Absent with no index.
+  bytes attachment_hash = 8;
+}
+
+message CodePosition {
+  // Required, zero-based UTF-8 byte offset in the exact source blob. A position
+  // must precede EOF and land on a code point boundary. No UTF-16 coordinates.
+  optional uint64 byte_offset = 1;
+  // Optional redundant coordinates, supplied together: one-based line and
+  // one-based UTF-8 byte column. They must agree with byte_offset.
+  optional uint32 line = 2;
+  optional uint32 column = 3;
+}
+
+message CodeFilePosition {
+  string path = 1; // Normalized repository-relative file path, no symlink follow.
+  CodePosition position = 2;
+}
+
+message CodeSpan {
+  // One-based inclusive line bounds, matching SymbolEntry and SourceLocation.
+  uint32 start_line = 1;
+  uint32 end_line = 2;
+  // Both present or both absent. Half-open zero-based UTF-8 byte range. Never
+  // invent byte precision for a stored definition that has only line bounds.
+  optional uint64 start_byte = 3;
+  optional uint64 end_byte = 4;
+}
+
+// SymbolAnchor's path + container::path::name spelling at this exact revision.
+// Neither symbol_id nor semantic_hash alone identifies a unique definition.
+message CodeSymbolAddress {
+  string path = 1;
+  string symbol_id = 2;
+  // Canonical zero-based SymbolEntry index in this attachment's file node.
+  // Omission resolves by spelling; multiple visible matches are AMBIGUOUS.
+  optional uint32 definition_index = 3;
+}
+
+enum CodeSymbolKind {
+  CODE_SYMBOL_KIND_UNSPECIFIED = 0;
+  CODE_SYMBOL_KIND_FUNCTION = 1;
+  CODE_SYMBOL_KIND_TYPE = 2;
+  CODE_SYMBOL_KIND_ENUM = 3;
+  CODE_SYMBOL_KIND_TRAIT = 4;
+  CODE_SYMBOL_KIND_CLASS = 5;
+  CODE_SYMBOL_KIND_INTERFACE = 6;
+  CODE_SYMBOL_KIND_TYPE_ALIAS = 7;
+  CODE_SYMBOL_KIND_CONST = 8;
+  CODE_SYMBOL_KIND_MODULE = 9;
+  CODE_SYMBOL_KIND_OTHER = 10;
+}
+
+message CodeSymbol {
+  CodeSymbolAddress address = 1;
+  string name = 2;
+  CodeSymbolKind kind = 3;
+  CodeSpan span = 4;
+  // Native hd-sem-sym-v1 meaning fingerprint, exactly 32 bytes, not a CAS key.
+  bytes semantic_hash = 5;
+}
+
+enum CodeOccurrenceRole {
+  CODE_OCCURRENCE_ROLE_UNSPECIFIED = 0;
+  CODE_OCCURRENCE_ROLE_DEFINITION = 1;
+  CODE_OCCURRENCE_ROLE_REFERENCE = 2;
+  CODE_OCCURRENCE_ROLE_CALL = 3;
+  CODE_OCCURRENCE_ROLE_TYPE_REFERENCE = 4;
+}
+
+message CodeOccurrence {
+  string path = 1;
+  uint32 local_id = 2;
+  string name = 3;
+  CodeOccurrenceRole role = 4;
+  CodeSpan span = 5;
+  // Present only if a unique enclosing definition is recorded and visible.
+  CodeSymbolAddress enclosing_symbol = 6;
+}
+
+message GetFileSymbolsRequest {
+  RevisionRef revision = 1;
+  ThreadRef thread = 2;
+  string path = 3;
+  PageRequest page = 4;
+  ReadBudget budget = 5;
+}
+message GetFileSymbolsResponse {
+  CodeNavigationMetadata metadata = 1;
+  repeated CodeSymbol symbols = 2;
+  PageInfo page = 3;
+  CodeNavigationReason reason = 4;
+}
+
+message GetDefinitionRequest {
+  RevisionRef revision = 1;
+  ThreadRef thread = 2;
+  CodeFilePosition at = 3;
+  ReadBudget budget = 4;
+}
+message GetDefinitionResponse {
+  CodeNavigationMetadata metadata = 1;
+  // Present when a unique visible occurrence covers the requested byte.
+  // Retained on an unresolved answer; absent if no occurrence was found.
+  CodeOccurrence occurrence = 2;
+  oneof outcome {
+    CodeSymbol definition = 3;
+    CodeNavigationReason reason = 4;
+  }
+}
+
+enum CodeEdgeKind {
+  CODE_EDGE_KIND_UNSPECIFIED = 0;
+  CODE_EDGE_KIND_REFERS_TO = 1;
+  CODE_EDGE_KIND_CALLS = 2;
+  CODE_EDGE_KIND_TYPE_REF = 3;
+}
+
+// Original source-to-target orientation, also for incoming/caller queries.
+message CodeSemanticRef {
+  CodeOccurrence source = 1;
+  CodeSymbol target = 2;
+  CodeEdgeKind kind = 3;
+  uint32 hop = 4; // One-based distance from the query root, at most hop_cap.
+}
+
+// Single-revision envelope re-homing weft#2021. Do not merge graphs across
+// revisions or Threads. CALLEES_OF additionally serves the impact-graph consumer.
+message GetSemanticRefsRequest {
+  RevisionRef revision = 1;
+  ThreadRef thread = 2;
+  oneof target {
+    CodeSymbolAddress symbol = 3;
+    CodeFilePosition at = 4;
+  }
+  enum Kind {
+    KIND_UNSPECIFIED = 0; // Defaults to REFS_OF.
+    KIND_REFS_OF = 1;
+    KIND_CALLERS_OF = 2;
+    KIND_CALLEES_OF = 3;
+  }
+  Kind kind = 5;
+  uint32 hop_cap = 6; // Zero defaults to one; hard maximum four.
+  PageRequest page = 7;
+  ReadBudget budget = 8;
+}
+message GetSemanticRefsResponse {
+  CodeNavigationMetadata metadata = 1;
+  repeated CodeSemanticRef refs = 2;
+  PageInfo page = 3;
+  // True only when the authorized graph beyond the hop/work cap is omitted.
+  // A next_page alone is not truncation. Hidden edges never affect this bit.
+  bool truncated = 4;
+  CodeNavigationReason reason = 5;
+}
+
+message GetSemanticImportersRequest {
+  RevisionRef revision = 1;
+  ThreadRef thread = 2;
+  string path = 3;
+  uint32 hop_cap = 4; // Zero defaults to one; hard maximum four.
+  PageRequest page = 5;
+  ReadBudget budget = 6;
+}
+message CodeImporter {
+  string path = 1;
+  uint32 hop = 2;
+}
+message GetSemanticImportersResponse {
+  CodeNavigationMetadata metadata = 1;
+  repeated CodeImporter importers = 2;
+  PageInfo page = 3;
+  bool truncated = 4;
+  CodeNavigationReason reason = 5;
+}

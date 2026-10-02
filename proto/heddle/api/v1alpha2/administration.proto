@@ -194,6 +194,15 @@ message BookmarkRecord {
   string label = 3;
   // False is a retained tombstone with its own CAS version.
   bool bookmarked = 4;
+  // First save in the current saved interval; label edits preserve it. A re-save
+  // after removal starts a new interval. Tombstones retain the last known value.
+  // Unset for legacy/never-saved records; never fabricate a historical time.
+  google.protobuf.Timestamp bookmarked_at = 5;
+  // Server commit time of the last effective save, label edit or removal.
+  // No-op/idempotent retries preserve it. Unset if historically unknown.
+  // Workspace streams do not promise time order; clients sort loaded saved rows
+  // newest-first by bookmarked_at, unknown last. See saved-source.md for ties.
+  google.protobuf.Timestamp updated_at = 6;
 }
 message BookmarkMutationResponse {
   MutationReceipt receipt = 1;

@@ -7,6 +7,20 @@ import "heddle/api/v1alpha2/administration.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/stream.proto";
 
+// Unknown, including a missing path at the exact revision. Never infer from
+// extensions, line numbers, the working tree or the current Thread head.
+enum SourcePathKind {
+  SOURCE_PATH_KIND_UNSPECIFIED = 0;
+  SOURCE_PATH_KIND_FILE = 1;
+  SOURCE_PATH_KIND_DIRECTORY = 2;
+}
+// Read-projection provenance, never part of a canonical signed source map.
+enum SourcePathKindSource {
+  SOURCE_PATH_KIND_SOURCE_UNSPECIFIED = 0;
+  SOURCE_PATH_KIND_SOURCE_RECORDED = 1;
+  SOURCE_PATH_KIND_SOURCE_DERIVED = 2;
+}
+
 message SourceAnchor {
   RevisionRef revision = 1;
   string path = 2;
@@ -20,6 +34,14 @@ message SourceAnchor {
   // above remain original signed evidence. Omitted means exact-location only;
   // implementations MUST NOT infer tracking from the owning Thread.
   SourceTargetReference target = 7;
+  // RECORDED means the original canonical source map contains path_kind,
+  // appended after optional target, as "file" or "directory". Unknown omits
+  // the key, preserving old bytes/signatures. DERIVED is read metadata only,
+  // obtained from this exact revision and never written back into signed bytes.
+  // Content-read authorization and redaction precede lookup AND emission,
+  // including recorded kinds. Hidden/missing paths never disclose their type.
+  SourcePathKind path_kind = 8;
+  SourcePathKindSource path_kind_source = 9;
 }
 
 // Shared by primary anchors and annotation references. This is a reference,
@@ -48,6 +70,9 @@ message SourceLocation {
   optional uint32 start_line = 4;
   optional uint32 end_line = 5;
   ThreadRef thread = 6;
+  // Derived at this location's exact revision under content-read visibility.
+  // This whole message is projection metadata, never original signed evidence.
+  SourcePathKind path_kind = 7;
 }
 
 // Stable within an endpoint observation. Only a viewed_thread binding requires

@@ -283,6 +283,17 @@ message Requirement {
   LandingRequirementKind landing_kind = 7;
 }
 
+// Stable semantic affordance, independent of RPC spelling. Never authority.
+// Zero/unknown values mean unknown: do not infer permission or show an action.
+enum Capability {
+  CAPABILITY_UNSPECIFIED = 0;
+  CAPABILITY_RECORD_REVIEW = 1;
+  CAPABILITY_LAND = 2;
+  CAPABILITY_PUT_GRANT = 3;
+  CAPABILITY_CREATE_INVITATION = 4;
+  CAPABILITY_REVISE_SPOOL = 5;
+}
+
 message ActionAvailability {
   string method = 1;
   EndpointRef endpoint = 2;
@@ -291,6 +302,9 @@ message ActionAvailability {
   bool authorized = 5;
   repeated Requirement requirements = 6;
   repeated ExpectedVersion observed_versions = 7;
+  // A known capability still requires implemented, authorized and no unmet
+  // requirements. method remains the concrete route; missing advice is unknown.
+  Capability capability = 8;
 }
 
 message Applied {
@@ -299,6 +313,10 @@ message Applied {
 
 message Blocked {
   repeated Requirement requirements = 1;
+  // Primary typed refusal, matching existing CallFailure.error semantics.
+  // Populate for settings, invitation, seat and plan refusals. Never reveal
+  // hidden resources/policies; absent/zero/unknown reasons are generic refusal.
+  heddle.api.common.ErrorDetail error = 2;
 }
 
 message MutationReceipt {

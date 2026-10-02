@@ -71,6 +71,7 @@ class AdditiveBundleContractTest(unittest.TestCase):
                 ("created_at", 7),
                 ("causal_id", 8),
                 ("causal_parents", 9),
+                ("author_display_name", 10),
             ],
         )
         event = body(COLLABORATION, "message", "CollaborationEvent")
@@ -88,6 +89,9 @@ class AdditiveBundleContractTest(unittest.TestCase):
                 ("private", 5),
                 ("installation_id", 6),
                 ("linked_spools", 7),
+                ("default_branch", 8),
+                ("refs", 9),
+                ("refs_status", 10),
             ],
         )
         connection = body(INTEGRATION, "message", "ProviderConnection")

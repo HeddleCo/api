@@ -42,12 +42,12 @@ pub const GRANT_ENVELOPE_V2_FIXTURE_JSON: &str =
 pub const TRANSPORT_BOOTSTRAP_V1_FIXTURE_JSON: &str =
     include_str!("../tests/fixtures/transport-bootstrap-v1.json");
 
-/// Page size used when callers omit or pass zero for a requested size.
+/// Generic helper default. V2 RPC-specific defaults may differ.
 pub const DEFAULT_PAGE_SIZE: u32 = 50;
-/// Largest page the public API permits.
+/// Generic helper cap. V2 RPC-specific bounds (such as ListPaths) take precedence.
 pub const MAX_PAGE_SIZE: u32 = 200;
 
-/// Applies the contract-owned default and upper bound to a requested page.
+/// Applies generic paging defaults; use each v2 RPC's own bounds when specified.
 pub const fn normalize_page_size(requested: u32) -> u32 {
     if requested == 0 {
         DEFAULT_PAGE_SIZE

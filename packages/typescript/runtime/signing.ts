@@ -28,6 +28,8 @@ export const DEVICE_PROOF_PUBLIC_KEY_ROLE = "device_proof_public_key\0";
 export const GRANT_ENVELOPE_V2_FORMAT_VERSION = 2;
 
 export const SIGNING_DOMAIN = TIER_1_REQUEST_SIGNING_V1_DOMAIN;
+// Generic paging helper; v2 RPC-specific bounds/defaults take precedence.
+// In particular, ListPaths and provider refs use their own caps and validation.
 export const DEFAULT_PAGE_SIZE = 50;
 export const MAX_PAGE_SIZE = 200;
 export function normalizePageSize(requested: number): number {

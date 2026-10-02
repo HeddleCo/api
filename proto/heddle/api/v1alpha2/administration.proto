@@ -107,6 +107,16 @@ message SpoolSettings {
   // inherits from the parent; root fallback is ANY_WRITER. A child may choose
   // any explicit rule; this is nearest-ancestor inheritance, not a min ceiling.
   BlockingDiscussionResolveRule blocking_discussion_resolve_rule = 9;
+  // Local stable Thread selection, no ancestor inheritance/name fallback.
+  // Resource admins set/clear via ReviseSpool under the containing spool CAS.
+  // Must refer to an existing readable Thread in this spool when set. Import
+  // initializes it from the source default branch's exact imported Thread;
+  // retry/reimport must preserve an existing administrator selection.
+  // Returned in SpoolOverview.settings. Omit for callers when deleted/unreadable
+  // without clearing the stored selection or silently replacing it. No hidden
+  // ID/tombstone; unset/deleted/unreadable look identical. Complete submitted
+  // settings without this field explicitly clear it; filtered reads do not.
+  ThreadRef default_thread = 10;
   // Opaque compare-and-swap version belongs to the containing spool record.
 }
 message SpoolMount {

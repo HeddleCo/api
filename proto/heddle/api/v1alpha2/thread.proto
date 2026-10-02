@@ -109,6 +109,39 @@ message ThreadOverview {
   // Optional after landing. A local landing can supply its own signed executor
   // record with the same semantics; absence is not evidence of permission.
   LandingRecord landing_record = 28;
+  // Present whenever a landing_target was requested but the singular
+  // landing_assessment is absent. MULTIPLE_HEADS explains an intentionally
+  // absent singular result while per-head results remain available.
+  // No target or a returned singular assessment means no gap status.
+  LandingAssessmentStatus landing_assessment_status = 29;
+}
+
+// Why a requested assessment is absent, not a verdict permitting landing.
+// An emitted status has a known nonzero state and a Requirement with a known
+// kind and nonempty explanation. UNSPECIFIED/unknown/missing means unknown to
+// readers; producers MUST NOT emit UNSPECIFIED as a reason to wait or land.
+// State, explanation, subject and policy MUST NOT reveal hidden base/target
+// identity or existence. Missing/forbidden targets keep identical RPC behavior.
+message LandingAssessmentStatus {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_PENDING = 1;
+    STATE_FAILED = 2;
+    STATE_NOT_ELIGIBLE = 3;
+    // No caller-visible published source head; never count hidden heads.
+    STATE_NO_PUBLISHED_HEAD = 4;
+    // Only when this caller independently already knows the base exists.
+    // Otherwise use generic UNAVAILABLE with no hidden reference/explanation.
+    STATE_BASE_UNREADABLE = 5;
+    // Source/target material unavailable; does not distinguish absent/forbidden.
+    STATE_UNAVAILABLE = 6;
+    // Singular overview omitted; per-head assessments may still be present.
+    STATE_MULTIPLE_HEADS = 7;
+  }
+  State state = 1;
+  // Same typed requirement/display explanation pattern as ActionAvailability.
+  // Sanitize errors; advice never grants authority. No hidden references.
+  Requirement reason = 2;
 }
 
 message LandingAssessment {
@@ -201,6 +234,9 @@ message ThreadAlternative {
   repeated ReviewRecord reviews = 4;
   LandingAssessment assessment = 5;
   repeated CheckEvidenceCurrency checks = 6;
+  // Present when a target was requested and this head has no assessment.
+  // Mutually exclusive with assessment; same visibility rules as the overview.
+  LandingAssessmentStatus assessment_status = 7;
 }
 
 // Decoded executor-signed integration, plus the exact signed Thread operation.

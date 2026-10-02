@@ -1,0 +1,20 @@
+{
+  "messages": [
+    "heddle.api.common.HostedWitnessSetV1",
+    "heddle.api.common.HostedWitnessEntryV1",
+    "heddle.api.common.SignedHostedWitnessSetV1",
+    "heddle.api.common.HostedWitnessHistoryProofV1",
+    "heddle.api.common.HostedWitnessStatementV1",
+    "heddle.api.common.SignedHostedWitnessStatementV1",
+    "heddle.api.v1alpha2.ImportMemberPermissionV1",
+    "heddle.api.v1alpha2.SignedImportMemberPermissionV1",
+    "heddle.api.v1alpha2.ImportGenesisAuthorityV1",
+    "heddle.api.v1alpha2.ImportJobDelegationV1",
+    "heddle.api.v1alpha2.SignedImportJobDelegationV1",
+    "heddle.api.v1alpha2.ImportJobRenewalV1",
+    "heddle.api.v1alpha2.SignedImportJobRenewalV1",
+    "heddle.api.v1alpha2.DelegatedImportOperationV1",
+    "heddle.api.v1alpha2.ImportPublicationWitnessV1",
+    "heddle.api.v1alpha2.ImportPublicProofBundleV1"
+  ]
+}

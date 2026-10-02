@@ -451,9 +451,22 @@ carriers, never independent trust anchors. `validate_public_bundle` and
 `validatePublicBundle` implement this closure check; resolution has no retrieval
 fallback. Native creator/owner verification remains mandatory.
 
+Every selected `(spool_uuid, policy_sequence, policy_state_hash)` resolves the
+original `SignedSpoolPolicyRecord` and every predecessor back to zero32/sequence
+0. Only that pair denotes policy genesis; a positive sequence cannot omit its
+signed policy. Each branch's genesis binding resolves its native original,
+creator envelope, exact `ImportGenesisWitnessV1` sidecar and original purpose-1
+admission statement. Supplying sidecars only for the statements that happen to
+be included does not establish completeness. Closure validation checks these
+references; native verification separately checks policy preimages, signatures,
+owner context and all admission signatures and retirement paths. Historical
+authority times come from receipts **after** authenticating them, converted
+from milliseconds to seconds; callers cannot substitute a convenient time.
+
 The frozen renewed export contains two original permissions (the first expires
 at 1300 seconds), predecessor and successor certificates, accepted renewal,
-two operations, both publication snapshots, and both unchanged receipts. A fresh
+two operations, both publication snapshots, the real sequence-1 signed policy,
+and both original branch genesis admissions and publication receipts. A fresh
 receiver at 1350 seconds uses independently selected roots and the export plus
 later exact retirement paths. It verifies the predecessor at its witnessed
 publication time and the successor at its witnessed publication time. Checking
@@ -515,8 +528,17 @@ policy and all review/evidence originals. Request proof is the original
 `signing_identity` is `principal:device-key:` followed by lowercase hex of its
 32-byte signer. It uses the unchanged `heddle-req-sig-v1` counted textual
 request framing, not the witness digest; the payload retains the full preimage.
-Retain the existing native initiating-proof typed ID and never compute State IDs
-by hashing MessagePack: State's existing versioned field hash remains unchanged.
+The existing hosted initiating-proof ID is frozen exactly as follows. Let `U`
+be the unchanged unary signing input and `S` the original 64-byte Ed25519
+signature. Let `P = U || S`, with no separator or additional length around `S`.
+The ID is native `ContentHash::compute_typed("weft-hosted-landing-request-proof-v1", P)`:
+`BLAKE3(UTF8(domain) || u64_le(len(P)) || 0x00 || P)`. Both the domain and the
+signature's inclusion are mandatory. A witness signature cannot replace `S`.
+Never compute State IDs by hashing MessagePack: State's existing versioned
+field hash remains unchanged. An original capture must contain a child State;
+its declared State parents, after excluding the signed genesis base, must equal
+the States selected by its complete causal operation parents. The synthetic
+initial State is a genesis base only and cannot be reused as a source capture.
 
 For account-native originals, `authority_envelope` is exact canonical protobuf
 `ThreadControlAuthority` format 1 from `identity.proto`, including its verified
@@ -531,6 +553,24 @@ contains no appendable proof secret. Its maintenance input is the frozen
 creator envelope in the import-specific genesis vector is exact
 `UTF8("heddle-signed-import-member-permission-v1\0") || canonical signed permission`;
 this proof grants the scoped genesis/import rights only, never metadata/landing.
+
+`ThreadControl.authority_envelope` is an ordinary native `Vec<u8>` and therefore
+uses an integer array, including inside review controls. In contrast,
+`SourceAuthor::Account.authority` explicitly uses native `serde_bytes` binary.
+Never choose the representation from the semantic meaning of "bytes"; retain
+the pinned codec's representation and exact parse/re-encode equality.
+
+The locked `tools/hybrid-native` tool uses published `heddle-api
+0.31.0-alpha.12`, `heddle-thread-api 0.28.1`, `heddle-object-model 0.28.1`,
+`heddle-crypto 0.28.1`, and `heddleco-capability-verifier 0.28.1`, the set pinned
+by weft. Maintenance generation uses these codecs. `tools/verify.sh` runs its
+fixed-vector gate for native parsing, re-encoding, signatures, child ancestry,
+causal/claim closure, original authority and hosted request binding, plus fresh
+historical verification from the complete export, independently selected roots
+and retirement paths. It also rejects the retained old parentless and
+non-canonical originals and the old request-proof formula, and independently
+removes each selected policy and genesis-admission original. The closed legacy
+dispatch control retains its exact pre-`source_ref` negative bytes.
 
 Common field matching is also frozen:
 

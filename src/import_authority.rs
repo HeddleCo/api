@@ -1201,6 +1201,15 @@ fn validate_bundle_history(bundle: &ImportPublicProofBundleV1) -> Result<(), Rej
         }
         Ok(())
     }
+    for statement in &bundle.statements {
+        let s = statement.body.as_ref().ok_or(Reject::Canonical)?;
+        require_policy_history(
+            bundle,
+            &s.spool_uuid,
+            s.policy_sequence,
+            &s.policy_state_hash,
+        )?;
+    }
     sorted(&bundle.member_permissions, signed_permission_digest)?;
     sorted(&bundle.manifests, manifest_digest)?;
     if let Some(p) = &bundle.member_permission
@@ -1256,6 +1265,25 @@ fn validate_bundle_history(bundle: &ImportPublicProofBundleV1) -> Result<(), Rej
                     .iter()
                     .any(|e| hash(&[e]) == b.creator_authority_envelope_digest)
             {
+                return Err(Reject::Scope);
+            }
+            // Every branch needs its original admission, not merely its
+            // binding. Proof-only retirement lookup cannot recover a payload.
+            if !bundle.genesis_witnesses.iter().any(|payload| {
+                payload.binding.as_ref() == Some(g)
+                    && payload.original_genesis.as_ref().is_some_and(|o| {
+                        native_id(o) == b.genesis_digest && bundle.original_geneses.contains(o)
+                    })
+                    && hash(&[&payload.creator_authority_envelope])
+                        == b.creator_authority_envelope_digest
+                    && canonical(payload).is_ok_and(|bytes| {
+                        bundle.statements.iter().any(|s| {
+                            s.body
+                                .as_ref()
+                                .is_some_and(|s| s.purpose == 1 && s.canonical_payload == bytes)
+                        })
+                    })
+            }) {
                 return Err(Reject::Scope);
             }
         }
@@ -1335,6 +1363,44 @@ fn validate_bundle_history(bundle: &ImportPublicProofBundleV1) -> Result<(), Rej
         }
     }
     Ok(())
+}
+/// Reference completeness only. Native verification must authenticate every
+/// selected policy, its owner context and the receipt before using its time.
+fn require_policy_history(
+    bundle: &ImportPublicProofBundleV1,
+    spool: &[u8],
+    mut sequence: u64,
+    state_hash: &[u8],
+) -> Result<(), Reject> {
+    let mut state_hash = state_hash.to_vec();
+    for _ in 0..=bundle.policies.len() {
+        width(&state_hash, 32)?;
+        if sequence == 0 {
+            return if state_hash == [0; 32] {
+                Ok(())
+            } else {
+                Err(Reject::Scope)
+            };
+        }
+        let mut matches = bundle
+            .policies
+            .iter()
+            .filter_map(|p| p.body.as_ref())
+            .filter(|p| {
+                p.spool_uuid == spool && p.sequence == sequence && p.policy_state_hash == state_hash
+            });
+        let policy = matches.next().ok_or(Reject::Scope)?;
+        if matches.next().is_some() {
+            return Err(Reject::Canonical);
+        }
+        let head = policy.expected_head.as_ref().ok_or(Reject::Canonical)?;
+        if head.sequence.checked_add(1) != Some(sequence) {
+            return Err(Reject::Scope);
+        }
+        sequence = head.sequence;
+        state_hash = head.state_hash.clone();
+    }
+    Err(Reject::Scope)
 }
 fn native_id(record: &SignedRecord) -> Vec<u8> {
     let mut h = blake3::Hasher::new();

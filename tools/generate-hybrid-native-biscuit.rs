@@ -1,5 +1,5 @@
-//! Standalone maintenance helper, never run by tests. Build in an isolated Cargo
-//! package with biscuit-auth =6.0.0, heddle-biscuit-verifier =0.28.3, hex =0.4.
+//! Maintenance helper, never mint during tests. The locked hybrid-native crate
+//! pins biscuit-auth =6.0.0 and heddle-biscuit-verifier =0.28.1.
 //! All seeds are published conformance data. Pass the output .binpb as argv[1].
 //! The JavaScript maintenance generator consumes this immutable sealed artifact.
 use biscuit_auth::{Biscuit, KeyPair, builder::Algorithm};
@@ -13,7 +13,8 @@ fn main() -> Result<(), String> {
     let next = fixture(KeyPair::from_bytes(&[14; 32], Algorithm::Ed25519.into()))?;
     let mut builder = Biscuit::builder();
     for fact in [
-        "subject(\"21212121-2121-2121-2121-212121212121\")".to_owned(),
+        "user(\"21212121-2121-2121-2121-212121212121\")".to_owned(),
+        "session(\"hybrid-native-fixture\")".to_owned(),
         "subject_kind(\"user\")".to_owned(),
         "subject_user_uuid(\"21212121-2121-2121-2121-212121212121\")".to_owned(),
         format!(

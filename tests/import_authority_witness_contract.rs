@@ -997,6 +997,35 @@ fn fresh_export_contains_replaced_expired_permissions_and_each_original_manifest
     let b: api::ImportPublicProofBundleV1 = record(&f, "complete_renewed_export");
     let c = Context::from_export(&f, &b);
     import::validate_public_bundle(&b).expect("complete renewed closure");
+    let set = witness::verify_set(
+        b.witness_set.as_ref().expect("set"),
+        &c.set(1_350_000),
+        None,
+    )
+    .expect("fresh independently rooted witness set");
+    let authenticated_time = |name: &str, proof_name: &str| {
+        let signed: host::SignedHostedWitnessStatementV1 = record(&f, name);
+        assert!(
+            b.statements.contains(&signed),
+            "original receipt is exported"
+        );
+        let proof: host::HostedWitnessHistoryProofV1 = record(&f, proof_name);
+        witness::resolve_statement(&set, &signed, Some(&proof), false, 1_350_000)
+            .expect("original receipt signature and retirement binding");
+        let body = signed.body.as_ref().expect("authenticated body");
+        assert!(
+            b.policies.iter().any(|p| p.body.as_ref().is_some_and(|p| {
+                p.sequence == body.policy_sequence
+                    && p.policy_state_hash == body.policy_state_hash
+                    && p.spool_uuid == body.spool_uuid
+            })),
+            "selected signed policy exported; native gate verifies its owner and preimage"
+        );
+        body.observed_at_unix_millis / 1000
+    };
+    let publication_time = authenticated_time("publication_statement", "publication_proof");
+    let renewed_time =
+        authenticated_time("renewed_publication_statement", "renewed_publication_proof");
     let old = &b.delegations[0];
     let successor = &b.delegations[1];
     let p0 = import::resolve_bundle_permission(
@@ -1018,9 +1047,38 @@ fn fresh_export_contains_replaced_expired_permissions_and_each_original_manifest
         import::verify_member_permission(p0.expect("member"), &c.owner(1350)),
         Err(codec::Reject::Expired)
     );
-    let previous = import::verify_delegation(old, p0, &c.owner(1100))
+    let previous = import::verify_delegation(old, p0, &c.owner(publication_time))
         .expect("historical authority at original publication");
     for genesis in &b.genesis_authorities {
+        let payload = b
+            .genesis_witnesses
+            .iter()
+            .find(|p| p.binding.as_ref() == Some(genesis))
+            .expect("each original genesis sidecar");
+        let canonical = codec::canonical(payload).expect("payload bytes");
+        let admission = b
+            .statements
+            .iter()
+            .find(|s| {
+                s.body
+                    .as_ref()
+                    .is_some_and(|s| s.purpose == 1 && s.canonical_payload == canonical)
+            })
+            .expect("each original genesis admission");
+        let main: host::SignedHostedWitnessStatementV1 = record(&f, "genesis_admission");
+        let (name, proof) = if *admission == main {
+            ("genesis_admission", "genesis_proof")
+        } else {
+            ("genesis_dev_admission", "genesis_dev_proof")
+        };
+        let admission_time = authenticated_time(name, proof);
+        let at_admission = import::verify_delegation(old, p0, &c.owner(admission_time))
+            .expect("original parent authority at authenticated genesis admission");
+        import::verify_witness_payload(
+            admission.body.as_ref().expect("receipt"),
+            import::WitnessPayload::Genesis(payload),
+        )
+        .expect("exact original genesis admission payload");
         let binding = genesis.body.as_ref().expect("genesis binding");
         let original = b
             .original_geneses
@@ -1058,7 +1116,7 @@ fn fresh_export_contains_replaced_expired_permissions_and_each_original_manifest
             .expect("exported original envelope");
         import::verify_genesis_authority(
             genesis,
-            &previous,
+            &at_admission,
             &binding.genesis_digest,
             &signature.signature,
             &codec::hash(&[envelope]),
@@ -1075,14 +1133,8 @@ fn fresh_export_contains_replaced_expired_permissions_and_each_original_manifest
             .committed_manifest_digest,
     )
     .expect("original partial snapshot");
-    let next = import::verify_renewal(renewal, &previous, committed, 1, p1, &c.owner(1250))
+    let next = import::verify_renewal(renewal, &previous, committed, 1, p1, &c.owner(renewed_time))
         .expect("renewal at successor witnessed time");
-    let set = witness::verify_set(
-        b.witness_set.as_ref().expect("set"),
-        &c.set(1_350_000),
-        None,
-    )
-    .expect("fresh independently rooted witness set");
     for o in &b.operations {
         let is_old = o.body.as_ref().expect("operation").delegation_digest == previous.digest();
         let active = if is_old { &previous } else { &next };
@@ -1141,6 +1193,77 @@ fn fresh_export_contains_replaced_expired_permissions_and_each_original_manifest
         Err(codec::Reject::Canonical)
     );
 }
+#[test]
+fn historical_export_requires_each_selected_policy_and_genesis_admission_original() {
+    let f = fixture();
+    let b: api::ImportPublicProofBundleV1 = record(&f, "complete_renewed_export");
+    import::validate_public_bundle(&b).expect("complete control");
+    let mut missing = b.clone();
+    missing.policies.clear();
+    assert_eq!(
+        import::validate_public_bundle(&missing),
+        Err(codec::Reject::Scope)
+    );
+    println!("B REJECT zero-policy export: Scope");
+    let mut duplicate = b.clone();
+    duplicate.policies.push(duplicate.policies[0].clone());
+    assert_eq!(
+        import::validate_public_bundle(&duplicate),
+        Err(codec::Reject::Canonical)
+    );
+    // Reference-only chain probe. Native policy/signature mutation rejection
+    // is exercised separately by the published-codec gate.
+    let mut chain = b.clone();
+    let mut second = chain.policies[0].clone();
+    let body = second.body.as_mut().expect("policy");
+    body.expected_head = Some(api::SignedPolicyHead {
+        state_hash: body.policy_state_hash.clone(),
+        sequence: 1,
+    });
+    body.sequence = 2;
+    body.policy_state_hash = vec![0x7b; 32];
+    chain.policies.push(second);
+    for receipt in &mut chain.statements {
+        let body = receipt.body.as_mut().expect("receipt");
+        body.policy_sequence = 2;
+        body.policy_state_hash = vec![0x7b; 32];
+    }
+    import::validate_public_bundle(&chain).expect("complete predecessor references");
+    chain.policies.remove(0);
+    assert_eq!(
+        import::validate_public_bundle(&chain),
+        Err(codec::Reject::Scope)
+    );
+    for (i, payload) in b.genesis_witnesses.iter().enumerate() {
+        for part in ["admission", "payload", "genesis", "envelope"] {
+            let mut missing = b.clone();
+            match part {
+                "admission" => missing.statements.retain(|s| {
+                    s.body.as_ref().is_none_or(|s| {
+                        s.canonical_payload != codec::canonical(payload).expect("payload")
+                    })
+                }),
+                "payload" => {
+                    missing.genesis_witnesses.remove(i);
+                }
+                "genesis" => missing
+                    .original_geneses
+                    .retain(|g| Some(g) != payload.original_genesis.as_ref()),
+                "envelope" => missing
+                    .creator_authority_envelopes
+                    .retain(|e| *e != payload.creator_authority_envelope),
+                _ => unreachable!("fixed parts"),
+            }
+            assert_eq!(
+                import::validate_public_bundle(&missing),
+                Err(codec::Reject::Scope),
+                "branch {i} {part}"
+            );
+            println!("B REJECT missing branch {i} genesis {part}: Scope");
+        }
+    }
+}
+
 #[test]
 fn preparation_wire_state_and_publication_wins_manifest_cas() {
     let f = fixture();

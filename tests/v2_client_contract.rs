@@ -489,8 +489,7 @@ fn sync_without_hybrid_encodes_openings_and_accepts_ready() {
                         protocol: protocol.clone(),
                         ..Default::default()
                     }
-                )),
-                ..Default::default()
+                ))
             },
             PublishContentServerFrame {
                 body: Some(publish_content_server_frame::Body::Ready(

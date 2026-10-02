@@ -158,9 +158,12 @@ message SpoolOverview {
 // rollups may serve eventually consistent values; they are display hints, not
 // authorization or a transactional snapshot of underlying Threads/changes.
 message CatalogActivitySummary {
-  // Public Threads currently open on this Spool.
+  // Public Threads in DRAFT, ACTIVE or READY, excluding LANDED, ABANDONED
+  // and unknown lifecycle values. Each Thread is counted once.
   uint64 open_thread_count = 1;
-  // Public changes landed during the trailing 30 days at observation time.
+  // Distinct successful public LandingRecords executed in (as_of - 30 days,
+  // as_of], deduplicated by signed operation digest; failed/retried attempts
+  // do not add counts. See docs/alpha-v2/catalog.md for snapshot semantics.
   uint64 landed_30d = 2;
 }
 
@@ -404,10 +407,25 @@ enum CatalogSort {
   CATALOG_SORT_RECENT_ACTIVITY = 3;
 }
 
+// All predicates are ANDed with query over caller-visible public catalog rows.
+// Absent or empty means no filtering. See docs/alpha-v2/catalog.md.
+message CatalogFilter {
+  // At least one public Thread in DRAFT, ACTIVE or READY.
+  bool has_open_threads = 1;
+  // At least one successful public landing in the trailing 30 * 86400 seconds.
+  bool landed_within_30d = 2;
+  // SpoolSettings.require_review_to_land is true; not a review backlog.
+  bool require_review_to_land = 3;
+  // Literal leading canonical path_segments, matched case-insensitively by
+  // whole segment. Empty means any address; empty/invalid segments are invalid.
+  repeated string namespace_prefix = 4;
+}
+
 message ObserveCatalogRequest {
-  // Bounded text search over public spool names, slugs and descriptions.
+  // Bounded case-insensitive literal search over public names, slugs,
+  // descriptions, joined canonical addresses, path segments and owner handles.
   string query = 1;
-  // PageInfo.next_page is an opaque token bound to query, sort, caller and
+  // PageInfo.next_page is an opaque token bound to query, filter, sort, caller and
   // catalog generation. It contains the last row's sort key and Spool UUID;
   // servers compare that pair strictly after the row using the order above.
   // For RECENT_ACTIVITY, a null timestamp follows all known timestamps and
@@ -417,6 +435,40 @@ message ObserveCatalogRequest {
   ObserveOptions observe = 3;
   // Unknown values are invalid. UNSPECIFIED retains the legacy slug order.
   CatalogSort sort = 4;
+  // PageInfo.matching_count, exhausted and next_page respect this filter.
+  // A token reused with a different normalized filter/query is rejected.
+  CatalogFilter filter = 5;
+}
+
+// Linkable public leader even when its row is outside the requested page.
+// Only already-public labels; never private ancestry or owner identity.
+message CatalogLeader {
+  SpoolRef ref = 1;
+  string name = 2;
+  repeated string path_segments = 3;
+  // Corresponding open_thread_count or landed_30d, depending on the list.
+  uint64 count = 4;
+}
+
+// One snapshot per catalog snapshot, independent of page size or sort. No live
+// refresh. Same query/filter and caller-visible public rows as catalog paging.
+// Private Spools/activity MUST NOT affect counts, leaders, approximation or
+// other observable summary metadata. See docs/alpha-v2/catalog.md.
+message CatalogSummary {
+  uint64 spool_count = 1;
+  uint64 open_thread_count = 2;
+  uint64 landed_30d = 3;
+  // Number of matching Spools with public activity in (as_of - 7 days, as_of].
+  uint64 active_7d = 4;
+  // At most 5 positive-count leaders each, count descending then UUID ascending.
+  repeated CatalogLeader most_open = 5;
+  repeated CatalogLeader most_landed = 6;
+  // Required snapshot boundary; rollups may lag at most 300 seconds.
+  google.protobuf.Timestamp as_of = 7;
+  // Above 10,000 visible matches, the server may aggregate only the first
+  // 10,000 by UUID. Activity totals then are unscaled lower bounds and leaders
+  // are sample leaders. spool_count stays exact. Never sample hidden rows.
+  bool approximate = 8;
 }
 message CatalogEvent {
   StreamFrame frame = 1;
@@ -425,5 +477,6 @@ message CatalogEvent {
     SectionStatus status = 3;
     Removal removal = 4;
     SectionReplacement replace_section = 5;
+    CatalogSummary summary = 6;
   }
 }

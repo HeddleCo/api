@@ -899,28 +899,6 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "heddle-api"
 version = "0.31.0-alpha.19"
-dependencies = [
- "blake3",
- "bytes",
- "ed25519-dalek 3.0.0",
- "hex",
- "prost 0.14.1",
- "prost-build",
- "prost-reflect",
- "prost-types 0.14.1",
- "protoc-bin-vendored",
- "rmp-serde",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.18",
- "unicode-general-category",
- "unicode-normalization",
-]
-
-[[package]]
-name = "heddle-api"
-version = "0.31.0-alpha.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea5798c1d332b0ba35ad77896ec6854e1ded9574e48ae2fc2b50c2788a20f40"
 dependencies = [
@@ -933,6 +911,28 @@ dependencies = [
  "prost-reflect",
  "prost-types 0.14.1",
  "protoc-bin-vendored",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.18",
+ "unicode-general-category",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "heddle-api"
+version = "0.31.0-alpha.20"
+dependencies = [
+ "blake3",
+ "bytes",
+ "ed25519-dalek 3.0.0",
+ "hex",
+ "prost 0.14.1",
+ "prost-build",
+ "prost-reflect",
+ "prost-types 0.14.1",
+ "protoc-bin-vendored",
+ "rmp-serde",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1028,7 +1028,7 @@ dependencies = [
  "blake3",
  "chrono",
  "getrandom 0.4.3",
- "heddle-api 0.31.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heddle-api 0.31.0-alpha.19",
  "heddle-biscuit-verifier",
  "heddle-crypto",
  "heddle-object-model",
@@ -1052,7 +1052,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek 3.0.0",
  "getrandom 0.2.17",
- "heddle-api 0.31.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heddle-api 0.31.0-alpha.19",
  "heddle-biscuit-verifier",
  "hex",
  "p256 0.14.0",
@@ -1115,7 +1115,7 @@ dependencies = [
  "anyhow",
  "biscuit-auth",
  "heddle-api 0.31.0-alpha.19",
- "heddle-api 0.31.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heddle-api 0.31.0-alpha.20",
  "heddle-biscuit-verifier",
  "heddle-crypto",
  "heddle-object-model",
@@ -1185,15 +1185,6 @@ name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]
@@ -1559,7 +1550,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac6c3320f9abac597dcbc668774ef006702672474aad53c6d596b62e487b40b1"
 dependencies = [
  "heck",
- "itertools 0.14.0",
+ "itertools",
  "log",
  "multimap",
  "once_cell",
@@ -1579,7 +1570,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -1592,7 +1583,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn 2.0.119",

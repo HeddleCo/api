@@ -1530,69 +1530,216 @@ fn boundary_dependency_requires_exact_evidence() {
     println!("BOUNDARY PASS dependency_missing_binding: exact control");
 }
 
+fn commit_input<'a>(v: &'a Value, field: &str, control: bool) -> &'a Value {
+    if control {
+        v.get(format!("control_{field}")).unwrap_or(&v[field])
+    } else {
+        &v[field]
+    }
+}
+
+fn commit_negative(f: &Value, v: &Value) {
+    let c = Context::new(f);
+    let d: api::SignedImportJobDelegationV1 =
+        record(f, v["delegation"].as_str().expect("delegation"));
+    let prepared: api::PrepareImportJobResponse =
+        record(f, v["preparation"].as_str().unwrap_or("commit_preparation"));
+    let parent: Option<api::SignedImportMemberPermissionV1> =
+        if v.get("parent") == Some(&Value::Null) {
+            None
+        } else {
+            Some(record(f, v["parent"].as_str().unwrap_or("permission")))
+        };
+    let genesis_names = |control| {
+        commit_input(v, "geneses", control)
+            .as_array()
+            .map(|names| {
+                names
+                    .iter()
+                    .map(|name| name.as_str().expect("genesis name"))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(|| vec!["genesis_dev", "genesis_main"])
+    };
+    let geneses: Vec<api::SignedImportGenesisAuthorityV1> = genesis_names(false)
+        .iter()
+        .map(|name| record(f, name))
+        .collect();
+    let now = v["now_seconds"].as_i64().unwrap_or(1100);
+    let body = d.body.as_ref().expect("body");
+    let id = v["id"].as_str().expect("id");
+    match id {
+        "parent_amplification" | "parent_ref" => {
+            for (g, m) in geneses.iter().zip(&body.branch_manifest) {
+                assert_eq!(
+                    g.body
+                        .as_ref()
+                        .expect("genesis body")
+                        .parent_permission_digest,
+                    body.parent_permission_digest,
+                    "{id}: genesis must bind the child's parent"
+                );
+                assert_eq!(
+                    import::signed_genesis_digest(g).expect("genesis digest"),
+                    m.genesis_authority_digest
+                );
+            }
+        }
+        "window_duration" | "window_too_early" => {
+            let p = parent
+                .as_ref()
+                .expect("parent")
+                .body
+                .as_ref()
+                .expect("parent body");
+            assert!(
+                body.not_before_unix_seconds >= p.not_before_unix_seconds,
+                "{id}: parent must contain child start"
+            );
+            assert!(
+                body.expires_at_unix_seconds <= p.expires_at_unix_seconds,
+                "{id}: parent must contain child end"
+            );
+        }
+        "window_empty" => assert!(
+            body.expires_at_unix_seconds > now,
+            "reversed window must not also violate E>T"
+        ),
+        "reservation_expired" => {
+            let p = parent
+                .as_ref()
+                .expect("parent")
+                .body
+                .as_ref()
+                .expect("parent body");
+            assert_eq!(now, prepared.reservation_expires_at_unix_seconds);
+            assert!(
+                body.not_before_unix_seconds <= now - 1
+                    && body.expires_at_unix_seconds > now
+                    && p.expires_at_unix_seconds > now,
+                "reservation must expire during otherwise valid authority"
+            );
+            assert_eq!(commit_input(v, "now_seconds", true).as_i64(), Some(now - 1));
+            assert_eq!(v["control"], v["delegation"]);
+        }
+        _ => {}
+    }
+    let mut expected = c.owner(now);
+    expected.authority_expires_at_seconds =
+        v["authority_expires_at_seconds"].as_i64().unwrap_or(2000);
+    let rejection =
+        import::verify_prepared_delegation(&prepared, &d, parent.as_ref(), &geneses, &expected)
+            .expect_err(id);
+    assert_eq!(
+        format!("{rejection:?}"),
+        v["expected"].as_str().expect("reason"),
+        "{id}"
+    );
+    println!(
+        "COMMIT REJECT {id}: {rejection:?} ({})",
+        v["first_failing_check"]
+    );
+    let control_prepared = record(
+        f,
+        commit_input(v, "preparation", true)
+            .as_str()
+            .unwrap_or("commit_preparation"),
+    );
+    let control_parent = record(
+        f,
+        commit_input(v, "parent", true)
+            .as_str()
+            .unwrap_or("permission"),
+    );
+    let control_geneses: Vec<_> = genesis_names(true)
+        .iter()
+        .map(|name| record(f, name))
+        .collect();
+    // Ordinary controls share the negative's context; reservation controls are adjacent.
+    let control_now = commit_input(v, "now_seconds", true)
+        .as_i64()
+        .unwrap_or(1100);
+    let mut expected = c.owner(control_now);
+    expected.authority_expires_at_seconds = commit_input(v, "authority_expires_at_seconds", true)
+        .as_i64()
+        .unwrap_or(2000);
+    import::verify_prepared_delegation(
+        &control_prepared,
+        &record(f, v["control"].as_str().expect("control")),
+        Some(&control_parent),
+        &control_geneses,
+        &expected,
+    )
+    .expect("neighboring passing commit after rejection");
+    println!("COMMIT PASS {id} control at {control_now}");
+}
+
 #[test]
 fn prepared_commit_vectors_reject_then_accept() {
     let f = fixture();
-    let c = Context::new(&f);
-    let prepared = record(&f, "commit_preparation");
-    let geneses = [record(&f, "genesis_dev"), record(&f, "genesis_main")];
-    let parent: api::SignedImportMemberPermissionV1 = record(&f, "permission");
     for v in f["commit_vectors"]["negative"]
         .as_array()
         .expect("commit negatives")
     {
-        let d = record(&f, v["delegation"].as_str().expect("delegation"));
-        let permission = if v.get("parent") == Some(&Value::Null) {
-            None
-        } else {
-            Some(record(&f, v["parent"].as_str().unwrap_or("permission")))
-        };
-        let result = import::verify_prepared_delegation(
-            &prepared,
-            &d,
-            permission.as_ref(),
-            &geneses,
-            &c.owner(v["now_seconds"].as_i64().unwrap_or(1100)),
-        );
-        let rejection = result.expect_err(v["id"].as_str().expect("id"));
-        assert_eq!(
-            format!("{rejection:?}"),
-            v["expected"].as_str().expect("reason"),
-            "{}",
-            v["id"]
-        );
-        println!(
-            "COMMIT REJECT {}: {rejection:?} ({})",
-            v["id"], v["first_failing_check"]
-        );
-        import::verify_prepared_delegation(
-            &prepared,
-            &record(&f, "delegation"),
-            Some(&parent),
-            &geneses,
-            &c.owner(1100),
-        )
-        .expect("unchanged passing commit after each rejection");
-        println!("COMMIT PASS {} control", v["id"]);
+        commit_negative(&f, v);
     }
+    let c = Context::new(&f);
     for name in f["commit_vectors"]["passing"]
         .as_array()
         .expect("passing commits")
     {
-        let d = import::verify_prepared_delegation(
-            &prepared,
+        import::verify_prepared_delegation(
+            &record(&f, "commit_preparation"),
             &record(&f, name.as_str().expect("name")),
-            Some(&parent),
-            &geneses,
+            Some(&record(&f, "permission")),
+            &[record(&f, "genesis_dev"), record(&f, "genesis_main")],
             &c.owner(1100),
         )
         .expect("browser-completed commit within host bounds");
-        if name == "commit_future_within_skew" {
-            assert_eq!(
-                import::verify_new_operation(&record(&f, "operation_main"), &d, 1100),
-                Err(codec::Reject::Expired)
-            );
-        }
         println!("COMMIT PASS {name}");
     }
+}
+
+macro_rules! commit_isolation_test {
+    ($name:ident, $id:literal) => {
+        #[test]
+        fn $name() {
+            let f = fixture();
+            let v = f["commit_vectors"]["negative"]
+                .as_array()
+                .expect("negatives")
+                .iter()
+                .find(|v| v["id"] == $id)
+                .expect("named case");
+            commit_negative(&f, v);
+        }
+    };
+}
+commit_isolation_test!(commit_isolated_parent_amplification, "parent_amplification");
+commit_isolation_test!(commit_isolated_parent_ref, "parent_ref");
+commit_isolation_test!(commit_isolated_window_empty, "window_empty");
+commit_isolation_test!(commit_isolated_window_duration, "window_duration");
+commit_isolation_test!(commit_isolated_window_too_early, "window_too_early");
+commit_isolation_test!(commit_isolated_reservation_expired, "reservation_expired");
+
+#[test]
+fn commit_future_operation_obeys_signed_start() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let d = import::verify_prepared_delegation(
+        &record(&f, "commit_preparation"),
+        &record(&f, "commit_future_within_skew"),
+        Some(&record(&f, "permission")),
+        &[record(&f, "genesis_dev"), record(&f, "genesis_main")],
+        &c.owner(1100),
+    )
+    .expect("future commit within skew");
+    let operation = record(&f, "commit_future_operation");
+    assert_eq!(
+        import::verify_new_operation(&operation, &d, 1199),
+        Err(codec::Reject::Expired)
+    );
+    import::verify_new_operation(&operation, &d, 1200)
+        .expect("matching job-signed operation at signed start");
+    println!("COMMIT FUTURE OPERATION: 1199 Expired; 1200 PASS");
 }

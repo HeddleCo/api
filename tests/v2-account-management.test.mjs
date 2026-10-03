@@ -28,7 +28,7 @@ test('account wire vectors match Rust', () => {
     const schema = api[`${type}Schema`];
     const value = create(schema, values[type]);
     assert.equal(Buffer.from(toBinary(schema, value)).toString('hex'), hex, type);
-    assert.deepEqual(fromBinary(schema, Buffer.from(hex, 'hex')), value, type);
+    assert.deepEqual(fromBinary(schema, new Uint8Array(Buffer.from(hex, 'hex'))), value, type);
   }
 });
 

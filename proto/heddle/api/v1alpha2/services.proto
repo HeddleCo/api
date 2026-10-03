@@ -16,6 +16,7 @@ import "heddle/api/v1alpha2/identity.proto";
 import "heddle/api/v1alpha2/import_authority.proto";
 import "heddle/api/v1alpha2/integration.proto";
 import "heddle/api/v1alpha2/ownership.proto";
+import "heddle/api/v1alpha2/platform_admin.proto";
 import "heddle/api/v1alpha2/sync.proto";
 import "heddle/api/v1alpha2/thread.proto";
 import "heddle/api/v1alpha2/timeline_upload.proto";
@@ -2937,6 +2938,82 @@ service BillingService {
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
       authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+}
+
+// Read-only online checks for platform administration. Only current durable
+// platform staff standing for directly authenticated humans authorizes them;
+// delegated, agent, service and anonymous credentials are denied. Verify the
+// original credential/PoP and attenuation for each exact method. Projection in
+// PrincipalRecord.actions uses the corresponding Capability and is advice only.
+// Clients must check within each request before any side effect; missing or
+// unknown advice denies. Responses are point-in-time decisions for this RPC and
+// observing credential only, never portable grants, bearers, offline proofs or
+// reusable permits. These checks do not execute email or console operations.
+service PlatformAdminService {
+  option (heddle.api.common.service_contract) = {
+    deployment_targets: [DEPLOYMENT_TARGET_WEFT]
+    maturity: SERVICE_MATURITY_PLANNED
+  };
+  // Checks access to email templates and settings.
+  // Projects CAPABILITY_PLATFORM_EMAIL_TEMPLATES in PrincipalRecord.actions.
+  rpc AuthorizeEmailTemplates(PlatformAuthorizationRequest) returns (PlatformAuthorizationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_PLATFORM_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Checks access to email delivery and audit.
+  // Projects CAPABILITY_PLATFORM_EMAIL_DELIVERY in PrincipalRecord.actions.
+  rpc AuthorizeEmailDelivery(PlatformAuthorizationRequest) returns (PlatformAuthorizationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_PLATFORM_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Checks analytics access; does not provide an analytics data API.
+  // Projects CAPABILITY_PLATFORM_ANALYTICS in PrincipalRecord.actions.
+  rpc AuthorizeAnalytics(PlatformAuthorizationRequest) returns (PlatformAuthorizationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_PLATFORM_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Checks directory access; does not provide invitation data or mutations.
+  // Projects CAPABILITY_PLATFORM_INVITATION_DIRECTORY in PrincipalRecord.actions.
+  rpc AuthorizeInvitationDirectory(PlatformAuthorizationRequest) returns (PlatformAuthorizationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_PLATFORM_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_GLOBAL_ADMINISTRATOR
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }

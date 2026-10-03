@@ -292,6 +292,12 @@ enum Capability {
   CAPABILITY_PUT_GRANT = 3;
   CAPABILITY_CREATE_INVITATION = 4;
   CAPABILITY_REVISE_SPOOL = 5;
+  // Platform advice requires a fresh matching PlatformAdminService check within
+  // each request before any side effect; these values never confer authority.
+  CAPABILITY_PLATFORM_EMAIL_TEMPLATES = 6;
+  CAPABILITY_PLATFORM_EMAIL_DELIVERY = 7;
+  CAPABILITY_PLATFORM_ANALYTICS = 8;
+  CAPABILITY_PLATFORM_INVITATION_DIRECTORY = 9;
 }
 
 message ActionAvailability {

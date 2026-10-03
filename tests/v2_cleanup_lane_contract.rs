@@ -204,6 +204,10 @@ mod descriptor {
                 ("CAPABILITY_PUT_GRANT".into(), 3),
                 ("CAPABILITY_CREATE_INVITATION".into(), 4),
                 ("CAPABILITY_REVISE_SPOOL".into(), 5),
+                ("CAPABILITY_PLATFORM_EMAIL_TEMPLATES".into(), 6),
+                ("CAPABILITY_PLATFORM_EMAIL_DELIVERY".into(), 7),
+                ("CAPABILITY_PLATFORM_ANALYTICS".into(), 8),
+                ("CAPABILITY_PLATFORM_INVITATION_DIRECTORY".into(), 9),
             ]
         );
         field(

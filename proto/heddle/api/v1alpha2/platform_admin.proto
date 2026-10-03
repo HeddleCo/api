@@ -1,0 +1,24 @@
+syntax = "proto3";
+package heddle.api.v1alpha2;
+
+import "heddle/api/v1alpha2/common.proto";
+
+// The caller comes only from the verified credential and request PoP.
+message PlatformAuthorizationRequest {}
+
+// Point-in-time online decision for this RPC and the observing credential only.
+// Never a portable grant, bearer, offline proof or reusable permit. Clients must
+// call the matching check within each request before any side effect; missing
+// or unknown advice denies. The check itself does not execute that side effect.
+// Authorization comes only from current durable platform staff standing for a
+// directly authenticated human across supported rooting tiers. Delegated,
+// agent, service and anonymous credentials are denied. Verified credential and
+// delegation attribution establishes directness, never a claimed account UUID,
+// token staff fact or member-held action. Uncertain authorization state denies.
+message PlatformAuthorizationResponse {
+  // On success, the matching action is authorized; unauthorized callers are
+  // denied by the RPC. PrincipalRecord.actions projects the same decision with
+  // the matching Capability, exact method and serving Weft endpoint, no customer
+  // target, and implemented only when the endpoint advertises the handler.
+  ActionAvailability action = 1;
+}

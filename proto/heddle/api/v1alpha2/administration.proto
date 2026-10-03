@@ -275,10 +275,13 @@ message ReviseSpoolRequest {
   // A selected path sets its supplied value, including false/empty/UNSPECIFIED.
   // An absent selected message explicitly clears it (settings may be absent).
   // Clears/reset-to-default require permission to read AND clear the current
-  // value; deny atomically with PERMISSION_DENIED and no hidden-value details.
-  // This includes default_thread and default_review_policy, the caller-filtered
-  // references. Validate set references and resulting audience/policy together
-  // under expected_version; no partial apply. There is no complete-record mode.
+  // value. Replacing default_thread or default_review_policy also removes the
+  // current caller-filtered reference and requires that permission; setting an
+  // equal reference does not. Independently validate permission for the new
+  // target. Deny atomically with PERMISSION_DENIED and no hidden-value details.
+  // Bind the stored-value check and update to the same expected_version and
+  // recheck live authorization at commit. Validate resulting audience/policy
+  // together; no partial apply. There is no complete-record mode.
   google.protobuf.FieldMask settings_mask = 7;
 }
 // Move a personal-root child to the account's root-level address at its current

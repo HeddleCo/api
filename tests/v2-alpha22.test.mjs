@@ -160,8 +160,8 @@ test("alpha22 oversized first paths and unary definitions have pre-matching boun
     assert.ok(32768 + 8192 + 8192 + 1024 <= accepted.maxSnapshotBytes, "first visible row always makes progress");
   }
   // Largest admitted definition/occurrence pair fits, including its wire wrappers.
-  const symbol = create(api.CodeSymbolSchema, { name: "x".repeat(16380) });
-  const occurrence = create(api.CodeOccurrenceSchema, { name: "x".repeat(16380) });
+  const symbol = create(api.CodeSymbolSchema, { name: "x".repeat(16381) });
+  const occurrence = create(api.CodeOccurrenceSchema, { name: "x".repeat(16381) });
   assert.equal(toBinary(api.CodeSymbolSchema, symbol).length, 16384);
   assert.equal(toBinary(api.CodeOccurrenceSchema, occurrence).length, 16384);
   const maximumDefinition = create(api.GetDefinitionResponseSchema, {

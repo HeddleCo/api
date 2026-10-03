@@ -138,6 +138,13 @@ message ContentEvent {
 
 // Finite, exact-revision leaf-path listing. No depth cap or Search tip restriction.
 // See docs/alpha-v2/cleanup-lane.md for matching, bounds and disclosure rules.
+// ListPaths per-method minimum budget: 3 items, 65536 frame bytes and 65536
+// snapshot bytes after clamping, checked before source selection/matching.
+// Admitted leaf paths <= 16384 UTF-8 bytes, complete path events <= 32768
+// encoded bytes, echo/completion <= 8192 each, plus 1024 framing reserve.
+// Enforce the path bound at source admission; incompatible preexisting sources
+// have UNAVAILABLE coverage independent of matches. Never skip/truncate a path.
+// Every nonempty window emits its first visible path and can make progress.
 message ListPathsRequest {
   RevisionRef revision = 1;
   // Required owning Thread; must own revision and have the same Spool.

@@ -157,8 +157,15 @@ message ObserveRunsRequest {
   // snapshot includes the selected RunRecord and policy, when present, plus at
   // most timeline_limit records, ordered by position from oldest to newest.
   // Its PageInfo is exhausted with an empty next_page when the selection fits.
-  // Budget-limited snapshots return PARTIAL with continuation; only impossible
-  // fixed request/control overhead is rejected, before matching data.
+  // Budget-limited snapshots return timeline PARTIAL with an empty next_page
+  // and page.exhausted=false. The checkpoint cursor retains the fixed initial
+  // latest-N lower/upper boundary and last delivered position. The first
+  // snapshot_complete=true commits staging, not completeness of coverage.
+  // Deliver the fixed remainder in bounded UPSERT batches on this stream or
+  // after resume, before following newer positions. The last remainder batch
+  // has timeline COMPLETE, page.exhausted=true and empty next_page, then a
+  // checkpoint. Charge all remainder payloads/statuses/checkpoints to budget.
+  // Only impossible fixed request/control overhead is rejected before matching.
   // Default UNSPECIFIED retains oldest-first paging and WindowChanged resets
   // when a non-exhausted page changes. In LATEST, new positions append after
   // the fixed initial selection; they MUST NOT trigger WindowChanged merely
@@ -170,8 +177,11 @@ message ObserveRunsRequest {
   uint32 timeline_limit = 8;
   // ObserveOptions.after_cursor is a stream resume cursor, never a page token.
   // It is bound to timeline_start, timeline_limit and the run filter. Successful
-  // resume continues after that checkpoint without selecting a new latest N;
-  // if replay is unavailable, the server sends a terminal reset. The client
+  // after_cursor resume delivers the retained initial remainder before following
+  // later positions, without selecting a new latest N;
+  // if replay or the fixed boundary/remainder is unavailable, or a genuine
+  // removal loses continuity, the server sends a terminal reset. Recheck live
+  // authorization at each handoff. The client
   // reconnects without after_cursor to start a replacement latest snapshot.
   // PageRequest.after_page is invalid in LATEST mode.
 }

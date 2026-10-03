@@ -240,30 +240,6 @@
       "error": "shape"
     },
     {
-      "name": "invalid endpoint maximum",
-      "requested": [
-        1024,
-        524288,
-        "4194304"
-      ],
-      "defaults": [
-        1024,
-        524288,
-        "4194304"
-      ],
-      "maximum": [
-        1023,
-        524288,
-        "4194304"
-      ],
-      "capacity": [
-        1024,
-        524288,
-        "4194304"
-      ],
-      "error": "advertisement"
-    },
-    {
       "name": "invalid zero default",
       "requested": [
         1024,
@@ -310,6 +286,102 @@
         "4194304"
       ],
       "error": "shape"
+    },
+    {
+      "name": "below floor items only",
+      "requested": [
+        0,
+        0,
+        "0"
+      ],
+      "defaults": [
+        1023,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1023,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    },
+    {
+      "name": "below floor frame only",
+      "requested": [
+        0,
+        0,
+        "0"
+      ],
+      "defaults": [
+        1024,
+        524287,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524287,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    },
+    {
+      "name": "below floor snapshot only",
+      "requested": [
+        0,
+        0,
+        "0"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194303"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194303"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    },
+    {
+      "name": "defaults above maximum only",
+      "requested": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "defaults": [
+        1025,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
     }
   ],
   "thread_wire_hex": "7a0308c8018201330a070a0573706f6f6c1a2861616161616161616161616161616161616161616161616161616161616161616161616161616161f201020864",

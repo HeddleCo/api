@@ -30,6 +30,11 @@ enum ObservationMode {
 // max_frame_bytes < 1024, snapshot bytes < frame bytes, or fixed selection
 // overhead > max_items (INVALID_ARGUMENT). Matching data size never causes a
 // budget rejection: return bounded PARTIAL coverage with a continuation.
+// Indivisible rows require explicit per-method bounds and minimum budgets that
+// fit one maximum admitted row plus controls (code-navigation.md, cleanup-lane.md).
+// Check those minima before matching and row bounds at source/index admission.
+// A nonempty page must emit its first visible row; unary results fit atomically.
+// Existing blob chunks remain chunked; there is no generic chunk protocol.
 message ReadBudget {
   // Zero selects the endpoint's advertised default; it never means unbounded.
   // ObserveThread timeline charges every visible run and event frame, status,

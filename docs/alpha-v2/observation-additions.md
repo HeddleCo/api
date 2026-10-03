@@ -146,6 +146,11 @@ forbidden/absent targets must have indistinguishable failures.
 Clearing/resetting requires the caller to be allowed to **read and clear the
 current stored value**, independently of administrator role. Refuse an
 unauthorized clear atomically with PERMISSION_DENIED and no hidden-value details.
+Replacing either caller-filtered reference (`default_thread` or
+`default_review_policy`) also removes its current stored value and requires
+that permission, independently of read/set permission for the new target.
+Setting an equal reference removes nothing. Bind the current-value check and
+update to the same `expected_version`; recheck live authorization at commit.
 A filtered overview can safely be used as patch values with a mask listing only
 the fields the caller intentionally edited. It must never imply a clear.
 

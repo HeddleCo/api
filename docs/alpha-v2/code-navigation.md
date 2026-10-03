@@ -141,10 +141,53 @@ The stream.proto clamp/floor/default rules apply; above-maximum budgets clamp.
 The page cap shortens returned rows independently of the accepted budget and
 never reduces the endpoint's advertised maximum below the guaranteed floor.
 Every response carries a fully populated `accepted_budget`, including empty
-or unresolved definition results. Fixed metadata overhead that cannot fit is
-INVALID_ARGUMENT, decided before matching. Larger visible collections return
-shorter resumable pages; matching row size/count never causes budget rejection.
-Definition results follow the same budget. Count visible rows and controls.
+or unresolved definition results. Count visible rows and controls.
+
+Indivisible results use explicit admission bounds, not a chunk protocol.
+All four methods require the effective budget to meet
+`CODE_NAVIGATION_MIN_READ_BUDGET = { max_items: 4, max_frame_bytes: 65536, max_snapshot_bytes: 65536 }`.
+After clamping, reject any smaller field with INVALID_ARGUMENT before selecting
+an index or matching data, even for an empty or unresolved answer. Defaults
+must meet this method minimum. The item reserve covers one row and metadata,
+page and budget controls; a definition's occurrence/definition pair counts as
+one result row. The minimum is below the guaranteed floor, so it does not
+require DescribeEndpoint or widening a signed nonzero request.
+
+These are maximum deterministic protobuf encoded sizes, including nested fields:
+
+| Component | Maximum bytes |
+| --- | --- |
+| `CodeSymbol` | 16384 |
+| `CodeOccurrence` | 16384 |
+| `CodeSemanticRef` | 32768 |
+| `CodeImporter` | 32768 |
+| `CodeNavigationMetadata` | 8192 |
+| `PageInfo` | 8192 |
+
+The maximum definition pair is 32768 bytes. Reserve a further 1024 bytes for
+field wrappers, effective budget, flags/reasons and transport framing. Thus
+one maximum row (or definition pair), maximum metadata and maximum PageInfo
+fit within 50176 bytes, less than the 65536-byte frame/snapshot minimum.
+Collection pages MUST leave this reserve before choosing rows and always
+include at least their first visible row when nonempty. Shorten subsequent
+rows to fit and use the existing next_page; never return a continuation before
+an unreturned first row, skip a row or truncate its spelling/address.
+GetDefinition returns its whole bounded occurrence/definition pair atomically.
+
+Enforce the symbol, occurrence, edge and importer bounds at SemanticIndex
+admission; oversized indexes fail INVALID_ARGUMENT without installing an
+attachment. Validate worst-case metadata for all attachment languages, not
+just a matching visible result, against the metadata bound at admission.
+For existing attachments that predate these bounds, validate as an index
+profile prerequisite, independently of the query/matches; an incompatible
+attachment is unusable and returns NO_INDEX, never a row-size budget failure.
+Do not reveal the offending record or hidden-language details. Fixed metadata
+inputs from the request (Thread/revision references) must fit the same reserve;
+reject impossible request overhead before index selection. Page tokens and
+metadata construction must stay within the specified bounds without dropping
+required fields. No source parsing, chunk/reassembly envelope or cursor family
+is added. The existing exact-revision transfer with
+`TransferSelection.include_semantic_index` retrieves the admitted attachment.
 
 `hop_cap=0` means one hop; maximum four. `REFS_OF` traverses incoming RefersTo,
 Calls and TypeRef edges; `CALLERS_OF` traverses incoming Calls only;

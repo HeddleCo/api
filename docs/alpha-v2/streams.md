@@ -353,9 +353,33 @@ structurally impossible budgets decided from the request shape before matching:
 frame bytes below 1024, clamped snapshot bytes below frame bytes, or fixed
 selection/control overhead exceeding the effective item budget. A matching
 collection exceeding budget returns bounded PARTIAL coverage and a continuation,
-not RESOURCE_EXHAUSTED. Visible row size or count must not choose a different
-failure or disclose hidden data. Use chunking or a continuation for domain data;
-fixed shape checks are independent of matches.
+not RESOURCE_EXHAUSTED. Indivisible rows require explicit per-method bounds and
+minimum budgets sufficient for a maximum admitted row plus control overhead.
+ListPaths and all code-navigation methods define those bounds in cleanup-lane.md
+and code-navigation.md: validate their effective method minimum before source
+selection or matching; validate item bounds at source/index admission. A first
+visible row must fit and advance the continuation. Unary GetDefinition returns
+its bounded whole answer. Do not loop on an empty page, skip a row or widen the
+echo. Existing blob range reads remain chunked; no generic chunk protocol is
+introduced. Matching row counts and sizes never choose a budget failure or
+expose hidden data; fixed shape checks are independent of matches.
+
+LATEST ObserveRuns uses the existing stream cursor to finish a budget-limited
+initial selection. The initial latest-N boundary is fixed before the snapshot;
+the checkpoint cursor retains that boundary and the last delivered position.
+A PARTIAL `timeline` status has `page.exhausted=false` and an empty `next_page`.
+The first checkpoint commits the available snapshot with `snapshot_complete=true`;
+that bit commits staging, while SectionStatus coverage describes whether the
+fixed selection is complete. Continue the remainder in bounded UPSERT batches
+on this stream, or reconnect with `ObserveOptions.after_cursor` to finish it.
+Complete the fixed remainder before following newer positions, even when new
+records arrive during truncation/disconnection. The completing batch includes
+COMPLETE status with `page.exhausted=true`, then a checkpoint. Subsequent records
+append normally. Every remainder batch is charged against the effective budget,
+including statuses/checkpoints. PageRequest remains forbidden in LATEST; resume
+never selects a new latest N. Live authorization is rechecked before handoff;
+lost retained remainder/boundary or genuine removal requires terminal Reset,
+never silently skipping into a new selection.
 
 `StreamOpen.accepted_budget` is mandatory, including on resume. It echoes the
 fully resolved effective budget with all fields positive, each no larger than

@@ -271,3 +271,78 @@ fn descriptor_fields_are_additive_and_sources_are_stable() {
         3
     );
 }
+
+#[test]
+fn locked_email_takes_precedence_over_wildcard_digest_with_typed_policy_denied() {
+    for kind in ["", "*", "account_security", "security_surface"] {
+        let rule = NotificationRule {
+            kind: kind.into(),
+            channel: Channel::Unspecified as i32,
+            delivery: Delivery::Digest as i32,
+            ..Default::default()
+        };
+        let error = validate_notification_rule(&rule).expect_err("locked email cannot digest");
+        assert_eq!(error, NotificationValidationError::LockedEmail);
+        assert_eq!(error.code(), CallFailureCode::FailedPrecondition);
+        assert_eq!(error.reason(), ErrorReason::PolicyDenied);
+    }
+    for (kind, channel) in [
+        ("mention", Channel::Unspecified),
+        ("account_security", Channel::InApp),
+        ("security_surface", Channel::InApp),
+    ] {
+        let rule = NotificationRule {
+            kind: kind.into(),
+            channel: channel as i32,
+            delivery: Delivery::Digest as i32,
+            ..Default::default()
+        };
+        let error = validate_notification_rule(&rule).expect_err("non-email digest");
+        assert_eq!(error, NotificationValidationError::DigestRequiresEmail);
+        assert_eq!(error.code(), CallFailureCode::InvalidArgument);
+        assert_eq!(error.reason(), ErrorReason::FieldInvalid);
+    }
+}
+
+#[test]
+fn settings_cadence_shared_vectors_reject_invalid_account_and_override_intervals() {
+    let vectors: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/notification-cadence.json"))
+            .expect("shared cadence vectors");
+    for row in vectors.as_array().expect("array") {
+        let interval = if row["interval"].is_null() {
+            None
+        } else {
+            Some(prost_types::Duration {
+                seconds: row["interval"]["seconds"].as_i64().expect("seconds"),
+                nanos: row["interval"]["nanos"].as_i64().expect("nanos") as i32,
+            })
+        };
+        let mut preferences = NotificationPreferences::default();
+        if row["scope"] == "account" {
+            preferences.digest_interval = interval;
+        } else {
+            preferences
+                .digest_overrides
+                .push(NotificationDigestOverride {
+                    spool: Some(SpoolRef {
+                        id: "00000000-0000-4000-8000-000000000001".into(),
+                    }),
+                    digest_interval: interval,
+                    ..Default::default()
+                });
+        }
+        let result = validate_notification_preferences_write(&SetNotificationPreferencesRequest {
+            preferences: Some(preferences),
+            ..Default::default()
+        });
+        if let Some(violation) = row["violation"].as_str() {
+            let error = result.expect_err(row["name"].as_str().expect("name"));
+            assert_eq!(format!("{error:?}"), violation, "{row}");
+            assert_eq!(error.code(), CallFailureCode::InvalidArgument);
+            assert_eq!(error.reason(), ErrorReason::FieldInvalid);
+        } else {
+            assert_eq!(result, Ok(()), "{row}");
+        }
+    }
+}

@@ -15,7 +15,7 @@
     "kind": "",
     "channel": 0,
     "delivery": 2,
-    "violation": "DigestRequiresEmail"
+    "violation": "LockedEmail"
   },
   {
     "kind": "",
@@ -165,7 +165,7 @@
     "kind": "*",
     "channel": 0,
     "delivery": 2,
-    "violation": "DigestRequiresEmail"
+    "violation": "LockedEmail"
   },
   {
     "kind": "*",
@@ -465,7 +465,7 @@
     "kind": "account_security",
     "channel": 0,
     "delivery": 2,
-    "violation": "DigestRequiresEmail"
+    "violation": "LockedEmail"
   },
   {
     "kind": "account_security",
@@ -615,7 +615,7 @@
     "kind": "security_surface",
     "channel": 0,
     "delivery": 2,
-    "violation": "DigestRequiresEmail"
+    "violation": "LockedEmail"
   },
   {
     "kind": "security_surface",

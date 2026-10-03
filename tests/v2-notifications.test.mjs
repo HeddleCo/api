@@ -103,3 +103,39 @@ test('effective projection count and whole-message byte bounds are enforced', ()
   assert.throws(() => api.validateNotificationPreferencesBound(preferences), error =>
     error.code === CallFailureCode.RESOURCE_EXHAUSTED && error.reason === ErrorReason.QUOTA_EXCEEDED);
 });
+
+
+test('locked email takes precedence over wildcard DIGEST with typed PolicyDenied', () => {
+  for (const kind of ['', '*', 'account_security', 'security_surface']) {
+    const rule = create(api.NotificationRuleSchema, { kind, channel: 0, delivery: 2 });
+    assert.throws(() => api.validateNotificationRule(rule), error =>
+      error.violation === 'LockedEmail' && error.code === CallFailureCode.FAILED_PRECONDITION &&
+      error.reason === ErrorReason.POLICY_DENIED);
+  }
+  for (const [kind, channel] of [['mention', 0], ['account_security', 1], ['security_surface', 1]]) {
+    assert.throws(() => api.validateNotificationRule(create(api.NotificationRuleSchema, {
+      kind, channel, delivery: 2,
+    })), error => error.violation === 'DigestRequiresEmail' &&
+      error.code === CallFailureCode.INVALID_ARGUMENT && error.reason === ErrorReason.FIELD_INVALID);
+  }
+});
+
+const cadenceVectors = JSON.parse(readFileSync(new URL('./fixtures/notification-cadence.json', import.meta.url), 'utf8'));
+for (const { name, scope, interval, violation } of cadenceVectors) {
+  test(`settings cadence: ${name}`, () => {
+    const duration = interval ? { seconds: BigInt(interval.seconds), nanos: interval.nanos } : undefined;
+    const preferences = create(api.NotificationPreferencesSchema, scope === 'account' ? {
+      digestInterval: duration,
+    } : {
+      digestOverrides: [create(api.NotificationDigestOverrideSchema, {
+        spool: create(api.SpoolRefSchema, { id: '00000000-0000-4000-8000-000000000001' }),
+        digestInterval: duration,
+      })],
+    });
+    const validate = () => api.validateNotificationPreferencesWrite(
+      create(api.SetNotificationPreferencesRequestSchema, { preferences }));
+    if (violation) assert.throws(validate, error => error.violation === violation &&
+      error.code === CallFailureCode.INVALID_ARGUMENT && error.reason === ErrorReason.FIELD_INVALID);
+    else assert.doesNotThrow(validate);
+  });
+}

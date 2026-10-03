@@ -1,5 +1,6 @@
+import type { PlatformAuthorizationResponse } from "@heddleco/api/v2";
 import { createServiceClient, type RpcTransport } from "../packages/typescript/dist/v1alpha2/client.js";
-import { SearchService, ThreadService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
+import { PlatformAdminService, SearchService, ThreadService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
 import { SearchSourceHistory } from "../packages/typescript/dist/v1alpha2/content_pb.js";
 import type { ThreadListEvent, ThreadMutationResponse } from "../packages/typescript/dist/v1alpha2/thread_pb.js";
 
@@ -19,3 +20,13 @@ search.search({ text: "authorize", threads: [{ spool: { id: "spool" }, id: { val
   sourceScope: { case: "sourceRevision", value: { spool: { id: "spool" }, revision: { case: "state", value: { value: new Uint8Array(32) } } } } });
 // @ts-expect-error Exact revision and history are mutually exclusive selections.
 search.search({ text: "authorize", sourceScope: { case: "sourceHistory", value: { spool: { id: "spool" } } } });
+
+const platform = createServiceClient(PlatformAdminService, transport, new Set<string>());
+const platformChecks: Promise<PlatformAuthorizationResponse>[] = [
+  platform.authorizeEmailTemplates({}), platform.authorizeEmailDelivery({}),
+  platform.authorizeAnalytics({}), platform.authorizeInvitationDirectory({}),
+];
+void platformChecks;
+// @ts-expect-error Authorization checks are unary decisions, not observations.
+const platformStream: AsyncIterable<PlatformAuthorizationResponse> = platform.authorizeAnalytics({});
+void platformStream;

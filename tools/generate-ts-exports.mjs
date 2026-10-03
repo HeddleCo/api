@@ -61,6 +61,7 @@ copyFileSync("packages/typescript/runtime/v2-collaboration.ts", join(v2Root, "co
 copyFileSync("packages/typescript/runtime/v2-source-targets.ts", join(v2Root, "source-targets.ts"));
 copyFileSync("packages/typescript/runtime/v2-invitation.ts", join(v2Root, "invitation.ts"));
 copyFileSync("packages/typescript/runtime/v2-passkey-label.ts", join(v2Root, "passkey-label.ts"));
+copyFileSync("packages/typescript/runtime/v2-account-metadata.ts", join(v2Root, "account-metadata.ts"));
 copyFileSync("packages/typescript/runtime/v2-notifications.ts", join(v2Root, "notifications.ts"));
 copyFileSync("packages/typescript/runtime/v2-msgpack.ts", join(v2Root, "_collaboration-msgpack.ts"));
 copyFileSync("packages/typescript/runtime/v2-hybrid-codec.ts", join(v2Root, "_hybrid-codec.ts"));

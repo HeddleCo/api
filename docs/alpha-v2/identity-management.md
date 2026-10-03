@@ -1,5 +1,9 @@
 # Identity management canonical records
 
+For the additive passkey removal, profile/handle commands, account actions,
+session filters and advisory metadata contract, see
+[Account management additions](account-management.md).
+
 These formats use Ed25519 signatures over UTF-8 format name, one zero byte, then
 `canonical_record`. Unknown formats and noncanonical encodings fail closed.
 `heddle_api::v2::identity_management` owns the canonical codecs; these are not

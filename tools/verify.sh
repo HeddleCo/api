@@ -8,6 +8,7 @@ python3 -B -m unittest tests/test_attention_contract.py
 python3 -B -m unittest tests/test_explore_contract.py
 python3 -B -m unittest tests/test_attestation_contract.py
 python3 -B -m unittest tests/test_handle_contract.py
+python3 -B -m unittest tests/test_account_management_contract.py
 python3 -B -m unittest tests/test_owner_authorization_contract.py
 python3 -B -m unittest tests/test_owner_authz_cutover_contract.py
 python3 -B -m unittest tests/test_workflow_contract.py

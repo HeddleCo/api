@@ -74,6 +74,14 @@ message PrincipalRecord {
   string account_id = 6;
   string acting_agent_id = 7;
   repeated EntityRef authorized_resources = 8;
+  // Declare account-scope commands, including RenamePasskey, RemovePasskey,
+  // RevokeDevice, RevokeSession, SetDisplayName, SetPrimaryHandle and RemoveHandle.
+  // authorized reflects this observing credential's complete caveats, not the
+  // account's tier. Include refused commands with authorized=false (for example
+  // RevokeDevice for an ephemeral sign-in). Target-specific requirements still
+  // apply, including version CAS and last-method/primary/last-handle safeguards.
+  // RemovePasskey MUST be authorized=false unless require_independent_root holds:
+  // root_established plus an unattenuated credential, in addition to its caveats.
   // PlatformAdminService checks project here with their matching Capability,
   // exact method path and serving Weft endpoint, without a customer target.
   // Authorization requires current durable platform staff standing for a
@@ -86,7 +94,9 @@ message PrincipalRecord {
   repeated ActionAvailability actions = 9;
   EntitlementRecord entitlement = 10;
   RootingTier rooting_tier = 11;
-  // Generated pet name while agent-rooted and unclaimed; handle stays empty.
+  // Explicit normalized display name, falling back to the primary handle when
+  // cleared. Generated pet name while agent-rooted and unclaimed; handle stays
+  // empty. Presentation only; changing this never changes account authority.
   string display_name = 12;
   // Personal namespace for creation and remote provisioning. Omitted when it
   // has not been created or is unavailable to this observing credential.
@@ -107,9 +117,29 @@ message SessionRecord {
   bool revoked = 5;
   google.protobuf.Timestamp issued_at = 6;
   google.protobuf.Timestamp last_used_at = 7;
+  // Optional metadata expressed as an empty string when unavailable. Captured
+  // at session creation from the client's transport user agent when available;
+  // client-supplied, advisory, never identity or authority. Retained verbatim,
+  // at most 8192 UTF-8 bytes, with Unicode Cc rejected. Render as untrusted text.
   string user_agent = 8;
   string ip_address = 9;
   bool is_current = 10;
+  // Optional client-supplied label captured at session creation (including
+  // declined device enrollment). Same trim/NFC/256-byte rules as passkey labels;
+  // empty means no label. Advisory only; never evidence of a registered device.
+  optional string device_label = 11;
+}
+
+// State filtering never expands the caller's authorized session scope.
+enum SessionStateFilter {
+  // Compatibility default: ALL, including ended sessions, as before this field.
+  SESSION_STATE_FILTER_UNSPECIFIED = 0;
+  // Recommended for settings. Not revoked and expires_at is later than the
+  // server's snapshot time. Apply before paging, budgets and matching_count.
+  SESSION_STATE_FILTER_ACTIVE = 1;
+  // Revoked (including signed out) or expired at the server's snapshot time.
+  SESSION_STATE_FILTER_ENDED = 2;
+  SESSION_STATE_FILTER_ALL = 3;
 }
 
 // Account-private passkey inventory, requested through ObserveIdentity. The
@@ -123,6 +153,19 @@ message PasskeyRecord {
   string label = 3;
   SignedPasskeyAuthority certificate = 4;
   bool revoked = 5;
+  // Absent for historical records with unknown registration time.
+  google.protobuf.Timestamp created_at = 6;
+  // Last successful authentication using this exact passkey; absent if unused
+  // or unknown. Viewing or renaming a passkey does not count as use.
+  google.protobuf.Timestamp last_used_at = 7;
+  // Exactly 16 bytes when present; extracted from registration authenticator
+  // data. Clients should request attestation conveyance "indirect" to obtain
+  // the AAGUID. Zero AAGUIDs and omission mean unknown authenticator. This is
+  // advisory metadata, never authority, attestation trust or sign-in permission.
+  optional bytes aaguid = 8;
+  // Optional advisory friendly name derived from AAGUID metadata. Same
+  // trim/NFC/256-byte rules as passkey labels; never authenticator authority.
+  optional string authenticator_name = 9;
 }
 message DelegationRecord {
   RecordRef ref = 1;
@@ -432,6 +475,8 @@ message BeginAuthenticationRequest {
   // reassigns a key owned by another account. The passkey assertion, request
   // proof, device admission and session receipt commit as one ceremony.
   bool enroll_device = 3;
+  // Client-supplied advisory session label, captured even without enrollment.
+  // Same trim/NFC/256-byte rules as passkey labels; empty means unavailable.
   string device_label = 4;
   CredentialMethod method = 5;
   // Required exactly when method is OAUTH. Never a caller-supplied issuer URL.
@@ -564,7 +609,8 @@ message RegistrationChallenge {
   string handle = 7;
   string display_name = 8;
   UserVerification user_verification = 9;
-  // The passkey creation uses attestation="none". A follow-up assertion by
+  // Clients should request attestation="indirect" to obtain advisory AAGUID
+  // metadata. Attestation is never account authority. A follow-up assertion by
   // that passkey proves its binding to caller_public_key using these bytes.
   // The independent CallContext signature proves possession of the device key.
   bytes device_binding_challenge = 10;
@@ -611,6 +657,8 @@ message CompleteRegistrationRequest {
   }
   bytes caller_public_key = 4;
   PasskeyProof device_binding = 5;
+  // Client-supplied advisory device/session label captured at registration.
+  // Same trim/NFC/256-byte rules as passkey labels; empty means unavailable.
   string device_label = 6;
   // New signup establishes an owner root. Claim preserves the original
   // deferred root and appends CLAIM_DEFERRED_HUMAN. Adding a passkey/device
@@ -658,6 +706,84 @@ message RenamePasskeyResponse {
   MutationReceipt receipt = 1;
   // Updated record with its new version and display label.
   PasskeyRecord passkey = 2;
+}
+
+// Retires the exact account-owned passkey. Same request PoP, caller ownership,
+// exact-method caveats, idempotency and version CAS as RenamePasskey, plus the
+// existing require_independent_root predicate: root_established plus an
+// unattenuated credential. Delegated and ephemeral credentials MUST be denied.
+// Weft MUST atomically refuse
+// removal of the account's last usable sign-in method with typed
+// CALL_FAILURE_CODE_FAILED_PRECONDITION / ERROR_REASON_LIFECYCLE_STATE.
+// Recovery factors alone are not usable sign-in methods. Retire sign-in
+// authority and revoke temporary sessions minted by this passkey together;
+// retain signed evidence for admitted history. Device-root cascades follow the
+// canonical identity model's CURRENT/TARGET revocation policy.
+message RemovePasskeyRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
+  string client_operation_id = 1;
+  // Account-private unscoped PasskeyRecord.ref: spool absent, nonempty id of
+  // at most 1366 ASCII bytes (unpadded base64url of a 1..1024-byte credential ID).
+  RecordRef passkey = 2;
+  // Required exact 32-byte PasskeyRecord.version; conflict changes no state.
+  bytes expected_version = 3;
+}
+message RemovePasskeyResponse {
+  MutationReceipt receipt = 1;
+  // Updated record with revoked=true and its new version.
+  PasskeyRecord passkey = 2;
+}
+
+message SetDisplayNameRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
+  string client_operation_id = 1;
+  // Same normalization as RenamePasskeyRequest.label: trim Unicode White_Space,
+  // NFC, reject Cc/Cf/Cs/Co/Cn/Zl/Zp, then limit to 256 UTF-8 bytes. Empty clears
+  // the explicit name, restoring the primary handle/generated pet name fallback.
+  string display_name = 2;
+}
+message SetDisplayNameResponse {
+  MutationReceipt receipt = 1;
+  PrincipalRecord principal = 2;
+}
+
+// Only an active, verified claimed handle belonging to the caller's account
+// can become primary. Held names and unverified claims are not eligible.
+message SetPrimaryHandleRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
+  string client_operation_id = 1;
+  // Exact canonical PublicHandleRecord.handle: nonempty and at most 256 UTF-8 bytes,
+  // including the provider qualifier, checked before normalization. Reuse weft-base
+  // handle::parse_canonical_text and its grammar; see docs/alpha-v2/account-management.md.
+  string handle = 2;
+}
+message SetPrimaryHandleResponse {
+  MutationReceipt receipt = 1;
+  // handle now names the primary handle; display_name keeps any explicit name.
+  PrincipalRecord principal = 2;
+  PublicHandleRecord public_handle = 3;
+}
+
+// Removes an active verified claimed handle belonging to the caller's account.
+// Weft MUST refuse removing the primary or last active claimed handle with
+// CALL_FAILURE_CODE_FAILED_PRECONDITION / ERROR_REASON_LIFECYCLE_STATE.
+// Select another primary first. Removing a handle never changes account UUIDs
+// or revokes a credential; existing directory/tombstone policy still applies.
+message RemoveHandleRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
+  string client_operation_id = 1;
+  // Exact canonical PublicHandleRecord.handle: nonempty and at most 256 UTF-8 bytes,
+  // including the provider qualifier, checked before normalization. Reuse weft-base
+  // handle::parse_canonical_text and its grammar; see docs/alpha-v2/account-management.md.
+  string handle = 2;
+}
+message RemoveHandleResponse {
+  MutationReceipt receipt = 1;
+  PrincipalRecord principal = 2;
 }
 
 // Irreversibly deletes the caller's account. The authenticating credential
@@ -1309,6 +1435,11 @@ message CurrentCredentialRecord {
   // Absent when portable owner association is unavailable. Receivers separately
   // validate current authority at first admission. Contains no private key.
   bytes thread_control_authority = 17;
+  // Exact raw WebAuthn credential ID used to authenticate this original session,
+  // 1..1024 bytes when present. Absent for non-passkey authentication or unknown
+  // historical bindings; never infer from device IDs or the sessions page.
+  // Identifies a passkey for display only; not a reusable assertion or authority.
+  optional bytes passkey_credential_id = 18;
   // Revoke the specific device, delegation or session using the corresponding
   // observed version; this metadata never permits an account-wide revocation.
 }

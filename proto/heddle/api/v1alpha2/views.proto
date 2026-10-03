@@ -327,6 +327,12 @@ message ObserveIdentityRequest {
   bool include_current_credential = 7;
   bool include_billing = 8;
   PageRequest passkeys = 9;
+  // Applies only to the requested sessions page. UNSPECIFIED preserves ALL;
+  // settings clients should explicitly select ACTIVE. Bind page/checkpoint
+  // cursors to this filter and filter before page counts and byte budgets.
+  // Does not filter CurrentCredentialRecord.session, which describes this
+  // exact credential independently of pagination. Unknown values are invalid.
+  SessionStateFilter session_state = 10;
   // Optional scalar sections use the same total budget and their own status.
 }
 

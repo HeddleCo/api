@@ -140,7 +140,7 @@ def audit_metadata(decoded: str, files: list[list[str]]) -> None:
     ) == service_count
     assert package_descriptor.count(f"[{CONTRACT_PACKAGE}.rpc_contract]") == rpc_count
     assert service_count == 20
-    assert rpc_count == 163  # Includes four platform authorization checks.
+    assert rpc_count == 167  # Four platform checks and four account-management RPCs.
     assert package_descriptor.count("maturity: SERVICE_MATURITY_PLANNED") == 20
     assert "maturity: SERVICE_MATURITY_SHIPPED" not in package_descriptor
     for dynamic_type in (

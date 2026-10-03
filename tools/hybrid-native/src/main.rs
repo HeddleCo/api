@@ -1370,8 +1370,7 @@ mod tests {
             let original = payload.original_genesis.as_ref().expect("native original");
             let g = genesis(original).expect("published native parse and creator signature");
             let binding = payload.binding.as_ref().expect("binding");
-            let signature =
-                signature(original, g.creator.as_bytes()).expect("original creator signature");
+            let signature = signature(original, &g.creator).expect("original creator signature");
             import::verify_genesis_authority(
                 binding,
                 &verified,

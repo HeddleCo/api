@@ -16,17 +16,33 @@ authenticated-principal signing identity, Tier-1 proof of possession over the
 exact method and complete deterministic protobuf request, durable write,
 client-operation-ID retries, identity-and-credentials capability, and caller-bound
 account authorization with existence hidden. There is no new portable SignedRecord
-format or owner-key ceremony. These are ordinary account commands whose effective
-delegated permissions and full credential caveats must still be enforced.
+format or owner-key ceremony. `SetDisplayName`, `SetPrimaryHandle` and
+`RemoveHandle` are ordinary account commands whose effective delegated permissions
+and full credential caveats must still be enforced. `RemovePasskey` additionally
+requires the existing `require_independent_root` predicate: `root_established`
+plus an unattenuated credential (one authority block). Delegated and ephemeral
+credentials cannot retire a durable passkey authority, even with full account
+scope and valid request PoP. Caller ownership, exact-method caveats, version CAS
+and the last-method check are still required.
 
-Every request has `client_operation_id` at tag 1; every response has a
+Every request has `client_operation_id` at tag 1. It must parse with weft's existing
+`uuid::Uuid` parser, as used by `identity_v2_management::start`: 32 ASCII hex
+digits, a 36-byte hyphenated UUID, that UUID inside braces (38 bytes), or the
+`urn:uuid:` form (45 bytes). Hex digits may be uppercase or lowercase. The maximum
+is 45 ASCII bytes; whitespace is not trimmed and arbitrary nonblank strings are
+invalid. This inherits the existing ID scheme and introduces no new validator.
+Every response has a
 `MutationReceipt` at tag 1. A same-ID/same-request retry returns the original
 outcome; reusing an operation ID with different request bytes is rejected.
 State changes and receipt persistence commit together.
 
 `RemovePasskey` takes the account-private `PasskeyRecord.ref` and its exact
 `expected_version` (tag 3), just like `RenamePasskey`. A version mismatch changes
-no state. A successful response carries the updated revoked record and version.
+no state. The reference must be unscoped (`spool` absent), with a nonempty ID of
+at most 1366 ASCII bytes: the unpadded base64url representation of the existing
+1..1024-byte WebAuthn credential ID, as checked by weft's
+`identity_v2_management::passkey_reference`. A successful response carries the
+updated revoked record and version.
 Weft must atomically check that another usable sign-in method remains, and refuse
 removal of the last one with typed `CALL_FAILURE_CODE_FAILED_PRECONDITION` and
 `ERROR_REASON_LIFECYCLE_STATE`, without committing removal. Recovery factors alone
@@ -47,8 +63,18 @@ the generated pet name while unclaimed. `PrincipalRecord.display_name` already
 exists at tag 12. Display names never establish authority or change account UUIDs.
 
 `SetPrimaryHandle` and `RemoveHandle` take the exact canonical
-`PublicHandleRecord.handle` at tag 2, using the existing handle grammar and provider
-qualification. Only active verified claimed handles owned by the caller's account
+`PublicHandleRecord.handle` at tag 2. Inputs must be nonempty and at most
+256 UTF-8 bytes, including the provider qualifier, checked before normalization
+(so trimming cannot rescue an oversized input). Whitespace-only inputs are
+invalid. The canonical grammar/parser is
+[`weft_base::handle::parse_canonical_text`](https://github.com/HeddleCo/weft/blob/integration/crates/weft-base/src/handle.rs):
+native `name`, GitHub `gh:name`, and other providers `host:name` (for example
+`gitlab.com:name`; bare `gitlab:name` is not a provider-qualified handle).
+The parser trims and ASCII-lowercases to derive exact lookup coordinates; it
+does not apply confusable folding. Native names retain
+[`weft_base::principal::is_valid_human_username`](https://github.com/HeddleCo/weft/blob/integration/crates/weft-base/src/principal.rs)
+validation; provider handles must match an existing verified provider binding.
+Only active verified claimed handles owned by the caller's account
 are eligible; held names are not claimed handles. Selection atomically updates
 the account's primary handle and returns the principal and public handle.
 Removal returns the updated principal and preserves existing directory/tombstone
@@ -91,7 +117,9 @@ there is no schema change to its shape. Hosts must declare the account-scope
 commands `RenamePasskey`, `RemovePasskey`, `RevokeDevice`, `RevokeSession`,
 `SetDisplayName`, `SetPrimaryHandle`, and `RemoveHandle`. `authorized` reflects the
 exact current credential and its caveats; refused actions remain declared with
-`authorized=false`, including `RevokeDevice` for an ephemeral sign-in. Clients
+`authorized=false`, including `RevokeDevice` for an ephemeral sign-in and
+`RemovePasskey` whenever `require_independent_root` fails. The same existing
+predicate must govern handler authorization and action availability. Clients
 should read these declarations rather than infer permission from authentication
 method labels or account rooting tier. Target-specific checks, including
 last-method, primary/last-handle safeguards and session ownership, still apply at
@@ -148,6 +176,25 @@ only extends the kind vocabulary. Rust and TypeScript export constants for both
 strings, without introducing or renumbering a notification enum.
 
 ## Verified implementation evidence
+
+Consumer acceptance requirements for weft#2530/#2531/#2532: add `RemovePasskey`
+to `INDEPENDENT_ROOT_METHODS` and classify it as `DenyAttenuated` in
+`AUTH_ROOT_BOUNDARY_CATALOG`; classify the other three new commands as
+`SafeBearer`. Reuse `require_independent_root` in the removal handler and the
+existing action-availability predicate in the principal projection. Handler
+tests must use valid request signatures, owned targets, matching versions and
+two usable sign-in methods: full-scope delegated and ephemeral requests fail
+specifically on authority, while an eligible independent-root request succeeds.
+Also assert that removal is declared with `authorized=false` for both denied
+credentials. Keep the other three commands delegatable with complete caveats.
+
+When wiring the existing validators into those consumers, cover every accepted
+UUID form and malformed/over-45-byte IDs; empty/whitespace-only handles;
+256-byte and 257-byte raw handle inputs including provider qualification and
+multibyte UTF-8; and overlong inputs whose trimmed form would otherwise fit.
+Cover absent/scoped/empty/over-1366-byte passkey references as well. These are
+consumer acceptance requirements, not claims of handler execution by this API
+contract PR. API tests pin the normative text and public package import.
 
 The issue evidence was checked read-only with `git show origin/integration:<path>`
 at weft `70eda4107ec2b81cab0b8d2ff88f08ba010a05c0`:

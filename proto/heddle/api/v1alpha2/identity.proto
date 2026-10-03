@@ -80,6 +80,8 @@ message PrincipalRecord {
   // account's tier. Include refused commands with authorized=false (for example
   // RevokeDevice for an ephemeral sign-in). Target-specific requirements still
   // apply, including version CAS and last-method/primary/last-handle safeguards.
+  // RemovePasskey MUST be authorized=false unless require_independent_root holds:
+  // root_established plus an unattenuated credential, in addition to its caveats.
   // PlatformAdminService checks project here with their matching Capability,
   // exact method path and serving Weft endpoint, without a customer target.
   // Authorization requires current durable platform staff standing for a
@@ -706,8 +708,11 @@ message RenamePasskeyResponse {
   PasskeyRecord passkey = 2;
 }
 
-// Retires the exact account-owned passkey. Same request PoP, account permissions,
-// idempotency and version CAS as RenamePasskey. Weft MUST atomically refuse
+// Retires the exact account-owned passkey. Same request PoP, caller ownership,
+// exact-method caveats, idempotency and version CAS as RenamePasskey, plus the
+// existing require_independent_root predicate: root_established plus an
+// unattenuated credential. Delegated and ephemeral credentials MUST be denied.
+// Weft MUST atomically refuse
 // removal of the account's last usable sign-in method with typed
 // CALL_FAILURE_CODE_FAILED_PRECONDITION / ERROR_REASON_LIFECYCLE_STATE.
 // Recovery factors alone are not usable sign-in methods. Retire sign-in
@@ -715,7 +720,11 @@ message RenamePasskeyResponse {
 // retain signed evidence for admitted history. Device-root cascades follow the
 // canonical identity model's CURRENT/TARGET revocation policy.
 message RemovePasskeyRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
   string client_operation_id = 1;
+  // Account-private unscoped PasskeyRecord.ref: spool absent, nonempty id of
+  // at most 1366 ASCII bytes (unpadded base64url of a 1..1024-byte credential ID).
   RecordRef passkey = 2;
   // Required exact 32-byte PasskeyRecord.version; conflict changes no state.
   bytes expected_version = 3;
@@ -727,6 +736,8 @@ message RemovePasskeyResponse {
 }
 
 message SetDisplayNameRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
   string client_operation_id = 1;
   // Same normalization as RenamePasskeyRequest.label: trim Unicode White_Space,
   // NFC, reject Cc/Cf/Cs/Co/Cn/Zl/Zp, then limit to 256 UTF-8 bytes. Empty clears
@@ -741,9 +752,12 @@ message SetDisplayNameResponse {
 // Only an active, verified claimed handle belonging to the caller's account
 // can become primary. Held names and unverified claims are not eligible.
 message SetPrimaryHandleRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
   string client_operation_id = 1;
-  // Exact canonical PublicHandleRecord.handle, including its provider qualifier
-  // where applicable. Existing handle normalization/validation applies.
+  // Exact canonical PublicHandleRecord.handle: nonempty and at most 256 UTF-8 bytes,
+  // including the provider qualifier, checked before normalization. Reuse weft-base
+  // handle::parse_canonical_text and its grammar; see docs/alpha-v2/account-management.md.
   string handle = 2;
 }
 message SetPrimaryHandleResponse {
@@ -759,8 +773,12 @@ message SetPrimaryHandleResponse {
 // Select another primary first. Removing a handle never changes account UUIDs
 // or revokes a credential; existing directory/tombstone policy still applies.
 message RemoveHandleRequest {
+  // UUID accepted by weft's existing UUID parser; at most 45 ASCII bytes.
+  // See docs/alpha-v2/account-management.md for the inherited UUID forms.
   string client_operation_id = 1;
-  // Exact canonical PublicHandleRecord.handle; same grammar as SetPrimaryHandle.
+  // Exact canonical PublicHandleRecord.handle: nonempty and at most 256 UTF-8 bytes,
+  // including the provider qualifier, checked before normalization. Reuse weft-base
+  // handle::parse_canonical_text and its grammar; see docs/alpha-v2/account-management.md.
   string handle = 2;
 }
 message RemoveHandleResponse {

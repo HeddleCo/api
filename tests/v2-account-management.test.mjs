@@ -3,11 +3,6 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import * as api from '../packages/typescript/dist/v1alpha2/index.js';
-import {
-  normalizeDisplayName, normalizeAdvisoryLabel, validateAaguid,
-  validatePasskeyCredentialId, validateSessionUserAgent,
-  HELD_NAME_REQUESTED, HELD_NAME_REQUEST_LAPSED,
-} from '../packages/typescript/dist/v1alpha2/account-metadata.js';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/account-metadata.json', import.meta.url), 'utf8'));
 const unicode = JSON.parse(readFileSync(new URL('./fixtures/passkey-label-unicode.json', import.meta.url), 'utf8'));
@@ -32,7 +27,12 @@ test('account wire vectors match Rust', () => {
   }
 });
 
-test('account metadata uses shared Rust bounds and passkey Unicode policy', () => {
+test('public account metadata subpath uses shared Rust bounds and passkey Unicode policy', async () => {
+  const {
+    normalizeDisplayName, normalizeAdvisoryLabel, validateAaguid,
+    validatePasskeyCredentialId, validateSessionUserAgent,
+    HELD_NAME_REQUESTED, HELD_NAME_REQUEST_LAPSED,
+  } = await import('@heddleco/api/v2/account-metadata');
   for (const normalize of [normalizeDisplayName, normalizeAdvisoryLabel]) {
     for (const { input, normalized } of [...fixture.labels, ...unicode]) {
       if (normalized === undefined) assert.throws(() => normalize(input));

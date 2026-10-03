@@ -136,14 +136,15 @@ count. Hidden occurrences do not participate in ambiguity decisions.
 ## Paging, graph traversal and bounded work
 
 Default page size is 100; maximum is 256. `ReadBudget.max_items` caps returned
-rows, and `max_frame_bytes` and `max_snapshot_bytes` each cap the whole encoded
-unary response including metadata/page information. Zero uses endpoint defaults;
-defaults never exceed 256 rows or 1 MiB. Hard response ceiling is 1 MiB.
-Reject requests exceeding hard or advertised endpoint limits with
-`CallFailureCode.RESOURCE_EXHAUSTED` and `ErrorReason.QUOTA_EXCEEDED`.
-Do not silently widen a budget. If even one row plus metadata cannot fit, return
-the same typed failure; otherwise return a resumable page. Definition results
-follow the same byte budget. Count only visible emitted rows against max_items.
+rows and controls, and byte fields bound the whole encoded unary response.
+The stream.proto clamp/floor/default rules apply; above-maximum budgets clamp.
+The page cap shortens returned rows independently of the accepted budget and
+never reduces the endpoint's advertised maximum below the guaranteed floor.
+Every response carries a fully populated `accepted_budget`, including empty
+or unresolved definition results. Fixed metadata overhead that cannot fit is
+INVALID_ARGUMENT, decided before matching. Larger visible collections return
+shorter resumable pages; matching row size/count never causes budget rejection.
+Definition results follow the same budget. Count visible rows and controls.
 
 `hop_cap=0` means one hop; maximum four. `REFS_OF` traverses incoming RefersTo,
 Calls and TypeRef edges; `CALLERS_OF` traverses incoming Calls only;

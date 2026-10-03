@@ -16,7 +16,10 @@ message DescribeEndpointResponse {
   // populate this list automatically. Availability does not imply permission.
   repeated string implemented_methods = 3;
   repeated string understood_signed_record_formats = 4;
+  // Every default is positive and <= its corresponding maximum.
   ReadBudget default_read_budget = 5;
+  // Every maximum MUST meet GUARANTEED_READ_BUDGET in stream.proto.
+  // Clients can send a fixed budget without first calling DescribeEndpoint.
   ReadBudget maximum_read_budget = 6;
   uint32 max_concurrent_streams_per_connection = 7;
   uint32 max_pending_batch_bytes = 8;

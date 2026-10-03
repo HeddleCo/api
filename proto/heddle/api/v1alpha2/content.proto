@@ -129,6 +129,8 @@ message ContentEvent {
     ProvenanceResult provenance = 6;
     SectionStatus selection_complete = 7;
     heddle.api.common.StateSummary state = 8;
+    // Exactly once, first event before selection payloads/completions.
+    ReadBudget accepted_budget = 9;
   }
   // Each requested selection ends with selection_complete. Missing completion
   // before FIN means interruption, not an empty file or exhausted collection.
@@ -159,6 +161,8 @@ message ListPathsEvent {
     // COMPLETE describes the window; page.exhausted alone ends pagination.
     // Missing completion before FIN means interruption, not exhaustion.
     SectionStatus complete = 3;
+    // Exactly once, first event; fully populated effective ReadBudget.
+    ReadBudget accepted_budget = 4;
   }
 }
 
@@ -176,6 +180,8 @@ message ArtifactEvent {
   oneof payload {
     BlobChunk chunk = 2;
     SectionStatus complete = 3;
+    // Exactly once, first event; fully populated effective ReadBudget.
+    ReadBudget accepted_budget = 4;
   }
 }
 
@@ -313,6 +319,8 @@ message SearchEvent {
     SearchHit hit = 2;
     SectionStatus complete = 3;
     SearchDomainStatus domain_status = 4;
+    // Exactly once, first event before domain statuses/hits/completion.
+    ReadBudget accepted_budget = 5;
   }
 }
 

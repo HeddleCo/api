@@ -142,6 +142,7 @@ message TransferReady {
   repeated TransferObject have = 6;
   repeated TransferObject need = 7;
   TransferCheckpoint checkpoint = 8;
+  // Mandatory effective ReadBudget echo, with the stream.proto clamp/floor.
   ReadBudget budget = 9;
   bool full_closure_available = 10;
   repeated TransferObject missing = 11;
@@ -485,6 +486,7 @@ message ReplicationOpen {
   EndpointRef source = 8;
   EndpointRef destination = 9;
 }
+// budget is the mandatory effective ReadBudget echo under stream.proto rules.
 message ReplicationReady {
   EndpointRef endpoint = 1;
   ThreadRef thread = 2;

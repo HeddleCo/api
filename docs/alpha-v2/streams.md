@@ -335,9 +335,49 @@ including transfers that can resume. Every stream still bounds its initial
 response and incomplete frames. A canceled read preserves both partial framing
 and its original deadline; reconnecting is distinct from restarting that timer.
 
-Endpoints advertise positive default and maximum item/frame/snapshot/batch limits.
-Accepted budgets cannot exceed either the requested nonzero limit or endpoint
-maximum. The shared codec ceiling is 8 MiB per control message; endpoints should
+`ReadBudget` in stream.proto is the single definition for observations, finite
+reads and transfer openings; Rust and TypeScript helpers use that generated type.
+Endpoints advertise positive defaults no greater than their maxima. Every
+endpoint, including devices and providers, MUST advertise maximums at least
+`GUARANTEED_READ_BUDGET = { max_items: 1024, max_frame_bytes: 524288,
+max_snapshot_bytes: 4194304 }`. This is a capacity floor, not a required page size.
+
+For each field, resolve zero to the advertised default, then take
+`min(resolved request, advertised maximum, current capacity)`. Above-maximum
+values MUST clamp and MUST NOT cause rejection on that basis. An accepted field
+MUST be at least `min(resolved request, guaranteed floor)`: capacity below that
+bound fails retryably with UNAVAILABLE, never silently accepts a smaller budget.
+Nonzero small requests remain upper bounds; endpoints never widen them to the
+floor. Defaults below the floor are allowed. INVALID_ARGUMENT is reserved for
+structurally impossible budgets decided from the request shape before matching:
+frame bytes below 1024, clamped snapshot bytes below frame bytes, or fixed
+selection/control overhead exceeding the effective item budget. A matching
+collection exceeding budget returns bounded PARTIAL coverage and a continuation,
+not RESOURCE_EXHAUSTED. Visible row size or count must not choose a different
+failure or disclose hidden data. Use chunking or a continuation for domain data;
+fixed shape checks are independent of matches.
+
+`StreamOpen.accepted_budget` is mandatory, including on resume. It echoes the
+fully resolved effective budget with all fields positive, each no larger than
+the corresponding nonzero request or advertised maximum, and meeting the lower
+bound above. Finite streams ReadContent, ListPaths, ReadArtifact and Search emit
+exactly one initial `accepted_budget` oneof event before any data, statuses or
+completion; it has no selection payload. Unary ResolveResources, ResolveHandles
+and all four code-navigation reads echo `accepted_budget` in their response.
+TransferReady.budget and ReplicationReady.budget are the same mandatory effective
+echo vocabulary. Charge echo/control frames to the budget alongside domain data.
+A missing/zero echo is a protocol error. Client helpers validate positive fields,
+request bounds and the nonzero-request floor without DescribeEndpoint; transports
+retain responsibility for actual byte/item accounting. Zero-default bounds and
+advertised maximum checks belong to the endpoint.
+
+A client may sign a fixed read budget before its first request.
+`heddle-req-sig-v1` binds identity, the exact proto method path, timestamp,
+16-byte nonce and SHA256 of the exact deterministic request bytes; it binds no
+endpoint or audience value. Its clock must be within `PROOF_WINDOW_MILLIS`.
+DescribeEndpoint is optional for sizing/signing reads; signing canonical bytes
+are unchanged. The endpoint echoes the effective budget without rewriting the
+signed request body. The shared codec ceiling is 8 MiB per control message; endpoints should
 choose smaller limits for interactive views. The cursor ceiling is 4096 bytes.
 Enforce frame lengths before allocating the declared body. Transports and typed
 reducers additionally enforce total snapshot/batch/item limits; the lifecycle

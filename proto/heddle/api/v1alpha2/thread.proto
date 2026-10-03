@@ -119,6 +119,11 @@ message ThreadOverview {
   // absent singular result while per-head results remain available.
   // No target or a returned singular assessment means no gap status.
   LandingAssessmentStatus landing_assessment_status = 29;
+  // Time the Thread landed, from the landing execution's executed_at, paired
+  // with integrated_revision on every overview including list rows. Unset when
+  // the Thread has not landed. Later metadata edits do not change this time;
+  // updated_at is not a substitute. Matches landing_record.executed_at if present.
+  google.protobuf.Timestamp integrated_at = 30;
 }
 
 // Why a requested assessment is absent, not a verdict permitting landing.

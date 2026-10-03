@@ -6,12 +6,17 @@ pub mod identity_management;
 pub mod invitation;
 pub mod notifications;
 pub mod passkey_label;
+pub mod read_budget;
+pub mod spool_settings;
 use crate::StreamingShape;
 use crate::heddle::api::common::{
     AuthorizationAccess, AuthorizationExistence, AuthorizationRole, AuthorizationScopeSource,
     CallContext, DeploymentTarget, RetryBehavior, RpcEffect, ServiceMaturity, SigningTier,
 };
 use crate::heddle::api::v1alpha2::{StreamDataKind, StreamFrame, stream_frame};
+pub use read_budget::{
+    GUARANTEED_READ_BUDGET, ReadBudgetError, negotiate_read_budget, validate_accepted_read_budget,
+};
 
 include!(concat!(env!("OUT_DIR"), "/heddle_api_v2_methods.rs"));
 
@@ -99,6 +104,8 @@ pub enum StreamProtocolError {
     Payload,
     #[error("invalid or oversized checkpoint cursor")]
     Cursor,
+    #[error("missing or invalid accepted ReadBudget")]
+    Budget,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -218,6 +225,8 @@ impl ObservationState {
                 if self.cursor.len() > MAX_CURSOR_BYTES {
                     return Err(StreamProtocolError::Cursor);
                 }
+                validate_accepted_read_budget(&Default::default(), open.accepted_budget.as_ref())
+                    .map_err(|_| StreamProtocolError::Budget)?;
                 if self.cursor.is_empty() {
                     self.phase = Phase::Snapshot;
                     ObservationAction::BeginSnapshot

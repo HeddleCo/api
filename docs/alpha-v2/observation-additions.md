@@ -133,14 +133,39 @@ inheritance and no name-based fallback. It identifies a Thread in the containing
 spool, not a revision; it may have zero or multiple heads. Clients still observe
 that Thread to select readable content and must not invent a winning head.
 
-A resource administrator can set or clear it through the existing
-`ReviseSpoolRequest.settings` complete-record replacement under
-`expected_version`, the containing spool's CAS. Validate a supplied reference
-as an existing readable Thread in that spool; wrong-spool references are invalid
-and forbidden/absent Threads must have indistinguishable failures. Omission in
-a deliberately submitted complete settings record clears the setting. An
-observation's omission does not mutate persisted settings; a filtered projection
-must not be blindly treated as a complete admin replacement.
+A resource administrator changes it through `ReviseSpoolRequest.settings` and
+`settings_mask`, under `expected_version`, the containing spool's CAS. Paths
+are the top-level proto field names relative to settings. An omitted/empty mask
+leaves all settings unchanged; values outside the mask are ignored. A masked
+reference sets the supplied value; a masked absent reference explicitly clears
+it, including when the entire settings message is absent. No complete-record
+replacement mode remains. Validate supplied references as existing readable
+resources in the containing spool; wrong-spool references are invalid and
+forbidden/absent targets must have indistinguishable failures.
+
+Clearing/resetting requires the caller to be allowed to **read and clear the
+current stored value**, independently of administrator role. Refuse an
+unauthorized clear atomically with PERMISSION_DENIED and no hidden-value details.
+A filtered overview can safely be used as patch values with a mask listing only
+the fields the caller intentionally edited. It must never imply a clear.
+
+The field audit covers all ten `SpoolSettings` fields. `default_thread` and
+`default_review_policy` are caller-filtered resource references: deleted or
+unreadable targets are omitted without mutating storage or revealing hidden IDs.
+The other eight fields (audience, default_state_audience, description,
+allow_child_creation, require_review_to_land, abandoned_thread_retention,
+hold_lifecycle, blocking_discussion_resolve_rule) have no individual target
+filter; the settings section itself is authorization-gated. All ten use the
+same mask rule, including scalar default values (`false`, empty, UNSPECIFIED).
+An absent selected duration removes that local value. Nested paths, wildcard,
+unknown paths and duplicates are INVALID_ARGUMENT. Resulting settings are
+validated together and committed atomically under the spool version CAS.
+
+A field mask fits the existing administration style: the shared `SpoolSettings`
+record remains the create/read representation, and mutation intent lives on
+`ReviseSpoolRequest`, like its existing optional slug. A separate clear flag per
+reference would split patch semantics and leave scalar false/empty intent
+ambiguous. Mask paths are explicit even when a filtered read has no value.
 
 On import, weft resolves the source's advertised default branch to the exact
 imported Thread and sets this setting as part of the versioned spool update.
@@ -161,3 +186,12 @@ multi-head singular gaps, settings/CAS/observation propagation, old readers
 ignoring additions, and new readers accepting old records. Descriptor tests pin
 field types, tags, enum values, and the unchanged signed policy. Server-side
 population and caller-visibility enforcement require the weft implementation.
+
+## Thread landing time
+
+`ThreadOverview.integrated_at = 30` is the landing execution's `executed_at`,
+paired with `integrated_revision` on every overview, including ObserveThreads
+and ObserveSpool list rows. It is unset when the Thread has not landed. If a
+landing record is present, the times agree. Later renames or metadata edits can
+change `updated_at` without changing `integrated_at`; clients must use the latter
+for landing recency and never fabricate it from the last update time.

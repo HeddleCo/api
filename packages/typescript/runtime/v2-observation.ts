@@ -1,7 +1,11 @@
 import { StreamDataKind, type StreamFrame } from "./stream_pb.js";
+import { create } from "@bufbuild/protobuf";
+import { ReadBudgetSchema } from "./stream_pb.js";
+import { validateAcceptedReadBudget, ReadBudgetError } from "./read-budget.js";
+export { GUARANTEED_READ_BUDGET } from "./read-budget.js";
 
 export const MAX_CURSOR_BYTES = 4096;
-export type StreamProtocolReason = "sequence" | "binding" | "resume" | "phase" | "payload" | "cursor";
+export type StreamProtocolReason = "sequence" | "binding" | "resume" | "phase" | "payload" | "cursor" | "budget";
 export class StreamProtocolError extends Error {
   constructor(readonly reason: StreamProtocolReason) {
     super(`Invalid observation stream: ${reason}`);
@@ -67,6 +71,11 @@ export class ObservationState {
         if (!equal(body.value.bindingDigest, this.binding)) throw new StreamProtocolError("binding");
         if (!equal(body.value.resumedFrom, this.committedCursor)) throw new StreamProtocolError("resume");
         if (this.committedCursor.length > MAX_CURSOR_BYTES) throw new StreamProtocolError("cursor");
+        try { validateAcceptedReadBudget(create(ReadBudgetSchema), body.value.acceptedBudget); }
+        catch (error) {
+          if (error instanceof ReadBudgetError) throw new StreamProtocolError("budget");
+          throw error;
+        }
         this.phase = this.committedCursor.length === 0 ? "snapshot" : "live";
         action = { kind: this.phase === "snapshot" ? "beginSnapshot" : "resumed" };
         break;

@@ -54,7 +54,7 @@ const fixture = {
   operations, statuses: statuses.map(({ value, ...vector }) => vector), overviews,
   settings_wire_hex: wire(SpoolSettingsSchema, settings),
   revise_wire_hex: wire(ReviseSpoolRequestSchema, { clientOperationId: 'set-default', spool,
-    expectedVersion: new Uint8Array([5]), name: 'hexyl', settings }),
+    expectedVersion: new Uint8Array([5]), name: 'hexyl', settings, settingsMask: { paths: ['description', 'default_thread'] } }),
   spool_wire_hex: wire(SpoolOverviewSchema, { ref: spool, version: new Uint8Array([5]), settings }),
   // Unset, deleted, and unreadable selections have identical caller projections.
   omitted_settings_wire_hex: wire(SpoolSettingsSchema, { description: settings.description }),

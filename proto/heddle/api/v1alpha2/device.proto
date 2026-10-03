@@ -156,8 +156,9 @@ message ObserveRunsRequest {
   // default mode), a positive timeline_limit, and no page request. The initial
   // snapshot includes the selected RunRecord and policy, when present, plus at
   // most timeline_limit records, ordered by position from oldest to newest.
-  // Its PageInfo is exhausted with an empty next_page. The endpoint rejects
-  // the request if the full initial snapshot exceeds accepted item/byte budgets.
+  // Its PageInfo is exhausted with an empty next_page when the selection fits.
+  // Budget-limited snapshots return PARTIAL with continuation; only impossible
+  // fixed request/control overhead is rejected, before matching data.
   // Default UNSPECIFIED retains oldest-first paging and WindowChanged resets
   // when a non-exhausted page changes. In LATEST, new positions append after
   // the fixed initial selection; they MUST NOT trigger WindowChanged merely

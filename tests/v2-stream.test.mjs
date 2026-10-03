@@ -8,13 +8,22 @@ import {
 } from "../packages/typescript/dist/framing.js";
 import { CallFailureSchema } from "../packages/typescript/dist/errors_pb.js";
 import { StreamFrameSchema, StreamDataKind } from "../packages/typescript/dist/v1alpha2/stream_pb.js";
-import { ObservationState, StreamProtocolError } from "../packages/typescript/dist/v1alpha2/observation.js";
+import { ObservationState, StreamProtocolError, GUARANTEED_READ_BUDGET } from "../packages/typescript/dist/v1alpha2/observation.js";
 
 const bytes = (text) => new TextEncoder().encode(text);
 const frame = (sequence, kind, value = {}) => create(StreamFrameSchema, { sequence: BigInt(sequence), body: { case: kind, value } });
-const opening = (cursor = "", binding = 7) => ({ bindingDigest: new Uint8Array(32).fill(binding), resumedFrom: bytes(cursor) });
+const opening = (cursor = "", binding = 7) => ({ bindingDigest: new Uint8Array(32).fill(binding), resumedFrom: bytes(cursor), acceptedBudget: GUARANTEED_READ_BUDGET });
 const checkpoint = (cursor, previous = "", snapshot = true) => ({ cursor: bytes(cursor), previousCursor: bytes(previous), snapshotComplete: snapshot });
 const reason = (expected) => (error) => error instanceof StreamProtocolError && error.reason === expected;
+
+test("missing or zero budget echoes cannot open an observation", () => {
+  const state = new ObservationState(new Uint8Array(32).fill(7));
+  for (const acceptedBudget of [undefined, { maxItems: 0, maxFrameBytes: 0, maxSnapshotBytes: 0n }]) {
+    assert.throws(() => state.accept(frame(1, "open", { ...opening(), acceptedBudget }), false), reason("budget"));
+    assert.deepEqual(state.cursor, bytes(""));
+  }
+  state.accept(frame(1, "open", opening()), false);
+});
 
 test("stream codecs match shared Rust wire vectors at every truncation", () => {
   const vectors = JSON.parse(readFileSync(new URL("fixtures/v2-stream-wire.json", import.meta.url)));

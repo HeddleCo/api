@@ -18,6 +18,18 @@ enum ObservationMode {
   OBSERVATION_MODE_FOLLOW = 2;
 }
 
+// One budget vocabulary for observations, finite reads and transfer openings.
+// For each field, zero chooses the advertised positive default; otherwise the
+// effective value is min(requested, advertised maximum, current capacity).
+// Above-maximum values MUST clamp, never cause rejection on that basis alone.
+// Every endpoint (including devices/providers) MUST advertise maxima >=
+// GUARANTEED_READ_BUDGET: 1024 items, 524288 frame bytes, 4194304 snapshot bytes.
+// Effective fields MUST be >= min(resolved request, that floor). If capacity
+// cannot meet this lower bound, fail retryably (UNAVAILABLE), never accept less.
+// Reject only structurally impossible budgets from request shape, e.g. nonzero
+// max_frame_bytes < 1024, snapshot bytes < frame bytes, or fixed selection
+// overhead > max_items (INVALID_ARGUMENT). Matching data size never causes a
+// budget rejection: return bounded PARTIAL coverage with a continuation.
 message ReadBudget {
   // Zero selects the endpoint's advertised default; it never means unbounded.
   // ObserveThread timeline charges every visible run and event frame, status,
@@ -72,6 +84,9 @@ message StreamOpen {
   bytes binding_digest = 2;
   // Empty starts a replacement snapshot. Otherwise MUST equal after_cursor.
   bytes resumed_from = 3;
+  // Mandatory on every open, including resume; every effective field is > 0,
+  // <= its requested nonzero value and advertised maximum, and meets the floor
+  // lower bound above. Echo the effective budget, not the original request.
   ReadBudget accepted_budget = 4;
   // An observation cannot outlive its validated authority. Reconnect with fresh
   // proof and the last committed cursor; no authority widening within a stream.

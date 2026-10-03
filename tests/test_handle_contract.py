@@ -90,7 +90,7 @@ class SharedHandleContractTest(unittest.TestCase):
         )
         self.assertEqual(
             fields(IDENTITY, "ResolveHandlesResponse"),
-            [("HandleResolution", "handles", 1)],
+            [("HandleResolution", "handles", 1), ("ReadBudget", "accepted_budget", 2)],
         )
         resolution = body(IDENTITY, "message", "HandleResolution")
         self.assertRegex(resolution, r"\bPublicHandleRecord\s+public_handle\s*=\s*5\s*;")

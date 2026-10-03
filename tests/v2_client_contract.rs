@@ -262,6 +262,7 @@ fn failed_reducer_leaves_the_last_resumable_checkpoint() {
                 sequence: 1,
                 body: Some(stream_frame::Body::Open(StreamOpen {
                     binding_digest: vec![7; 32],
+                    accepted_budget: Some(heddle_api::v2::GUARANTEED_READ_BUDGET),
                     ..Default::default()
                 })),
             },

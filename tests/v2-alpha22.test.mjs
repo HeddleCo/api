@@ -12,9 +12,14 @@ const budget = (v) => create(api.ReadBudgetSchema, {
 test("alpha22 clear semantics preserve hidden settings and authorize explicit clears", () => {
   assert.equal(typeof api.applySpoolSettingsPatch, "function", "explicit-clear helper must be exported");
   const stored = create(api.SpoolSettingsSchema, {
+    audience: 3, defaultStateAudience: 2, allowChildCreation: true, requireReviewToLand: true,
+    abandonedThreadRetention: { seconds: 20n }, holdLifecycle: 1, blockingDiscussionResolveRule: 1,
     description: "before", defaultThread: { id: { value: new Uint8Array(32).fill(3) } },
     defaultReviewPolicy: { id: "policy" },
   });
+  assert.equal(Buffer.from(toBinary(api.SpoolSettingsSchema, stored)).toString("hex"), fixture.settings_wire_hex);
+  assert.deepEqual(api.applySpoolSettingsPatch(create(api.SpoolSettingsSchema), stored,
+    { paths: Object.keys(fixture.settings_fields) }, () => false), stored);
   const filtered = create(api.SpoolSettingsSchema, { description: "after" });
   const updated = api.applySpoolSettingsPatch(stored, filtered, { paths: ["description"] }, () => false);
   assert.deepEqual(updated.defaultThread, stored.defaultThread);
@@ -35,6 +40,8 @@ test("alpha22 clear semantics preserve hidden settings and authorize explicit cl
   for (const [path, property] of Object.entries(fixture.settings_fields)) {
     const result = api.applySpoolSettingsPatch(stored, undefined, { paths: [path] }, () => true);
     assert.deepEqual(result[property], create(api.SpoolSettingsSchema)[property]);
+    assert.equal(Buffer.from(toBinary(api.SpoolSettingsSchema, result)).toString("hex"), fixture.cleared_settings_wire_hex[path]);
+    assert.throws(() => api.applySpoolSettingsPatch(stored, undefined, { paths: [path] }, () => false), /clearDenied/);
   }
 });
 
@@ -49,6 +56,7 @@ test("alpha22 ReadBudget clamps fixed requests and enforces the guaranteed floor
       const accepted = api.negotiateReadBudget(...args);
       assert.deepEqual(accepted, budget(vector.accepted), vector.name);
       api.validateAcceptedReadBudget(args[0], accepted);
+      assert.equal(Buffer.from(toBinary(api.ReadBudgetSchema, accepted)).toString("hex"), vector.accepted_wire_hex);
     }
   }
   const requested = budget(fixture.floor);
@@ -64,4 +72,18 @@ test("alpha22 integrated_at round trips the landing time independently of update
   assert.notDeepEqual(overview.updatedAt, overview.integratedAt);
   assert.equal(Buffer.from(toBinary(api.ThreadOverviewSchema, overview)).toString("hex"), fixture.thread_wire_hex);
   assert.equal(create(api.ThreadOverviewSchema).integratedAt, undefined);
+});
+
+test("alpha22 mask and finite echoes share Rust wire vectors", () => {
+  for (const [message, wire] of Object.entries(fixture.echoes_wire_hex)) {
+    const schema = api[`${message}Schema`];
+    const decoded = fromBinary(schema, Buffer.from(wire, "hex"));
+    const accepted = message.endsWith("Event") ? decoded.payload.value : decoded.acceptedBudget;
+    if (message.endsWith("Event")) assert.equal(decoded.payload.case, "acceptedBudget");
+    api.validateAcceptedReadBudget(budget(fixture.floor), accepted);
+    assert.equal(Buffer.from(toBinary(schema, decoded)).toString("hex"), wire);
+  }
+  const request = fromBinary(api.ReviseSpoolRequestSchema, Buffer.from(fixture.clear_request_wire_hex, "hex"));
+  assert.deepEqual(request.settingsMask.paths, ["default_thread", "default_review_policy"]);
+  assert.equal(request.settings, undefined, "mask alone explicitly clears selected messages");
 });

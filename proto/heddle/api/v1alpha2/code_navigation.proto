@@ -139,6 +139,8 @@ message GetFileSymbolsResponse {
   repeated CodeSymbol symbols = 2;
   PageInfo page = 3;
   CodeNavigationReason reason = 4;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 5;
 }
 
 message GetDefinitionRequest {
@@ -156,6 +158,8 @@ message GetDefinitionResponse {
     CodeSymbol definition = 3;
     CodeNavigationReason reason = 4;
   }
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 5;
 }
 
 enum CodeEdgeKind {
@@ -201,6 +205,8 @@ message GetSemanticRefsResponse {
   // A next_page alone is not truncation. Hidden edges never affect this bit.
   bool truncated = 4;
   CodeNavigationReason reason = 5;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 6;
 }
 
 message GetSemanticImportersRequest {
@@ -221,4 +227,6 @@ message GetSemanticImportersResponse {
   PageInfo page = 3;
   bool truncated = 4;
   CodeNavigationReason reason = 5;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 6;
 }

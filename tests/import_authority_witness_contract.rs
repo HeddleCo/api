@@ -931,6 +931,7 @@ fn frozen_unsigned_payloads_and_cross_model_commitments() {
             "ImportAuthorityWitnessV1" => canonical!(api::ImportAuthorityWitnessV1),
             "HostedLandingWitnessV1" => canonical!(api::HostedLandingWitnessV1),
             "ImportOwnerChainV1" => canonical!(api::ImportOwnerChainV1),
+            "ImportJobPreparationV1" => canonical!(api::ImportJobPreparationV1),
             "ImportResultManifestV1" => canonical!(api::ImportResultManifestV1),
             "ImportPublicationWitnessV1" => canonical!(api::ImportPublicationWitnessV1),
             "SignedImportMemberPermissionV1" => canonical!(api::SignedImportMemberPermissionV1),
@@ -1527,4 +1528,71 @@ fn boundary_dependency_requires_exact_evidence() {
     )
     .expect("matched dependencies");
     println!("BOUNDARY PASS dependency_missing_binding: exact control");
+}
+
+#[test]
+fn prepared_commit_vectors_reject_then_accept() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let prepared = record(&f, "commit_preparation");
+    let geneses = [record(&f, "genesis_dev"), record(&f, "genesis_main")];
+    let parent: api::SignedImportMemberPermissionV1 = record(&f, "permission");
+    for v in f["commit_vectors"]["negative"]
+        .as_array()
+        .expect("commit negatives")
+    {
+        let d = record(&f, v["delegation"].as_str().expect("delegation"));
+        let permission = if v.get("parent") == Some(&Value::Null) {
+            None
+        } else {
+            Some(record(&f, v["parent"].as_str().unwrap_or("permission")))
+        };
+        let result = import::verify_prepared_delegation(
+            &prepared,
+            &d,
+            permission.as_ref(),
+            &geneses,
+            &c.owner(v["now_seconds"].as_i64().unwrap_or(1100)),
+        );
+        let rejection = result.expect_err(v["id"].as_str().expect("id"));
+        assert_eq!(
+            format!("{rejection:?}"),
+            v["expected"].as_str().expect("reason"),
+            "{}",
+            v["id"]
+        );
+        println!(
+            "COMMIT REJECT {}: {rejection:?} ({})",
+            v["id"], v["first_failing_check"]
+        );
+        import::verify_prepared_delegation(
+            &prepared,
+            &record(&f, "delegation"),
+            Some(&parent),
+            &geneses,
+            &c.owner(1100),
+        )
+        .expect("unchanged passing commit after each rejection");
+        println!("COMMIT PASS {} control", v["id"]);
+    }
+    for name in f["commit_vectors"]["passing"]
+        .as_array()
+        .expect("passing commits")
+    {
+        let d = import::verify_prepared_delegation(
+            &prepared,
+            &record(&f, name.as_str().expect("name")),
+            Some(&parent),
+            &geneses,
+            &c.owner(1100),
+        )
+        .expect("browser-completed commit within host bounds");
+        if name == "commit_future_within_skew" {
+            assert_eq!(
+                import::verify_new_operation(&record(&f, "operation_main"), &d, 1100),
+                Err(codec::Reject::Expired)
+            );
+        }
+        println!("COMMIT PASS {name}");
+    }
 }

@@ -50,6 +50,9 @@ record!(ImportJobDelegationV1, format_version:u, identity:m, delegation_id:b, lo
     retry_lineage_id:b, job_public_key:b, job_key_id:b, delegating_public_key:b,
     parent_permission_digest:b, owner_chain_digest:b, purpose:e, scope:m, branch_manifest:l,
     not_before_unix_seconds:u, expires_at_unix_seconds:u, cancellation_id:b, predecessor_delegation_digest:b);
+record!(ImportJobPreparationV1, format_version:u, identity:m, delegation_id:b, logical_job_id:b,
+    retry_lineage_id:b, job_public_key:b, job_key_id:b, owner_chain_digest:b, purpose:e,
+    scope:m, cancellation_id:b, predecessor_delegation_digest:b);
 record!(SignedImportJobDelegationV1, body:m, delegating_signature:m);
 record!(ImportCommittedSlotV1, ref_name:s, slot_id:u, signed_operation_digest:b,
     resulting_frontier_digest:b, result_bytes:u);
@@ -442,6 +445,112 @@ pub fn verify_delegation(
         digest: signed_delegation_digest(signed)?,
     })
 }
+/// Frozen canonical projection. The browser completes only the fields absent
+/// here; it cannot normalize or reduce even an otherwise authorized scope.
+pub fn delegation_preparation(d: &ImportJobDelegationV1) -> ImportJobPreparationV1 {
+    ImportJobPreparationV1 {
+        format_version: d.format_version,
+        identity: d.identity.clone(),
+        delegation_id: d.delegation_id.clone(),
+        logical_job_id: d.logical_job_id.clone(),
+        retry_lineage_id: d.retry_lineage_id.clone(),
+        job_public_key: d.job_public_key.clone(),
+        job_key_id: d.job_key_id.clone(),
+        owner_chain_digest: d.owner_chain_digest.clone(),
+        purpose: d.purpose,
+        scope: d.scope.clone(),
+        cancellation_id: d.cancellation_id.clone(),
+        predecessor_delegation_digest: d.predecessor_delegation_digest.clone(),
+    }
+}
+
+/// Validate Commit against the HOST-STORED preparation and independently
+/// selected current authority. Native genesis/envelope verification, online
+/// revocation, custody uniqueness and transactional activation remain host gates.
+/// Retained renewal genesis bindings require their original accepted context.
+pub fn verify_prepared_delegation(
+    prepared: &PrepareImportJobResponse,
+    signed: &SignedImportJobDelegationV1,
+    member: Option<&SignedImportMemberPermissionV1>,
+    geneses: &[SignedImportGenesisAuthorityV1],
+    expected: &ImportOwnerExpectation<'_>,
+) -> Result<VerifiedImportDelegation, Reject> {
+    let proposal = prepared.proposal.as_ref().ok_or(Reject::Canonical)?;
+    let d = signed.body.as_ref().ok_or(Reject::Canonical)?;
+    if canonical(proposal)? != canonical(&delegation_preparation(d))? {
+        return Err(Reject::PreparedFields);
+    }
+    let scope = proposal.scope.as_ref().ok_or(Reject::Canonical)?;
+    if d.branch_manifest.len() != scope.branches.len() {
+        return Err(Reject::PreparedFields);
+    }
+    for (m, b) in d.branch_manifest.iter().zip(&scope.branches) {
+        let limit = m.limit.as_ref().ok_or(Reject::PreparedFields)?;
+        if canonical(limit)? != canonical(b)? {
+            return Err(Reject::PreparedFields);
+        }
+    }
+    // Use i128 for host arithmetic so extreme advertised uint64 bounds cannot
+    // wrap. Skew permits a future not-before, never grace after expiry.
+    let now = i128::from(expected.now_unix_seconds);
+    let start = i128::from(d.not_before_unix_seconds);
+    let end = i128::from(d.expires_at_unix_seconds);
+    let at = i128::from(prepared.prepared_at_unix_seconds);
+    let skew = i128::from(prepared.clock_skew_allowance_seconds);
+    if at < 0
+        || now < at
+        || i128::from(prepared.reservation_expires_at_unix_seconds) != at + 3600
+        || now >= i128::from(prepared.reservation_expires_at_unix_seconds)
+    {
+        return Err(Reject::Expired);
+    }
+    if prepared.max_validity_duration_seconds == 0
+        || start < 0
+        || start < at - skew
+        || start > now + skew
+        || end <= start
+        || end <= now
+        || end - start > i128::from(prepared.max_validity_duration_seconds)
+    {
+        return Err(Reject::ValidityBounds);
+    }
+    if let Some(parent) = member {
+        verify_member_permission(parent, expected)?;
+    }
+    // Future not-before within skew can be committed, but verify_new_operation
+    // still refuses execution until that exact signed time. Parent/owner expiry
+    // and containment are checked without extending them by skew.
+    let at_start = ImportOwnerExpectation {
+        now_unix_seconds: expected.now_unix_seconds.max(d.not_before_unix_seconds),
+        ..*expected
+    };
+    let verified = verify_delegation(signed, member, &at_start)?;
+    if geneses.len() != d.branch_manifest.len() {
+        return Err(Reject::GenesisBinding);
+    }
+    for m in &d.branch_manifest {
+        let branch = m.limit.as_ref().ok_or(Reject::Canonical)?;
+        let g = geneses
+            .iter()
+            .find(|g| signed_genesis_digest(g).is_ok_and(|h| h == m.genesis_authority_digest))
+            .ok_or(Reject::GenesisBinding)?;
+        let body = g.body.as_ref().ok_or(Reject::GenesisBinding)?;
+        if body.genesis_digest != branch.genesis_digest {
+            return Err(Reject::GenesisBinding);
+        }
+        if d.predecessor_delegation_digest.iter().all(|b| *b == 0) {
+            verify_genesis_authority(
+                g,
+                &verified,
+                &branch.genesis_digest,
+                &body.original_creator_signature,
+                &body.creator_authority_envelope_digest,
+            )?;
+        }
+    }
+    Ok(verified)
+}
+
 pub fn verify_genesis_authority(
     signed: &SignedImportGenesisAuthorityV1,
     delegation: &VerifiedImportDelegation,

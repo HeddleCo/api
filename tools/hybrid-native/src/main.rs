@@ -1337,6 +1337,55 @@ mod tests {
         .expect("fixed vectors")
     }
     #[test]
+    fn prepared_commit_matches_native_original_branches() {
+        let f = fixture();
+        let prepared: wire::PrepareImportJobResponse =
+            record(&f, "commit_preparation").expect("preparation");
+        let identity = record(&f, "identity").expect("identity");
+        let owner = hex_field(&f["keys"]["owner"]["public_key_hex"]).expect("owner");
+        let chain = hex_field(&f["context"]["owner_chain_digest_hex"]).expect("chain");
+        let expectation = import::ImportOwnerExpectation {
+            identity: &identity,
+            owner_public_key: &owner,
+            owner_chain_digest: &chain,
+            authority_expires_at_seconds: 2000,
+            now_unix_seconds: 1100,
+            forbidden_job_keys: &[],
+            known_job_associations: &[],
+        };
+        let geneses = [
+            record(&f, "genesis_dev").expect("dev"),
+            record(&f, "genesis_main").expect("main"),
+        ];
+        let verified = import::verify_prepared_delegation(
+            &prepared,
+            &record(&f, "delegation").expect("delegation"),
+            Some(&record(&f, "permission").expect("parent")),
+            &geneses,
+            &expectation,
+        )
+        .expect("completed signed commit");
+        for name in ["genesis_dev_payload", "genesis_payload"] {
+            let payload: wire::ImportGenesisWitnessV1 = record(&f, name).expect("original payload");
+            let original = payload.original_genesis.as_ref().expect("native original");
+            let g = genesis(original).expect("published native parse and creator signature");
+            let binding = payload.binding.as_ref().expect("binding");
+            let signature =
+                signature(original, g.creator.as_bytes()).expect("original creator signature");
+            import::verify_genesis_authority(
+                binding,
+                &verified,
+                g.id().expect("native genesis ID").as_bytes(),
+                &signature,
+                &codec::hash(&[&payload.creator_authority_envelope]),
+            )
+            .expect("exact prepared branch, original signature and envelope");
+        }
+        println!(
+            "COMMIT NATIVE PASS: prepared branches, original creator signatures and envelopes"
+        );
+    }
+    #[test]
     fn published_harness_pair_is_0287_alpha19() {
         for manifest in [
             include_str!("../Cargo.toml"),

@@ -234,3 +234,15 @@ test('boundary dependency requires exact evidence',async()=>{
   await authority.verifyWitnessPayload(vector('boundary_authority_statement').body,{kind:'authority',payload:vector('boundary_authority_payload')});
   console.log('BOUNDARY PASS dependency_missing_binding: exact control');
 });
+
+for(const v of fixture.commit_vectors.negative)test(`Commit REJECT then PASS: ${v.id}; ${v.first_failing_check}`,async()=>{
+ const parent=v.parent===null?undefined:vector(v.parent??'permission'),geneses=[vector('genesis_dev'),vector('genesis_main')];
+ await assert.rejects(authority.verifyPreparedImportDelegation(vector('commit_preparation'),vector(v.delegation),parent,geneses,ownerContext(BigInt(v.now_seconds??1100))),expected(v.expected));
+ console.log(`COMMIT REJECT ${v.id}: ${v.expected} (${v.first_failing_check})`);
+ await authority.verifyPreparedImportDelegation(vector('commit_preparation'),vector(v.control),vector('permission'),geneses,ownerContext());
+ console.log(`COMMIT PASS ${v.id} control`);
+});
+for(const name of fixture.commit_vectors.passing)test(`browser-completed Commit: ${name}`,async()=>{
+ const d=await authority.verifyPreparedImportDelegation(vector('commit_preparation'),vector(name),vector('permission'),[vector('genesis_dev'),vector('genesis_main')],ownerContext());
+ if(name==='commit_future_within_skew')await assert.rejects(authority.verifyNewImportOperation(vector('operation_main'),d,1100n),expected('Expired'));
+});

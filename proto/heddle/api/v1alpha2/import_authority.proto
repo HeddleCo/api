@@ -99,9 +99,12 @@ message SignedImportGenesisAuthorityV1 {
   AuthorizationSignature creator_signature = 2;
 }
 message ImportBranchManifestV1 {
-  ImportBranchLimitV1 limit = 1;
-  bytes genesis_authority_digest = 2; // Exact signed genesis-binding digest.
+  ImportBranchLimitV1 limit = 1; // Exact ordered prepared branch; server-frozen.
+  bytes genesis_authority_digest = 2; // Browser-completed exact signed binding digest.
 }
+// The browser copies every field from ImportJobPreparationV1 byte-for-byte,
+// adds only fields 8, 9, 13 (binding digests, never limits), 14 and 15, and signs
+// the complete body. Prepare supplies no placeholders for these fields.
 message ImportJobDelegationV1 {
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
@@ -110,14 +113,14 @@ message ImportJobDelegationV1 {
   bytes retry_lineage_id = 5;
   bytes job_public_key = 6;
   bytes job_key_id = 7; // heddle-key-v1(ED25519 u32be, raw key).
-  bytes delegating_public_key = 8;
-  bytes parent_permission_digest = 9;
+  bytes delegating_public_key = 8; // Browser signer device / active owner.
+  bytes parent_permission_digest = 9; // Browser's exact parent ref; zero32 for direct owner.
   bytes owner_chain_digest = 10;
   ImportDelegationPurpose purpose = 11;
   ImportPermissionScopeV1 scope = 12;
   repeated ImportBranchManifestV1 branch_manifest = 13;
-  int64 not_before_unix_seconds = 14;
-  int64 expires_at_unix_seconds = 15;
+  int64 not_before_unix_seconds = 14; // Browser-selected within prepared host bounds.
+  int64 expires_at_unix_seconds = 15; // Exclusive; no clock-skew grace after expiry.
   bytes cancellation_id = 16;
   bytes predecessor_delegation_digest = 17; // Zero32 initially.
 }
@@ -231,16 +234,41 @@ message PrepareImportJobRequest {
   bytes retry_lineage_id = 5;
   bytes renew_logical_job_id = 6; // Empty initially; no execution authority.
 }
+// Exact server-frozen projection of ImportJobDelegationV1. No signer, parent
+// permission, genesis-binding digests or validity window exists at Prepare.
+// Canonical bytes use numbered-field order and the framing above. Commit must
+// compare this projection byte-for-byte with the stored reservation.
+message ImportJobPreparationV1 {
+  uint32 format_version = 1;
+  ImportIdentityV1 identity = 2;
+  bytes delegation_id = 3;
+  bytes logical_job_id = 4;
+  bytes retry_lineage_id = 5;
+  bytes job_public_key = 6;
+  bytes job_key_id = 7;
+  bytes owner_chain_digest = 8;
+  ImportDelegationPurpose purpose = 9;
+  ImportPermissionScopeV1 scope = 10;
+  bytes cancellation_id = 11;
+  bytes predecessor_delegation_digest = 12;
+}
 message PrepareImportJobResponse {
-  ImportJobDelegationV1 proposal = 1;
+  ImportJobPreparationV1 proposal = 1;
   int64 reservation_expires_at_unix_seconds = 2; // Prepare time + 3600, exclusive.
   // Mandatory for renew_logical_job_id; absent for initial preparation. Read in
   // one authorized transaction with proposal, never assembled from stale reads.
   ImportJobCasStateV1 renewal_state = 3;
+  uint64 max_validity_duration_seconds = 4; // Positive; expires - not_before.
+  uint64 clock_skew_allowance_seconds = 5; // No grace after exclusive expiry.
+  int64 prepared_at_unix_seconds = 6; // Host clock; reservation expiry = this + 3600.
 }
 message CommitImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
+  // Exactly one initial delegation and its branch bindings. The browser fills
+  // and signs the device key, parent permission digest (zero32 for direct owner),
+  // per-branch genesis authority digests and not-before/exclusive expiry. Host
+  // selects the stored reservation by delegation ID, never a caller proposal.
   ImportPublicProofBundleV1 proof = 3;
 }
 message RenewImportJobRequest {

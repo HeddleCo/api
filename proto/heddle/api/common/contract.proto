@@ -168,6 +168,7 @@ enum CapabilityArea {
   CAPABILITY_AREA_NOTIFICATIONS = 15;
   // Account subscription and billing administration under effective delegation.
   CAPABILITY_AREA_BILLING = 16;
+  CAPABILITY_AREA_PLATFORM_ADMINISTRATION = 17;
 }
 
 // Authorization is declarative contract metadata. Producers still own runtime

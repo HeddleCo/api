@@ -80,6 +80,15 @@ message PrincipalRecord {
   // account's tier. Include refused commands with authorized=false (for example
   // RevokeDevice for an ephemeral sign-in). Target-specific requirements still
   // apply, including version CAS and last-method/primary/last-handle safeguards.
+  // PlatformAdminService checks project here with their matching Capability,
+  // exact method path and serving Weft endpoint, without a customer target.
+  // Authorization requires current durable platform staff standing for a
+  // directly authenticated human; delegated, agent, service and anonymous
+  // credentials are denied. Verify directness from credential/delegation
+  // attribution, never a claimed account UUID or token staff fact.
+  // Reproject on standing changes or expiry, including FOLLOW replacements or
+  // resets. Advice is presentation only: clients must call the matching check
+  // within each request before any side effect. Missing/unknown advice denies.
   repeated ActionAvailability actions = 9;
   EntitlementRecord entitlement = 10;
   RootingTier rooting_tier = 11;

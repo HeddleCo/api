@@ -139,9 +139,9 @@ def audit_metadata(decoded: str, files: list[list[str]]) -> None:
         f"[{CONTRACT_PACKAGE}.service_contract]"
     ) == service_count
     assert package_descriptor.count(f"[{CONTRACT_PACKAGE}.rpc_contract]") == rpc_count
-    assert service_count == 19
-    assert rpc_count == 163  # Includes four additive account-management RPCs.
-    assert package_descriptor.count("maturity: SERVICE_MATURITY_PLANNED") == 19
+    assert service_count == 20
+    assert rpc_count == 167  # Four platform checks and four account-management RPCs.
+    assert package_descriptor.count("maturity: SERVICE_MATURITY_PLANNED") == 20
     assert "maturity: SERVICE_MATURITY_SHIPPED" not in package_descriptor
     for dynamic_type in (
         'type_name: ".google.protobuf.Any"',

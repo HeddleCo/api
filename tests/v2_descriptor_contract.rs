@@ -152,6 +152,7 @@ fn every_candidate_route_has_metadata_and_resolvable_authorization_targets() {
     }
     for required in [
         "IdentityService",
+        "PlatformAdminService",
         "SpoolService",
         "OwnerAuthorizationService",
         "ThreadService",

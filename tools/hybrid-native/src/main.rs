@@ -918,87 +918,89 @@ fn verify_boundary_native(
     let signed: host::SignedHostedWitnessStatementV1 = record(f, statement_name)?;
     let time = authenticate(f, &set, &signed)?;
     let statement = signed.body.as_ref().context("boundary witness")?;
-    let (evidence, original, envelope) = if kind == "genesis" {
+    let (evidence, original, envelope, dependencies) = if kind == "genesis" {
         let payload: wire::ImportGenesisWitnessV1 = record(f, payload_name)?;
         import::verify_witness_payload(statement, import::WitnessPayload::Genesis(&payload))?;
         (
-            payload.boundary_acceptance.context("boundary evidence")?,
+            vec![payload.boundary_acceptance.context("boundary evidence")?],
             payload.original_genesis.context("original genesis")?,
             payload.creator_authority_envelope,
+            Vec::new(),
         )
     } else {
         let payload: wire::ImportAuthorityWitnessV1 = record(f, payload_name)?;
         import::verify_witness_payload(statement, import::WitnessPayload::Authority(&payload))?;
         (
-            payload
-                .boundary_acceptances
-                .into_iter()
-                .next()
-                .context("boundary evidence")?,
+            payload.boundary_acceptances,
             payload.original.context("source original")?,
             payload.authority_envelope,
+            payload.dependencies,
         )
     };
-    let a = evidence.signed_acceptance.as_ref().context("acceptance")?;
-    let acceptance = crypto::original_boundary_acceptance::SignedBoundaryAcceptance {
-        canonical: a.canonical_record.clone(),
-        signature: signature(
-            a,
-            &OriginalBoundaryAcceptance::decode(&a.canonical_record)?.accepting_publisher,
-        )?,
-    }
-    .verify_signature()?;
-    let manifest = OriginalPublicationManifest::decode(&evidence.originals_manifest)?;
-    let intent: PublicationIntent = rmp_serde::from_slice(&evidence.publication_intent)?;
-    ensure!(
-        rmp_serde::to_vec_named(&intent)? == evidence.publication_intent,
-        "canonical native intent"
-    );
-    let selected = acceptance.selected(&intent, &manifest)?;
+    let enclosing = evidence
+        .iter()
+        .find(|e| e.binding.as_ref() == statement.boundary_acceptance.as_ref())
+        .context("exact enclosing acceptance binding")?;
+    let enclosing_id = enclosing
+        .binding
+        .as_ref()
+        .context("acceptance binding")?
+        .acceptance_id
+        .clone();
     let descriptor = if kind == "genesis" {
         OriginalManifestEntry::from_genesis(&genesis(&original)?, &envelope)?
     } else {
         OriginalManifestEntry::from_operation(&operation(&original)?)?
     };
-    ensure!(
-        selected.contains(&&descriptor),
-        "exact original selected by signed manifest"
-    );
-    ensure!(
-        selected.len() == evidence.original_receipts.len(),
-        "complete per-original receipt selection"
-    );
+    // Resolve immutable subjects from the existing native fixture originals, never
+    // from a receipt's claims. Every candidate's original signature is checked.
+    let native_authority: wire::ImportAuthorityWitnessV1 =
+        record(f, "authority_admission_payload")?;
+    let candidates = bundle
+        .genesis_witnesses
+        .iter()
+        .map(|p| -> Result<_> {
+            Ok((
+                p.original_genesis
+                    .clone()
+                    .context("exported original genesis")?,
+                p.creator_authority_envelope.clone(),
+            ))
+        })
+        .chain(std::iter::once(Ok((
+            original,
+            if kind == "genesis" {
+                envelope
+            } else {
+                Vec::new()
+            },
+        ))))
+        .chain(
+            dependencies
+                .into_iter()
+                .chain(native_authority.dependencies)
+                .filter(|r| r.format == "heddle-thread-operation-v1")
+                .map(|r| Ok((r, Vec::new()))),
+        );
+    let mut originals = BTreeMap::new();
+    for candidate in candidates {
+        let (original, envelope) = candidate?;
+        let entry = if original.format == "heddle-thread-genesis-v1" {
+            OriginalManifestEntry::from_genesis(&genesis(&original)?, &envelope)?
+        } else {
+            OriginalManifestEntry::from_operation(&operation(&original)?)?
+        };
+        let value = (entry.clone(), original, envelope);
+        if let Some(previous) = originals.insert(entry.subject, value.clone()) {
+            ensure!(previous == value, "conflicting original subject evidence");
+        }
+    }
     let issuer = set
         .body()
         .entries
         .iter()
         .find(|e| e.executor_id == statement.executor_id)
         .context("authenticated witness issuer")?;
-    let trust = TrustedHostedExecutor {
-        spool: intent.spool,
-        spool_genesis: intent.spool_genesis,
-        executor: issuer.public_key.as_slice().try_into()?,
-    };
-    for r in &evidence.original_receipts {
-        ensure!(
-            r.signatures.len() == 1 && r.signatures[0].public_key == issuer.public_key,
-            "independent per-original receipt signer"
-        );
-        if kind == "genesis" {
-            ThreadGenesisAdmission::decode(&r.canonical_record)?.authorize_with_acceptance(
-                &genesis(&original)?,
-                &envelope,
-                &trust,
-                Some(&acceptance),
-            )?;
-        } else {
-            ThreadAuthorityAdmission::decode(&r.canonical_record)?.authorize_with_acceptance(
-                &operation(&original)?,
-                &trust,
-                Some(&acceptance),
-            )?;
-        }
-    }
     let root: wire::OwnerHistory = record(f, "owner_history")?;
     let native_root = capability_verifier::wire::SignedOwnerRoot::decode(
         root.root.context("root")?.encode_to_vec().as_slice(),
@@ -1008,52 +1010,155 @@ fn verify_boundary_native(
         owner.authority_key().public_key == hex_field(&f["keys"]["owner"]["public_key_hex"])?,
         "independently selected owner"
     );
-    let SourceAuthor::Account {
-        actor, authority, ..
-    } = &acceptance.accepting_author
-    else {
-        bail!("account acceptance required")
-    };
-    let subject_kind = match descriptor.subject {
-        ManifestSubject::Genesis(_) => {
-            capability_verifier::boundary_authority::BoundarySubjectKind::AccountGenesis
+    for evidence in &evidence {
+        let a = evidence.signed_acceptance.as_ref().context("acceptance")?;
+        let acceptance = crypto::original_boundary_acceptance::SignedBoundaryAcceptance {
+            canonical: a.canonical_record.clone(),
+            signature: signature(
+                a,
+                &OriginalBoundaryAcceptance::decode(&a.canonical_record)?.accepting_publisher,
+            )?,
         }
-        ManifestSubject::Source(_) => {
-            capability_verifier::boundary_authority::BoundarySubjectKind::Source
+        .verify_signature()?;
+        let manifest = OriginalPublicationManifest::decode(&evidence.originals_manifest)?;
+        let intent: PublicationIntent = rmp_serde::from_slice(&evidence.publication_intent)?;
+        ensure!(
+            rmp_serde::to_vec_named(&intent)? == evidence.publication_intent,
+            "canonical native intent"
+        );
+        let selected = acceptance.selected(&intent, &manifest)?;
+        if evidence
+            .binding
+            .as_ref()
+            .context("acceptance binding")?
+            .acceptance_id
+            == enclosing_id
+        {
+            ensure!(
+                selected.contains(&&descriptor),
+                "exact original selected by signed manifest"
+            );
         }
-        _ => bail!("fixture original kind"),
-    };
-    let method = if kind == "genesis" {
-        "/heddle.api.v1alpha2.ThreadService/StartThread"
-    } else {
-        "/heddle.api.v1alpha2.SyncService/PublishContent"
-    };
-    let id = descriptor.subject.id();
-    capability_verifier::boundary_authority::verify_accepting_authority(
-        authority,
-        capability_verifier::thread_control_authority::Context {
-            owner: &owner,
-            account_uuid: actor.principal_id.as_bytes(),
-            publisher: &acceptance.accepting_publisher,
-            agent_id: actor.agent_id.as_deref(),
-            method,
-            spool_path: "example",
-            now: time,
-        },
-        capability_verifier::boundary_authority::OriginalSubjectScope {
-            kind: subject_kind,
-            account: acceptance.original_account.as_bytes(),
-            thread: descriptor.thread.as_bytes(),
-            subject: id.as_bytes(),
-            publisher: &descriptor.publisher,
-            agent_id: descriptor
-                .authority
-                .as_ref()
-                .and_then(|a| a.actor.agent_id.as_deref()),
-        },
-        &[],
-        |_| false,
-    )?;
+        ensure!(
+            selected.len() == evidence.original_receipts.len(),
+            "complete per-original receipt selection"
+        );
+        let trust = TrustedHostedExecutor {
+            spool: intent.spool,
+            spool_genesis: intent.spool_genesis,
+            executor: issuer.public_key.as_slice().try_into()?,
+        };
+        let mut seen = std::collections::BTreeSet::new();
+        for r in &evidence.original_receipts {
+            ensure!(
+                r.signatures.len() == 1 && r.signatures[0].public_key == issuer.public_key,
+                "independent per-original receipt signer"
+            );
+            let subject = match r.format.as_str() {
+                "heddle-thread-genesis-admission-v2" => ManifestSubject::Genesis(
+                    ThreadGenesisAdmission::decode(&r.canonical_record)?.thread,
+                ),
+                "heddle-thread-authority-admission-v3" => {
+                    use objects::object::thread_authority_admission::OriginalAuthoritySubject;
+                    match ThreadAuthorityAdmission::decode(&r.canonical_record)?.subject {
+                        OriginalAuthoritySubject::Operation(id) => ManifestSubject::Source(id),
+                        _ => bail!("fixture receipt original kind"),
+                    }
+                }
+                _ => bail!("fixture receipt format"),
+            };
+            let selected_entry = selected
+                .iter()
+                .find(|e| e.subject == subject)
+                .context("receipt subject outside selected originals")?;
+            ensure!(seen.insert(subject.clone()), "duplicate receipt subject");
+            let (entry, original, envelope) = originals
+                .get(&subject)
+                .context("selected original/envelope missing")?;
+            ensure!(
+                *selected_entry == entry,
+                "selected descriptor differs from immutable original"
+            );
+            match subject {
+                ManifestSubject::Genesis(_) => {
+                    let receipt = crypto::thread_genesis_admission::SignedGenesisAdmission {
+                        canonical: r.canonical_record.clone(),
+                        signature: signature(r, &issuer.public_key)?,
+                        boundary_acceptance: None,
+                    }
+                    .verify_signature()?;
+                    receipt.authorize_with_acceptance(
+                        &genesis(original)?,
+                        envelope,
+                        &trust,
+                        Some(&acceptance),
+                    )?;
+                }
+                ManifestSubject::Source(_) => {
+                    let receipt = crypto::thread_authority_admission::SignedAuthorityAdmission {
+                        canonical: r.canonical_record.clone(),
+                        signature: signature(r, &issuer.public_key)?,
+                        boundary_acceptance: None,
+                    }
+                    .verify_signature()?;
+                    receipt.authorize_with_acceptance(
+                        &operation(original)?,
+                        &trust,
+                        Some(&acceptance),
+                    )?;
+                }
+                _ => bail!("fixture original kind"),
+            }
+        }
+        ensure!(
+            selected.iter().all(|e| seen.contains(&e.subject)),
+            "selected original receipt omitted"
+        );
+        let SourceAuthor::Account {
+            actor, authority, ..
+        } = &acceptance.accepting_author
+        else {
+            bail!("account acceptance required")
+        };
+        for entry in selected {
+            let (subject_kind, method) = match entry.subject {
+                ManifestSubject::Genesis(_) => (
+                    capability_verifier::boundary_authority::BoundarySubjectKind::AccountGenesis,
+                    "/heddle.api.v1alpha2.ThreadService/StartThread",
+                ),
+                ManifestSubject::Source(_) => (
+                    capability_verifier::boundary_authority::BoundarySubjectKind::Source,
+                    "/heddle.api.v1alpha2.SyncService/PublishContent",
+                ),
+                _ => bail!("fixture original kind"),
+            };
+            capability_verifier::boundary_authority::verify_accepting_authority(
+                authority,
+                capability_verifier::thread_control_authority::Context {
+                    owner: &owner,
+                    account_uuid: actor.principal_id.as_bytes(),
+                    publisher: &acceptance.accepting_publisher,
+                    agent_id: actor.agent_id.as_deref(),
+                    method,
+                    spool_path: "example",
+                    now: time,
+                },
+                capability_verifier::boundary_authority::OriginalSubjectScope {
+                    kind: subject_kind,
+                    account: acceptance.original_account.as_bytes(),
+                    thread: entry.thread.as_bytes(),
+                    subject: entry.subject.id().as_bytes(),
+                    publisher: &entry.publisher,
+                    agent_id: entry
+                        .authority
+                        .as_ref()
+                        .and_then(|a| a.actor.agent_id.as_deref()),
+                },
+                &[],
+                |_| false,
+            )?;
+        }
+    }
     println!(
         "BOUNDARY NATIVE PASS {statement_name}: selected original, exact acceptance basis, receipt signatures, current accepting authority"
     );
@@ -1288,6 +1393,26 @@ mod tests {
             format!("{error:#}").contains("duplicate receipt subject"),
             "{error:#}"
         );
+    }
+    #[test]
+    fn boundary_enclosing_acceptance_uses_exact_binding() {
+        let f = fixture();
+        let p: wire::ImportAuthorityWitnessV1 =
+            record(&f, "boundary_enclosing_not_first_payload").expect("payload");
+        let s: host::SignedHostedWitnessStatementV1 =
+            record(&f, "boundary_enclosing_not_first_statement").expect("statement");
+        assert_ne!(
+            p.boundary_acceptances[0].binding,
+            s.body.expect("body").boundary_acceptance,
+            "control must select an acceptance beyond the first"
+        );
+        verify_boundary_native(
+            &f,
+            "boundary_enclosing_not_first_statement",
+            "boundary_enclosing_not_first_payload",
+            "authority",
+        )
+        .expect("exact source acceptance after dependency acceptance");
     }
     #[test]
     fn boundary_all_dependency_acceptances_are_verified() {

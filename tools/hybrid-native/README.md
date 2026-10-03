@@ -1,5 +1,5 @@
-The frozen HYBRID native gate uses the newest compatible published native pair: heddle 0.28.6 /
-heddle-api 0.31.0-alpha.18. `Cargo.lock` fixes its full dependency graph. It runs as part of
+The frozen HYBRID native gate uses the newest compatible published native pair: heddle 0.28.7 /
+heddle-api 0.31.0-alpha.19. `Cargo.lock` fixes its full dependency graph. It runs as part of
 `../../tools/verify.sh`; verification reads fixed vectors and never mints a
 Biscuit or regenerates expected bytes.
 
@@ -17,6 +17,16 @@ verification authenticates the selected signed policy and both branch genesis
 admissions. It uses receipt-derived times after witness signature and archive
 verification. Export closure remains a reference check, separate from native
 authority verification.
+
+Boundary verification resolves the enclosing original by its exact acceptance
+binding and checks every dependency acceptance. Receipt subjects must cover
+the complete native selected set one-to-one; each receipt is verified against
+its own signed original and creator envelope, and current accepting authority
+is checked for every selected subject. Frozen sets of sizes two and three,
+multiple dependency acceptances, and omission, duplicate, substitution and
+extra-receipt negatives run alongside the shared Rust/TypeScript commitment
+tests. Those clients check the signed commitments; the native gate checks
+subject membership and authority.
 
 The regression input retains verbatim old originals from `acf67659`, including
 the closed legacy dispatch negative. This command must exit nonzero:

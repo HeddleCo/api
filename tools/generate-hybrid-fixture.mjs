@@ -237,13 +237,31 @@ for(const [size,parts] of [[2,[boundaryMain,boundaryDev]],[3,[boundaryMain,bound
     archiveBoundary('boundary_'+change+'_'+size,create(api.ImportGenesisWitnessV1Schema,{...genesisPayload,boundaryAcceptance:bad}),'genesis',bad.binding,change==='duplicate'?'duplicate receipt subject':change==='substitution'?'receipt subject outside selected originals':'complete per-original receipt selection');
   }
 }
-function multipleAcceptances(name,acceptances,negative){
+function multipleAcceptances(name,acceptances,negative,enclosing=boundarySource){
   const dependencies=acceptances.flatMap(e=>[e.signedAcceptance,...e.originalReceipts]).sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));
   const sorted=[...acceptances].sort((a,b)=>compare(a.binding.acceptanceId,b.binding.acceptanceId));
   const p=create(api.ImportAuthorityWitnessV1Schema,{...boundaryAuthority,dependencies,boundaryAcceptances:sorted});
-  archiveBoundary(name,p,'authority',boundarySource.binding,negative);
+  archiveBoundary(name,p,'authority',enclosing.binding,negative);
 }
 multipleAcceptances('boundary_multiple_dependencies',[boundaryMain,boundaryDev,boundarySource]);
+// A distinct source acceptance sorts after a dependency acceptance. The
+// enclosing binding, rather than list position, must choose source authority.
+function sourceAcceptanceWithIntent(nonce){
+  const e=clone(api.ImportBoundaryAcceptanceV1Schema,boundarySource);
+  const intent=decode(e.publicationIntent);intent.client_operation_id=raw(nonce,16);
+  e.publicationIntent=nativeEncode('heddle-original-publication-intent-v1',intent);
+  const a=decode(e.signedAcceptance.canonicalRecord);
+  a.publication_intent=Array.from(nativeId('heddle-original-publication-intent-v1',e.publicationIntent));
+  e.signedAcceptance=native('heddle-original-boundary-acceptance-v1',a);
+  e.binding.acceptanceId=nativeId(e.signedAcceptance.format,e.signedAcceptance.canonicalRecord);
+  e.binding.signedAcceptanceDigest=signedNativeDigest(e.signedAcceptance);
+  e.binding.publicationIntentDigest=boundaryOctetsDigest('heddle-boundary-publication-intent-v1',e.publicationIntent);
+  const r=decode(e.originalReceipts[0].canonicalRecord);r.basis.BoundaryAcceptance.acceptance=Array.from(e.binding.acceptanceId);
+  return receiptSet(e,[native(e.originalReceipts[0].format,r,['witness'])]);
+}
+const laterSource=sourceAcceptanceWithIntent(0xb4);
+multipleAcceptances('boundary_enclosing_not_first',[boundaryMain,laterSource],undefined,laterSource);
+
 const two=combinedBoundary('boundary_dependency_set', [boundaryMain,boundaryDev]);
 const firstReceipt=decode(two.originalReceipts.find(r=>hex(decode(r.canonicalRecord).thread)===hex(decode(boundaryMain.originalReceipts[0].canonicalRecord).thread)).canonicalRecord);
 firstReceipt.admitted_at_ms+=1;

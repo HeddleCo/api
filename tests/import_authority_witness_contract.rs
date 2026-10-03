@@ -1403,9 +1403,17 @@ fn boundary_passing_genesis_and_dependency_vectors() {
     let c = Context::new(&f);
     let set =
         witness::verify_set(&record(&f, "current_set"), &c.set(1_100_000), None).expect("set");
+    // Shared matching validates commitments; native negatives are rejected by
+    // the separate published-codec semantic gate.
     for v in f["boundary_vectors"]["passing"]
         .as_array()
         .expect("passing")
+        .iter()
+        .chain(
+            f["boundary_vectors"]["native_negative"]
+                .as_array()
+                .expect("native negatives"),
+        )
     {
         let statement: host::SignedHostedWitnessStatementV1 =
             record(&f, v["statement"].as_str().expect("statement"));

@@ -9,10 +9,10 @@ name = "conformance"
 path = "conformance.rs"
 
 [dev-dependencies]
-heddleco-capability-verifier = "=0.28.6"
+heddleco-capability-verifier = "=0.28.7"
 # The released verifier pins this exact published heddle-api; its types stay isolated
 # from the contract crate under test, which moves with every release.
-native-api = { package = "heddle-api", version = "=0.31.0-alpha.18" }
+native-api = { package = "heddle-api", version = "=0.31.0-alpha.19" }
 contract = { package = "heddle-api", path = "../.." }
 prost = "=0.14.1"
 serde_json = "=1.0.149"

@@ -662,16 +662,23 @@ Never choose the representation from the semantic meaning of "bytes"; retain
 the pinned codec's representation and exact parse/re-encode equality.
 
 The locked `tools/hybrid-native` tool uses published `heddle-api
-0.31.0-alpha.18`, `heddle-thread-api 0.28.6`, `heddle-object-model 0.28.6`,
-`heddle-crypto 0.28.6`, `heddleco-capability-verifier 0.28.6`, and
-`heddle-biscuit-verifier 0.28.6`. On 2026-10-03 `cargo search` showed 0.28.6
-and alpha.19 as the newest publications; 0.28.6 requires exactly alpha.18,
-so 0.28.6/alpha.18 is the newest compatible published pair. Maintenance
+0.31.0-alpha.19`, `heddle-thread-api 0.28.7`, `heddle-object-model 0.28.7`,
+`heddle-crypto 0.28.7`, `heddleco-capability-verifier 0.28.7`, and
+`heddle-biscuit-verifier 0.28.7`. On 2026-10-03 the complete 0.28.7 crate set
+and alpha.19 are published; 0.28.7 requires exactly alpha.19,
+so 0.28.7/alpha.19 is the newest compatible published pair. Maintenance
 generation uses these codecs. `tools/verify.sh` runs its
 fixed-vector gate for native parsing, re-encoding, signatures, child ancestry,
 causal/claim closure, original authority and hosted request binding, plus fresh
 historical verification from the complete export, independently selected roots
-and retirement paths. It also rejects the retained old parentless and
+and retirement paths. The boundary gate matches receipt subjects one-to-one
+to the complete native selected set, resolves each signed original and creator
+envelope, and verifies current accepting authority for every selected subject.
+It checks every supplied dependency acceptance and selects the enclosing
+original's acceptance by the statement's exact binding. Frozen two- and
+three-original controls and multiple dependency acceptances accompany omission,
+duplicate, substitution and extra-receipt negatives. Shared Rust/TypeScript
+commitment tests remain separate from these native semantic checks. It also rejects the retained old parentless and
 non-canonical originals and the old request-proof formula, and independently
 removes each selected policy and genesis-admission original. The closed legacy
 dispatch control retains its exact pre-`source_ref` negative bytes.

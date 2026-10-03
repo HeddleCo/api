@@ -373,8 +373,8 @@ name = "custodial-recovery-verifier-conformance"
 version = "0.0.0"
 dependencies = [
  "ed25519-dalek 3.0.0",
- "heddle-api 0.31.0-alpha.18",
  "heddle-api 0.31.0-alpha.19",
+ "heddle-api 0.31.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "heddleco-capability-verifier",
  "hex",
  "prost 0.14.1",
@@ -739,29 +739,6 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "heddle-api"
-version = "0.31.0-alpha.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfbcb8b5f909e52b89ff61d556b7697f924ed830c398fed82b2bad3e5fba278f"
-dependencies = [
- "blake3",
- "bytes",
- "ed25519-dalek 3.0.0",
- "hex",
- "prost 0.14.1",
- "prost-build",
- "prost-reflect",
- "prost-types 0.14.1",
- "protoc-bin-vendored",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.18",
- "unicode-general-category",
- "unicode-normalization",
-]
-
-[[package]]
-name = "heddle-api"
 version = "0.31.0-alpha.19"
 dependencies = [
  "blake3",
@@ -783,10 +760,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "heddle-biscuit-verifier"
-version = "0.28.6"
+name = "heddle-api"
+version = "0.31.0-alpha.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f83016442543350b1b9e7d7fd6f2bd6d6007a1bfc1b481a94ae1cbb56c5777ed"
+checksum = "9ea5798c1d332b0ba35ad77896ec6854e1ded9574e48ae2fc2b50c2788a20f40"
+dependencies = [
+ "blake3",
+ "bytes",
+ "ed25519-dalek 3.0.0",
+ "hex",
+ "prost 0.14.1",
+ "prost-build",
+ "prost-reflect",
+ "prost-types 0.14.1",
+ "protoc-bin-vendored",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.18",
+ "unicode-general-category",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "heddle-biscuit-verifier"
+version = "0.28.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537de883f25ccc0b80d620c90b1632de20db9281309082662d78b17e9fe35819"
 dependencies = [
  "base64 0.22.1",
  "biscuit-auth",
@@ -802,16 +802,16 @@ dependencies = [
 
 [[package]]
 name = "heddleco-capability-verifier"
-version = "0.28.6"
+version = "0.28.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3095b1779371b71055fe19542a5400ad50f9db6bfb47097ad79a9b2f3cabc727"
+checksum = "229c2e5ca3bd3511ec1416b28099462e73340a9259bcfc3725780ab2b5955dea"
 dependencies = [
  "base64 0.22.1",
  "biscuit-auth",
  "chrono",
  "ed25519-dalek 3.0.0",
  "getrandom 0.2.17",
- "heddle-api 0.31.0-alpha.18",
+ "heddle-api 0.31.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "heddle-biscuit-verifier",
  "hex",
  "p256 0.14.0",

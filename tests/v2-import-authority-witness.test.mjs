@@ -215,7 +215,8 @@ for(const [name,v] of Object.entries(fixture.raw_commitment_vectors))test(`froze
 
 test('boundary passing genesis and dependency vectors',async()=>{
   const set=await witness.verifyWitnessSet(vector('current_set'),setContext());
-  for(const v of fixture.boundary_vectors.passing){const s=vector(v.statement);await witness.resolveWitnessStatement(set,s,undefined,false,1100000n);await authority.verifyWitnessPayload(s.body,{kind:v.kind,payload:vector(v.payload)});}
+  // Native semantic negatives have valid shared commitments and signatures.
+  for(const v of [...fixture.boundary_vectors.passing,...fixture.boundary_vectors.native_negative]){const s=vector(v.statement);await witness.resolveWitnessStatement(set,s,undefined,false,1100000n);await authority.verifyWitnessPayload(s.body,{kind:v.kind,payload:vector(v.payload)});}
 });
 for(const v of fixture.boundary_vectors.negative)test('boundary '+v.name,async()=>{
   const set=await witness.verifyWitnessSet(vector('current_set'),setContext()),s=vector(v.statement);

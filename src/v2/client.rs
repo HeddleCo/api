@@ -123,6 +123,10 @@ impl<T: RpcTransport> Client<T> {
         Ok(bytes)
     }
 
+    /// Transports the caller's exact request and request PoP. For HYBRID imports,
+    /// Prepare returns frozen fields/bounds; the browser completes and signs the
+    /// delegation explicitly. Commit hosts use verify_prepared_delegation with
+    /// their durable reservation; this generic client grants no import authority.
     pub async fn call<M: UnaryRpc>(
         &self,
         request: &M::Request,

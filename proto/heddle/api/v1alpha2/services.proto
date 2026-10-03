@@ -2654,6 +2654,9 @@ service IntegrationService {
     deployment_targets: [DEPLOYMENT_TARGET_WEFT]
     maturity: SERVICE_MATURITY_PLANNED
   };
+  // Freeze the exact job/identity/lineage/scope and persist encrypted key custody.
+  // Advertise host time, maximum validity duration and clock-skew allowance.
+  // The returned preparation has no execution authority.
   rpc PrepareImportJob(PrepareImportJobRequest) returns (PrepareImportJobResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -2673,6 +2676,10 @@ service IntegrationService {
       mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
+  // Complete the stored preparation with browser-signed device, parent grant,
+  // genesis bindings and bounded window. Compare frozen canonical bytes, verify
+  // non-amplification, exact branch bindings and signature before activation;
+  // recheck current authority and reservation expiry in the mutation transaction.
   rpc CommitImportJob(CommitImportJobRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

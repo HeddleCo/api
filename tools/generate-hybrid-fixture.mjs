@@ -12,7 +12,7 @@ import { ThreadControlAuthoritySchema } from '../packages/typescript/dist/v1alph
 import { LandThreadRequestSchema } from '../packages/typescript/dist/v1alpha2/thread_pb.js';
 import { unarySigningBytes } from '../packages/typescript/dist/signing.js';
 import { blake3 } from '@noble/hashes/blake3.js';
-import { frontierDigest, contentDigest, boundaryOctetsDigest, publicationPayload, signedNativeDigest, authorityEnvelopeDigest, originalSignaturesDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
+import { delegationPreparation, frontierDigest, contentDigest, boundaryOctetsDigest, publicationPayload, signedNativeDigest, authorityEnvelopeDigest, originalSignaturesDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import * as api from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
 import * as common from '../packages/typescript/dist/common/hosted_witness_pb.js';
 import { canonicalThreadGenesis, threadGenesisId } from '../packages/typescript/dist/v1alpha2/thread-genesis.js';
@@ -80,6 +80,98 @@ for(const [name,g] of Object.entries(genesisRecords)){const body=create(api.Impo
 artifact.originals=Object.fromEntries(Object.entries(genesisRecords).map(([n,g])=>[n,{canonical_hex:hex(g.canonical),signature_hex:hex(g.signature),envelope_hex:hex(envelopes[n]),genesis_digest_hex:hex(g.genesisDigest)}]));
 const delegationBody=create(api.ImportJobDelegationV1Schema,{formatVersion:1,identity,delegationId:raw(0x52,16),logicalJobId,retryLineageId,jobPublicKey:keys.job.publicKey,jobKeyId:keyId(keys.job.publicKey),delegatingPublicKey:keys.device.publicKey,parentPermissionDigest:permissionDigest,ownerChainDigest:chainDigest,purpose:1,scope,branchManifest:scope.branches.map(b=>({limit:b,genesisAuthorityDigest:signedGenesisDigest(genesisProofs[b.refName.split('/').at(-1)])})),notBeforeUnixSeconds:1000n,expiresAtUnixSeconds:1300n,cancellationId:raw(0x53),predecessorDelegationDigest:raw(0)});
 const delegation=signed('delegation',api.ImportJobDelegationV1Schema,delegationBody,api.SignedImportJobDelegationV1Schema,'delegatingSignature','device','heddle-import-job-delegation-v1');
+// api#321: exact frozen preparation and browser-completed Commit vectors.
+const preparation=wire('commit_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{
+ proposal:commitment('preparation',api.ImportJobPreparationV1Schema,delegationPreparation(delegationBody),'heddle-import-job-preparation-v1'),
+ preparedAtUnixSeconds:1000n,reservationExpiresAtUnixSeconds:4600n,maxValidityDurationSeconds:300n,clockSkewAllowanceSeconds:100n,
+}));
+artifact.commit_vectors={passing:['delegation'],negative:[]};
+const commitSigned=(name,body)=>signed(name,api.ImportJobDelegationV1Schema,body,api.SignedImportJobDelegationV1Schema,'delegatingSignature','device','heddle-import-job-delegation-v1');
+function commitNegative(id,body,expected,check,extra={}){
+ const value=commitSigned(`commit_${id}`,body);
+ artifact.commit_vectors.negative.push({id,delegation:`commit_${id}`,expected,first_failing_check:check,control:'delegation',...extra});
+ return value;
+}
+function mutateLeaf(value,field){
+ if(field.fieldKind==='enum'||field.scalar===13)value[field.localName]++;
+ else if(field.scalar===12){value[field.localName]=value[field.localName].slice();value[field.localName][0]^=1;}
+ else if(field.scalar===9)value[field.localName]+='-changed';
+ else value[field.localName]+=1n;
+}
+function frozenLeaves(schema,value,path=[]){
+ return schema.fields.flatMap(field=>{
+  const next=[...path,field.localName],v=value[field.localName];
+  if(field.fieldKind==='message')return frozenLeaves(field.message,v,next);
+  if(field.fieldKind==='list')return v.flatMap((item,i)=>frozenLeaves(field.message,item,[...next,i]));
+  return [{path:next,field}];
+ });
+}
+for(const {path,field} of frozenLeaves(api.ImportJobPreparationV1Schema,preparation.proposal)){
+ const body=clone(api.ImportJobDelegationV1Schema,delegationBody);let target=body;
+ for(const part of path.slice(0,-1))target=target[part];mutateLeaf(target,field);
+ commitNegative(`frozen_${path.join('_')}`,body,'PreparedFields',`frozen.${path.join('.')}`);
+}
+for(const field of api.ImportBranchLimitV1Schema.fields){
+ const body=clone(api.ImportJobDelegationV1Schema,delegationBody);mutateLeaf(body.branchManifest[0].limit,field);
+ commitNegative(`frozen_manifest_${field.name}`,body,'PreparedFields',`frozen.branch_manifest.limit.${field.name}`);
+}
+for(const [id,mutate] of [
+ ['branch_removed',b=>b.scope.branches.pop()],['branch_reordered',b=>b.scope.branches.reverse()],
+ ['manifest_removed',b=>b.branchManifest.pop()],['manifest_reordered',b=>b.branchManifest.reverse()],
+]){const b=clone(api.ImportJobDelegationV1Schema,delegationBody);mutate(b);commitNegative(`frozen_${id}`,b,'PreparedFields',`frozen.${id}`);}
+// Rebind every signed genesis reference when a case gets a different parent.
+function commitParentInputs(name,parentBody,childBody=delegationBody){
+ const parent=signed(`commit_${name}_parent`,api.ImportMemberPermissionV1Schema,parentBody,api.SignedImportMemberPermissionV1Schema,'ownerSignature','owner','heddle-import-member-permission-v1');
+ const body=clone(api.ImportJobDelegationV1Schema,childBody),geneses=[];
+ body.parentPermissionDigest=signedPermissionDigest(parent);
+ const envelope=join(str('heddle-signed-import-member-permission-v1\0'),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,parent));
+ for(const [i,m] of body.branchManifest.entries()){
+  const branch=m.limit.refName.split('/').at(-1),g=clone(api.ImportGenesisAuthorityV1Schema,genesisProofs[branch].body);
+  g.parentPermissionDigest=body.parentPermissionDigest;g.creatorAuthorityEnvelopeDigest=hash(envelope);
+  const genesisName=`commit_${name}_genesis_${branch}`;
+  const proof=signed(genesisName,api.ImportGenesisAuthorityV1Schema,g,api.SignedImportGenesisAuthorityV1Schema,'creatorSignature','device','heddle-import-genesis-authority-v1');
+  geneses.push(genesisName);body.branchManifest[i].genesisAuthorityDigest=signedGenesisDigest(proof);
+ }
+ return {body,inputs:{parent:`commit_${name}_parent`,geneses}};
+}
+// Duration and early-start violate only host bounds, not parent containment.
+const wideParent=clone(api.ImportMemberPermissionV1Schema,permissionBody);wideParent.notBeforeUnixSeconds=800n;wideParent.expiresAtUnixSeconds=1400n;
+const wideCommit=commitParentInputs('wide',wideParent);
+commitSigned('commit_wide_control',wideCommit.body);
+for(const [id,start,end] of [['duration',1000n,1301n],['too_early',899n,1199n],['too_late',1201n,1300n],['expired',1000n,1100n],['empty',1200n,1199n]]){
+ const useWide=['duration','too_early'].includes(id),b=clone(api.ImportJobDelegationV1Schema,useWide?wideCommit.body:delegationBody);
+ b.notBeforeUnixSeconds=start;b.expiresAtUnixSeconds=end;
+ commitNegative(`window_${id}`,b,'ValidityBounds',`window.${id}`,useWide?{...wideCommit.inputs,control:'commit_wide_control'}:{});
+}
+const future=clone(api.ImportJobDelegationV1Schema,delegationBody);future.notBeforeUnixSeconds=1200n;
+const futureDelegation=commitSigned('commit_future_within_skew',future);artifact.commit_vectors.passing.push('commit_future_within_skew');
+commitNegative('parent_absent',delegationBody,'ImportPermission','parent.required',{parent:null});
+// Child and genesis stay mutually consistent; only the supplied signed parent differs.
+const equivalentParent=clone(api.ImportMemberPermissionV1Schema,permissionBody);equivalentParent.nonce=raw(0x90);
+signed('commit_equivalent_parent',api.ImportMemberPermissionV1Schema,equivalentParent,api.SignedImportMemberPermissionV1Schema,'ownerSignature','owner','heddle-import-member-permission-v1');
+commitNegative('parent_ref',delegationBody,'Scope','parent.exact_signed_digest',{parent:'commit_equivalent_parent',control_parent:'permission'});
+const narrowParent=clone(api.ImportMemberPermissionV1Schema,permissionBody);narrowParent.scope.maxResultBytes=1999n;narrowParent.scope.branches[0].maxResultBytes=999n;
+const narrow=commitParentInputs('narrow',narrowParent);
+// The negative's child retains its frozen larger scope; its control fits the same parent.
+const narrowControl=clone(api.ImportJobDelegationV1Schema,narrow.body);narrowControl.scope=clone(api.ImportPermissionScopeV1Schema,narrowParent.scope);
+narrowControl.branchManifest.forEach((m,i)=>m.limit=narrowControl.scope.branches[i]);
+commitSigned('commit_narrow_control',narrowControl);
+const narrowPreparation=clone(api.PrepareImportJobResponseSchema,preparation);narrowPreparation.proposal=delegationPreparation(narrowControl);
+wire('commit_narrow_preparation',api.PrepareImportJobResponseSchema,narrowPreparation);
+commitNegative('parent_amplification',narrow.body,'Scope','parent.non_amplification',{...narrow.inputs,control:'commit_narrow_control',control_preparation:'commit_narrow_preparation'});
+const badGenesis=clone(api.ImportJobDelegationV1Schema,delegationBody);badGenesis.branchManifest[0].genesisAuthorityDigest=raw(0x91);
+commitNegative('genesis_digest',badGenesis,'GenesisBinding','genesis.exact_signed_digest');
+const substitutedGenesis=clone(api.ImportJobDelegationV1Schema,delegationBody);substitutedGenesis.branchManifest[0].genesisAuthorityDigest=signedGenesisDigest(genesisProofs.main);
+commitNegative('genesis_branch',substitutedGenesis,'GenesisBinding','genesis.prepared_branch');
+const invalidSignature=clone(api.SignedImportJobDelegationV1Schema,delegation);invalidSignature.delegatingSignature.signature[0]^=1;
+wire('commit_bad_signature',api.SignedImportJobDelegationV1Schema,invalidSignature);
+artifact.commit_vectors.negative.push({id:'bad_signature',delegation:'commit_bad_signature',expected:'Signature',first_failing_check:'delegation.signature',control:'delegation'});
+// Keep owner, parent and child current on both sides of the exclusive reservation boundary.
+const reservationParent=clone(api.ImportMemberPermissionV1Schema,permissionBody);reservationParent.expiresAtUnixSeconds=4900n;
+const reservation=commitParentInputs('reservation',reservationParent);reservation.body.notBeforeUnixSeconds=4500n;reservation.body.expiresAtUnixSeconds=4800n;
+commitSigned('commit_reservation',reservation.body);
+artifact.commit_vectors.negative.push({id:'reservation_expired',delegation:'commit_reservation',expected:'Expired',first_failing_check:'reservation.exclusive_expiry',...reservation.inputs,now_seconds:4600,authority_expires_at_seconds:5000,control:'commit_reservation',control_now_seconds:4599});
+
 const directBody=clone(api.ImportJobDelegationV1Schema,delegationBody);directBody.delegatingPublicKey=keys.owner.publicKey;directBody.parentPermissionDigest=raw(0);directBody.jobPublicKey=keys.direct_job.publicKey;directBody.jobKeyId=keyId(keys.direct_job.publicKey);directBody.logicalJobId=raw(0x54,16);directBody.delegationId=raw(0x55,16);
 directBody.scope.branches=directBody.scope.branches.map((b,i)=>{const next=clone(api.ImportBranchLimitV1Schema,b),canonical=nativeGenesis({spoolId:'23232323-2323-2323-2323-232323232323',baseStateId,name:b.refName,intent:'Direct owner import',owner:{kind:'account',accountId:'21212121-2121-2121-2121-212121212121'},nonce:raw(0x7d+i,16)},keys.owner.publicKey);next.genesisDigest=threadGenesisId(canonical);next.targetThreadId=next.genesisDigest;const g=create(api.ImportGenesisAuthorityV1Schema,{formatVersion:1,identity,genesisDigest:next.genesisDigest,originalCreatorSignature:sig('owner',join(str('heddle-thread-genesis-v1\0'),canonical)),creatorPublicKey:keys.owner.publicKey,creatorAuthorityEnvelopeDigest:hash(str('direct active owner authority')),parentPermissionDigest:raw(0),ownerChainDigest:chainDigest});const proof=signed(`direct_genesis_${i}`,api.ImportGenesisAuthorityV1Schema,g,api.SignedImportGenesisAuthorityV1Schema,'creatorSignature','owner','heddle-import-genesis-authority-v1');directBody.branchManifest[i]=create(api.ImportBranchManifestV1Schema,{limit:next,genesisAuthorityDigest:signedGenesisDigest(proof)});return next;});
 signed('direct_owner',api.ImportJobDelegationV1Schema,directBody,api.SignedImportJobDelegationV1Schema,'delegatingSignature','owner','heddle-import-job-delegation-v1');
@@ -87,6 +179,7 @@ const converted={};
 for(const b of branchLimits){const name=b.refName.split('/').at(-1),operation=native('heddle-thread-operation-v1',{version:1,thread:Array.from(b.targetThreadId),parents:[],publisher:Array.from(keys.job.publicKey),body:{kind:'capture',canonical:{result:capture,author:{kind:'local_key'}}}},['job']);converted[name]=operation;commitment(`result_frontier_${name}`,api.ImportFrontierV1Schema,create(api.ImportFrontierV1Schema,{formatVersion:1,threadId:b.targetThreadId,operationIds:[nativeId(operation.format,operation.canonicalRecord)]}),'heddle-import-frontier-v1');wire(`converted_${name}`,SignedRecordSchema,operation);}
 function operationBody(b,d,physical=raw(0x56,16)){return create(api.DelegatedImportOperationV1Schema,{formatVersion:1,spoolUuid,spoolGenesisDigest:spoolDigest,logicalJobId:d.body.logicalJobId,retryLineageId:d.body.retryLineageId,physicalOperationId:physical,delegationDigest:signedDelegationDigest(d),refName:b.refName,slotId:b.slotId,hashAlgorithm:b.hashAlgorithm,observedCommitOid:b.pinnedCommitOid,genesisDigest:b.genesisDigest,targetThreadId:b.targetThreadId,expectedFrontierDigest:b.expectedFrontierDigest,resultingFrontierDigest:new Uint8Array(Buffer.from(artifact.commitment_vectors[`result_frontier_${b.refName.split('/').at(-1)}`].digest_hex,'hex')),resultingContentDigest:contentDigest(content),resultBytes:BigInt(content.canonicalCapture.length),optionsDigest:d.body.scope.optionsDigest,converterVersion:d.body.scope.converterVersion});}
 const operations=Object.fromEntries(scope.branches.map(b=>{const n=b.refName.split('/').at(-1),body=operationBody(b,delegation);return [n,signed(`operation_${n}`,api.DelegatedImportOperationV1Schema,body,api.SignedDelegatedImportOperationV1Schema,'jobSignature','job','heddle-delegated-import-operation-v1')];}));
+signed('commit_future_operation',api.DelegatedImportOperationV1Schema,operationBody(scope.branches[1],futureDelegation),api.SignedDelegatedImportOperationV1Schema,'jobSignature','job','heddle-delegated-import-operation-v1');
 const committedSlot=o=>({refName:o.body.refName,slotId:o.body.slotId,signedOperationDigest:signedOperationDigest(o),resultingFrontierDigest:o.body.resultingFrontierDigest,resultBytes:o.body.resultBytes});
 const partialManifest=wire('partial_manifest',api.ImportResultManifestV1Schema,create(api.ImportResultManifestV1Schema,{formatVersion:1,logicalJobId,retryLineageId,slots:[committedSlot(operations.main)]}));
 const nextBody=clone(api.ImportJobDelegationV1Schema,delegationBody);nextBody.delegationId=raw(0x59,16);nextBody.parentPermissionDigest=signedPermissionDigest(renewedPermission);nextBody.jobPublicKey=keys.renew_job.publicKey;nextBody.jobKeyId=keyId(keys.renew_job.publicKey);nextBody.predecessorDelegationDigest=signedDelegationDigest(delegation);nextBody.notBeforeUnixSeconds=1200n;nextBody.expiresAtUnixSeconds=1800n;nextBody.scope.branches=nextBody.scope.branches.filter(b=>b.refName.endsWith('dev'));nextBody.scope.maxOperations=1;nextBody.scope.maxResultBytes=1000n;nextBody.branchManifest=nextBody.branchManifest.filter(b=>b.limit.refName.endsWith('dev'));
@@ -318,7 +411,7 @@ const completedRenewal=clone(api.ImportJobRenewalV1Schema,renewalBody);completed
 const originalTerminal=wire('publication_wins_manifest',api.ImportResultManifestV1Schema,create(api.ImportResultManifestV1Schema,{formatVersion:1,logicalJobId,retryLineageId,slots:[committedSlot(operations.dev),committedSlot(operations.main)]}));
 const emptyManifest=wire('empty_manifest',api.ImportResultManifestV1Schema,create(api.ImportResultManifestV1Schema,{formatVersion:1,logicalJobId,retryLineageId}));const racingRenewal=clone(api.ImportJobRenewalV1Schema,renewalBody);racingRenewal.committedManifestDigest=manifestDigest(emptyManifest);signed('publication_wins_renewal',api.ImportJobRenewalV1Schema,racingRenewal,api.SignedImportJobRenewalV1Schema,'delegatingSignature','device','heddle-import-job-renewal-v1');
 artifact.retry_scenarios.push({id:'publication_wins_unchanged_epoch_manifest_cas',initial_epoch:1,renewal:'publication_wins_renewal',before_manifest:'empty_manifest',after_manifest:'partial_manifest',publication:'operation_main',now_seconds:1250,expected:'StaleManifest',epoch_after:1});
-wire('renewal_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{proposal:nextBody,reservationExpiresAtUnixSeconds:4800n,renewalState:{formatVersion:1,logicalJobId,retryLineageId,activePredecessor:delegation,authorityEpoch:1n,committedManifest:partialManifest}}));
+wire('renewal_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{proposal:delegationPreparation(nextBody),reservationExpiresAtUnixSeconds:4800n,preparedAtUnixSeconds:1200n,maxValidityDurationSeconds:700n,clockSkewAllowanceSeconds:100n,renewalState:{formatVersion:1,logicalJobId,retryLineageId,activePredecessor:delegation,authorityEpoch:1n,committedManifest:partialManifest}}));
 const exportBundle=wire('complete_renewed_export',api.ImportPublicProofBundleV1Schema,create(api.ImportPublicProofBundleV1Schema,{formatVersion:1,ownerGenesis:spoolGenesis,ownerHistories:[artifact.wire_vectors.owner_history?create(owner.OwnerHistorySchema,{root:signedRoot,stateHash}):null],memberPermissions:[permission,renewedPermission].sort((a,b)=>compare(signedPermissionDigest(a),signedPermissionDigest(b))),genesisAuthorities:Object.values(genesisProofs),delegations:[delegation,next],renewals:[renewal],operations:[operations.main,renewedOperation],terminalManifest,manifests:[partialManifest,terminalManifest].sort((a,b)=>compare(manifestDigest(a),manifestDigest(b))),witnessSet:retiredSet,policies:[policy],statements:[statements[0],devGenesisAdmission,publicationStatement,renewedStatement],genesisWitnesses:[genesisPayload,devGenesisPayload],originalGeneses:Object.values(originalGeneses),creatorAuthorityEnvelopes:[envelopes.main],ownerChain:chain}));
 for(const [name,chars] of [['root_id_boundary',128],['root_id_over_boundary',129]]){const b=clone(common.HostedWitnessSetV1Schema,setBody);b.descriptorRootId='é'.repeat(chars);signedSet(name,b);}
 for(const [name,schema,v,domain] of [['owner_chain',api.ImportOwnerChainV1Schema,chain,'heddle-import-owner-chain-v1'],['partial_manifest',api.ImportResultManifestV1Schema,partialManifest,'heddle-import-result-manifest-v1'],['terminal_manifest',api.ImportResultManifestV1Schema,terminalManifest,'heddle-import-result-manifest-v1'],['publication',api.ImportPublicationWitnessV1Schema,publication,'heddle-import-publication-payload-v1']])commitment(name,schema,v,domain);
@@ -334,4 +427,4 @@ rawCommitment('witness_selector','heddle-hosted-witness-key-v1\0',keys.witness.p
 rawCommitment('authority_envelope','heddle-hosted-authority-envelope-v1',sized(envelope));
 artifact.first_failing_checks={unrelated_permissions:'permission_format_selection',completed_slot_renewal:'committed_slot_exclusion',paused_worker:'authority_epoch_and_active_delegation_fence',publication_wins:'committed_manifest_digest_cas',legacy_hosted_import:'hybrid_import_dispatch',root_id_over_boundary:'root_id_utf8_byte_bound'};
 writeFileSync(new URL('../tests/fixtures/import-authority-host-witness-v1.json',import.meta.url),JSON.stringify(artifact,null,2)+'\n');
-console.log(`Frozen ${artifact.messages.length} messages, ${Object.keys(artifact.signed_vectors).length} signed byte vectors, ${artifact.negative_vectors.length} negative vectors, ${artifact.trees.length} trees, ${artifact.retry_scenarios.length} retry scenarios.`);
+console.log(`Frozen ${artifact.messages.length} messages, ${Object.keys(artifact.signed_vectors).length} signed byte vectors, ${artifact.negative_vectors.length} witness/operation negatives, ${artifact.commit_vectors.negative.length} Commit negatives, ${artifact.trees.length} trees, ${artifact.retry_scenarios.length} retry scenarios.`);

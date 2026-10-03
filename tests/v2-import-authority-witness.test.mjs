@@ -234,3 +234,46 @@ test('boundary dependency requires exact evidence',async()=>{
   await authority.verifyWitnessPayload(vector('boundary_authority_statement').body,{kind:'authority',payload:vector('boundary_authority_payload')});
   console.log('BOUNDARY PASS dependency_missing_binding: exact control');
 });
+
+// Per-case inputs keep downstream parent/genesis and time checks independent.
+function commitInputs(v,control=false){
+ const pick=(field,fallback)=>v[control?`control_${field}`:field]??(control?v[field]:undefined)??fallback;
+ const parentName=control?(v.control_parent??v.parent??'permission'):(v.parent===null?null:pick('parent','permission'));
+ return {prepared:vector(pick('preparation','commit_preparation')),signed:vector(control?v.control:v.delegation),parent:parentName===null?undefined:vector(parentName),geneses:pick('geneses',['genesis_dev','genesis_main']).map(vector),context:{...ownerContext(BigInt(pick('now_seconds',1100))),authorityExpiresAtSeconds:BigInt(pick('authority_expires_at_seconds',2000))}};
+}
+function assertCommitIsolation(v,input){
+ const d=input.signed.body,p=input.parent?.body,now=input.context.nowUnixSeconds;
+ if(['parent_amplification','parent_ref'].includes(v.id)){
+  for(const [i,g] of input.geneses.entries()){
+   assert.deepEqual(g.body.parentPermissionDigest,d.parentPermissionDigest,`${v.id}: genesis must bind the child's parent`);
+   assert.deepEqual(authority.signedGenesisDigest(g),d.branchManifest[i].genesisAuthorityDigest);
+  }
+ }
+ if(['window_duration','window_too_early'].includes(v.id)){
+  assert.ok(d.notBeforeUnixSeconds>=p.notBeforeUnixSeconds,`${v.id}: parent must contain child start`);
+  assert.ok(d.expiresAtUnixSeconds<=p.expiresAtUnixSeconds,`${v.id}: parent must contain child end`);
+ }
+ if(v.id==='window_empty')assert.ok(d.expiresAtUnixSeconds>now,'reversed window must not also violate E>T');
+ if(v.id==='reservation_expired'){
+  assert.equal(now,input.prepared.reservationExpiresAtUnixSeconds);
+  assert.ok(d.notBeforeUnixSeconds<=now-1n&&d.expiresAtUnixSeconds>now&&p.expiresAtUnixSeconds>now,'reservation must expire during otherwise valid authority');
+  const control=commitInputs(v,true);assert.equal(control.context.nowUnixSeconds,now-1n);assert.deepEqual(control.signed,input.signed);
+ }
+}
+for(const v of fixture.commit_vectors.negative)test(`Commit REJECT then PASS: ${v.id}; ${v.first_failing_check}`,async()=>{
+ const input=commitInputs(v);assertCommitIsolation(v,input);
+ await assert.rejects(authority.verifyPreparedImportDelegation(input.prepared,input.signed,input.parent,input.geneses,input.context),expected(v.expected));
+ console.log(`COMMIT REJECT ${v.id}: ${v.expected} (${v.first_failing_check})`);
+ const control=commitInputs(v,true);
+ await authority.verifyPreparedImportDelegation(control.prepared,control.signed,control.parent,control.geneses,control.context);
+ console.log(`COMMIT PASS ${v.id} control at ${control.context.nowUnixSeconds}`);
+});
+for(const name of fixture.commit_vectors.passing)test(`browser-completed Commit: ${name}`,async()=>{
+ const d=await authority.verifyPreparedImportDelegation(vector('commit_preparation'),vector(name),vector('permission'),[vector('genesis_dev'),vector('genesis_main')],ownerContext());
+ if(name==='commit_future_within_skew'){
+  const operation=vector('commit_future_operation');
+  await assert.rejects(authority.verifyNewImportOperation(operation,d,1199n),expected('Expired'));
+  await authority.verifyNewImportOperation(operation,d,1200n);
+  console.log('COMMIT FUTURE OPERATION: 1199 Expired; 1200 PASS');
+ }
+});

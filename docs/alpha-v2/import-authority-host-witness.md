@@ -1,9 +1,9 @@
 # HYBRID import authority and host witness, format 1
 
-This is the api#296 contract, revised in place by api#318, for [weft#2479 at
+This is the api#296 contract, revised in place by api#318 and api#321, for [weft#2479 at
 8d427f8c1](https://github.com/HeddleCo/weft/pull/2479/changes/8d427f8c12006c63c5cad43cce260fd91a5e77a5).
 The build decision is [weft#2469](https://github.com/HeddleCo/weft/issues/2469).
-The schema is additive; its semantics require a coordinated incompatible-peer
+The undeployed v1 preparation schema is revised in place; its semantics require a coordinated incompatible-peer
 gate. Package versions and tags do not change in this PR. The delivery order is
 **api → heddle → weft → tapestry**. This contract neither deploys that cascade
 nor establishes that the original runtime defect is fixed.
@@ -20,7 +20,7 @@ maintenance generator requires built bindings and explicit fixture review.
 | Accepted design section | Additive messages |
 | --- | --- |
 | Owner-authorized genesis and delegation | `ImportIdentityV1`, `ImportOwnerChainV1`, `ImportBranchLimitV1`, `ImportPermissionScopeV1`, `ImportMemberPermissionV1`, `SignedImportMemberPermissionV1`, `ImportGenesisAuthorityV1`, `SignedImportGenesisAuthorityV1`, `ImportBranchManifestV1`, `ImportJobDelegationV1`, `SignedImportJobDelegationV1` |
-| Job preparation, encrypted custody, expiry, and retries | `ImportCommittedSlotV1`, `ImportResultManifestV1`, `ImportJobRenewalV1`, `SignedImportJobRenewalV1`, `PrepareImportJobRequest`, `PrepareImportJobResponse`, `CommitImportJobRequest`, `RenewImportJobRequest`, `CancelImportJobRequest` |
+| Job preparation, encrypted custody, expiry, and retries | `ImportJobPreparationV1`, `ImportCommittedSlotV1`, `ImportResultManifestV1`, `ImportJobRenewalV1`, `SignedImportJobRenewalV1`, `PrepareImportJobRequest`, `PrepareImportJobResponse`, `CommitImportJobRequest`, `RenewImportJobRequest`, `CancelImportJobRequest` |
 | Owner-authorized genesis and delegation: converted content | `DelegatedImportOperationV1`, `SignedDelegatedImportOperationV1` |
 | What the host witness attests | `HostedWitnessBoundaryAcceptanceV1`, `ImportBoundaryAcceptanceV1`, `ImportGenesisWitnessV1`, `ImportAuthorityRecordKind`, `ImportAuthorityWitnessV1`, `HostedLandingRequestProofV1`, `HostedLandingWitnessV1`, `ImportPublicationWitnessV1`, `HostedWitnessStatementV1`, `SignedHostedWitnessStatementV1` |
 | Complete authenticated witness set and exact retirement archive | `HostedWitnessEntryV1`, `HostedWitnessSetV1`, `SignedHostedWitnessSetV1`, `HostedWitnessHistoryProofV1` |
@@ -64,6 +64,7 @@ contract neither changes those domains nor makes transport keys witnesses.
 | Witness purpose 3 | Ed25519 over H(`heddle-import-publication-witness-v1` || canonical statement) |
 | Witness purpose 4 | Ed25519 over H(`heddle-hosted-landing-witness-v1` || canonical statement) |
 | Owner-chain commitment | H(`heddle-import-owner-chain-v1` || canonical `ImportOwnerChainV1`) |
+| Frozen preparation commitment | H(`heddle-import-job-preparation-v1` || canonical `ImportJobPreparationV1`); comparison uses the full canonical bytes |
 | Result manifest | H(`heddle-import-result-manifest-v1` || canonical `ImportResultManifestV1`) |
 
 H means SHA-256. The ASCII domains above have **no NUL**, except the explicitly
@@ -189,7 +190,94 @@ persist the distinct seed BEFORE returning the exact unsigned proposal. A
 reservation expires exclusively at prepare time + **3600 seconds**. No prepared
 job executes until Commit verifies the complete user-signed proposal/chain,
 original branches, current permission and budgets. The browser closes only after
-this authorization. A proposal change needs a new signature, not request PoP.
+this authorization. A proposal change requires fresh preparation and signature.
+
+### Exact Prepare/Commit delegation boundary (api#321)
+
+`PrepareImportJobResponse.proposal` is **`ImportJobPreparationV1`**, not a
+partially populated delegation. It freezes this complete canonical layout, in
+field-number order, using the framing above:
+
+| Field | Frozen value / encoding |
+| --- | --- |
+| 1 | `format_version`: u32be(1) |
+| 2 | `identity`: flattened `ImportIdentityV1`, including all six account/Spool/owner state fields |
+| 3–5 | `delegation_id`, `logical_job_id`, `retry_lineage_id`: each counted16 |
+| 6–8 | `job_public_key`, `job_key_id`, `owner_chain_digest`: each counted32 |
+| 9 | `purpose`: u32be(IMPORT_CONVERSION_V1 = 1) |
+| 10 | `scope`: flattened `ImportPermissionScopeV1`, including every exact ordered branch limit, provider/URL, OID algorithm/mode, target/frontier, destination/options/converter and budget |
+| 11–12 | `cancellation_id`, `predecessor_delegation_digest`: each counted32; predecessor zero32 initially |
+
+The server persists this exact preparation with its encrypted job key and bounds
+before returning. Idempotent Prepare retries return the same reservation, key,
+proposal, host time and bounds; they do not restart the one-hour reservation.
+The browser checks the proposed identity and scope against its intended import,
+then copies every frozen field into `ImportJobDelegationV1` unchanged. Even a
+scope reduction or equivalent URL/ref normalization requires fresh preparation.
+Each manifest limit is an exact copy of the corresponding ordered prepared
+scope branch. The browser supplies **only**:
+
+- `delegating_public_key`: its authorized signer device (or active owner key);
+- `parent_permission_digest`: the exact signed typed owner-issued permission,
+  or zero32 for direct active owner authority;
+- each manifest entry's `genesis_authority_digest`: the exact signed genesis
+  binding for that prepared branch, retaining its original creator signature;
+- `not_before_unix_seconds` and exclusive `expires_at_unix_seconds`.
+
+The browser signs the **entire completed delegation**, including frozen fields,
+under the existing v1 delegation domain. Prepare has no user signature, parent
+grant or genesis-binding placeholder and confers no execution authority.
+
+Prepare returns `prepared_at_unix_seconds = A`, exclusive reservation expiry
+`R = A + 3600`, positive `max_validity_duration_seconds = D` and nonnegative
+`clock_skew_allowance_seconds = S`. At host-owned Commit time `T`, signed
+not-before `N` and exclusive expiry `E` MUST satisfy:
+
+```text
+0 <= A <= T < R = A + 3600
+0 <= N; A - S <= N <= T + S
+N < E; T < E; E - N <= D
+```
+
+Skew permits clock differences at not-before, never grace after expiry or an
+extension of parent/owner authority. Commit may accept `N > T` within skew;
+execution remains forbidden until `N`. The typed parent must be valid at actual
+Commit time and contain the entire child window, and the child's expiry cannot
+exceed the independently verified owner authority expiry. Use checked/widened
+integer arithmetic, including extreme uint64 duration/skew advertisements.
+
+`verify_prepared_delegation` (Rust) / `verifyPreparedImportDelegation` (TS) take
+the **host-stored** response, signed child, exact parent permission (if any),
+signed genesis bindings and independently verified current owner expectation.
+They compare the canonical frozen projection and ordered manifest limits
+byte-for-byte (`PreparedFields`); check reservation (`Expired`) and signed host
+window (`ValidityBounds`); verify the typed parent and non-amplification
+(`ImportPermission` / `Scope`), key roles and complete delegation signature
+(`Signature`); resolve each exact signed genesis digest and require its genesis
+ID to equal its prepared branch (`GenesisBinding`). Initial bindings also verify
+their device signature, identity, parent and chain. The same comparison applies
+to a prepared renewal replacement; retained genesis bindings must additionally
+be verified in their **original accepted context**, followed by renewal CAS and
+remaining-scope checks. No retained binding is re-signed under a new parent.
+
+Commit resolves its single initial signed delegation from `proof.delegations`
+and uses the delegation ID to select its durable reservation. It never accepts
+a caller-supplied preparation/bounds as authority. Verify original native
+geneses, creator signatures/envelopes and independently selected owner history;
+then recheck current policy, cancellation, device/credential revocation, custody
+association and reservation under the activation transaction. The standalone
+`verify_delegation` / `verifyImportDelegation` helpers verify signed authority;
+they cannot establish equality to a reservation. Typed RPC clients carry the
+request and request PoP only and do not silently complete/sign a delegation.
+
+The generated `commit_vectors` freeze passing completed commits, future
+not-before at the skew edge, and negatives for every frozen scalar/byte/string
+field (including nested identity, scope, both branches and manifest limits),
+list omission/reordering, each window inequality, missing/mismatched/amplifying
+parent, genesis digest/branch substitution, invalid signature and reservation
+expiry. Rust and TS assert the exact intended rejection and then accept the
+unchanged signed control after **each** negative. Expected bytes and signatures
+come solely from the maintenance generator, never test-time signing.
 
 In-window deploy/replica/lease retries preserve the same key and certificate.
 `RetryImportSourceRequest` still creates a distinct physical operation. In

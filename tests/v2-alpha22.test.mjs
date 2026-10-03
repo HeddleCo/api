@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import * as api from "../packages/typescript/dist/v1alpha2/index.js";
+import { CallFailureCode, CallFailureSchema } from "../packages/typescript/dist/errors_pb.js";
+import { decodeMessageStream, encodeStreamFailure, encodeStreamMessage, RpcCallError } from "../packages/typescript/dist/framing.js";
 
 const fixture = JSON.parse(readFileSync(new URL("fixtures/v2-alpha22.json", import.meta.url)));
 const budget = (v) => create(api.ReadBudgetSchema, {
@@ -123,6 +125,80 @@ for (const [index, dimension] of ["items", "frame", "snapshot"].entries()) {
 }
 
 const contract = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8").replace(/\s+/g, " ");
+
+for (const [frameBytes, intentBytes] of [[1024, 2048], [65536, 65536]]) {
+  test(`alpha22 oversized first mandatory LATEST run has a bounded terminal failure (${frameBytes} bytes)`, async () => {
+  const thread = { spool: { id: "11111111-1111-4111-8111-111111111111" }, id: { value: new Uint8Array(32).fill(3) } };
+  const run = { spool: thread.spool, id: "run-7" };
+    const requested = budget([6, frameBytes, String(frameBytes)]);
+    const accepted = api.negotiateReadBudget(requested, budget(fixture.floor), budget(fixture.floor), budget(fixture.floor));
+    assert.deepEqual(accepted, requested, "both reported budgets are accepted without widening");
+    const json = (command) => JSON.stringify({ cwd: "/workspace", format: "heddle.claude-permission.v1",
+      permission_id: "p-1", run_id: "run-7", tool_input: { command }, tool_name: "Bash" });
+    const intent = new TextEncoder().encode(json("x".repeat(intentBytes - json("").length)));
+    assert.equal(intent.length, intentBytes);
+    assert.ok(intent.length <= 65536, "the exact permission JSON is within its documented bound");
+    JSON.parse(new TextDecoder().decode(intent));
+    const request = create(api.ObserveRunsRequestSchema, {
+      spool: thread.spool, runs: [run], includeTimeline: true,
+      timelineStart: api.TimelineStart.LATEST, timelineLimit: 3, observe: { budget: requested },
+    });
+    assert.equal(request.page, undefined);
+    const oversized = create(api.RunEventSchema, {
+      frame: { sequence: 2n, body: { case: "data", value: { kind: api.StreamDataKind.SNAPSHOT } } },
+      payload: { case: "run", value: { ref: run, thread, version: new Uint8Array(32), harness: "claude-code",
+        pendingPermissions: [{ id: "p-1", requestDigest: new Uint8Array(32), harness: "claude-code",
+          toolName: "Bash", canonicalInputJson: intent }] } },
+    });
+    const encoded = toBinary(api.RunEventSchema, oversized);
+    assert.ok(encoded.length > accepted.maxFrameBytes, "moving this mandatory run to another batch cannot make it fit");
+    const roundTrip = fromBinary(api.RunEventSchema, encoded);
+    assert.deepEqual(roundTrip.payload.value.pendingPermissions[0].canonicalInputJson, intent);
+    console.log(`LATEST reproduction: accepted=${frameBytes}/${frameBytes}, intent=${intentBytes}, RunEvent=${encoded.length}`);
+
+    // This repository defines the API contract, not the host scheduler. Pin the
+    // permitted outcome, then exercise its wire representation and real reader.
+    const text = contract("docs/alpha-v2/streams.md");
+    const failureSpec = text.match(/INDIVISIBLE_RESULT_FAILURE = \{ code: RESOURCE_EXHAUSTED, message: "([^"]+)" \}/);
+    assert.ok(failureSpec, "oversized first mandatory LATEST run needs a defined bounded failure");
+    assert.match(text, /progress guarantee applies only to ListPaths and the four code-navigation methods/);
+    assert.match(text, /RunRecord.*RunPolicy.*TimelineRecord/);
+    assert.match(text, /empty otherwise legal batch.*mandatory initial run\/policy set/);
+    assert.match(text, /authorization.*before.*size check/);
+    assert.match(text, /Reserve one item and 128 bytes/);
+    assert.match(text, /Discard uncommitted staging.*last committed cursor/);
+    for (const path of ["proto/heddle/api/v1alpha2/stream.proto", "proto/heddle/api/v1alpha2/device.proto"]) {
+      assert.match(contract(path), /RESOURCE_EXHAUSTED.*indivisible result exceeds read budget/);
+    }
+    const failure = create(CallFailureSchema, { code: CallFailureCode.RESOURCE_EXHAUSTED, message: failureSpec[1] });
+    assert.equal(failure.error, undefined, "no resource, size, intent or retry detail leaks");
+    const terminal = encodeStreamFailure(failure, accepted.maxFrameBytes);
+    assert.ok(terminal.length <= 128, "the complete terminal frame fits the fixed reserve");
+    const binding = new Uint8Array(32).fill(7);
+    const opening = create(api.RunEventSchema, { frame: { sequence: 1n, body: { case: "open", value: {
+      bindingDigest: binding, acceptedBudget: accepted,
+    } } } });
+    const openWire = encodeStreamMessage(toBinary(api.RunEventSchema, opening), accepted.maxFrameBytes);
+    assert.ok(BigInt(openWire.length + terminal.length) <= accepted.maxSnapshotBytes);
+    assert.ok(2 <= accepted.maxItems, "open and terminal failure are charged");
+    const state = new api.ObservationState(binding);
+    let payloads = 0;
+    const input = async function* () { yield openWire; yield terminal; };
+    await assert.rejects(async () => {
+      for await (const body of decodeMessageStream(input(), accepted.maxFrameBytes)) {
+        const event = fromBinary(api.RunEventSchema, body);
+        state.accept(event.frame, event.payload.case !== undefined);
+        if (event.payload.case !== undefined) payloads++;
+      }
+    }, (error) => error instanceof RpcCallError && error.failure.code === CallFailureCode.RESOURCE_EXHAUSTED
+      && error.failure.message === failure.message && error.failure.error === undefined);
+    assert.equal(payloads, 0, "no truncated run, permission or empty-success checkpoint is emitted");
+    assert.deepEqual(state.cursor, new Uint8Array(), "failure cannot advance the initial cursor");
+    assert.equal(state.isComplete, false);
+    console.log(`LATEST bounded failure: ${terminal.length} bytes, payloads=${payloads}, cursor=empty`);
+  });
+}
+
 function methodMinimum(path, name) {
   const source = contract(path);
   const match = source.match(new RegExp(`${name} = \\{ max_items: (\\d+), max_frame_bytes: (\\d+), max_snapshot_bytes: (\\d+) \\}`));

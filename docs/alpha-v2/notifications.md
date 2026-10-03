@@ -110,9 +110,11 @@ off by default. Locks apply to email only, regardless of origin and Spool.
 The vocabulary has no separate review-requested, agent-waiting, blocking-reply,
 or recovery enum values. Review asks use `review_ready`; waiting on a steer uses
 `steer_held`; account recovery uses `account_security`. Ordinary
-`discussion_reply` remains ambient. A reply that explicitly blocks the
-recipient uses the direct-ask class in weft's effective projection (a concrete
-recipient `mention` when applicable); clients must not assume every reply is
-blocking. Future more specific kinds can be added by weft without converting
-these v2 string fields into enums. The ambiguous interpretations above should
-be coordinated with weft's default implementation in #2529.
+`discussion_reply` is classified ambient here because its enum comment describes
+ordinary replies to a joined discussion. A blocking reply is a direct ask in the
+owner model, but this vocabulary has no distinct blocking-reply selector; an
+explicit recipient mention uses `mention`. Weft can add a more specific blocking
+kind without converting these v2 string fields into enums. Clients display the
+observed classification rather than treating every reply as blocking. The
+ambiguous interpretations above follow the decision's spirit and are listed
+explicitly for weft's default implementation in #2529.

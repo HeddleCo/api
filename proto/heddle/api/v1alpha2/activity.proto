@@ -76,6 +76,19 @@ message NotificationRecord {
   google.protobuf.Timestamp read_at = 8;
   repeated ActionAvailability actions = 9;
 }
+// Per-channel stored selector. Empty kind or "*" matches all kinds; empty or
+// "any" actor_origin matches both "human" and "agent". CHANNEL_UNSPECIFIED
+// matches all channels. Spool rules take precedence over account rules; within
+// a scope exact kind > exact channel > exact origin, with first rule winning ties.
+// IN_APP and PUSH are on/off only (IMMEDIATE or DISABLED). First reject unknown
+// channels/deliveries and UNSPECIFIED delivery with INVALID_ARGUMENT /
+// FIELD_INVALID. Next check the email lock: an email rule matching
+// account_security or security_surface must be IMMEDIATE, regardless of origin
+// or Spool. Attempts to disable or digest their email, including wildcard rules
+// and public unsubscribe, are rejected with FAILED_PRECONDITION / POLICY_DENIED
+// before any write. This lock takes precedence over the email-only DIGEST check:
+// other DIGEST rules on non-email or wildcard channels are rejected with
+// INVALID_ARGUMENT / FIELD_INVALID.
 message NotificationRule {
   string kind = 1;
   SpoolRef spool = 2;
@@ -95,28 +108,79 @@ message NotificationRule {
   }
   Delivery delivery = 5;
 }
+// Stored settings and weft-owned read projections are distinct. The inbox is
+// the record and never waits for an email digest. ObserveNotifications with
+// include_preferences returns all these fields in the same preferences payload.
 message NotificationPreferences {
   bytes version = 1;
   repeated NotificationRule rules = 2;
-  // Account default: zero disables digests; supported nonzero intervals are
-  // one hour, one day and one week. This does not change rule delivery modes.
+  // Email-only account cadence: zero disables scheduled digest email;
+  // supported nonzero intervals are one hour, one day and one week. Supplied
+  // durations require zero nanos and seconds in {0, 3600, 86400, 604800}, otherwise
+  // INVALID_ARGUMENT / FIELD_INVALID. Absence uses weft's daily default.
+  // This does not delay inbox items or push.
   google.protobuf.Duration digest_interval = 3;
+  // IANA timezone anchoring email digest windows; empty uses weft's default.
   string timezone = 4;
   // One override per Spool. Removing an override restores the account default.
   // Cadence can be overridden without overriding any routing rules.
   repeated NotificationDigestOverride digest_overrides = 5;
+  // Read-only resolved cells, not stored rules. Complete account matrix plus
+  // sparse cells whose result differs in configured Spool scopes. Unique by
+  // (kind, spool, actor_origin, channel), at most 4096 cells and 1 MiB encoded
+  // for the complete preferences message. No silent truncation: a larger read
+  // fails with RESOURCE_EXHAUSTED / QUOTA_EXCEEDED. Omitted Spool cells inherit
+  // the account cell. Only currently authorized Spool scopes may be disclosed.
+  // Weft owns defaults and precedence; clients must not infer defaults from
+  // missing stored rules. RULE identifies a matching stored rule, DEFAULT a
+  // weft default. A locked email cell is always IMMEDIATE.
+  repeated EffectiveDelivery effective_delivery = 6;
+  // Read-only next account email digest window, absent when its effective
+  // interval is off. A schedule projection, not a promise of queued email.
+  google.protobuf.Timestamp next_digest_at = 7;
+}
+// One concrete resolved delivery, using the same selectors as a stored rule.
+// kind and channel are concrete (never wildcard); actor_origin is human/agent,
+// or empty for a kind whose delivery is independent of origin. spool absent is
+// account scope. source must be RULE or DEFAULT; delivery must be concrete.
+// An off effective digest interval resolves email DIGEST to DISABLED without
+// changing the stored rule or its source. Destination readiness is separate.
+message EffectiveDelivery {
+  string kind = 1;
+  SpoolRef spool = 2;
+  string actor_origin = 3;
+  NotificationRule.Channel channel = 4;
+  NotificationRule.Delivery delivery = 5;
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_RULE = 1;
+    SOURCE_DEFAULT = 2;
+  }
+  Source source = 6;
+  // True for non-suppressible security/recovery email: account_security and
+  // security_surface. This is a server policy marker, not client authority.
+  bool locked = 7;
 }
 message NotificationDigestOverride {
   SpoolRef spool = 1;
   // Required, with the same values as the account default. Explicit zero means
   // off for this Spool, even when the account default enables digests.
   google.protobuf.Duration digest_interval = 2;
+  // Read-only next email digest window for this Spool, absent when its interval
+  // is off. Allows an enabled override while the account cadence is off.
+  google.protobuf.Timestamp next_digest_at = 3;
 }
 message MarkNotificationsReadRequest {
   string client_operation_id = 1;
   repeated RecordRef notifications = 2;
   google.protobuf.Timestamp through = 3;
 }
+// Atomic settings replacement under expected_version. Read-only projection
+// fields (effective_delivery and next_digest_at, including overrides) are ignored
+// and recomputed, never persisted or used as authority. The server MUST validate
+// every rule and digest interval before writing; invalid delivery or cadence
+// rejects the whole request. Portable helpers complement remaining host validation
+// of timezone, selectors, duplicate overrides and input budgets.
 message SetNotificationPreferencesRequest {
   string client_operation_id = 1;
   NotificationPreferences preferences = 2;

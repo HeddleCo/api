@@ -157,7 +157,8 @@ message ObserveRunsRequest {
   // snapshot includes the selected RunRecord and policy, when present, plus at
   // most timeline_limit records, ordered by position from oldest to newest.
   // Its PageInfo is exhausted with an empty next_page when the selection fits.
-  // Budget-limited snapshots return timeline PARTIAL with an empty next_page
+  // When mandatory run/policy and each whole timeline record fit, budget-limited
+  // snapshots return timeline PARTIAL with an empty next_page
   // and page.exhausted=false. The checkpoint cursor retains the fixed initial
   // latest-N lower/upper boundary and last delivered position. The first
   // snapshot_complete=true commits staging, not completeness of coverage.
@@ -165,7 +166,17 @@ message ObserveRunsRequest {
   // after resume, before following newer positions. The last remainder batch
   // has timeline COMPLETE, page.exhausted=true and empty next_page, then a
   // checkpoint. Charge all remainder payloads/statuses/checkpoints to budget.
-  // Only impossible fixed request/control overhead is rejected before matching.
+  // Impossible fixed request/control overhead (including the terminal-failure
+  // reserve in ReadBudget) is INVALID_ARGUMENT before matching. ObserveRuns has
+  // no guaranteed whole-record bound: after authorization/projection, a RunRecord,
+  // RunPolicy or TimelineRecord that cannot fit an empty legal batch with controls,
+  // or a mandatory initial run/policy set that cannot fit the initial snapshot,
+  // ends with CallFailure RESOURCE_EXHAUSTED, message exactly
+  // "indivisible result exceeds read budget", no ErrorDetail or retry hint.
+  // Apply this in default/LATEST mode, initial/resumed/live batches; charge the
+  // reserved failure item/bytes. Discard uncommitted staging and keep only the
+  // last committed cursor. Never omit pending permissions/policy, truncate exact
+  // intent bytes or loop PARTIAL/Reset. Same-budget automatic retries are forbidden.
   // Default UNSPECIFIED retains oldest-first paging and WindowChanged resets
   // when a non-exhausted page changes. In LATEST, new positions append after
   // the fixed initial selection; they MUST NOT trigger WindowChanged merely
@@ -186,6 +197,8 @@ message ObserveRunsRequest {
   // PageRequest.after_page is invalid in LATEST mode.
 }
 
+// Each run, policy and timeline payload is a whole indivisible record. Bounded
+// continuation cannot split it; the ReadBudget bounded-failure rule applies.
 message RunEvent {
   StreamFrame frame = 1;
   oneof payload {

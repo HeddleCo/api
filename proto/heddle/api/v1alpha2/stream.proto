@@ -28,12 +28,24 @@ enum ObservationMode {
 // cannot meet this lower bound, fail retryably (UNAVAILABLE), never accept less.
 // Reject only structurally impossible budgets from request shape, e.g. nonzero
 // max_frame_bytes < 1024, snapshot bytes < frame bytes, or fixed selection
-// overhead > max_items (INVALID_ARGUMENT). Matching data size never causes a
-// budget rejection: return bounded PARTIAL coverage with a continuation.
-// Indivisible rows require explicit per-method bounds and minimum budgets that
-// fit one maximum admitted row plus controls (code-navigation.md, cleanup-lane.md).
-// Check those minima before matching and row bounds at source/index admission.
-// A nonempty page must emit its first visible row; unary results fit atomically.
+// overhead > max_items (INVALID_ARGUMENT), including per-method minima/reserves.
+// Indivisible-result progress is guaranteed only for ListPaths and the four
+// code-navigation methods, with explicit bounds/minima in cleanup-lane.md and
+// code-navigation.md. Check minima before matching and bounds at admission.
+// These methods return bounded PARTIAL/continuation for larger collections;
+// their first visible row fits and unary results fit atomically.
+// Other uncovered indivisible results, including ObserveRuns run/policy/timeline
+// payloads, may not fit. After authorization/projection, if a whole record plus
+// required controls cannot fit an empty legal batch, or a mandatory initial set
+// cannot fit its snapshot, terminate before emitting/committing it with the
+// existing CallFailure: RESOURCE_EXHAUSTED, message exactly
+// "indivisible result exceeds read budget", no ErrorDetail or retry hint.
+// Reserve/charge one item and 128 bytes including framing for that failure per
+// snapshot/batch; insufficient fixed overhead is INVALID_ARGUMENT before matching.
+// If only the current batch is full, continue in a fresh bounded batch instead.
+// Discard uncommitted staging; retain the last committed cursor. Never truncate,
+// omit mandatory data, widen budgets or loop PARTIAL/Reset for a record that cannot
+// fit. Do not automatically retry with the same budget. See streams.md.
 // Existing blob chunks remain chunked; there is no generic chunk protocol.
 message ReadBudget {
   // Zero selects the endpoint's advertised default; it never means unbounded.

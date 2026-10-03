@@ -351,21 +351,55 @@ Nonzero small requests remain upper bounds; endpoints never widen them to the
 floor. Defaults below the floor are allowed. INVALID_ARGUMENT is reserved for
 structurally impossible budgets decided from the request shape before matching:
 frame bytes below 1024, clamped snapshot bytes below frame bytes, or fixed
-selection/control overhead exceeding the effective item budget. A matching
-collection exceeding budget returns bounded PARTIAL coverage and a continuation,
-not RESOURCE_EXHAUSTED. Indivisible rows require explicit per-method bounds and
-minimum budgets sufficient for a maximum admitted row plus control overhead.
-ListPaths and all code-navigation methods define those bounds in cleanup-lane.md
-and code-navigation.md: validate their effective method minimum before source
-selection or matching; validate item bounds at source/index admission. A first
-visible row must fit and advance the continuation. Unary GetDefinition returns
-its bounded whole answer. Do not loop on an empty page, skip a row or widen the
-echo. Existing blob range reads remain chunked; no generic chunk protocol is
-introduced. Matching row counts and sizes never choose a budget failure or
-expose hidden data; fixed shape checks are independent of matches.
+selection/control overhead exceeding the effective item budget, including
+per-method minima and, where applicable, the terminal-failure reserve below. The indivisible-result
+progress guarantee applies only to ListPaths and the four code-navigation methods.
+Their explicit admission bounds and minimum budgets in cleanup-lane.md and
+code-navigation.md fit a maximum admitted row plus control overhead: validate
+the effective method minimum before source selection or matching and item bounds
+at source/index admission. A matching collection exceeding budget returns
+bounded PARTIAL coverage and a continuation, not RESOURCE_EXHAUSTED; its first
+visible row fits and advances the continuation. Unary GetDefinition returns its
+bounded whole answer. Matching row counts and sizes never choose a budget failure
+for these methods. Existing blob range reads remain chunked. No generic chunk
+protocol is introduced.
+
+Other indivisible shapes have no guaranteed whole-record bound. This includes
+ObserveRuns `RunRecord` (including all pending permissions and their exact intent
+bytes), `RunPolicy` and `TimelineRecord`, in both default and LATEST mode, initial
+snapshots, resumed remainders and live updates. Apply current authorization and
+the caller-visible projection before the size check; hidden records cannot cause
+this failure. If the next visible whole record cannot fit an empty otherwise legal
+batch with its required controls, or the mandatory initial run/policy set cannot
+fit the initial snapshot with its required controls, terminate through the existing
+typed CallFailure channel before emitting the offending record or committing that
+batch. Check encoded event wrappers and transport framing, item count, frame bytes
+and total snapshot/batch bytes. This rule also applies to other methods' uncovered
+indivisible results; chunked payloads retain their existing rules. If the record
+fits a fresh legal batch and only the current batch is full, use bounded PARTIAL
+coverage and continuation instead of failing.
+
+Use the fixed failure `INDIVISIBLE_RESULT_FAILURE = { code: RESOURCE_EXHAUSTED,
+message: "indivisible result exceeds read budget" }`, with ErrorDetail absent.
+The complete failure frame, including transport framing, is at most 128 bytes.
+Endpoints serving uncovered indivisible results apply this reserve:
+Reserve one item and 128 bytes for this terminal failure in every snapshot/batch;
+charge it and all other controls to the accepted budget. Reject insufficient fixed
+control/reserve overhead with INVALID_ARGUMENT before selecting or matching data.
+No offending reference, intent, size, count, required-budget value or retry hint is
+included. Discard uncommitted staging and retain only the last committed cursor;
+failure is not a checkpoint or successful completion. Do not omit mandatory
+permissions/policy, truncate decision-bound bytes, widen the echo, skip a record,
+or return empty PARTIAL/Reset cycles for an unrepresentable result. Reconnecting
+or moving the same record between batches cannot fix its size. Clients MUST NOT
+automatically retry this failure with the same budget; an explicit new request
+with a larger signed budget can succeed only if the complete authorized result
+and controls fit that budget and the endpoint's limits.
 
 LATEST ObserveRuns uses the existing stream cursor to finish a budget-limited
-initial selection. The initial latest-N boundary is fixed before the snapshot;
+initial selection when its mandatory run/policy set and each whole timeline record
+fit as specified above; otherwise the bounded terminal failure applies. The
+initial latest-N boundary is fixed before the snapshot;
 the checkpoint cursor retains that boundary and the last delivered position.
 A PARTIAL `timeline` status has `page.exhausted=false` and an empty `next_page`.
 The first checkpoint commits the available snapshot with `snapshot_complete=true`;

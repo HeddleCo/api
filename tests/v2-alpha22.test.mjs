@@ -128,8 +128,8 @@ const contract = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 
 
 for (const [frameBytes, intentBytes] of [[1024, 2048], [65536, 65536]]) {
   test(`alpha22 oversized first mandatory LATEST run has a bounded terminal failure (${frameBytes} bytes)`, async () => {
-  const thread = { spool: { id: "11111111-1111-4111-8111-111111111111" }, id: { value: new Uint8Array(32).fill(3) } };
-  const run = { spool: thread.spool, id: "run-7" };
+    const thread = { spool: { id: "11111111-1111-4111-8111-111111111111" }, id: { value: new Uint8Array(32).fill(3) } };
+    const run = { spool: thread.spool, id: "run-7" };
     const requested = budget([6, frameBytes, String(frameBytes)]);
     const accepted = api.negotiateReadBudget(requested, budget(fixture.floor), budget(fixture.floor), budget(fixture.floor));
     assert.deepEqual(accepted, requested, "both reported budgets are accepted without widening");

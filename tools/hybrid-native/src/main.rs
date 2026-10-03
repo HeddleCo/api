@@ -1,5 +1,5 @@
 //! Maintenance codec and fixed-vector native gate. No expected bytes are
-//! generated during verification. All codecs come from weft's published pins.
+//! generated during verification. All codecs come from the newest compatible published pair.
 use anyhow::{Context, Result, bail, ensure};
 use contract::{
     heddle::api::{common as host, v1alpha2 as wire},
@@ -8,6 +8,11 @@ use contract::{
 use crypto::thread_operation::SignedGenesis;
 use objects::object::{
     ContentHash, State,
+    original_boundary_acceptance::{
+        OriginalBoundaryAcceptance, OriginalPublicationManifest, PublicationIntent,
+    },
+    thread_authority_admission::ThreadAuthorityAdmission,
+    thread_genesis_admission::ThreadGenesisAdmission,
     thread_replication::{
         Capture, ThreadGenesis, ThreadOperation, integration::HostedIntegration,
         metadata::ThreadControl, ownership_claim::ThreadOwnershipClaim,
@@ -502,6 +507,23 @@ fn encode(format: &str, bytes: &[u8]) -> Result<Vec<u8>> {
         "heddle-hosted-integration-v1" => {
             rmp_serde::from_slice::<HostedIntegration>(bytes)?.encode()?
         }
+        "heddle-original-boundary-acceptance-v1" => {
+            rmp_serde::from_slice::<OriginalBoundaryAcceptance>(bytes)?.encode()?
+        }
+        "heddle-original-publication-manifest-v1" => {
+            rmp_serde::from_slice::<OriginalPublicationManifest>(bytes)?.encode()?
+        }
+        "heddle-original-publication-intent-v1" => {
+            let intent: PublicationIntent = rmp_serde::from_slice(bytes)?;
+            intent.id()?;
+            rmp_serde::to_vec_named(&intent)?
+        }
+        "heddle-thread-genesis-admission-v2" => {
+            rmp_serde::from_slice::<ThreadGenesisAdmission>(bytes)?.encode()?
+        }
+        "heddle-thread-authority-admission-v3" => {
+            rmp_serde::from_slice::<ThreadAuthorityAdmission>(bytes)?.encode()?
+        }
         "capture" => {
             let capture: Capture = rmp_serde::from_slice(bytes)?;
             capture.validated_state()?;
@@ -881,6 +903,282 @@ fn verify_native(f: &Value) -> Result<()> {
     Ok(())
 }
 
+fn verify_boundary_native(
+    f: &Value,
+    statement_name: &str,
+    payload_name: &str,
+    kind: &str,
+) -> Result<()> {
+    use objects::object::{
+        original_boundary_acceptance::{ManifestSubject, OriginalManifestEntry},
+        thread_replication::{SourceAuthor, integration::TrustedHostedExecutor},
+    };
+    let bundle: wire::ImportPublicProofBundleV1 = record(f, "complete_renewed_export")?;
+    let set = set(f, &bundle)?;
+    let signed: host::SignedHostedWitnessStatementV1 = record(f, statement_name)?;
+    let time = authenticate(f, &set, &signed)?;
+    let statement = signed.body.as_ref().context("boundary witness")?;
+    let (evidence, original, envelope, dependencies) = if kind == "genesis" {
+        let payload: wire::ImportGenesisWitnessV1 = record(f, payload_name)?;
+        import::verify_witness_payload(statement, import::WitnessPayload::Genesis(&payload))?;
+        (
+            vec![payload.boundary_acceptance.context("boundary evidence")?],
+            payload.original_genesis.context("original genesis")?,
+            payload.creator_authority_envelope,
+            Vec::new(),
+        )
+    } else {
+        let payload: wire::ImportAuthorityWitnessV1 = record(f, payload_name)?;
+        import::verify_witness_payload(statement, import::WitnessPayload::Authority(&payload))?;
+        (
+            payload.boundary_acceptances,
+            payload.original.context("source original")?,
+            payload.authority_envelope,
+            payload.dependencies,
+        )
+    };
+    let enclosing = evidence
+        .iter()
+        .find(|e| e.binding.as_ref() == statement.boundary_acceptance.as_ref())
+        .context("exact enclosing acceptance binding")?;
+    let enclosing_id = enclosing
+        .binding
+        .as_ref()
+        .context("acceptance binding")?
+        .acceptance_id
+        .clone();
+    let descriptor = if kind == "genesis" {
+        OriginalManifestEntry::from_genesis(&genesis(&original)?, &envelope)?
+    } else {
+        OriginalManifestEntry::from_operation(&operation(&original)?)?
+    };
+    // Resolve immutable subjects from the existing native fixture originals, never
+    // from a receipt's claims. Every candidate's original signature is checked.
+    let native_authority: wire::ImportAuthorityWitnessV1 =
+        record(f, "authority_admission_payload")?;
+    let candidates = bundle
+        .genesis_witnesses
+        .iter()
+        .map(|p| -> Result<_> {
+            Ok((
+                p.original_genesis
+                    .clone()
+                    .context("exported original genesis")?,
+                p.creator_authority_envelope.clone(),
+            ))
+        })
+        .chain(std::iter::once(Ok((
+            original,
+            if kind == "genesis" {
+                envelope
+            } else {
+                Vec::new()
+            },
+        ))))
+        .chain(
+            dependencies
+                .into_iter()
+                .chain(native_authority.dependencies)
+                .filter(|r| r.format == "heddle-thread-operation-v1")
+                .map(|r| Ok((r, Vec::new()))),
+        );
+    let mut originals = BTreeMap::new();
+    for candidate in candidates {
+        let (original, envelope) = candidate?;
+        let entry = if original.format == "heddle-thread-genesis-v1" {
+            OriginalManifestEntry::from_genesis(&genesis(&original)?, &envelope)?
+        } else {
+            OriginalManifestEntry::from_operation(&operation(&original)?)?
+        };
+        let value = (entry.clone(), original, envelope);
+        if let Some(previous) = originals.insert(entry.subject, value.clone()) {
+            ensure!(previous == value, "conflicting original subject evidence");
+        }
+    }
+    let issuer = set
+        .body()
+        .entries
+        .iter()
+        .find(|e| e.executor_id == statement.executor_id)
+        .context("authenticated witness issuer")?;
+    let root: wire::OwnerHistory = record(f, "owner_history")?;
+    let native_root = capability_verifier::wire::SignedOwnerRoot::decode(
+        root.root.context("root")?.encode_to_vec().as_slice(),
+    )?;
+    let owner = capability_verifier::verify_owner_root(&native_root)?;
+    ensure!(
+        owner.authority_key().public_key == hex_field(&f["keys"]["owner"]["public_key_hex"])?,
+        "independently selected owner"
+    );
+    for evidence in &evidence {
+        let a = evidence.signed_acceptance.as_ref().context("acceptance")?;
+        let acceptance = crypto::original_boundary_acceptance::SignedBoundaryAcceptance {
+            canonical: a.canonical_record.clone(),
+            signature: signature(
+                a,
+                &OriginalBoundaryAcceptance::decode(&a.canonical_record)?.accepting_publisher,
+            )?,
+        }
+        .verify_signature()?;
+        let manifest = OriginalPublicationManifest::decode(&evidence.originals_manifest)?;
+        let intent: PublicationIntent = rmp_serde::from_slice(&evidence.publication_intent)?;
+        ensure!(
+            rmp_serde::to_vec_named(&intent)? == evidence.publication_intent,
+            "canonical native intent"
+        );
+        let selected = acceptance.selected(&intent, &manifest)?;
+        if evidence
+            .binding
+            .as_ref()
+            .context("acceptance binding")?
+            .acceptance_id
+            == enclosing_id
+        {
+            ensure!(
+                selected.contains(&&descriptor),
+                "exact original selected by signed manifest"
+            );
+        }
+        ensure!(
+            selected.len() == evidence.original_receipts.len(),
+            "complete per-original receipt selection"
+        );
+        let trust = TrustedHostedExecutor {
+            spool: intent.spool,
+            spool_genesis: intent.spool_genesis,
+            executor: issuer.public_key.as_slice().try_into()?,
+        };
+        let mut seen = std::collections::BTreeSet::new();
+        for r in &evidence.original_receipts {
+            ensure!(
+                r.signatures.len() == 1 && r.signatures[0].public_key == issuer.public_key,
+                "independent per-original receipt signer"
+            );
+            let subject = match r.format.as_str() {
+                "heddle-thread-genesis-admission-v2" => ManifestSubject::Genesis(
+                    ThreadGenesisAdmission::decode(&r.canonical_record)?.thread,
+                ),
+                "heddle-thread-authority-admission-v3" => {
+                    use objects::object::thread_authority_admission::OriginalAuthoritySubject;
+                    match ThreadAuthorityAdmission::decode(&r.canonical_record)?.subject {
+                        OriginalAuthoritySubject::Operation(id) => ManifestSubject::Source(id),
+                        _ => bail!("fixture receipt original kind"),
+                    }
+                }
+                _ => bail!("fixture receipt format"),
+            };
+            let selected_entry = selected
+                .iter()
+                .find(|e| e.subject == subject)
+                .context("receipt subject outside selected originals")?;
+            ensure!(seen.insert(subject.clone()), "duplicate receipt subject");
+            let (entry, original, envelope) = originals
+                .get(&subject)
+                .context("selected original/envelope missing")?;
+            ensure!(
+                *selected_entry == entry,
+                "selected descriptor differs from immutable original"
+            );
+            match subject {
+                ManifestSubject::Genesis(_) => {
+                    let receipt = crypto::thread_genesis_admission::SignedGenesisAdmission {
+                        canonical: r.canonical_record.clone(),
+                        signature: signature(r, &issuer.public_key)?,
+                        boundary_acceptance: None,
+                    }
+                    .verify_signature()?;
+                    receipt.authorize_with_acceptance(
+                        &genesis(original)?,
+                        envelope,
+                        &trust,
+                        Some(&acceptance),
+                    )?;
+                }
+                ManifestSubject::Source(_) => {
+                    let receipt = crypto::thread_authority_admission::SignedAuthorityAdmission {
+                        canonical: r.canonical_record.clone(),
+                        signature: signature(r, &issuer.public_key)?,
+                        boundary_acceptance: None,
+                    }
+                    .verify_signature()?;
+                    receipt.authorize_with_acceptance(
+                        &operation(original)?,
+                        &trust,
+                        Some(&acceptance),
+                    )?;
+                }
+                _ => bail!("fixture original kind"),
+            }
+        }
+        ensure!(
+            selected.iter().all(|e| seen.contains(&e.subject)),
+            "selected original receipt omitted"
+        );
+        let SourceAuthor::Account {
+            actor, authority, ..
+        } = &acceptance.accepting_author
+        else {
+            bail!("account acceptance required")
+        };
+        for entry in selected {
+            let (subject_kind, method) = match entry.subject {
+                ManifestSubject::Genesis(_) => (
+                    capability_verifier::boundary_authority::BoundarySubjectKind::AccountGenesis,
+                    "/heddle.api.v1alpha2.ThreadService/StartThread",
+                ),
+                ManifestSubject::Source(_) => (
+                    capability_verifier::boundary_authority::BoundarySubjectKind::Source,
+                    "/heddle.api.v1alpha2.SyncService/PublishContent",
+                ),
+                _ => bail!("fixture original kind"),
+            };
+            capability_verifier::boundary_authority::verify_accepting_authority(
+                authority,
+                capability_verifier::thread_control_authority::Context {
+                    owner: &owner,
+                    account_uuid: actor.principal_id.as_bytes(),
+                    publisher: &acceptance.accepting_publisher,
+                    agent_id: actor.agent_id.as_deref(),
+                    method,
+                    spool_path: "example",
+                    now: time,
+                },
+                capability_verifier::boundary_authority::OriginalSubjectScope {
+                    kind: subject_kind,
+                    account: acceptance.original_account.as_bytes(),
+                    thread: entry.thread.as_bytes(),
+                    subject: entry.subject.id().as_bytes(),
+                    publisher: &entry.publisher,
+                    agent_id: entry
+                        .authority
+                        .as_ref()
+                        .and_then(|a| a.actor.agent_id.as_deref()),
+                },
+                &[],
+                |_| false,
+            )?;
+        }
+    }
+    println!(
+        "BOUNDARY NATIVE PASS {statement_name}: selected original, exact acceptance basis, receipt signatures, current accepting authority"
+    );
+    Ok(())
+}
+fn verify_boundaries(f: &Value) -> Result<()> {
+    for v in f["boundary_vectors"]["passing"]
+        .as_array()
+        .context("boundary passing vectors")?
+    {
+        verify_boundary_native(
+            f,
+            v["statement"].as_str().context("statement")?,
+            v["payload"].as_str().context("payload")?,
+            v["kind"].as_str().context("kind")?,
+        )?;
+    }
+    Ok(())
+}
+
 fn verify_authority(
     bytes: &[u8],
     owner: &capability_verifier::VerifiedOwnerState,
@@ -987,6 +1285,7 @@ fn main() -> Result<()> {
         Some("verify") => {
             let f = read_json(args.get(2).context("fixture path")?)?;
             verify_native(&f)?;
+            verify_boundaries(&f)?;
             verify_export(&f, &record(&f, "complete_renewed_export")?)?;
         }
         Some("verify-capture") => {
@@ -1036,6 +1335,219 @@ mod tests {
             "../../../tests/fixtures/import-authority-host-witness-v1.json"
         ))
         .expect("fixed vectors")
+    }
+    #[test]
+    fn published_harness_pair_is_0287_alpha19() {
+        for manifest in [
+            include_str!("../Cargo.toml"),
+            include_str!("../../../tests/custodial-verifier/Cargo.toml"),
+        ] {
+            assert!(
+                manifest.contains("version = \"=0.31.0-alpha.19\""),
+                "published API pin must be alpha.19"
+            );
+            assert!(
+                manifest.contains("\"=0.28.7\""),
+                "published heddle pin must be 0.28.7"
+            );
+            assert!(!manifest.contains("0.28.6") && !manifest.contains("alpha.18"));
+        }
+        for lock in [
+            include_str!("../Cargo.lock"),
+            include_str!("../../../tests/custodial-verifier/Cargo.lock"),
+        ] {
+            assert!(
+                lock.contains("version = \"0.28.7\""),
+                "locked published heddle must be 0.28.7"
+            );
+            assert!(
+                !lock.contains("version = \"0.28.6\"")
+                    && !lock.contains("version = \"0.31.0-alpha.18\"")
+            );
+        }
+    }
+    #[test]
+    fn boundary_complete_two_and_three_originals() {
+        let f = fixture();
+        for size in [2, 3] {
+            verify_boundary_native(
+                &f,
+                &format!("boundary_complete_{size}_statement"),
+                &format!("boundary_complete_{size}_payload"),
+                "genesis",
+            )
+            .expect("complete distinct subjects must pass");
+        }
+    }
+    #[test]
+    fn boundary_duplicate_subject_cannot_cover_missing_original() {
+        let f = fixture();
+        let error = verify_boundary_native(
+            &f,
+            "boundary_duplicate_2_statement",
+            "boundary_duplicate_2_payload",
+            "genesis",
+        )
+        .expect_err("two distinct signed receipts for main cannot cover dev");
+        assert!(
+            format!("{error:#}").contains("duplicate receipt subject"),
+            "{error:#}"
+        );
+    }
+    #[test]
+    fn boundary_enclosing_acceptance_uses_exact_binding() {
+        let f = fixture();
+        let p: wire::ImportAuthorityWitnessV1 =
+            record(&f, "boundary_enclosing_not_first_payload").expect("payload");
+        let s: host::SignedHostedWitnessStatementV1 =
+            record(&f, "boundary_enclosing_not_first_statement").expect("statement");
+        assert_ne!(
+            p.boundary_acceptances[0].binding,
+            s.body.expect("body").boundary_acceptance,
+            "control must select an acceptance beyond the first"
+        );
+        verify_boundary_native(
+            &f,
+            "boundary_enclosing_not_first_statement",
+            "boundary_enclosing_not_first_payload",
+            "authority",
+        )
+        .expect("exact source acceptance after dependency acceptance");
+    }
+    #[test]
+    fn boundary_all_dependency_acceptances_are_verified() {
+        let f = fixture();
+        verify_boundary_native(
+            &f,
+            "boundary_multiple_dependencies_statement",
+            "boundary_multiple_dependencies_payload",
+            "authority",
+        )
+        .expect("resolve enclosing acceptance by exact binding");
+        let error = verify_boundary_native(
+            &f,
+            "boundary_invalid_dependency_acceptance_statement",
+            "boundary_invalid_dependency_acceptance_payload",
+            "authority",
+        )
+        .expect_err("every dependency acceptance must be verified");
+        assert!(
+            format!("{error:#}").contains("duplicate receipt subject"),
+            "{error:#}"
+        );
+    }
+    #[test]
+    fn boundary_receipt_collection_negatives() {
+        let f = fixture();
+        for v in f["boundary_vectors"]["native_negative"]
+            .as_array()
+            .expect("native negatives")
+        {
+            let name = v["name"].as_str().expect("name");
+            let error = verify_boundary_native(
+                &f,
+                v["statement"].as_str().expect("statement"),
+                v["payload"].as_str().expect("payload"),
+                v["kind"].as_str().expect("kind"),
+            )
+            .expect_err("incomplete subject coverage");
+            assert!(
+                format!("{error:#}").contains(v["error"].as_str().expect("expected error")),
+                "{name}: {error:#}"
+            );
+            println!("BOUNDARY NATIVE REJECT {name}: {error:#}");
+        }
+    }
+    #[test]
+    fn boundary_substitutions_fail_then_exact_native_control_passes() {
+        let f = fixture();
+        for v in f["boundary_vectors"]["negative"]
+            .as_array()
+            .expect("negatives")
+        {
+            let name = v["name"].as_str().expect("name");
+            let s: host::SignedHostedWitnessStatementV1 =
+                record(&f, v["statement"].as_str().expect("statement")).expect("statement bytes");
+            let p: wire::ImportGenesisWitnessV1 =
+                record(&f, v["payload"].as_str().expect("payload")).expect("payload bytes");
+            let e = p.boundary_acceptance.as_ref().expect("evidence");
+            let a = e.signed_acceptance.as_ref().expect("acceptance");
+            let acceptance = crypto::original_boundary_acceptance::SignedBoundaryAcceptance {
+                canonical: a.canonical_record.clone(),
+                signature: a.signatures[0].signature.clone(),
+            }
+            .verify_signature()
+            .expect("authentic native acceptance");
+            let manifest = OriginalPublicationManifest::decode(&e.originals_manifest)
+                .expect("canonical complete manifest");
+            let intent: PublicationIntent =
+                rmp_serde::from_slice(&e.publication_intent).expect("native intent");
+            assert_eq!(
+                rmp_serde::to_vec_named(&intent).expect("intent bytes"),
+                e.publication_intent
+            );
+            let original = p.original_genesis.as_ref().expect("original");
+            let g = genesis(original).expect("original native creator signature");
+            let receipt = ThreadGenesisAdmission::decode(&e.original_receipts[0].canonical_record)
+                .expect("canonical native receipt");
+            match name {
+                "acceptance_swapped_between_originals" => {
+                    let descriptor = objects::object::original_boundary_acceptance::OriginalManifestEntry::from_genesis(&g, &p.creator_authority_envelope).expect("original descriptor");
+                    assert!(
+                        !acceptance
+                            .selected(&intent, &manifest)
+                            .expect("valid other selection")
+                            .contains(&&descriptor)
+                    );
+                }
+                "manifest_mismatch" | "intent_mismatch" => assert!(
+                    acceptance.selected(&intent, &manifest).is_err(),
+                    "signed native selection rejects {name}"
+                ),
+                "receipt_from_another_acceptance" => {
+                    use objects::object::original_boundary_acceptance::BoundaryOriginalKind;
+                    assert!(
+                        receipt
+                            .basis
+                            .authorize_evidence(
+                                Some(&acceptance),
+                                receipt.spool,
+                                receipt.owner,
+                                Some(BoundaryOriginalKind::AccountGenesis)
+                            )
+                            .is_err(),
+                        "exact native acceptance ID rejects"
+                    );
+                }
+                "missing_binding" => assert_eq!(
+                    import::validate_statement_boundary(s.body.as_ref().expect("body")),
+                    Err(codec::Reject::BoundaryAcceptance)
+                ),
+                _ => panic!("unknown boundary control {name}"),
+            }
+            assert_eq!(
+                import::verify_witness_payload(
+                    s.body.as_ref().expect("body"),
+                    import::WitnessPayload::Genesis(&p)
+                ),
+                Err(codec::Reject::BoundaryAcceptance)
+            );
+            println!(
+                "BOUNDARY NATIVE REJECT {name}: {}",
+                v["first_failing_check"].as_str().expect("intended check")
+            );
+            verify_boundary_native(
+                &f,
+                "boundary_genesis_statement",
+                "boundary_genesis_payload",
+                "genesis",
+            )
+            .expect("exact native control");
+        }
+    }
+    #[test]
+    fn boundary_native_published_codec_vectors() {
+        verify_boundaries(&fixture()).expect("native boundary basis, membership and authority");
     }
     #[test]
     fn fixed_native_vectors_and_complete_historical_export() {

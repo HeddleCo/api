@@ -304,8 +304,9 @@ authorization, R1 proof and W0 next-guardian proof, and a corresponding W0-only
 persisted proposal for helper isolation.
 
 `cargo test --locked --manifest-path tests/custodial-verifier/Cargo.toml`
-runs the committed harness pinned to published capability-verifier 0.28.5,
-patching only its API types to this checkout. It asserts the exact retained-policy
+runs the committed harness pinned to published capability-verifier 0.28.7
+and its exact published API dependency, 0.31.0-alpha.19. The published API
+types remain isolated from the checkout contract crate. It asserts the exact retained-policy
 error, missing/empty/wrong-kind policy errors, missing/wrong/invalid W1 proof,
 W1 equal to R1, insufficient/invalid old authorization, missing/invalid R1 proof,
 and zero old-authority overlap. A fully signed backdated `valid_from` succeeds

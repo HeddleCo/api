@@ -61,6 +61,17 @@ enum HostedWitnessAdmissionBasis {
   HOSTED_WITNESS_ADMISSION_BASIS_ORIGINAL_AUTHORITY = 1;
   HOSTED_WITNESS_ADMISSION_BASIS_BOUNDARY_ACCEPTANCE = 2;
 }
+// Exact native boundary acceptance, manifest/intent and signed receipt commitments.
+// SHA256 transport digests; acceptance_id retains the native BLAKE3 typed ID.
+// Receipt digests are sorted unique and nonempty, at most 128. See normative doc.
+message HostedWitnessBoundaryAcceptanceV1 {
+  uint32 format_version = 1;
+  bytes acceptance_id = 2;
+  bytes signed_acceptance_digest = 3;
+  bytes originals_manifest_digest = 4;
+  bytes publication_intent_digest = 5;
+  repeated bytes original_receipt_digests = 6;
+}
 // New format: never reinterpret any legacy admission/HostedIntegration bytes.
 // Payloads are exactly ImportGenesisWitnessV1 (1), ImportAuthorityWitnessV1 (2),
 // ImportPublicationWitnessV1 (3), HostedLandingWitnessV1 (4), with no prefix. Receivers
@@ -84,6 +95,8 @@ message HostedWitnessStatementV1 {
   uint64 admission_order = 16; // Serialized authority/issuance order, positive.
   int64 observed_at_unix_millis = 17; // Assigned under the host fence.
   bytes canonical_payload = 18; // At most 64 KiB, exact originals/dependencies.
+  // Required exactly for BOUNDARY_ACCEPTANCE, allowed only for purposes 1/2.
+  HostedWitnessBoundaryAcceptanceV1 boundary_acceptance = 19;
 }
 message SignedHostedWitnessStatementV1 {
   HostedWitnessStatementV1 body = 1;

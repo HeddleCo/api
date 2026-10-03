@@ -923,6 +923,9 @@ fn frozen_unsigned_payloads_and_cross_model_commitments() {
                 );
                 canonical!(api::ImportFrontierV1)
             }
+            "HostedWitnessBoundaryAcceptanceV1" => {
+                canonical!(host::HostedWitnessBoundaryAcceptanceV1)
+            }
             "ImportContentV1" => canonical!(api::ImportContentV1),
             "ImportGenesisWitnessV1" => canonical!(api::ImportGenesisWitnessV1),
             "ImportAuthorityWitnessV1" => canonical!(api::ImportAuthorityWitnessV1),
@@ -1392,4 +1395,136 @@ fn raw_commitment_domains_and_preimages_are_frozen() {
         assert_eq!(preimage, bytes(&v["preimage_hex"]));
         assert_eq!(codec::hash(&[&preimage]), bytes(&v["digest_hex"]));
     }
+}
+
+#[test]
+fn boundary_passing_genesis_and_dependency_vectors() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let set =
+        witness::verify_set(&record(&f, "current_set"), &c.set(1_100_000), None).expect("set");
+    // Shared matching validates commitments; native negatives are rejected by
+    // the separate published-codec semantic gate.
+    for v in f["boundary_vectors"]["passing"]
+        .as_array()
+        .expect("passing")
+        .iter()
+        .chain(
+            f["boundary_vectors"]["native_negative"]
+                .as_array()
+                .expect("native negatives"),
+        )
+    {
+        let statement: host::SignedHostedWitnessStatementV1 =
+            record(&f, v["statement"].as_str().expect("statement"));
+        witness::resolve_statement(&set, &statement, None, false, 1_100_000)
+            .expect("authentic witness");
+        if v["kind"] == "genesis" {
+            let payload = record(&f, v["payload"].as_str().expect("payload"));
+            import::verify_witness_payload(
+                statement.body.as_ref().expect("body"),
+                import::WitnessPayload::Genesis(&payload),
+            )
+            .expect("exact acceptance");
+        } else {
+            let payload = record(&f, v["payload"].as_str().expect("payload"));
+            import::verify_witness_payload(
+                statement.body.as_ref().expect("body"),
+                import::WitnessPayload::Authority(&payload),
+            )
+            .expect("exact dependency binding");
+        }
+    }
+}
+fn boundary_negative(name: &str) {
+    let f = fixture();
+    let c = Context::new(&f);
+    let set =
+        witness::verify_set(&record(&f, "current_set"), &c.set(1_100_000), None).expect("set");
+    let v = f["boundary_vectors"]["negative"]
+        .as_array()
+        .expect("negative")
+        .iter()
+        .find(|v| v["name"] == name)
+        .expect("named vector");
+    let bad: host::SignedHostedWitnessStatementV1 =
+        record(&f, v["statement"].as_str().expect("statement"));
+    let payload: api::ImportGenesisWitnessV1 = record(&f, v["payload"].as_str().expect("payload"));
+    // Every negative has an authentic witness signature. The rejection must be
+    // exact acceptance binding, never Signature or generic payload Scope.
+    codec::verify(
+        &bytes(&f["keys"]["witness"]["public_key_hex"]),
+        &witness::statement_signing_digest(bad.body.as_ref().expect("body")).expect("digest"),
+        &bad.signature,
+    )
+    .expect("genuine negative signature");
+    if name == "missing_binding" {
+        assert_eq!(
+            witness::resolve_statement(&set, &bad, None, false, 1_100_000),
+            Err(codec::Reject::BoundaryAcceptance)
+        );
+    } else {
+        witness::resolve_statement(&set, &bad, None, false, 1_100_000)
+            .expect("authenticated substituted payload");
+    }
+    assert_eq!(
+        import::verify_witness_payload(
+            bad.body.as_ref().expect("body"),
+            import::WitnessPayload::Genesis(&payload)
+        ),
+        Err(codec::Reject::BoundaryAcceptance),
+        "{name}"
+    );
+    println!("BOUNDARY REJECT {name}: BoundaryAcceptance");
+    let good: host::SignedHostedWitnessStatementV1 = record(&f, "boundary_genesis_statement");
+    let payload = record(&f, "boundary_genesis_payload");
+    witness::resolve_statement(&set, &good, None, false, 1_100_000).expect("control witness");
+    import::verify_witness_payload(
+        good.body.as_ref().expect("body"),
+        import::WitnessPayload::Genesis(&payload),
+    )
+    .expect("neighboring exact control");
+    println!("BOUNDARY PASS {name}: exact control");
+}
+macro_rules! boundary_test {
+    ($name:ident, $vector:literal) => {
+        #[test]
+        fn $name() {
+            boundary_negative($vector);
+        }
+    };
+}
+boundary_test!(
+    boundary_acceptance_swapped_between_originals,
+    "acceptance_swapped_between_originals"
+);
+boundary_test!(boundary_manifest_mismatch, "manifest_mismatch");
+boundary_test!(boundary_intent_mismatch, "intent_mismatch");
+boundary_test!(
+    boundary_receipt_from_another_acceptance,
+    "receipt_from_another_acceptance"
+);
+boundary_test!(boundary_missing_binding, "missing_binding");
+#[test]
+fn boundary_dependency_requires_exact_evidence() {
+    let f = fixture();
+    let s: host::SignedHostedWitnessStatementV1 =
+        record(&f, "boundary_dependency_missing_statement");
+    let p = record(&f, "boundary_dependency_missing_payload");
+    assert_eq!(
+        import::verify_witness_payload(
+            s.body.as_ref().expect("body"),
+            import::WitnessPayload::Authority(&p)
+        ),
+        Err(codec::Reject::BoundaryAcceptance)
+    );
+    println!("BOUNDARY REJECT dependency_missing_binding: BoundaryAcceptance");
+    let s: host::SignedHostedWitnessStatementV1 = record(&f, "boundary_authority_statement");
+    let p = record(&f, "boundary_authority_payload");
+    import::verify_witness_payload(
+        s.body.as_ref().expect("body"),
+        import::WitnessPayload::Authority(&p),
+    )
+    .expect("matched dependencies");
+    println!("BOUNDARY PASS dependency_missing_binding: exact control");
 }

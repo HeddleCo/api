@@ -24,8 +24,9 @@ record!(RecordSignature, public_key:b, signature:b);
 record!(SignedRecord, format:s, canonical_record:b, signatures:l);
 record!(ImportFrontierV1, format_version:u, thread_id:b, operation_ids:h);
 record!(ImportContentV1, format_version:u, canonical_capture:b);
-record!(ImportGenesisWitnessV1, format_version:u, binding:m, original_genesis:m, creator_authority_envelope:b);
-record!(ImportAuthorityWitnessV1, format_version:u, kind:e, original:m, dependencies:l, authority_envelope:b);
+record!(ImportBoundaryAcceptanceV1, binding:m, signed_acceptance:m, originals_manifest:b, publication_intent:b, original_receipts:l);
+record!(ImportGenesisWitnessV1, format_version:u, binding:m, original_genesis:m, creator_authority_envelope:b, boundary_acceptance:o);
+record!(ImportAuthorityWitnessV1, format_version:u, kind:e, original:m, dependencies:l, authority_envelope:b, boundary_acceptances:l);
 record!(HostedLandingRequestProofV1, format_version:u, signing_identity:s, method_path:s, timestamp_millis:u, nonce:b, request_body:b, signature:m);
 record!(HostedLandingWitnessV1, format_version:u, execution:m, request:m, source_operation:m, review_evidence:l, authority_envelope:b);
 record!(ImportJobCasStateV1, format_version:u, logical_job_id:b, retry_lineage_id:b, active_predecessor:m, authority_epoch:u, committed_manifest:m);
@@ -740,6 +741,7 @@ pub fn verify_publication(
     proof: Option<&crate::heddle::api::common::HostedWitnessHistoryProofV1>,
     now_ms: i64,
 ) -> Result<crate::witness_trust::ResolvedWitnessStatement, Reject> {
+    validate_statement_boundary(statement.body.as_ref().ok_or(Reject::Canonical)?)?;
     verify_operation(operation, delegation)?;
     if !check_slot_replay(manifest, operation)? {
         return Err(Reject::Scope);
@@ -919,21 +921,239 @@ fn verify_native(record: &SignedRecord, format: &str) -> Result<(), Reject> {
     }
     Ok(())
 }
-fn native_dependencies(records: &[SignedRecord]) -> Result<(), Reject> {
+/// Recompute transport commitments from exact native evidence. The caller's
+/// native verifier additionally authenticates manifest membership, receipt
+/// subjects/bases, accepting authority and canonical native encoding.
+pub fn verify_boundary_acceptance(e: &ImportBoundaryAcceptanceV1) -> Result<(), Reject> {
+    let binding = e.binding.as_ref().ok_or(Reject::BoundaryAcceptance)?;
+    validate_boundary_binding(binding)?;
+    let acceptance = e
+        .signed_acceptance
+        .as_ref()
+        .ok_or(Reject::BoundaryAcceptance)?;
+    verify_native(acceptance, "heddle-original-boundary-acceptance-v1")?;
+    if acceptance.signatures.len() != 1 {
+        return Err(Reject::Signature);
+    }
+    if e.originals_manifest.is_empty()
+        || e.publication_intent.is_empty()
+        || e.originals_manifest.len() > MAX_RECORD_BYTES
+        || e.publication_intent.len() > MAX_RECORD_BYTES
+        || e.original_receipts.is_empty()
+        || e.original_receipts.len() > 128
+    {
+        return Err(Reject::Bounds);
+    }
+    if binding.acceptance_id != native_id(acceptance)
+        || binding.signed_acceptance_digest != signed_native_digest(acceptance)?
+        || binding.originals_manifest_digest
+            != boundary_octets_digest(
+                "heddle-boundary-originals-manifest-v1",
+                &e.originals_manifest,
+            )
+        || binding.publication_intent_digest
+            != boundary_octets_digest(
+                "heddle-boundary-publication-intent-v1",
+                &e.publication_intent,
+            )
+    {
+        return Err(Reject::BoundaryAcceptance);
+    }
+    let native: NativeBoundarySelection =
+        rmp_serde::from_slice(&acceptance.canonical_record).map_err(|_| Reject::Canonical)?;
+    if native.originals_manifest.as_slice()
+        != native_octets_id(
+            "heddle-original-publication-manifest-v1",
+            &e.originals_manifest,
+        )
+        || native.publication_intent.as_slice()
+            != native_octets_id(
+                "heddle-original-publication-intent-v1",
+                &e.publication_intent,
+            )
+    {
+        return Err(Reject::BoundaryAcceptance);
+    }
+    let mut digests = Vec::new();
+    for receipt in &e.original_receipts {
+        if ![
+            "heddle-thread-genesis-admission-v2",
+            "heddle-thread-authority-admission-v3",
+        ]
+        .contains(&receipt.format.as_str())
+        {
+            return Err(Reject::Version);
+        }
+        verify_native(receipt, &receipt.format)?;
+        if receipt.signatures.len() != 1 {
+            return Err(Reject::Signature);
+        }
+        let native: NativeBoundaryReceipt =
+            rmp_serde::from_slice(&receipt.canonical_record).map_err(|_| Reject::Canonical)?;
+        if native.basis
+            != (NativeBoundaryBasis::BoundaryAcceptance {
+                acceptance: binding
+                    .acceptance_id
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| Reject::Canonical)?,
+            })
+        {
+            return Err(Reject::BoundaryAcceptance);
+        }
+        digests.push(signed_native_digest(receipt)?);
+    }
+    if digests != binding.original_receipt_digests {
+        return Err(Reject::BoundaryAcceptance);
+    }
+    Ok(())
+}
+// These readers extract only the native commitment selectors. Full native
+// canonicality, model validity, membership and authority remain the native gate.
+#[derive(serde::Deserialize)]
+struct NativeBoundarySelection {
+    originals_manifest: [u8; 32],
+    publication_intent: [u8; 32],
+}
+#[derive(serde::Deserialize, PartialEq)]
+enum NativeBoundaryBasis {
+    OriginalAuthority,
+    BoundaryAcceptance { acceptance: [u8; 32] },
+}
+#[derive(serde::Deserialize)]
+struct NativeBoundaryReceipt {
+    basis: NativeBoundaryBasis,
+    thread: [u8; 32],
+    subject: Option<NativeBoundarySubject>,
+}
+#[derive(serde::Deserialize)]
+enum NativeBoundarySubject {
+    Operation([u8; 32]),
+    OwnershipClaim([u8; 32]),
+    OwnershipResolution([u8; 32]),
+}
+fn native_octets_id(format: &str, bytes: &[u8]) -> Vec<u8> {
+    let mut h = blake3::Hasher::new();
+    h.update(format.as_bytes());
+    h.update(&(bytes.len() as u64).to_le_bytes());
+    h.update(b"\0");
+    h.update(bytes);
+    h.finalize().as_bytes().to_vec()
+}
+fn boundary_original(
+    e: &ImportBoundaryAcceptanceV1,
+    original: &SignedRecord,
+) -> Result<(), Reject> {
+    let id = native_id(original);
+    for receipt in &e.original_receipts {
+        let value: NativeBoundaryReceipt =
+            rmp_serde::from_slice(&receipt.canonical_record).map_err(|_| Reject::Canonical)?;
+        let (format, subject) = match value.subject {
+            None if receipt.format == "heddle-thread-genesis-admission-v2" => {
+                ("heddle-thread-genesis-v1", value.thread)
+            }
+            Some(NativeBoundarySubject::Operation(id)) => ("heddle-thread-operation-v1", id),
+            Some(NativeBoundarySubject::OwnershipClaim(id)) => {
+                ("heddle-thread-ownership-claim-v1", id)
+            }
+            Some(NativeBoundarySubject::OwnershipResolution(id)) => {
+                ("heddle-thread-ownership-resolution-v1", id)
+            }
+            _ => return Err(Reject::BoundaryAcceptance),
+        };
+        if original.format == format && id == subject {
+            return Ok(());
+        }
+    }
+    Err(Reject::BoundaryAcceptance)
+}
+pub fn boundary_octets_digest(domain: &str, bytes: &[u8]) -> Vec<u8> {
+    hash(&[
+        domain.as_bytes(),
+        &(bytes.len() as u32).to_be_bytes(),
+        bytes,
+    ])
+}
+pub fn validate_boundary_binding(
+    b: &crate::heddle::api::common::HostedWitnessBoundaryAcceptanceV1,
+) -> Result<(), Reject> {
+    if b.format_version != 1 {
+        return Err(Reject::Version);
+    }
+    for digest in [
+        &b.acceptance_id,
+        &b.signed_acceptance_digest,
+        &b.originals_manifest_digest,
+        &b.publication_intent_digest,
+    ] {
+        width(digest, 32)?;
+    }
+    if b.original_receipt_digests.is_empty() || b.original_receipt_digests.len() > 128 {
+        return Err(Reject::Bounds);
+    }
+    for digest in &b.original_receipt_digests {
+        width(digest, 32)?;
+    }
+    if b.original_receipt_digests.windows(2).any(|w| w[0] >= w[1]) {
+        return Err(Reject::Canonical);
+    }
+    Ok(())
+}
+pub fn validate_statement_boundary(
+    s: &crate::heddle::api::common::HostedWitnessStatementV1,
+) -> Result<(), Reject> {
+    match (s.basis, s.boundary_acceptance.as_ref()) {
+        (1, None) => Ok(()),
+        (2, Some(b)) if s.purpose == 1 || s.purpose == 2 => validate_boundary_binding(b),
+        _ => Err(Reject::BoundaryAcceptance),
+    }
+}
+fn match_boundary(
+    s: &crate::heddle::api::common::HostedWitnessStatementV1,
+    evidence: &[ImportBoundaryAcceptanceV1],
+) -> Result<(), Reject> {
+    validate_statement_boundary(s)?;
+    let mut previous = None;
+    for e in evidence {
+        verify_boundary_acceptance(e)?;
+        let b = e.binding.as_ref().ok_or(Reject::BoundaryAcceptance)?;
+        if previous.is_some_and(|p: &[u8]| p >= b.acceptance_id.as_slice()) {
+            return Err(Reject::Canonical);
+        }
+        previous = Some(b.acceptance_id.as_slice());
+    }
+    if let Some(binding) = &s.boundary_acceptance
+        && !evidence.iter().any(|e| e.binding.as_ref() == Some(binding))
+    {
+        return Err(Reject::BoundaryAcceptance);
+    }
+    Ok(())
+}
+fn native_dependencies(
+    records: &[SignedRecord],
+    evidence: &[ImportBoundaryAcceptanceV1],
+) -> Result<(), Reject> {
     if records.len() > 128 {
         return Err(Reject::Bounds);
     }
     let mut previous = None;
     for record in records {
-        if ![
-            "heddle-thread-genesis-v1",
-            "heddle-thread-operation-v1",
-            "heddle-thread-ownership-claim-v1",
-            "heddle-thread-ownership-resolution-v1",
-        ]
-        .contains(&record.format.as_str())
-        {
-            return Err(Reject::Version);
+        match record.format.as_str() {
+            "heddle-thread-genesis-v1"
+            | "heddle-thread-operation-v1"
+            | "heddle-thread-ownership-claim-v1"
+            | "heddle-thread-ownership-resolution-v1" => (),
+            "heddle-original-boundary-acceptance-v1"
+            | "heddle-thread-genesis-admission-v2"
+            | "heddle-thread-authority-admission-v3" => {
+                if !evidence.iter().any(|e| {
+                    e.signed_acceptance.as_ref() == Some(record)
+                        || e.original_receipts.contains(record)
+                }) {
+                    return Err(Reject::BoundaryAcceptance);
+                }
+            }
+            _ => return Err(Reject::Version),
         }
         verify_native(record, &record.format)?;
         let digest = signed_native_digest(record)?;
@@ -981,6 +1201,16 @@ pub fn verify_witness_payload(
             let original = p.original_genesis.as_ref().ok_or(Reject::Canonical)?;
             let binding = p.binding.as_ref().ok_or(Reject::Canonical)?;
             let b = binding.body.as_ref().ok_or(Reject::Canonical)?;
+            match_boundary(
+                statement,
+                &p.boundary_acceptance.iter().cloned().collect::<Vec<_>>(),
+            )?;
+            if let Some(e) = &p.boundary_acceptance {
+                boundary_original(e, original)?;
+            }
+            if (statement.basis == 2) != p.boundary_acceptance.is_some() {
+                return Err(Reject::BoundaryAcceptance);
+            }
             verify_native(original, "heddle-thread-genesis-v1")?;
             if native_id(original) != b.genesis_digest {
                 return Err(Reject::Scope);
@@ -1049,7 +1279,16 @@ pub fn verify_witness_payload(
             if p.authority_envelope.is_empty() || p.authority_envelope.len() > MAX_RECORD_BYTES {
                 return Err(Reject::Bounds);
             }
-            native_dependencies(&p.dependencies)?;
+            match_boundary(statement, &p.boundary_acceptances)?;
+            if let Some(b) = &statement.boundary_acceptance {
+                let e = p
+                    .boundary_acceptances
+                    .iter()
+                    .find(|e| e.binding.as_ref() == Some(b))
+                    .ok_or(Reject::BoundaryAcceptance)?;
+                boundary_original(e, original)?;
+            }
+            native_dependencies(&p.dependencies, &p.boundary_acceptances)?;
             let records = std::iter::once(original)
                 .chain(p.dependencies.iter())
                 .collect::<Vec<_>>();
@@ -1079,7 +1318,8 @@ pub fn verify_witness_payload(
             }
             verify_native(execution, "heddle-thread-operation-v1")?;
             verify_native(source, "heddle-thread-operation-v1")?;
-            native_dependencies(&p.review_evidence)?;
+            match_boundary(statement, &[])?;
+            native_dependencies(&p.review_evidence, &[])?;
             let signature = request.signature.as_ref().ok_or(Reject::Signature)?;
             if request.signing_identity
                 != format!(
@@ -1203,6 +1443,7 @@ fn validate_bundle_history(bundle: &ImportPublicProofBundleV1) -> Result<(), Rej
     }
     for statement in &bundle.statements {
         let s = statement.body.as_ref().ok_or(Reject::Canonical)?;
+        validate_statement_boundary(s)?;
         require_policy_history(
             bundle,
             &s.spool_uuid,

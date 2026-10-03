@@ -1,7 +1,7 @@
 import { fromBinary, toBinary, ScalarType, type DescMessage, type Message, type MessageShape } from "@bufbuild/protobuf";
 import { sha256 } from "@noble/hashes/sha2.js";
 
-export type RejectReason = "Version" | "Canonical" | "Bounds" | "Signature" | "Root" | "Semantic" | "HighWater" | "Transition" | "JobAsWitness" | "KeyRole" | "Expired" | "Scope" | "ImportPermission" | "RenewalFork" | "StaleManifest" | "CommittedSlot" | "StaleContext" | "Proof" | "Revoked" | "SlotConflict" | "Protocol";
+export type RejectReason = "Version" | "Canonical" | "Bounds" | "Signature" | "Root" | "Semantic" | "HighWater" | "Transition" | "JobAsWitness" | "KeyRole" | "Expired" | "Scope" | "ImportPermission" | "RenewalFork" | "StaleManifest" | "CommittedSlot" | "StaleContext" | "Proof" | "Revoked" | "SlotConflict" | "Protocol" | "BoundaryAcceptance";
 export class HybridContractError extends Error { constructor(readonly reason: RejectReason) { super(reason); } }
 export function reject(reason: RejectReason): never { throw new HybridContractError(reason); }
 export function equal(a: Uint8Array, b: Uint8Array): boolean { return a.length === b.length && a.every((v,i) => v === b[i]); }
@@ -19,7 +19,7 @@ export function keyId(key: Uint8Array): Uint8Array { return hash(utf8.encode("he
  * contract: counted bytes/UTF-8, BE fixed integers/enums, flattened mandatory
  * nested bodies, u32 count for lists. Protobuf wire bytes are never signed. */
 export function canonicalHybridV1<S extends DescMessage>(schema: S, value: MessageShape<S>): Uint8Array {
-  const layouts:Record<string,number>={AuthorizationSignature:2,ImportIdentityV1:6,ImportOwnerChainV1:3,ImportBranchLimitV1:9,ImportPermissionScopeV1:8,ImportMemberPermissionV1:12,SignedImportMemberPermissionV1:2,ImportGenesisAuthorityV1:8,SignedImportGenesisAuthorityV1:2,ImportBranchManifestV1:2,ImportJobDelegationV1:17,SignedImportJobDelegationV1:2,ImportCommittedSlotV1:5,ImportResultManifestV1:4,ImportJobRenewalV1:5,SignedImportJobRenewalV1:2,DelegatedImportOperationV1:19,SignedDelegatedImportOperationV1:2,ImportPublicationWitnessV1:13,HostedWitnessEntryV1:10,HostedWitnessSetV1:8,HostedWitnessStatementV1:18,RecordSignature:2,SignedRecord:3,ImportFrontierV1:3,ImportContentV1:2,ImportGenesisWitnessV1:4,ImportAuthorityWitnessV1:5,HostedLandingRequestProofV1:7,HostedLandingWitnessV1:6,ImportJobCasStateV1:6};
+  const layouts:Record<string,number>={AuthorizationSignature:2,ImportIdentityV1:6,ImportOwnerChainV1:3,ImportBranchLimitV1:9,ImportPermissionScopeV1:8,ImportMemberPermissionV1:12,SignedImportMemberPermissionV1:2,ImportGenesisAuthorityV1:8,SignedImportGenesisAuthorityV1:2,ImportBranchManifestV1:2,ImportJobDelegationV1:17,SignedImportJobDelegationV1:2,ImportCommittedSlotV1:5,ImportResultManifestV1:4,ImportJobRenewalV1:5,SignedImportJobRenewalV1:2,DelegatedImportOperationV1:19,SignedDelegatedImportOperationV1:2,ImportPublicationWitnessV1:13,HostedWitnessEntryV1:10,HostedWitnessSetV1:8,HostedWitnessStatementV1:19,HostedWitnessBoundaryAcceptanceV1:6,ImportBoundaryAcceptanceV1:5,RecordSignature:2,SignedRecord:3,ImportFrontierV1:3,ImportContentV1:2,ImportGenesisWitnessV1:5,ImportAuthorityWitnessV1:6,HostedLandingRequestProofV1:7,HostedLandingWitnessV1:6,ImportJobCasStateV1:6};
   if(!/^heddle\.api\.(common|v1alpha2)\./.test(schema.typeName)||!layouts[schema.name])reject("Version");
   const parts:Uint8Array[]=[];let size=0;
   function put(bytes:Uint8Array){size+=bytes.length;if(size>1048576)reject("Bounds");parts.push(bytes);}
@@ -43,7 +43,7 @@ export function canonicalHybridV1<S extends DescMessage>(schema: S, value: Messa
       switch(f.fieldKind){
         case "scalar":scalar(f.scalar,v);break;
         case "enum":put(u32(v));break;
-        case "message":message(f.message,v);break;
+        case "message":if(f.localName==="boundaryAcceptance"){put(u32(v?1:0));if(v)message(f.message,v);}else message(f.message,v);break;
         case "list":if(v.length>4096||(f.listKind==="enum"&&v.length>4))reject("Bounds");put(u32(v.length));for(const item of v){if(f.listKind==="message")message(f.message,item);else if(f.listKind==="enum")put(u32(item));else scalar(f.scalar,item);}break;
         default:reject("Version");
       }

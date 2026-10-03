@@ -46,6 +46,8 @@ pub enum Reject {
     Revoked,
     #[error("committed slot conflict")]
     SlotConflict,
+    #[error("missing or mismatched exact boundary acceptance binding")]
+    BoundaryAcceptance,
     #[error("incompatible peer")]
     Protocol,
 }
@@ -134,6 +136,12 @@ macro_rules! field {
             $v.as_ref().ok_or($crate::hybrid_codec::Reject::Canonical)?,
             $out,
         )?
+    };
+    ($out:ident, $v:expr, o) => {
+        $out.extend_from_slice(&u32::from($v.is_some()).to_be_bytes());
+        if let Some(value) = &$v {
+            $crate::hybrid_codec::Canonical::write(value, $out)?;
+        }
     };
     ($out:ident, $v:expr, l) => {
         if $v.len() > 4096 {

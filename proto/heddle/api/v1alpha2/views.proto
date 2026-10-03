@@ -295,6 +295,8 @@ message AttentionEvent {
 
 message ObserveNotificationsRequest {
   bool unread_only = 1;
+  // Includes stored settings, bounded effective delivery and next email digest
+  // windows together in NotificationEvent.preferences, with live updates.
   bool include_preferences = 4;
   PageRequest page = 2;
   ObserveOptions observe = 3;

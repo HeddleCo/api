@@ -3,6 +3,7 @@ pub mod client;
 pub mod custodial_recovery;
 pub mod identity_management;
 pub mod invitation;
+pub mod notifications;
 pub mod passkey_label;
 use crate::StreamingShape;
 use crate::heddle::api::common::{

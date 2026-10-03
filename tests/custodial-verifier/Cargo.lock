@@ -185,9 +185,9 @@ checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "cc"
-version = "1.5.1"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f360145194ee8e21db5ee7f3fcd4fe52210864c75c985dae33218202c8bbe040"
+checksum = "f74872d07caf508b30a21f6836e7d7016a2eaf7d9ff4f48deaa58cd8a0407630"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -373,7 +373,7 @@ name = "custodial-recovery-verifier-conformance"
 version = "0.0.0"
 dependencies = [
  "ed25519-dalek 3.0.0",
- "heddle-api 0.31.0-alpha.16",
+ "heddle-api 0.31.0-alpha.18",
  "heddle-api 0.31.0-alpha.19",
  "heddleco-capability-verifier",
  "hex",
@@ -670,9 +670,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "0.14.9"
+version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bb6743198531e02858aeaea5398fcc883e71851fcbcb5a2f773e2fb6cb1edf2"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
@@ -739,9 +739,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "heddle-api"
-version = "0.31.0-alpha.16"
+version = "0.31.0-alpha.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2f4b3f7373352cf7341f19d6684735b924df85b8eef47afd37f7cb632d1edce"
+checksum = "bfbcb8b5f909e52b89ff61d556b7697f924ed830c398fed82b2bad3e5fba278f"
 dependencies = [
  "blake3",
  "bytes",
@@ -773,6 +773,7 @@ dependencies = [
  "prost-reflect",
  "prost-types 0.14.1",
  "protoc-bin-vendored",
+ "rmp-serde",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -783,9 +784,9 @@ dependencies = [
 
 [[package]]
 name = "heddle-biscuit-verifier"
-version = "0.28.5"
+version = "0.28.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42cbd97e4d60ade802d8dd3e3f672d23f6a8420c8d6e1f98238890ab915db660"
+checksum = "f83016442543350b1b9e7d7fd6f2bd6d6007a1bfc1b481a94ae1cbb56c5777ed"
 dependencies = [
  "base64 0.22.1",
  "biscuit-auth",
@@ -801,16 +802,16 @@ dependencies = [
 
 [[package]]
 name = "heddleco-capability-verifier"
-version = "0.28.5"
+version = "0.28.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ac4903929be362e565cb35349dbc9984238a9daf86d65cbe6d18be054020aa"
+checksum = "3095b1779371b71055fe19542a5400ad50f9db6bfb47097ad79a9b2f3cabc727"
 dependencies = [
  "base64 0.22.1",
  "biscuit-auth",
  "chrono",
  "ed25519-dalek 3.0.0",
  "getrandom 0.2.17",
- "heddle-api 0.31.0-alpha.16",
+ "heddle-api 0.31.0-alpha.18",
  "heddle-biscuit-verifier",
  "hex",
  "p256 0.14.0",
@@ -901,6 +902,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -919,9 +929,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.189"
+version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
 name = "linux-raw-sys"
@@ -1196,7 +1206,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac6c3320f9abac597dcbc668774ef006702672474aad53c6d596b62e487b40b1"
 dependencies = [
  "heck",
- "itertools",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -1216,7 +1226,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -1229,7 +1239,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -1426,6 +1436,25 @@ checksum = "b4a459cddafb3fe76b31fd8f1108007566c40301feb64dc7b54656eb7388172b"
 dependencies = [
  "crypto-bigint 0.7.5",
  "hmac 0.13.0",
+]
+
+[[package]]
+name = "rmp"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ba8be72d372b2c9b35542551678538b562e7cf86c3315773cae48dfbfe7790c"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "rmp-serde"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72f81bee8c8ef9b577d1681a70ebbc962c232461e397b22c208c43c04b67a155"
+dependencies = [
+ "rmp",
+ "serde",
 ]
 
 [[package]]
@@ -1786,9 +1815,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.26.1"
+version = "1.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ef6dac1e96601b4fb3acccccff2139741fcb757cb9a36089bf5be91cfb285ce"
+checksum = "97277d36b9c3ace13e58fa6e753f8b0bbbf302a18dd193240d70f9e29681059a"
 
 [[package]]
 name = "version_check"

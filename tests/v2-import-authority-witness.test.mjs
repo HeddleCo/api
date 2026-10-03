@@ -212,3 +212,24 @@ test('root ID multibyte shared vectors enforce 256 UTF-8 bytes',async()=>{const 
 
 
 for(const [name,v] of Object.entries(fixture.raw_commitment_vectors))test(`frozen raw commitment: ${name}`,async()=>{const preimage=Buffer.concat([Buffer.from(v.domain),Buffer.from(bytes(v.canonical_hex))]);assert.deepEqual(preimage,Buffer.from(bytes(v.preimage_hex)));assert.deepEqual(new Uint8Array((await import('@noble/hashes/sha2.js')).sha256(preimage)),bytes(v.digest_hex));});
+
+test('boundary passing genesis and dependency vectors',async()=>{
+  const set=await witness.verifyWitnessSet(vector('current_set'),setContext());
+  for(const v of fixture.boundary_vectors.passing){const s=vector(v.statement);await witness.resolveWitnessStatement(set,s,undefined,false,1100000n);await authority.verifyWitnessPayload(s.body,{kind:v.kind,payload:vector(v.payload)});}
+});
+for(const v of fixture.boundary_vectors.negative)test('boundary '+v.name,async()=>{
+  const set=await witness.verifyWitnessSet(vector('current_set'),setContext()),s=vector(v.statement);
+  assertCrypto(bytes(fixture.keys.witness.public_key_hex),witness.statementSigningDigest(s.body),s.signature);
+  if(v.name==='missing_binding')await assert.rejects(witness.resolveWitnessStatement(set,s,undefined,false,1100000n),expected(v.expected));
+  else await witness.resolveWitnessStatement(set,s,undefined,false,1100000n);
+  await assert.rejects(authority.verifyWitnessPayload(s.body,{kind:'genesis',payload:vector(v.payload)}),expected(v.expected));
+  console.log(`BOUNDARY REJECT ${v.name}: ${v.expected}`);
+  const good=vector(v.control_statement);await witness.resolveWitnessStatement(set,good,undefined,false,1100000n);await authority.verifyWitnessPayload(good.body,{kind:'genesis',payload:vector(v.control_payload)});
+  console.log(`BOUNDARY PASS ${v.name}: exact control`);
+});
+test('boundary dependency requires exact evidence',async()=>{
+  const bad=vector('boundary_dependency_missing_statement');await assert.rejects(authority.verifyWitnessPayload(bad.body,{kind:'authority',payload:vector('boundary_dependency_missing_payload')}),expected('BoundaryAcceptance'));
+  console.log('BOUNDARY REJECT dependency_missing_binding: BoundaryAcceptance');
+  await authority.verifyWitnessPayload(vector('boundary_authority_statement').body,{kind:'authority',payload:vector('boundary_authority_payload')});
+  console.log('BOUNDARY PASS dependency_missing_binding: exact control');
+});

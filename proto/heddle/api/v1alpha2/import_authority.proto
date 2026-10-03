@@ -282,11 +282,22 @@ message ImportContentV1 {
 // Typed purpose payloads use the same fixed-order canonical framing. SignedRecord
 // flattens counted format, counted original native bytes, signature count then
 // counted key/signature pairs, sorted by raw key. Native bytes are never changed.
+// Complete exact native evidence, never reconstructed from sidecar identifiers.
+// The acceptance signature commits to the complete manifest and intent native IDs.
+// Native verification checks selected originals and each receipt's exact basis.
+message ImportBoundaryAcceptanceV1 {
+  heddle.api.common.HostedWitnessBoundaryAcceptanceV1 binding = 1;
+  SignedRecord signed_acceptance = 2;
+  bytes originals_manifest = 3;
+  bytes publication_intent = 4;
+  repeated SignedRecord original_receipts = 5; // Binding digest order, at most 128.
+}
 message ImportGenesisWitnessV1 {
   uint32 format_version = 1;
   SignedImportGenesisAuthorityV1 binding = 2;
   SignedRecord original_genesis = 3;
   bytes creator_authority_envelope = 4;
+  ImportBoundaryAcceptanceV1 boundary_acceptance = 5;
 }
 enum ImportAuthorityRecordKind {
   IMPORT_AUTHORITY_RECORD_KIND_UNSPECIFIED = 0;
@@ -300,6 +311,7 @@ message ImportAuthorityWitnessV1 {
   SignedRecord original = 3;
   repeated SignedRecord dependencies = 4; // Sorted signed-native-record digests.
   bytes authority_envelope = 5;
+  repeated ImportBoundaryAcceptanceV1 boundary_acceptances = 6; // Acceptance-ID order, unique.
 }
 // Retained exact Tier-1 signing preimage + original signature; no bearer secret.
 message HostedLandingRequestProofV1 {

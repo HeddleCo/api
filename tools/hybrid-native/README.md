@@ -1,5 +1,5 @@
-The frozen HYBRID native gate uses the published native crate set pinned by
-weft. `Cargo.lock` fixes its full dependency graph. It runs as part of
+The frozen HYBRID native gate uses the newest compatible published native pair: heddle 0.28.6 /
+heddle-api 0.31.0-alpha.18. `Cargo.lock` fixes its full dependency graph. It runs as part of
 `../../tools/verify.sh`; verification reads fixed vectors and never mints a
 Biscuit or regenerates expected bytes.
 

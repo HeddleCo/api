@@ -14,11 +14,12 @@ record!(HostedWitnessEntryV1, executor_id:b, public_key:b, role:e, state:e, purp
     archive_leaf_count:u, revoked_at_unix_millis:u);
 record!(HostedWitnessSetV1, format_version:u, deployment_authority:s, descriptor_root_id:s,
     generation:u, issued_at_unix_millis:u, valid_until_unix_millis:u, current_executor_id:b, entries:l);
+record!(HostedWitnessBoundaryAcceptanceV1, format_version:u, acceptance_id:b, signed_acceptance_digest:b, originals_manifest_digest:b, publication_intent_digest:b, original_receipt_digests:h);
 record!(HostedWitnessStatementV1, format_version:u, executor_id:b, purpose:e, spool_uuid:b,
     spool_genesis_digest:b, owner_id:b, owner_state_hash:b, ownership_transfer_sequence:u,
     policy_state_hash:b, policy_sequence:u, basis:e, publisher_key_id:b, authority_digest:b,
     original_signatures_digest:b, host_transaction_id:b, admission_order:u,
-    observed_at_unix_millis:u, canonical_payload:b);
+    observed_at_unix_millis:u, canonical_payload:b, boundary_acceptance:o);
 
 pub fn witness_id(public_key: &[u8]) -> Vec<u8> {
     hash(&[b"heddle-hosted-witness-key-v1\0", public_key])
@@ -365,6 +366,7 @@ pub fn resolve_statement(
     if ![1, 2].contains(&s.basis) || s.admission_order == 0 {
         return Err(Reject::Semantic);
     }
+    crate::import_authority::validate_statement_boundary(s)?;
     let entry = set
         .body
         .entries

@@ -1,6 +1,6 @@
 # HYBRID import authority and host witness, format 1
 
-This is the api#296 contract for [weft#2479 at
+This is the api#296 contract, revised in place by api#318, for [weft#2479 at
 8d427f8c1](https://github.com/HeddleCo/weft/pull/2479/changes/8d427f8c12006c63c5cad43cce260fd91a5e77a5).
 The build decision is [weft#2469](https://github.com/HeddleCo/weft/issues/2469).
 The schema is additive; its semantics require a coordinated incompatible-peer
@@ -22,7 +22,7 @@ maintenance generator requires built bindings and explicit fixture review.
 | Owner-authorized genesis and delegation | `ImportIdentityV1`, `ImportOwnerChainV1`, `ImportBranchLimitV1`, `ImportPermissionScopeV1`, `ImportMemberPermissionV1`, `SignedImportMemberPermissionV1`, `ImportGenesisAuthorityV1`, `SignedImportGenesisAuthorityV1`, `ImportBranchManifestV1`, `ImportJobDelegationV1`, `SignedImportJobDelegationV1` |
 | Job preparation, encrypted custody, expiry, and retries | `ImportCommittedSlotV1`, `ImportResultManifestV1`, `ImportJobRenewalV1`, `SignedImportJobRenewalV1`, `PrepareImportJobRequest`, `PrepareImportJobResponse`, `CommitImportJobRequest`, `RenewImportJobRequest`, `CancelImportJobRequest` |
 | Owner-authorized genesis and delegation: converted content | `DelegatedImportOperationV1`, `SignedDelegatedImportOperationV1` |
-| What the host witness attests | `ImportGenesisWitnessV1`, `ImportAuthorityRecordKind`, `ImportAuthorityWitnessV1`, `HostedLandingRequestProofV1`, `HostedLandingWitnessV1`, `ImportPublicationWitnessV1`, `HostedWitnessStatementV1`, `SignedHostedWitnessStatementV1` |
+| What the host witness attests | `HostedWitnessBoundaryAcceptanceV1`, `ImportBoundaryAcceptanceV1`, `ImportGenesisWitnessV1`, `ImportAuthorityRecordKind`, `ImportAuthorityWitnessV1`, `HostedLandingRequestProofV1`, `HostedLandingWitnessV1`, `ImportPublicationWitnessV1`, `HostedWitnessStatementV1`, `SignedHostedWitnessStatementV1` |
 | Complete authenticated witness set and exact retirement archive | `HostedWitnessEntryV1`, `HostedWitnessSetV1`, `SignedHostedWitnessSetV1`, `HostedWitnessHistoryProofV1` |
 | Proof lookup after loss of Thread access | `GetHostedWitnessHistoryProofRequest`, `GetHostedWitnessHistoryProofResponse` |
 | Verification at the mutation boundary / cross-repo proof transport | `ImportPublicProofBundleV1`, `ImportFrontierV1`, `ImportContentV1`, `ImportJobCasStateV1` |
@@ -39,8 +39,9 @@ and Ed25519 public keys are 32; signatures are 64. Encodings include default
 values; there are no omitted signed fields, protobuf tags, hex strings, JSON
 numbers, optional-presence ambiguities or protobuf serialization in signatures.
 Signed wrappers flatten their body followed by AuthorizationSignature (counted
-signer ID, counted signature). These widths and layouts are frozen for v1;
-a new signed layout needs a new version/domain and new identities.
+signer ID, counted signature). These widths and layouts are frozen for v1. api#318 revises the undeployed v1
+layout in place; no old layout or compatibility reader is retained. After first
+deployment a new signed layout needs a new version/domain and new identities.
 
 Times in import authority are **Unix seconds**, following owner records. Set
 freshness, witness intervals and observations are **Unix milliseconds**, following
@@ -286,6 +287,85 @@ original work, not historical non-revocation; it needs the complete signed
 originals manifest, intent and per-original receipts from the existing acceptance
 contract. Import publication under this delegation uses OriginalAuthority.
 
+### Exact boundary acceptance binding (api#318)
+
+`HostedWitnessStatementV1` canonical field order is fields 1–18 in protobuf
+number order, followed by field 19 `boundary_acceptance`. Optional messages
+have **u32be(0)** for absent or **u32be(1) || flattened canonical message** for
+present; no other selector is valid. This also applies to genesis payload field
+5. Even OriginalAuthority includes the absent selector in its signing bytes.
+All old v1 statement/payload signatures, leaves, seals and paths are regenerated.
+There is one revised v1 format and no dual decoding or old-vector fallback.
+
+`HostedWitnessBoundaryAcceptanceV1` has exactly this frozen order:
+`format_version:u32be(1)`, `acceptance_id:counted32`,
+`signed_acceptance_digest:counted32`, `originals_manifest_digest:counted32`,
+`publication_intent_digest:counted32`, `original_receipt_digests:u32be(count)`
+followed by each `counted32` digest in strictly increasing raw-byte order.
+The receipt set is nonempty, unique and at most 128; omissions, duplicate receipts
+and truncation reject. It contains the complete selected per-original receipts
+for this acceptance. The binding is mandatory exactly for BoundaryAcceptance
+basis 2, only on purposes 1/2. OriginalAuthority basis 1 has no binding; converted
+publication and landing use basis 1. A genesis payload carries exactly its
+matching evidence. Authority payload field 6 carries a unique acceptance-ID-sorted
+list of evidence for its original and boundary dependencies, within the 64-KiB
+payload limit. Other originals never inherit a neighboring receipt's acceptance.
+
+`ImportBoundaryAcceptanceV1` flattens, in field order: `binding`,
+`signed_acceptance:SignedRecord`, `originals_manifest:counted bytes`,
+`publication_intent:counted bytes`, `original_receipts:u32be(count)` followed by
+canonical `SignedRecord` entries in the binding's exact receipt-digest order.
+Its manifest is the **complete** native `OriginalPublicationManifest` named
+MessagePack, and intent is exact named MessagePack `PublicationIntent`.
+The signed native acceptance commits to both of their native IDs: that signature
+is the complete manifest/intent signature binding; no separate manifest signer
+or second intent signing format is invented. Acceptance and receipts each have
+exactly one original Ed25519 signature. Their original bytes are unchanged.
+
+| Field | Exact commitment preimage / algorithm |
+| --- | --- |
+| `acceptance_id` | Native `BLAKE3(UTF8("heddle-original-boundary-acceptance-v1") || u64le(len(A)) || 0x00 || A)`, with `A` the exact native acceptance body |
+| `signed_acceptance_digest` | SHA256(`UTF8("heddle-signed-native-record-v1") || canonical SignedRecord`), including the original acceptance signature/key |
+| `originals_manifest_digest` | SHA256(`UTF8("heddle-boundary-originals-manifest-v1") || u32be(len(M)) || M`), complete manifest bytes `M` |
+| `publication_intent_digest` | SHA256(`UTF8("heddle-boundary-publication-intent-v1") || u32be(len(I)) || I`), complete intent bytes `I` |
+| Each `original_receipt_digests` entry | SHA256(`UTF8("heddle-signed-native-record-v1") || canonical SignedRecord`), exact original native admission receipt and signature |
+| Fixture binding commitment | SHA256(`UTF8("heddle-hosted-boundary-acceptance-binding-v1") || canonical binding`); the statement signs the full flattened binding, not just this digest |
+
+Domains in this table have no terminal NUL. Native manifest and intent IDs inside
+`A` remain BLAKE3 typed IDs with the same native preimage as the acceptance ID,
+using `heddle-original-publication-manifest-v1` and
+`heddle-original-publication-intent-v1` respectively. They are checked against
+`M` and `I`, independently of the SHA256 transport commitments. Every receipt's
+native `AdmissionBasis::BoundaryAcceptance.acceptance` MUST equal `acceptance_id`.
+Its native kind/subject must name the exact original: genesis receipt `thread`,
+or authority receipt `Operation`/`OwnershipClaim`/`OwnershipResolution` subject.
+The witness binding must equal the sidecar binding byte for byte. These checks
+reject a substitution even if the outer hashes and witness signature are valid.
+
+`native_dependencies` / TS dependency verification admit native
+`heddle-original-boundary-acceptance-v1`, `heddle-thread-genesis-admission-v2`,
+and `heddle-thread-authority-admission-v3` only when the **exact SignedRecord**
+resolves in matching validated evidence; absent evidence rejects
+`BoundaryAcceptance`, never a generic Version or Signature error. No allowlist-only
+acceptance path exists. Complete manifest selection, original/account/Spool/kind,
+receipt scope, native canonical re-encoding, receipt issuer trust and current
+accepting authority still require native verification. Signature/commitment
+matching does not select an owner or witness trust root. The published-codec gate
+calls `selected`, `authorize_with_acceptance` (including `authorize_evidence`),
+and the real current accepting-authority verifier against independently selected
+roots, using authenticated witness times. All accepted evidence and dependency
+signatures are covered by the canonical payload and binding in the retirement
+leaf; per-original receipt commitments refer to existing native receipts, so
+there is no circular commitment to the enclosing HYBRID statement.
+
+Frozen passing vectors cover both branch genesis acceptances and source acceptance
+with native acceptance/receipt dependencies, plus exact retirement proofs.
+Negatives isolate acceptance exchanged between originals, a complete manifest
+mismatch, a complete intent mismatch, a receipt from another acceptance, missing
+statement binding, and missing dependency evidence. They have authentic witness
+signatures and otherwise exact commitments; each reports `BoundaryAcceptance`
+and then verifies its neighboring exact control in both Rust and TypeScript.
+
 Each committed converted operation has its own receipt with the shared complete
 publication-manifest digest. `ImportPublicationWitnessV1` binds exact signed job
 operation and certificate, source observation/OID algorithm, logical/physical
@@ -502,8 +582,8 @@ native verifiers can construct the expected payload independently.
 
 | Purpose / typed payload | Exact canonical field order |
 | --- | --- |
-| 1 / `ImportGenesisWitnessV1` | `format_version:u32`, `binding:SignedImportGenesisAuthorityV1`, `original_genesis:SignedRecord`, `creator_authority_envelope:bytes` |
-| 2 / `ImportAuthorityWitnessV1` | `format_version:u32`, `kind:u32`, `original:SignedRecord`, `dependencies:list<SignedRecord>`, `authority_envelope:bytes` |
+| 1 / `ImportGenesisWitnessV1` | `format_version:u32`, `binding:SignedImportGenesisAuthorityV1`, `original_genesis:SignedRecord`, `creator_authority_envelope:bytes`, `boundary_acceptance:optional<ImportBoundaryAcceptanceV1>` |
+| 2 / `ImportAuthorityWitnessV1` | `format_version:u32`, `kind:u32`, `original:SignedRecord`, `dependencies:list<SignedRecord>`, `authority_envelope:bytes`, `boundary_acceptances:list<ImportBoundaryAcceptanceV1>` |
 | 3 / `ImportPublicationWitnessV1` | `format_version:u32`, `signed_operation_digest:bytes`, `delegation_digest:bytes`, `logical_job_id:bytes`, `retry_lineage_id:bytes`, `physical_operation_id:bytes`, `ref_name:UTF8`, `slot_id:u64`, `hash_algorithm:u32`, `observed_commit_oid:bytes`, `expected_frontier_digest:bytes`, `resulting_frontier_digest:bytes`, `terminal_manifest_digest:bytes` |
 | 4 / `HostedLandingWitnessV1` | `format_version:u32`, `execution:SignedRecord`, `request:HostedLandingRequestProofV1`, `source_operation:SignedRecord`, `review_evidence:list<SignedRecord>`, `authority_envelope:bytes` |
 | `HostedLandingRequestProofV1` | `format_version:u32`, `signing_identity:UTF8`, `method_path:UTF8`, `timestamp_millis:i64`, `nonce:bytes`, `request_body:bytes`, `signature:RecordSignature` |
@@ -582,9 +662,11 @@ Never choose the representation from the semantic meaning of "bytes"; retain
 the pinned codec's representation and exact parse/re-encode equality.
 
 The locked `tools/hybrid-native` tool uses published `heddle-api
-0.31.0-alpha.16`, `heddle-thread-api 0.28.5`, `heddle-object-model 0.28.5`,
-`heddle-crypto 0.28.5`, `heddleco-capability-verifier 0.28.5`, and
-`heddle-biscuit-verifier 0.28.5`, the published set selected for weft. Maintenance
+0.31.0-alpha.18`, `heddle-thread-api 0.28.6`, `heddle-object-model 0.28.6`,
+`heddle-crypto 0.28.6`, `heddleco-capability-verifier 0.28.6`, and
+`heddle-biscuit-verifier 0.28.6`. On 2026-10-03 `cargo search` showed 0.28.6
+and alpha.19 as the newest publications; 0.28.6 requires exactly alpha.18,
+so 0.28.6/alpha.18 is the newest compatible published pair. Maintenance
 generation uses these codecs. `tools/verify.sh` runs its
 fixed-vector gate for native parsing, re-encoding, signatures, child ancestry,
 causal/claim closure, original authority and hosted request binding, plus fresh

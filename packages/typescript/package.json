@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.31.0-alpha.20",
+  "version": "0.31.0-alpha.21",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {

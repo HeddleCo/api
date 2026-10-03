@@ -136,6 +136,19 @@ fn record<T: Message + Default>(f: &Value, name: &str) -> T {
     };
     codec::strict_decode(&bytes(&v["wire_hex"]), import::MAX_BUNDLE_BYTES).expect("fixed wire")
 }
+
+#[test]
+fn submission_observe_requires_signed_disclosure() {
+    let f = fixture();
+    let mut scope: api::ImportPermissionScopeV1 = record(&f, "scope");
+    import::validate_scope(&scope).expect("pinned control");
+    scope.branches[0].ref_mode = 2;
+    scope.branches[0].pinned_commit_oid.clear();
+    assert!(
+        import::validate_scope(&scope).is_err(),
+        "observe mode must carry the signed disclosure"
+    );
+}
 struct Context {
     identity: api::ImportIdentityV1,
     owner: Vec<u8>,

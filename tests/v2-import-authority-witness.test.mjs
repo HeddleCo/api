@@ -28,6 +28,11 @@ function ownerContext(now=1100n){return {identity:vector('identity'),ownerPublic
 function setContext(now=1100000n){return {authority:fixture.context.authority,rootId:fixture.context.root_id,rootPublicKey:bytes(fixture.keys.root.public_key_hex),rootEpoch:1n,nowUnixMillis:now,clockFloorUnixMillis:1000000n,knownJobKeys:['job','renew_job','direct_job'].map(n=>bytes(fixture.keys[n].public_key_hex))};}
 function assertCrypto(key,input,signature){const publicKey=createPublicKey({key:Buffer.concat([Buffer.from('302a300506032b6570032100','hex'),key]),format:'der',type:'spki'});assert.ok(nodeVerify(null,input,publicKey,signature),'fixed signature');}
 function expected(reason){return error=>error instanceof authority.HybridContractError&&error.reason===reason;}
+test('submission observe requires signed disclosure',()=>{
+ const scope=vector('scope');authority.validateImportScope(scope);
+ scope.branches[0].refMode=2;scope.branches[0].pinnedCommitOid=new Uint8Array();
+ assert.throws(()=>authority.validateImportScope(scope), 'observe mode must carry the signed disclosure');
+});
 // Only the owner/root keys are pinned. Derive this root-only history's context
 // from the exported originals, rather than a second fixture identity/chain.
 function exportOwnerContext(b){

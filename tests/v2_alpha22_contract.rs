@@ -355,3 +355,130 @@ fn alpha22_descriptors_pin_mask_landing_and_every_budget_echo() {
         }
     }
 }
+
+#[test]
+fn replacements_authorize_stored_references_and_fail_atomically() {
+    let f = fixture();
+    let stored = SpoolSettings::decode(
+        hex::decode(f["settings_wire_hex"].as_str().expect("wire"))
+            .expect("hex")
+            .as_slice(),
+    )
+    .expect("settings");
+    for vector in f["replacement_cases"].as_array().expect("shared cases") {
+        let patch = SpoolSettings::decode(
+            hex::decode(vector["patch_wire_hex"].as_str().expect("wire"))
+                .expect("hex")
+                .as_slice(),
+        )
+        .expect("patch");
+        let mask = FieldMask {
+            paths: vector["mask"]
+                .as_array()
+                .expect("mask")
+                .iter()
+                .map(|p| p.as_str().expect("path").into())
+                .collect(),
+        };
+        let mut calls = Vec::new();
+        assert_eq!(
+            apply_spool_settings_patch(&stored, Some(&patch), Some(&mask), |field| {
+                calls.push(field.to_owned());
+                !vector["denied"]
+                    .as_array()
+                    .expect("denied")
+                    .iter()
+                    .any(|v| v.as_str() == Some(field))
+            }),
+            Err(SpoolSettingsPatchError::ClearDenied),
+            "{}",
+            vector["field"]
+        );
+        assert_eq!(
+            calls,
+            mask.paths
+                .iter()
+                .filter(|p| p.as_str() != "description")
+                .cloned()
+                .collect::<Vec<_>>()
+        );
+        let mut expected = stored.clone();
+        for field in &mask.paths {
+            match field.as_str() {
+                "default_thread" => expected.default_thread = patch.default_thread.clone(),
+                "default_review_policy" => {
+                    expected.default_review_policy = patch.default_review_policy.clone()
+                }
+                "description" => expected.description = patch.description.clone(),
+                _ => panic!("unexpected shared mask"),
+            }
+        }
+        assert_eq!(
+            apply_spool_settings_patch(&stored, Some(&patch), Some(&mask), |_| true),
+            Ok(expected)
+        );
+        assert_eq!(
+            hex::encode(stored.encode_to_vec()),
+            f["settings_wire_hex"].as_str().expect("stored wire")
+        );
+    }
+    assert_eq!(
+        apply_spool_settings_patch(
+            &stored,
+            Some(&stored.clone()),
+            Some(&FieldMask {
+                paths: vec!["default_thread".into(), "default_review_policy".into()]
+            }),
+            |_| false
+        ),
+        Ok(stored)
+    );
+}
+
+fn isolated_floor(index: usize, dimension: &str) {
+    let f = fixture();
+    let name = format!("below floor {dimension} only");
+    let vector = f["budgets"]
+        .as_array()
+        .expect("vectors")
+        .iter()
+        .find(|v| v["name"].as_str() == Some(&name))
+        .expect("isolated floor vector");
+    let defaults = budget(&vector["defaults"]);
+    let maximum = budget(&vector["maximum"]);
+    for i in 0..3 {
+        let value = |v: &Value| {
+            if i == 2 {
+                v[i].as_str()
+                    .expect("u64 string")
+                    .parse::<u64>()
+                    .expect("u64")
+            } else {
+                v[i].as_u64().expect("u32")
+            }
+        };
+        assert!(value(&vector["defaults"]) <= value(&vector["maximum"]));
+        assert_eq!(value(&vector["maximum"]) < value(&f["floor"]), i == index);
+    }
+    assert_eq!(
+        negotiate_read_budget(
+            &budget(&vector["requested"]),
+            &defaults,
+            &maximum,
+            &budget(&vector["capacity"])
+        ),
+        Err(ReadBudgetError::Advertisement)
+    );
+}
+#[test]
+fn advertised_floor_isolates_items() {
+    isolated_floor(0, "items");
+}
+#[test]
+fn advertised_floor_isolates_frame() {
+    isolated_floor(1, "frame");
+}
+#[test]
+fn advertised_floor_isolates_snapshot() {
+    isolated_floor(2, "snapshot");
+}

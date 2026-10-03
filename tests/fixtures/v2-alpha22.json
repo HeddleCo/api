@@ -339,5 +339,39 @@
     "GetDefinitionResponse": "2a0c088008108080201880808002",
     "GetSemanticRefsResponse": "320c088008108080201880808002",
     "GetSemanticImportersResponse": "320c088008108080201880808002"
-  }
+  },
+  "replacement_cases": [
+    {
+      "field": "default_thread",
+      "patch_wire_hex": "522412220a200404040404040404040404040404040404040404040404040404040404040404",
+      "mask": [
+        "default_thread"
+      ],
+      "denied": [
+        "default_thread"
+      ]
+    },
+    {
+      "field": "default_review_policy",
+      "patch_wire_hex": "3a0c120a706f6c6963792d74776f",
+      "mask": [
+        "default_review_policy"
+      ],
+      "denied": [
+        "default_review_policy"
+      ]
+    },
+    {
+      "field": "atomic",
+      "patch_wire_hex": "1a0561667465723a0c120a706f6c6963792d74776f522412220a200404040404040404040404040404040404040404040404040404040404040404",
+      "mask": [
+        "description",
+        "default_thread",
+        "default_review_policy"
+      ],
+      "denied": [
+        "default_review_policy"
+      ]
+    }
+  ]
 }

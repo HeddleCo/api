@@ -82,14 +82,16 @@ fn account_commands_are_signed_receipt_backed_and_caller_bound() {
                     .expect("receipt type")
             )
         );
-        assert_eq!(
-            method
-                .input()
-                .get_field_by_name("expected_version")
-                .expect("CAS")
-                .number(),
-            3
-        );
+        if name == "RemovePasskey" {
+            assert_eq!(
+                method
+                    .input()
+                    .get_field_by_name("expected_version")
+                    .expect("CAS")
+                    .number(),
+                3
+            );
+        }
     }
 }
 

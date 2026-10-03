@@ -1,0 +1,34 @@
+[
+  {
+    "type": "RemovePasskeyRequest",
+    "hex": "0a0872656d6f76652d31120b1209706173736b65792d311a200101010101010101010101010101010101010101010101010101010101010101"
+  },
+  {
+    "type": "SetDisplayNameRequest",
+    "hex": "0a066e616d652d3112054a6f73c3a9"
+  },
+  {
+    "type": "SetPrimaryHandleRequest",
+    "hex": "0a097072696d6172792d311205616c696365"
+  },
+  {
+    "type": "RemoveHandleRequest",
+    "hex": "0a0868616e646c652d311206616c69636532"
+  },
+  {
+    "type": "PasskeyRecord",
+    "hex": "320208013a0208024210000000000000000000000000000000004a034b6579"
+  },
+  {
+    "type": "CurrentCredentialRecord",
+    "hex": "9201020102"
+  },
+  {
+    "type": "SessionRecord",
+    "hex": "420742726f777365725a064c6170746f70"
+  },
+  {
+    "type": "ObserveIdentityRequest",
+    "hex": "12005001"
+  }
+]

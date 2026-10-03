@@ -1,0 +1,42 @@
+{
+  "labels": [
+    {"name": "trim_nfc", "input": "  José  ", "normalized": "José"},
+    {"name": "clear", "input": "\t \u0085", "normalized": ""},
+    {"name": "unicode_whitespace", "input": "\u2003Alice\u2003", "normalized": "Alice"},
+    {"name": "internal_control", "input": "a\nb"},
+    {"name": "format", "input": "a\u200db"},
+    {"name": "private_use", "input": "a\ue000b"},
+    {"name": "separator", "input": "a\u2028b"}
+  ],
+  "label_bounds": [
+    {"character": "é", "count": 128, "valid": true},
+    {"character": "é", "count": 129, "valid": false},
+    {"character": "é", "count": 128, "valid": true},
+    {"character": "é", "count": 129, "valid": false},
+    {"character": "x", "count": 256, "valid": true},
+    {"character": "x", "count": 257, "valid": false}
+  ],
+  "aaguid": [
+    {"length": null, "valid": true},
+    {"length": 0, "valid": false},
+    {"length": 15, "valid": false},
+    {"length": 16, "valid": true},
+    {"length": 17, "valid": false}
+  ],
+  "credential_ids": [
+    {"length": null, "valid": true},
+    {"length": 0, "valid": false},
+    {"length": 1, "valid": true},
+    {"length": 1024, "valid": true},
+    {"length": 1025, "valid": false}
+  ],
+  "user_agents": [
+    {"character": "x", "count": 0, "valid": true},
+    {"character": "x", "count": 8192, "valid": true},
+    {"character": "x", "count": 8193, "valid": false},
+    {"character": "é", "count": 4096, "valid": true},
+    {"character": "é", "count": 4097, "valid": false},
+    {"character": "\n", "count": 1, "valid": false},
+    {"character": "\u0085", "count": 1, "valid": false}
+  ]
+}

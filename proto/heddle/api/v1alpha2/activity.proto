@@ -69,6 +69,10 @@ message NotificationRecord {
   RecordRef ref = 1;
   bytes version = 2;
   EntityRef subject = 3;
+  // Open kind vocabulary. HELD_NAME_REQUESTED goes to the held name's holder;
+  // HELD_NAME_REQUEST_LAPSED goes to its requester when the 30-day window lapses.
+  // Both are direct asks: inbox immediately, email immediately by default,
+  // and push immediately once available, subject to per-channel preferences.
   string kind = 4;
   string title = 5;
   string body = 6;

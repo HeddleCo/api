@@ -1,5 +1,6 @@
 // Maintenance-only generator. Tests read the checked-in artifact and NEVER
 // regenerate expected bytes/signatures. Review every fixture change as contract.
+// Published codecs: heddle 0.28.7 / heddle-api 0.31.0-alpha.19.
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -176,14 +177,87 @@ for(const name of ['acceptance_swapped_between_originals','manifest_mismatch','i
 const missingDependency=clone(api.ImportAuthorityWitnessV1Schema,boundaryAuthority);missingDependency.boundaryAcceptances=[];wire('boundary_dependency_missing_payload',api.ImportAuthorityWitnessV1Schema,missingDependency);
 const missingDependencyStatement=statement('boundary_dependency_missing_statement',2,canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,missingDependency),0x98,authorityEnvelopeDigest(envelope),originalSignaturesDigest([source,...boundaryDependencies]));
 artifact.boundary_vectors.dependency_negative={statement:'boundary_dependency_missing_statement',payload:'boundary_dependency_missing_payload',expected:'BoundaryAcceptance'};
+// Complete native receipt collections; shared clients check commitments only.
+const boundaryArchiveProofNames=[];
+function receiptSet(evidence,receipts){
+  const e=clone(api.ImportBoundaryAcceptanceV1Schema,evidence);
+  e.originalReceipts=receipts.sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));
+  e.binding.originalReceiptDigests=e.originalReceipts.map(signedNativeDigest);
+  return e;
+}
+function combinedBoundary(name,parts){
+  const e=clone(api.ImportBoundaryAcceptanceV1Schema,parts[0]);
+  const entries=parts.flatMap(p=>decode(p.originalsManifest).entries);
+  entries.sort((a,b)=>{const ak=Object.keys(a.subject)[0],bk=Object.keys(b.subject)[0];return ak.localeCompare(bk)||compare(new Uint8Array(a.subject[ak]),new Uint8Array(b.subject[bk]));});
+  e.originalsManifest=nativeEncode('heddle-original-publication-manifest-v1',{version:1,entries});
+  const a=decode(e.signedAcceptance.canonicalRecord);
+  a.originals_manifest=Array.from(nativeId('heddle-original-publication-manifest-v1',e.originalsManifest));
+  a.kinds=parts.includes(boundarySource)?['AccountGenesis','Source']:['AccountGenesis'];
+  e.signedAcceptance=native('heddle-original-boundary-acceptance-v1',a);
+  e.binding.acceptanceId=nativeId(e.signedAcceptance.format,e.signedAcceptance.canonicalRecord);
+  e.binding.signedAcceptanceDigest=signedNativeDigest(e.signedAcceptance);
+  e.binding.originalsManifestDigest=boundaryOctetsDigest('heddle-boundary-originals-manifest-v1',e.originalsManifest);
+  const receipts=parts.flatMap(p=>p.originalReceipts).map(r=>{const b=decode(r.canonicalRecord);b.basis.BoundaryAcceptance.acceptance=Array.from(e.binding.acceptanceId);return native(r.format,b,['witness']);});
+  const result=receiptSet(e,receipts);
+  wire(name,api.ImportBoundaryAcceptanceV1Schema,result);
+  commitment(name+'_binding',common.HostedWitnessBoundaryAcceptanceV1Schema,result.binding,'heddle-hosted-boundary-acceptance-binding-v1');
+  return result;
+}
+function archiveBoundary(name,payload,kind,binding,negative){
+  const schema=kind==='genesis'?api.ImportGenesisWitnessV1Schema:api.ImportAuthorityWitnessV1Schema;
+  wire(name+'_payload',schema,payload);
+  commitment(name+'_payload',schema,payload,kind==='genesis'?'heddle-import-genesis-witness-payload-v1':'heddle-import-authority-witness-payload-v1');
+  const digest=kind==='genesis'?signedGenesisDigest(genesisProofs.main):authorityEnvelopeDigest(envelope);
+  const originals=kind==='genesis'?[payload.originalGenesis]:[payload.original,...payload.dependencies];
+  statements.push(statement(name+'_statement',kind==='genesis'?1:2,canonicalHybridV1(schema,payload),0xa0+boundaryArchiveProofNames.length,digest,originalSignaturesDigest(originals),1100000n,binding));
+  boundaryArchiveProofNames.push(name+'_proof');
+  const v={name,statement:name+'_statement',payload:name+'_payload',kind};
+  if(negative)artifact.boundary_vectors.native_negative.push({...v,error:negative});
+  else artifact.boundary_vectors.passing.push(v);
+}
+artifact.boundary_vectors.native_negative=[];
+for(const [size,parts] of [[2,[boundaryMain,boundaryDev]],[3,[boundaryMain,boundaryDev,boundarySource]]]){
+  const e=combinedBoundary('boundary_set_'+size,parts);
+  archiveBoundary('boundary_complete_'+size,create(api.ImportGenesisWitnessV1Schema,{...genesisPayload,boundaryAcceptance:e}),'genesis',e.binding);
+  const bySubject=parts.map(p=>e.originalReceipts.find(r=>r.format===p.originalReceipts[0].format&&hex(decode(r.canonicalRecord).thread)===hex(decode(p.originalReceipts[0].canonicalRecord).thread)));
+  for(const change of ['omission','duplicate','substitution','extra']){
+    let receipts=[...bySubject];
+    const duplicateBody=decode(receipts[0].canonicalRecord);duplicateBody.admitted_at_ms+=1;
+    const duplicate=native(receipts[0].format,duplicateBody,['witness']);
+    if(change==='omission')receipts.pop();
+    if(change==='duplicate')receipts[1]=duplicate;
+    if(change==='extra')receipts.push(duplicate);
+    if(change==='substitution'){
+      const b=decode(receipts[receipts.length-1].canonicalRecord);
+      if(size===2)b.thread=Array.from(nativeId(localGenesis.format,localGenesis.canonicalRecord));
+      else b.subject={Operation:Array.from(nativeId(control.format,control.canonicalRecord))};
+      receipts[receipts.length-1]=native(receipts[receipts.length-1].format,b,['witness']);
+    }
+    const bad=receiptSet(e,receipts);
+    archiveBoundary('boundary_'+change+'_'+size,create(api.ImportGenesisWitnessV1Schema,{...genesisPayload,boundaryAcceptance:bad}),'genesis',bad.binding,change==='duplicate'?'duplicate receipt subject':change==='substitution'?'receipt subject outside selected originals':'complete per-original receipt selection');
+  }
+}
+function multipleAcceptances(name,acceptances,negative){
+  const dependencies=acceptances.flatMap(e=>[e.signedAcceptance,...e.originalReceipts]).sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));
+  const sorted=[...acceptances].sort((a,b)=>compare(a.binding.acceptanceId,b.binding.acceptanceId));
+  const p=create(api.ImportAuthorityWitnessV1Schema,{...boundaryAuthority,dependencies,boundaryAcceptances:sorted});
+  archiveBoundary(name,p,'authority',boundarySource.binding,negative);
+}
+multipleAcceptances('boundary_multiple_dependencies',[boundaryMain,boundaryDev,boundarySource]);
+const two=combinedBoundary('boundary_dependency_set', [boundaryMain,boundaryDev]);
+const firstReceipt=decode(two.originalReceipts.find(r=>hex(decode(r.canonicalRecord).thread)===hex(decode(boundaryMain.originalReceipts[0].canonicalRecord).thread)).canonicalRecord);
+firstReceipt.admitted_at_ms+=1;
+const mainReceipt=two.originalReceipts.find(r=>hex(decode(r.canonicalRecord).thread)===hex(firstReceipt.thread));
+multipleAcceptances('boundary_invalid_dependency_acceptance',[boundarySource,receiptSet(two,[mainReceipt,native(mainReceipt.format,firstReceipt,['witness'])])],'duplicate receipt subject');
 // Closed finding #5 keeps its exact pre-source_ref legacy negative input.
 const legacyInput=JSON.parse(readFileSync(new URL('../tests/fixtures/hybrid-native-old-parentless-v1.json',import.meta.url),'utf8'));
 wire('legacy_hosted_import',SignedRecordSchema,fromBinary(SignedRecordSchema,Buffer.from(legacyInput.legacy_wire_hex,'hex')));
-statements.push(devGenesisAdmission);
+const boundaryArchived=statements.splice(10);
+statements.push(devGenesisAdmission,...boundaryArchived);
 const leaves=statements.map(s=>leafDigest(s.body.purpose,canonicalHybridV1(common.HostedWitnessStatementV1Schema,s.body),s.signature)).sort(compare),archiveRoot=merkleRoot(leaves);
 function proof(index,a){if(a.length===1)return [];let k=1;while(k*2<a.length)k*=2;return index<k?[...proof(index,a.slice(0,k)),merkleRoot(a.slice(k))]:[...proof(index-k,a.slice(k)),merkleRoot(a.slice(0,k))];}
 for(let n of [0,1,2,3,5]){const a=n<=3?leaves.slice(0,n):[...leaves.slice(0,3),hash(str('additional archived exact statement 1')),hash(str('additional archived exact statement 2'))].sort(compare);artifact.trees.push({count:n,leaves_hex:a.map(hex),root_hex:hex(merkleRoot(a)),paths:a.map((_,i)=>({index:i,siblings_hex:proof(i,a).map(hex)}))});}
-const proofNames=['genesis_proof','authority_proof','ownership_proof','resolution_proof','publication_proof','renewed_publication_proof','landing_proof','boundary_genesis_proof','boundary_dev_genesis_proof','boundary_authority_proof','genesis_dev_proof'];
+const proofNames=['genesis_proof','authority_proof','ownership_proof','resolution_proof','publication_proof','renewed_publication_proof','landing_proof','boundary_genesis_proof','boundary_dev_genesis_proof','boundary_authority_proof','genesis_dev_proof',...boundaryArchiveProofNames];
 for(const [i,s] of statements.entries()){const leaf=leafDigest(s.body.purpose,canonicalHybridV1(common.HostedWitnessStatementV1Schema,s.body),s.signature),index=leaves.findIndex(x=>hex(x)===hex(leaf));wire(proofNames[i],common.HostedWitnessHistoryProofV1Schema,create(common.HostedWitnessHistoryProofV1Schema,{executorId:s.body.executorId,purpose:s.body.purpose,leafIndex:BigInt(index),leafCount:BigInt(leaves.length),siblings:proof(index,leaves)}));}
 function member(name,state=1){return create(common.HostedWitnessEntryV1Schema,{executorId:witnessId(keys[name].publicKey),publicKey:keys[name].publicKey,role:1,state,purposes:[1,2,3,4],activeFromUnixMillis:name==='next_witness'?1300000n:0n,activeUntilUnixMillis:2000000n});}
 function signedSet(name,body,key='root'){const input=setSigningBytes(body),signature=sig(key,input),value=create(common.SignedHostedWitnessSetV1Schema,{body,bodyDigest:hash(input),rootSignature:signature});artifact.signed_vectors[name]={schema:common.SignedHostedWitnessSetV1Schema.typeName,body_schema:common.HostedWitnessSetV1Schema.typeName,wire_hex:hex(toBinary(common.SignedHostedWitnessSetV1Schema,value)),canonical_hex:hex(canonicalHybridV1(common.HostedWitnessSetV1Schema,body)),signing_input_hex:hex(input),domain:'heddle-hosted-witness-set-v1\0',public_key_hex:hex(keys[key].publicKey),signature_hex:hex(signature)};return value;}

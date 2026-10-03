@@ -1232,6 +1232,108 @@ mod tests {
         .expect("fixed vectors")
     }
     #[test]
+    fn published_harness_pair_is_0287_alpha19() {
+        for manifest in [
+            include_str!("../Cargo.toml"),
+            include_str!("../../../tests/custodial-verifier/Cargo.toml"),
+        ] {
+            assert!(
+                manifest.contains("version = \"=0.31.0-alpha.19\""),
+                "published API pin must be alpha.19"
+            );
+            assert!(
+                manifest.contains("\"=0.28.7\""),
+                "published heddle pin must be 0.28.7"
+            );
+            assert!(!manifest.contains("0.28.6") && !manifest.contains("alpha.18"));
+        }
+        for lock in [
+            include_str!("../Cargo.lock"),
+            include_str!("../../../tests/custodial-verifier/Cargo.lock"),
+        ] {
+            assert!(
+                lock.contains("version = \"0.28.7\""),
+                "locked published heddle must be 0.28.7"
+            );
+            assert!(
+                !lock.contains("version = \"0.28.6\"")
+                    && !lock.contains("version = \"0.31.0-alpha.18\"")
+            );
+        }
+    }
+    #[test]
+    fn boundary_complete_two_and_three_originals() {
+        let f = fixture();
+        for size in [2, 3] {
+            verify_boundary_native(
+                &f,
+                &format!("boundary_complete_{size}_statement"),
+                &format!("boundary_complete_{size}_payload"),
+                "genesis",
+            )
+            .expect("complete distinct subjects must pass");
+        }
+    }
+    #[test]
+    fn boundary_duplicate_subject_cannot_cover_missing_original() {
+        let f = fixture();
+        let error = verify_boundary_native(
+            &f,
+            "boundary_duplicate_2_statement",
+            "boundary_duplicate_2_payload",
+            "genesis",
+        )
+        .expect_err("two distinct signed receipts for main cannot cover dev");
+        assert!(
+            format!("{error:#}").contains("duplicate receipt subject"),
+            "{error:#}"
+        );
+    }
+    #[test]
+    fn boundary_all_dependency_acceptances_are_verified() {
+        let f = fixture();
+        verify_boundary_native(
+            &f,
+            "boundary_multiple_dependencies_statement",
+            "boundary_multiple_dependencies_payload",
+            "authority",
+        )
+        .expect("resolve enclosing acceptance by exact binding");
+        let error = verify_boundary_native(
+            &f,
+            "boundary_invalid_dependency_acceptance_statement",
+            "boundary_invalid_dependency_acceptance_payload",
+            "authority",
+        )
+        .expect_err("every dependency acceptance must be verified");
+        assert!(
+            format!("{error:#}").contains("duplicate receipt subject"),
+            "{error:#}"
+        );
+    }
+    #[test]
+    fn boundary_receipt_collection_negatives() {
+        let f = fixture();
+        for v in f["boundary_vectors"]["native_negative"]
+            .as_array()
+            .expect("native negatives")
+        {
+            let name = v["name"].as_str().expect("name");
+            let error = verify_boundary_native(
+                &f,
+                v["statement"].as_str().expect("statement"),
+                v["payload"].as_str().expect("payload"),
+                v["kind"].as_str().expect("kind"),
+            )
+            .expect_err("incomplete subject coverage");
+            assert!(
+                format!("{error:#}").contains(v["error"].as_str().expect("expected error")),
+                "{name}: {error:#}"
+            );
+            println!("BOUNDARY NATIVE REJECT {name}: {error:#}");
+        }
+    }
+    #[test]
     fn boundary_substitutions_fail_then_exact_native_control_passes() {
         let f = fixture();
         for v in f["boundary_vectors"]["negative"]

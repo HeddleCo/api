@@ -41,21 +41,26 @@ before exact channel before exact origin; ties keep the first rule. Empty or
 `*` kind is a wildcard; empty/`any` origin matches human and agent; unspecified
 channel matches all channels. Defaults apply only when no rule matches.
 
-`SetNotificationPreferences` atomically validates every stored rule before
-writing. Projection fields are read-only and ignored on writes (including the
+`SetNotificationPreferences` atomically validates every stored rule and digest
+interval before writing. Projection fields are read-only and ignored on writes (including the
 per-Spool next digest timestamp); they are recomputed and never persisted as
 rules or accepted as authority. The Rust and TypeScript notification helpers
 validate settings replacement and public `UnsubscribeNotifications`. Servers
 must invoke these gates or implement equivalent validation; generated protobuf
 messages alone do not enforce cross-field constraints. No generic notification
-validator existed in this repository before this addition.
+validator existed in this repository before this addition. These helpers
+complement the host's remaining stored-settings validation, including timezone,
+selectors, duplicate overrides and input budgets; they do not replace it.
 
-An invalid channel/delivery, unspecified delivery, or DIGEST on in-app/push or a
-wildcard channel returns typed `INVALID_ARGUMENT / FIELD_INVALID`. Any selector
+Unknown channel/delivery enums and unspecified delivery are rejected first with
+typed `INVALID_ARGUMENT / FIELD_INVALID`. Next, any selector
 that would disable **or digest** locked email returns
 `FAILED_PRECONDITION / POLICY_DENIED`, including wildcard kinds/channels,
 origin-specific and Spool-specific rules, and signed-out unsubscribe. No partial
-write occurs. In-app and push for those same kinds remain individually editable.
+write occurs. The email lock takes precedence over the email-only DIGEST check:
+other DIGEST rules on in-app/push or wildcard channels return
+`INVALID_ARGUMENT / FIELD_INVALID`. In-app and push for those same kinds remain
+individually editable.
 A broadly disabling rule must be replaced with explicit editable-kind rules.
 Locking the email prevents a zero digest interval from suppressing security.
 
@@ -63,8 +68,11 @@ Locking the email prevents a zero digest interval from suppressing security.
 
 The digest batches only email by the account `digest_interval` and IANA
 `timezone`. Supported intervals are one hour, one day and one week; zero is off.
-Absent interval uses weft's daily default; empty timezone uses weft's timezone
-default. One `NotificationDigestOverride` per Spool replaces its interval;
+Every supplied duration must have zero nanos and seconds in
+`{0, 3600, 86400, 604800}`; every override must contain an interval. Invalid or
+missing override intervals return `INVALID_ARGUMENT / FIELD_INVALID`.
+Absent account interval uses weft's daily default; empty timezone uses weft's
+timezone default. One `NotificationDigestOverride` per Spool replaces its interval;
 removing it restores the account cadence. Explicit zero turns that Spool's
 scheduled email off without suppressing inbox items or immediate email.
 

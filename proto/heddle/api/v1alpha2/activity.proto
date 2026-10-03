@@ -80,13 +80,15 @@ message NotificationRecord {
 // "any" actor_origin matches both "human" and "agent". CHANNEL_UNSPECIFIED
 // matches all channels. Spool rules take precedence over account rules; within
 // a scope exact kind > exact channel > exact origin, with first rule winning ties.
-// IN_APP and PUSH are on/off only (IMMEDIATE or DISABLED). DIGEST is email-only,
-// including wildcard channel selectors: other combinations are rejected with
-// INVALID_ARGUMENT / FIELD_INVALID. Unknown channels/deliveries and UNSPECIFIED
-// delivery are invalid. An email rule matching account_security or
-// security_surface must be IMMEDIATE, regardless of origin or Spool. Attempts to
-// disable or digest their email, including wildcard rules and public unsubscribe,
-// are rejected with FAILED_PRECONDITION / POLICY_DENIED before any write.
+// IN_APP and PUSH are on/off only (IMMEDIATE or DISABLED). First reject unknown
+// channels/deliveries and UNSPECIFIED delivery with INVALID_ARGUMENT /
+// FIELD_INVALID. Next check the email lock: an email rule matching
+// account_security or security_surface must be IMMEDIATE, regardless of origin
+// or Spool. Attempts to disable or digest their email, including wildcard rules
+// and public unsubscribe, are rejected with FAILED_PRECONDITION / POLICY_DENIED
+// before any write. This lock takes precedence over the email-only DIGEST check:
+// other DIGEST rules on non-email or wildcard channels are rejected with
+// INVALID_ARGUMENT / FIELD_INVALID.
 message NotificationRule {
   string kind = 1;
   SpoolRef spool = 2;
@@ -113,8 +115,10 @@ message NotificationPreferences {
   bytes version = 1;
   repeated NotificationRule rules = 2;
   // Email-only account cadence: zero disables scheduled digest email;
-  // supported nonzero intervals are one hour, one day and one week. Absence
-  // uses weft's daily default. This does not delay inbox items or push.
+  // supported nonzero intervals are one hour, one day and one week. Supplied
+  // durations require zero nanos and seconds in {0, 3600, 86400, 604800}, otherwise
+  // INVALID_ARGUMENT / FIELD_INVALID. Absence uses weft's daily default.
+  // This does not delay inbox items or push.
   google.protobuf.Duration digest_interval = 3;
   // IANA timezone anchoring email digest windows; empty uses weft's default.
   string timezone = 4;
@@ -174,7 +178,9 @@ message MarkNotificationsReadRequest {
 // Atomic settings replacement under expected_version. Read-only projection
 // fields (effective_delivery and next_digest_at, including overrides) are ignored
 // and recomputed, never persisted or used as authority. The server MUST validate
-// every rule before writing; invalid delivery rejects the whole request.
+// every rule and digest interval before writing; invalid delivery or cadence
+// rejects the whole request. Portable helpers complement remaining host validation
+// of timezone, selectors, duplicate overrides and input budgets.
 message SetNotificationPreferencesRequest {
   string client_operation_id = 1;
   NotificationPreferences preferences = 2;

@@ -26,7 +26,9 @@ is checked for every selected subject. Frozen sets of sizes two and three,
 multiple dependency acceptances, and omission, duplicate, substitution and
 extra-receipt negatives run alongside the shared Rust/TypeScript commitment
 tests. Those clients check the signed commitments; the native gate checks
-subject membership and authority.
+subject membership and authority. The Prepare/Commit control also verifies the
+completed delegation against the frozen preparation and both original branch
+geneses with their native creator signatures and exact authority envelopes.
 
 The regression input retains verbatim old originals from `acf67659`, including
 the closed legacy dispatch negative. This command must exit nonzero:

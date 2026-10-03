@@ -30,6 +30,12 @@ pub enum Reject {
     Expired,
     #[error("delegation scope violation")]
     Scope,
+    #[error("prepared frozen fields changed")]
+    PreparedFields,
+    #[error("delegation window exceeds prepared host bounds")]
+    ValidityBounds,
+    #[error("genesis binding does not match prepared branch")]
+    GenesisBinding,
     #[error("missing typed owner import permission")]
     ImportPermission,
     #[error("renewal forks the logical job or widens remaining scope")]

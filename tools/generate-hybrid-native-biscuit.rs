@@ -1,5 +1,5 @@
 //! Maintenance helper, never mint during tests. The locked hybrid-native crate
-//! pins biscuit-auth =6.0.0 and heddle-biscuit-verifier =0.28.6.
+//! pins biscuit-auth =6.0.0 and heddle-biscuit-verifier =0.28.7.
 //! All seeds are published conformance data. Pass the output .binpb as argv[1].
 //! The JavaScript maintenance generator consumes this immutable sealed artifact.
 use biscuit_auth::{Biscuit, KeyPair, builder::Algorithm};

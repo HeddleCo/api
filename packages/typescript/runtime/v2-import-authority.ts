@@ -38,6 +38,49 @@ export async function verifyImportDelegation(signed:api.SignedImportJobDelegatio
   else{if(!member)reject("ImportPermission");await verifyImportMemberPermission(member,e);const p=member.body!;if(!equal(d.parentPermissionDigest,signedPermissionDigest(member))||!equal(d.delegatingPublicKey,p.subjectPublicKey)||!equal(d.logicalJobId,p.logicalJobId)||!equal(d.retryLineageId,p.retryLineageId)||d.notBeforeUnixSeconds<p.notBeforeUnixSeconds||d.expiresAtUnixSeconds>p.expiresAtUnixSeconds||!subset(d.scope,p.scope!))reject("Scope");}
   await auth(d.delegatingPublicKey,DELEGATION_DOMAIN,api.ImportJobDelegationV1Schema,d,snapshot.delegatingSignature);const digest=signedDelegationDigest(snapshot);const result={get body(){return clone(api.ImportJobDelegationV1Schema,d);},get digest(){return digest.slice();}};checked.set(result,{body:d,digest});return result;
 }
+/** Exact server-frozen projection; no normalization of signed scope. */
+export function delegationPreparation(d:api.ImportJobDelegationV1):api.ImportJobPreparationV1 {
+  return create(api.ImportJobPreparationV1Schema, {
+    formatVersion:d.formatVersion, identity:d.identity, delegationId:d.delegationId,
+    logicalJobId:d.logicalJobId, retryLineageId:d.retryLineageId, jobPublicKey:d.jobPublicKey,
+    jobKeyId:d.jobKeyId, ownerChainDigest:d.ownerChainDigest, purpose:d.purpose,
+    scope:d.scope, cancellationId:d.cancellationId, predecessorDelegationDigest:d.predecessorDelegationDigest,
+  });
+}
+/** Compare with HOST-STORED preparation and independently selected authority.
+ * Native originals, online revocation and transactional activation remain host
+ * gates. Renewal's retained genesis bindings use their original context. */
+export async function verifyPreparedImportDelegation(
+  prepared:api.PrepareImportJobResponse, signed:api.SignedImportJobDelegationV1,
+  member:api.SignedImportMemberPermissionV1|undefined, geneses:readonly api.SignedImportGenesisAuthorityV1[],
+  e:ImportOwnerExpectation,
+):Promise<VerifiedImportDelegation> {
+  // Snapshot every caller-owned input before the first asynchronous signature check.
+  prepared=clone(api.PrepareImportJobResponseSchema,prepared);
+  signed=clone(api.SignedImportJobDelegationV1Schema,signed);
+  member=member?clone(api.SignedImportMemberPermissionV1Schema,member):undefined;
+  geneses=geneses.map(g=>clone(api.SignedImportGenesisAuthorityV1Schema,g));e=snapshotExpectation(e);
+  const p=prepared.proposal??reject("Canonical"),d=signed.body??reject("Canonical");
+  if(!equal(canonicalHybridV1(api.ImportJobPreparationV1Schema,p),canonicalHybridV1(api.ImportJobPreparationV1Schema,delegationPreparation(d))))reject("PreparedFields");
+  const scope=p.scope??reject("Canonical");
+  if(d.branchManifest.length!==scope.branches.length)reject("PreparedFields");
+  d.branchManifest.forEach((m,i)=>{
+    if(!m.limit||!equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,m.limit),canonicalHybridV1(api.ImportBranchLimitV1Schema,scope.branches[i]!)))reject("PreparedFields");
+  });
+  const now=e.nowUnixSeconds,start=d.notBeforeUnixSeconds,end=d.expiresAtUnixSeconds,
+    at=prepared.preparedAtUnixSeconds,skew=prepared.clockSkewAllowanceSeconds;
+  if(at<0n||now<at||prepared.reservationExpiresAtUnixSeconds!==at+3600n||now>=prepared.reservationExpiresAtUnixSeconds)reject("Expired");
+  if(prepared.maxValidityDurationSeconds===0n||start<0n||start<at-skew||start>now+skew||end<=start||end<=now||end-start>prepared.maxValidityDurationSeconds)reject("ValidityBounds");
+  if(member)await verifyImportMemberPermission(member,e);
+  const verified=await verifyImportDelegation(signed,member,{...e,nowUnixSeconds:now>start?now:start});
+  if(geneses.length!==d.branchManifest.length)reject("GenesisBinding");
+  for(const m of d.branchManifest){
+    const branch=m.limit!,g=geneses.find(g=>equal(signedGenesisDigest(g),m.genesisAuthorityDigest))??reject("GenesisBinding"),body=g.body??reject("GenesisBinding");
+    if(!equal(body.genesisDigest,branch.genesisDigest))reject("GenesisBinding");
+    if(!d.predecessorDelegationDigest.some(Boolean))await verifyImportGenesisAuthority(g,verified,branch.genesisDigest,body.originalCreatorSignature,body.creatorAuthorityEnvelopeDigest);
+  }
+  return verified;
+}
 export async function verifyImportGenesisAuthority(signed:api.SignedImportGenesisAuthorityV1,delegation:VerifiedImportDelegation,genesisDigest:Uint8Array,originalSignature:Uint8Array,envelopeDigest:Uint8Array){const g=signed.body,d=read(delegation).body;if(!g)reject("Canonical");if(g.formatVersion!==1)reject("Version");width(g.originalCreatorSignature,64);for(const b of [g.genesisDigest,g.creatorPublicKey,g.creatorAuthorityEnvelopeDigest,g.parentPermissionDigest,g.ownerChainDigest])width(b,32);if(!g.identity||!sameIdentity(g.identity,d.identity!)||!equal(g.creatorPublicKey,d.delegatingPublicKey)||!equal(g.parentPermissionDigest,d.parentPermissionDigest)||!equal(g.ownerChainDigest,d.ownerChainDigest)||!equal(g.genesisDigest,genesisDigest)||!equal(g.originalCreatorSignature,originalSignature)||!equal(g.creatorAuthorityEnvelopeDigest,envelopeDigest)||!d.branchManifest.some(m=>m.limit&&equal(m.limit.genesisDigest,g.genesisDigest)&&equal(m.genesisAuthorityDigest,signedGenesisDigest(signed))))reject("Scope");await auth(g.creatorPublicKey,GENESIS_DOMAIN,api.ImportGenesisAuthorityV1Schema,g,signed.creatorSignature);}
 export async function verifyDelegatedImportOperation(signed:api.SignedDelegatedImportOperationV1,delegation:VerifiedImportDelegation){const o=signed.body,{body:d,digest}=read(delegation);if(!o)reject("Canonical");if(o.formatVersion!==1)reject("Version");width(o.physicalOperationId,16);for(const b of [o.spoolGenesisDigest,o.delegationDigest,o.genesisDigest,o.targetThreadId,o.expectedFrontierDigest,o.resultingFrontierDigest,o.resultingContentDigest,o.optionsDigest])width(b,32);width(o.spoolUuid,16);width(o.logicalJobId,16);width(o.retryLineageId,16);const s=d.scope!,b=s.branches.find(b=>b.refName===o.refName&&b.slotId===o.slotId);if(!b)reject("Scope");width(o.observedCommitOid,o.hashAlgorithm===1?20:o.hashAlgorithm===2?32:reject("Version"));if(!equal(o.spoolUuid,d.identity!.spoolUuid)||!equal(o.spoolGenesisDigest,d.identity!.spoolGenesisDigest)||!equal(o.logicalJobId,d.logicalJobId)||!equal(o.retryLineageId,d.retryLineageId)||!equal(o.delegationDigest,digest)||o.hashAlgorithm!==b.hashAlgorithm||(b.refMode===1&&!equal(o.observedCommitOid,b.pinnedCommitOid))||!equal(o.genesisDigest,b.genesisDigest)||!equal(o.targetThreadId,b.targetThreadId)||!equal(o.expectedFrontierDigest,b.expectedFrontierDigest)||o.resultBytes>b.maxResultBytes||o.resultBytes===0n||!equal(o.optionsDigest,s.optionsDigest)||o.converterVersion!==s.converterVersion)reject("Scope");await auth(d.jobPublicKey,OPERATION_DOMAIN,api.DelegatedImportOperationV1Schema,o,signed.jobSignature);}
 export async function verifyNewImportOperation(signed:api.SignedDelegatedImportOperationV1,d:VerifiedImportDelegation,now:bigint){const b=read(d).body;interval(b.notBeforeUnixSeconds,b.expiresAtUnixSeconds,now);await verifyDelegatedImportOperation(signed,d);}

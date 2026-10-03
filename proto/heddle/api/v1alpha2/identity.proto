@@ -703,7 +703,8 @@ message RenamePasskeyResponse {
 // CALL_FAILURE_CODE_FAILED_PRECONDITION / ERROR_REASON_LIFECYCLE_STATE.
 // Recovery factors alone are not usable sign-in methods. Retire sign-in
 // authority and revoke temporary sessions minted by this passkey together;
-// retain signed evidence for admitted history. Device revocation is separate.
+// retain signed evidence for admitted history. Device-root cascades follow the
+// canonical identity model's CURRENT/TARGET revocation policy.
 message RemovePasskeyRequest {
   string client_operation_id = 1;
   RecordRef passkey = 2;

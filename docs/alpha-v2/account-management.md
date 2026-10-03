@@ -32,8 +32,8 @@ removal of the last one with typed `CALL_FAILURE_CODE_FAILED_PRECONDITION` and
 `ERROR_REASON_LIFECYCLE_STATE`, without committing removal. Recovery factors alone
 do not count as usable sign-in methods. Retiring the passkey authority and
 revoking temporary sessions minted by that passkey happen together. Public signed
-evidence for already admitted history remains available; registered-device
-revocation has its own command.
+evidence for already admitted history remains available. Device-root cascades
+follow the [canonical identity model's CURRENT/TARGET revocation policy](https://github.com/HeddleCo/weft/blob/integration/docs/IDENTITY_RESOURCE_AUTHORIZATION_MODEL.md#revocation-decisions).
 
 `SetDisplayName` takes `display_name` at tag 2 and returns the updated
 `PrincipalRecord` at tag 2. Normalization is exactly

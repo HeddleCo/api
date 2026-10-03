@@ -1,0 +1,449 @@
+{
+  "floor": [
+    1024,
+    524288,
+    "4194304"
+  ],
+  "settings_fields": {
+    "audience": "audience",
+    "default_state_audience": "defaultStateAudience",
+    "description": "description",
+    "allow_child_creation": "allowChildCreation",
+    "require_review_to_land": "requireReviewToLand",
+    "abandoned_thread_retention": "abandonedThreadRetention",
+    "default_review_policy": "defaultReviewPolicy",
+    "hold_lifecycle": "holdLifecycle",
+    "blocking_discussion_resolve_rule": "blockingDiscussionResolveRule",
+    "default_thread": "defaultThread"
+  },
+  "budgets": [
+    {
+      "name": "above maximum clamps",
+      "requested": [
+        4294967295,
+        4294967295,
+        "18446744073709551615"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "accepted": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "accepted_wire_hex": "088008108080201880808002"
+    },
+    {
+      "name": "zero selects defaults",
+      "requested": [
+        0,
+        0,
+        "0"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "accepted": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "accepted_wire_hex": "088008108080201880808002"
+    },
+    {
+      "name": "below floor stays requested",
+      "requested": [
+        20,
+        1024,
+        "2048"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "accepted": [
+        20,
+        1024,
+        "2048"
+      ],
+      "accepted_wire_hex": "0814108008188010"
+    },
+    {
+      "name": "mixed zero",
+      "requested": [
+        0,
+        1024,
+        "0"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "accepted": [
+        1024,
+        1024,
+        "4194304"
+      ],
+      "accepted_wire_hex": "0880081080081880808002"
+    },
+    {
+      "name": "capacity above floor clamps",
+      "requested": [
+        4096,
+        2097152,
+        "16777216"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        8192,
+        4194304,
+        "33554432"
+      ],
+      "capacity": [
+        2048,
+        1048576,
+        "8388608"
+      ],
+      "accepted": [
+        2048,
+        1048576,
+        "8388608"
+      ],
+      "accepted_wire_hex": "088010108080401880808004"
+    },
+    {
+      "name": "capacity below floor retries",
+      "requested": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1023,
+        524288,
+        "4194304"
+      ],
+      "error": "capacity"
+    },
+    {
+      "name": "small request fits low capacity",
+      "requested": [
+        20,
+        1024,
+        "2048"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        20,
+        1024,
+        "2048"
+      ],
+      "accepted": [
+        20,
+        1024,
+        "2048"
+      ],
+      "accepted_wire_hex": "0814108008188010"
+    },
+    {
+      "name": "invalid frame shape",
+      "requested": [
+        20,
+        1023,
+        "2048"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "shape"
+    },
+    {
+      "name": "invalid zero default",
+      "requested": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "defaults": [
+        0,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    },
+    {
+      "name": "fixed overhead impossible",
+      "requested": [
+        20,
+        1024,
+        "1023"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "shape"
+    },
+    {
+      "name": "below floor items only",
+      "requested": [
+        0,
+        0,
+        "0"
+      ],
+      "defaults": [
+        1023,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1023,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    },
+    {
+      "name": "below floor frame only",
+      "requested": [
+        0,
+        0,
+        "0"
+      ],
+      "defaults": [
+        1024,
+        524287,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524287,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    },
+    {
+      "name": "below floor snapshot only",
+      "requested": [
+        0,
+        0,
+        "0"
+      ],
+      "defaults": [
+        1024,
+        524288,
+        "4194303"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194303"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    },
+    {
+      "name": "defaults above maximum only",
+      "requested": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "defaults": [
+        1025,
+        524288,
+        "4194304"
+      ],
+      "maximum": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "capacity": [
+        1024,
+        524288,
+        "4194304"
+      ],
+      "error": "advertisement"
+    }
+  ],
+  "thread_wire_hex": "7a0308c8018201330a070a0573706f6f6c1a2861616161616161616161616161616161616161616161616161616161616161616161616161616161f201020864",
+  "integrated_at": "100",
+  "settings_wire_hex": "080310021a066265666f726520012801320208143a081206706f6c69637940014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+  "cleared_settings_wire_hex": {
+    "audience": "10021a066265666f726520012801320208143a081206706f6c69637940014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "default_state_audience": "08031a066265666f726520012801320208143a081206706f6c69637940014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "description": "0803100220012801320208143a081206706f6c69637940014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "allow_child_creation": "080310021a066265666f72652801320208143a081206706f6c69637940014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "require_review_to_land": "080310021a066265666f72652001320208143a081206706f6c69637940014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "abandoned_thread_retention": "080310021a066265666f7265200128013a081206706f6c69637940014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "default_review_policy": "080310021a066265666f7265200128013202081440014801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "hold_lifecycle": "080310021a066265666f726520012801320208143a081206706f6c6963794801522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "blocking_discussion_resolve_rule": "080310021a066265666f726520012801320208143a081206706f6c6963794001522412220a200303030303030303030303030303030303030303030303030303030303030303",
+    "default_thread": "080310021a066265666f726520012801320208143a081206706f6c69637940014801"
+  },
+  "clear_request_wire_hex": "3a270a0e64656661756c745f7468726561640a1564656661756c745f7265766965775f706f6c696379",
+  "echoes_wire_hex": {
+    "ContentEvent": "4a0c088008108080201880808002",
+    "ListPathsEvent": "220c088008108080201880808002",
+    "ArtifactEvent": "220c088008108080201880808002",
+    "SearchEvent": "2a0c088008108080201880808002",
+    "ResolveResourcesResponse": "120c088008108080201880808002",
+    "ResolveHandlesResponse": "120c088008108080201880808002",
+    "GetFileSymbolsResponse": "2a0c088008108080201880808002",
+    "GetDefinitionResponse": "2a0c088008108080201880808002",
+    "GetSemanticRefsResponse": "320c088008108080201880808002",
+    "GetSemanticImportersResponse": "320c088008108080201880808002"
+  },
+  "replacement_cases": [
+    {
+      "field": "default_thread",
+      "patch_wire_hex": "522412220a200404040404040404040404040404040404040404040404040404040404040404",
+      "mask": [
+        "default_thread"
+      ],
+      "denied": [
+        "default_thread"
+      ]
+    },
+    {
+      "field": "default_review_policy",
+      "patch_wire_hex": "3a0c120a706f6c6963792d74776f",
+      "mask": [
+        "default_review_policy"
+      ],
+      "denied": [
+        "default_review_policy"
+      ]
+    },
+    {
+      "field": "atomic",
+      "patch_wire_hex": "1a0561667465723a0c120a706f6c6963792d74776f522412220a200404040404040404040404040404040404040404040404040404040404040404",
+      "mask": [
+        "description",
+        "default_thread",
+        "default_review_policy"
+      ],
+      "denied": [
+        "default_review_policy"
+      ]
+    }
+  ]
+}

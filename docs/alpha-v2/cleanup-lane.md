@@ -41,10 +41,33 @@ path, with no depth cap and no ranking.
 with FIELD_INVALID for `page.size`. ReadBudget zero fields choose advertised
 finite defaults; nonzero values are upper bounds that may shorten the page.
 The generic `normalize_page_size` / `normalizePageSize` helpers do not apply to
-these RPC-specific bounds. Charge every event including completion. Paths are emitted individually so
-`max_frame_bytes` bounds every frame. A budget too small for even one eligible
-path plus completion fails RESOURCE_EXHAUSTED rather than returning a cursor
-that cannot progress. Completion uses section `paths`, exact `computed_for`,
+these RPC-specific bounds. The first event is the mandatory effective `accepted_budget` echo under the
+shared stream.proto clamp/floor rules. Charge every event including this echo
+and completion. Paths are indivisible, so ListPaths has per-method bounds:
+`LIST_PATHS_MIN_READ_BUDGET = { max_items: 3, max_frame_bytes: 65536, max_snapshot_bytes: 65536 }`.
+After clamping, reject any smaller field with INVALID_ARGUMENT before source
+selection or matching, including an empty query. Defaults must meet this method
+minimum. The three items reserve an echo, one path and completion; this minimum
+is below the guaranteed floor and never widens a signed nonzero request.
+
+An admitted leaf path is at most 16384 UTF-8 bytes, without truncation. Its
+complete encoded ListPathsEvent, including the requested revision reference,
+is at most 32768 bytes. Echo and terminal completion are each at most 8192
+encoded bytes, including page tokens; reserve another 1024 bytes for transport
+framing. The maximum first path plus both controls therefore fits within 50176
+bytes, below the 65536-byte minimum. Check reference/control overhead from the
+request before source selection, and construct bounded page tokens. A nonempty
+window MUST emit its first visible path; shorten subsequent paths to fit and
+return PARTIAL with the existing continuation after the last emitted path.
+Never skip/truncate a path or emit an empty page before the same oversized item.
+
+Enforce the path limit at source admission for this content-read profile:
+oversized paths fail INVALID_ARGUMENT before admitting the source. Validate
+existing sources that predate the bound as a whole-profile prerequisite,
+independently of prefix, visible matches or budget. An incompatible source has
+coverage UNAVAILABLE with no paths, cursor or offending-path details, rather
+than a matching-row budget rejection. No additional wire/chunk protocol is
+needed. Completion uses section `paths`, exact `computed_for`,
 coverage, and PageInfo; COMPLETE means this window was evaluated, while
 `exhausted` alone means there are no more visible matches. Unavailable source
 uses coverage UNAVAILABLE without a fabricated empty COMPLETE result. Missing
@@ -138,8 +161,8 @@ Each repository ref page defaults to 128 and caps at 512; eight selectors cap a
 snapshot or delta batch at 4096 refs, additionally bounded by ObserveOptions.budget.
 Use these RPC-specific bounds, not the generic page helper. A repository row
 and its embedded refs must fit max_frame_bytes; shorten the visible ref page
-and return a continuation when needed. If even the row plus one eligible ref
-and status cannot fit, fail RESOURCE_EXHAUSTED rather than loop without progress.
+and return a continuation when needed. Fixed selection/control overhead that cannot fit is INVALID_ARGUMENT before
+matching. Data exceeding the window returns PARTIAL with continuation.
 Excess
 selector count, duplicates, or oversized pages are INVALID_ARGUMENT with the
 corresponding FIELD_INVALID. `refs = 9` contains branch/tag entries sorted by

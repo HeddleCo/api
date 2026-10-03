@@ -7,8 +7,10 @@ weft enforcement and tapestry presentation follow separately.
 
 `SpoolSettings.blocking_discussion_resolve_rule` is a delegated setting beside
 `hold_lifecycle` and the other landing settings. `ReviseSpool` requires resource
-administrator authority and replaces complete settings under the spool version
-CAS. `UNSPECIFIED` removes the local override: walk to the nearest specified
+administrator authority and patches the fields selected by `settings_mask`
+under the spool version CAS. Omission leaves the rule unchanged. Explicitly mask
+`blocking_discussion_resolve_rule` with `UNSPECIFIED` to remove the local override
+(with permission to read/clear its current value): walk to the nearest specified
 ancestor, with `ANY_WRITER` as the root fallback. A child can set any explicit
 rule. Existing spools with no setting keep today's behavior.
 

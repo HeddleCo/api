@@ -32,6 +32,8 @@
     "./repository": "./dist/repository_pb.js",
     "./attachment-authorization": "./dist/attachment-authorization.js",
     "./v2": "./dist/v1alpha2/index.js",
+    "./v2/read-budget": "./dist/v1alpha2/read-budget.js",
+    "./v2/spool-settings": "./dist/v1alpha2/spool-settings.js",
     "./v2/observation": "./dist/v1alpha2/observation.js",
     "./v2/timeline-upload": "./dist/v1alpha2/timeline-upload.js",
     "./v2/client": "./dist/v1alpha2/client.js",

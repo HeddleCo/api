@@ -10,6 +10,14 @@ import "heddle/api/v1alpha2/stream.proto";
 // embargo and entry gates to ReadContent. See docs/alpha-v2/code-navigation.md.
 // Hidden targets are indistinguishable from absent ones, including readiness,
 // ambiguity, truncation, counts and page tokens. Never follow a spoollink.
+// All four methods have per-method minimum budgets: 4 items, 65536 frame bytes,
+// 65536 snapshot bytes after clamping. Reject smaller fields INVALID_ARGUMENT
+// before index selection/matching. Admitted encoded sizes: CodeSymbol and
+// CodeOccurrence <= 16384 each; CodeSemanticRef and CodeImporter <= 32768 each;
+// CodeNavigationMetadata and PageInfo <= 8192 each. Reserve 1024 wrapper/control
+// bytes. A whole definition pair or first paged row always fits. Enforce item
+// and worst-case metadata bounds at admission; incompatible preexisting indexes
+// are NO_INDEX independent of matches. See code-navigation.md for full rules.
 enum SemanticAttestation {
   SEMANTIC_ATTESTATION_UNSPECIFIED = 0;
   SEMANTIC_ATTESTATION_CLIENT_ATTESTED = 1;
@@ -139,6 +147,8 @@ message GetFileSymbolsResponse {
   repeated CodeSymbol symbols = 2;
   PageInfo page = 3;
   CodeNavigationReason reason = 4;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 5;
 }
 
 message GetDefinitionRequest {
@@ -156,6 +166,8 @@ message GetDefinitionResponse {
     CodeSymbol definition = 3;
     CodeNavigationReason reason = 4;
   }
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 5;
 }
 
 enum CodeEdgeKind {
@@ -201,6 +213,8 @@ message GetSemanticRefsResponse {
   // A next_page alone is not truncation. Hidden edges never affect this bit.
   bool truncated = 4;
   CodeNavigationReason reason = 5;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 6;
 }
 
 message GetSemanticImportersRequest {
@@ -221,4 +235,6 @@ message GetSemanticImportersResponse {
   PageInfo page = 3;
   bool truncated = 4;
   CodeNavigationReason reason = 5;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 6;
 }

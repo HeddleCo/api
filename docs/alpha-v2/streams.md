@@ -335,9 +335,107 @@ including transfers that can resume. Every stream still bounds its initial
 response and incomplete frames. A canceled read preserves both partial framing
 and its original deadline; reconnecting is distinct from restarting that timer.
 
-Endpoints advertise positive default and maximum item/frame/snapshot/batch limits.
-Accepted budgets cannot exceed either the requested nonzero limit or endpoint
-maximum. The shared codec ceiling is 8 MiB per control message; endpoints should
+`ReadBudget` in stream.proto is the single definition for observations, finite
+reads and transfer openings; Rust and TypeScript helpers use that generated type.
+Endpoints advertise positive defaults no greater than their maxima. Every
+endpoint, including devices and providers, MUST advertise maximums at least
+`GUARANTEED_READ_BUDGET = { max_items: 1024, max_frame_bytes: 524288,
+max_snapshot_bytes: 4194304 }`. This is a capacity floor, not a required page size.
+
+For each field, resolve zero to the advertised default, then take
+`min(resolved request, advertised maximum, current capacity)`. Above-maximum
+values MUST clamp and MUST NOT cause rejection on that basis. An accepted field
+MUST be at least `min(resolved request, guaranteed floor)`: capacity below that
+bound fails retryably with UNAVAILABLE, never silently accepts a smaller budget.
+Nonzero small requests remain upper bounds; endpoints never widen them to the
+floor. Defaults below the floor are allowed. INVALID_ARGUMENT is reserved for
+structurally impossible budgets decided from the request shape before matching:
+frame bytes below 1024, clamped snapshot bytes below frame bytes, or fixed
+selection/control overhead exceeding the effective item budget, including
+per-method minima and, where applicable, the terminal-failure reserve below. The indivisible-result
+progress guarantee applies only to ListPaths and the four code-navigation methods.
+Their explicit admission bounds and minimum budgets in cleanup-lane.md and
+code-navigation.md fit a maximum admitted row plus control overhead: validate
+the effective method minimum before source selection or matching and item bounds
+at source/index admission. A matching collection exceeding budget returns
+bounded PARTIAL coverage and a continuation, not RESOURCE_EXHAUSTED; its first
+visible row fits and advances the continuation. Unary GetDefinition returns its
+bounded whole answer. Matching row counts and sizes never choose a budget failure
+for these methods. Existing blob range reads remain chunked. No generic chunk
+protocol is introduced.
+
+Other indivisible shapes have no guaranteed whole-record bound. This includes
+ObserveRuns `RunRecord` (including all pending permissions and their exact intent
+bytes), `RunPolicy` and `TimelineRecord`, in both default and LATEST mode, initial
+snapshots, resumed remainders and live updates. Apply current authorization and
+the caller-visible projection before the size check; hidden records cannot cause
+this failure. If the next visible whole record cannot fit an empty otherwise legal
+batch with its required controls, or the mandatory initial run/policy set cannot
+fit the initial snapshot with its required controls, terminate through the existing
+typed CallFailure channel before emitting the offending record or committing that
+batch. Check encoded event wrappers and transport framing, item count, frame bytes
+and total snapshot/batch bytes. This rule also applies to other methods' uncovered
+indivisible results; chunked payloads retain their existing rules. If the record
+fits a fresh legal batch and only the current batch is full, use bounded PARTIAL
+coverage and continuation instead of failing.
+
+Use the fixed failure `INDIVISIBLE_RESULT_FAILURE = { code: RESOURCE_EXHAUSTED,
+message: "indivisible result exceeds read budget" }`, with ErrorDetail absent.
+The complete failure frame, including transport framing, is at most 128 bytes.
+Endpoints serving uncovered indivisible results apply this reserve:
+Reserve one item and 128 bytes for this terminal failure in every snapshot/batch;
+charge it and all other controls to the accepted budget. Reject insufficient fixed
+control/reserve overhead with INVALID_ARGUMENT before selecting or matching data.
+No offending reference, intent, size, count, required-budget value or retry hint is
+included. Discard uncommitted staging and retain only the last committed cursor;
+failure is not a checkpoint or successful completion. Do not omit mandatory
+permissions/policy, truncate decision-bound bytes, widen the echo, skip a record,
+or return empty PARTIAL/Reset cycles for an unrepresentable result. Reconnecting
+or moving the same record between batches cannot fix its size. Clients MUST NOT
+automatically retry this failure with the same budget; an explicit new request
+with a larger signed budget can succeed only if the complete authorized result
+and controls fit that budget and the endpoint's limits.
+
+LATEST ObserveRuns uses the existing stream cursor to finish a budget-limited
+initial selection when its mandatory run/policy set and each whole timeline record
+fit as specified above; otherwise the bounded terminal failure applies. The
+initial latest-N boundary is fixed before the snapshot;
+the checkpoint cursor retains that boundary and the last delivered position.
+A PARTIAL `timeline` status has `page.exhausted=false` and an empty `next_page`.
+The first checkpoint commits the available snapshot with `snapshot_complete=true`;
+that bit commits staging, while SectionStatus coverage describes whether the
+fixed selection is complete. Continue the remainder in bounded UPSERT batches
+on this stream, or reconnect with `ObserveOptions.after_cursor` to finish it.
+Complete the fixed remainder before following newer positions, even when new
+records arrive during truncation/disconnection. The completing batch includes
+COMPLETE status with `page.exhausted=true`, then a checkpoint. Subsequent records
+append normally. Every remainder batch is charged against the effective budget,
+including statuses/checkpoints. PageRequest remains forbidden in LATEST; resume
+never selects a new latest N. Live authorization is rechecked before handoff;
+lost retained remainder/boundary or genuine removal requires terminal Reset,
+never silently skipping into a new selection.
+
+`StreamOpen.accepted_budget` is mandatory, including on resume. It echoes the
+fully resolved effective budget with all fields positive, each no larger than
+the corresponding nonzero request or advertised maximum, and meeting the lower
+bound above. Finite streams ReadContent, ListPaths, ReadArtifact and Search emit
+exactly one initial `accepted_budget` oneof event before any data, statuses or
+completion; it has no selection payload. Unary ResolveResources, ResolveHandles
+and all four code-navigation reads echo `accepted_budget` in their response.
+TransferReady.budget and ReplicationReady.budget are the same mandatory effective
+echo vocabulary. Charge echo/control frames to the budget alongside domain data.
+A missing/zero echo is a protocol error. Client helpers validate positive fields,
+request bounds and the nonzero-request floor without DescribeEndpoint; transports
+retain responsibility for actual byte/item accounting. Zero-default bounds and
+advertised maximum checks belong to the endpoint.
+
+A client may sign a fixed read budget before its first request.
+`heddle-req-sig-v1` binds identity, the exact proto method path, timestamp,
+16-byte nonce and SHA256 of the exact deterministic request bytes; it binds no
+endpoint or audience value. Its clock must be within `PROOF_WINDOW_MILLIS`.
+DescribeEndpoint is optional for sizing/signing reads; signing canonical bytes
+are unchanged. The endpoint echoes the effective budget without rewriting the
+signed request body. The shared codec ceiling is 8 MiB per control message; endpoints should
 choose smaller limits for interactive views. The cursor ceiling is 4096 bytes.
 Enforce frame lengths before allocating the declared body. Transports and typed
 reducers additionally enforce total snapshot/batch/item limits; the lifecycle

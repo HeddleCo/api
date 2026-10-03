@@ -115,6 +115,8 @@ message SpoolOverview {
   string name = 3;
   bytes version = 4;
   Audience audience = 5;
+  // Caller-filtered projection, never a complete replacement record. Both
+  // default_thread and default_review_policy omit deleted/unreadable targets.
   SpoolSettings settings = 6;
   repeated ActionAvailability actions = 7;
   repeated SectionStatus sections = 8;

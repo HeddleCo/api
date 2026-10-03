@@ -6,6 +6,31 @@ use heddle_api::heddle::api::v1alpha2::{
 use heddle_api::v2::{ObservationState, StreamProtocolError};
 
 #[test]
+fn missing_or_zero_budget_echo_cannot_open_an_observation() {
+    let mut state = ObservationState::new([7; 32], Vec::new());
+    for accepted_budget in [None, Some(Default::default())] {
+        assert_eq!(
+            state.accept(
+                &frame(
+                    1,
+                    stream_frame::Body::Open(StreamOpen {
+                        binding_digest: vec![7; 32],
+                        accepted_budget,
+                        ..Default::default()
+                    })
+                ),
+                false
+            ),
+            Err(StreamProtocolError::Budget)
+        );
+        assert_eq!(state.cursor(), b"");
+    }
+    state
+        .accept(&frame(1, open(&[])), false)
+        .expect("valid echo");
+}
+
+#[test]
 fn shared_stream_wire_vectors_match_rust_codec() {
     use heddle_api::framing::{
         decode_stream_frame, encode_stream_failure, encode_stream_message, encode_stream_raw_body,
@@ -83,6 +108,7 @@ fn frame(sequence: u64, body: stream_frame::Body) -> StreamFrame {
 fn open(resumed_from: &[u8]) -> stream_frame::Body {
     stream_frame::Body::Open(StreamOpen {
         binding_digest: vec![7; 32],
+        accepted_budget: Some(heddle_api::v2::GUARANTEED_READ_BUDGET),
         resumed_from: resumed_from.to_vec(),
         ..Default::default()
     })

@@ -2,6 +2,7 @@ syntax = "proto3";
 package heddle.api.v1alpha2;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
@@ -33,6 +34,8 @@ message ResourceResolution {
 }
 message ResolveResourcesResponse {
   repeated ResourceResolution results = 1;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 2;
 }
 
 enum ResourceRole {
@@ -73,7 +76,7 @@ enum BlockingDiscussionResolveRule {
 }
 
 // Fresh bootstrap permits child creation and has no implicit approval mandate.
-// Explicit review policies still apply. A revision supplies the complete record;
+// Explicit review policies still apply. ReviseSpool patches selected settings;
 // its settings participate in the observed review policy version.
 //
 // Mutation is SpoolService.ReviseSpool under delegated
@@ -100,6 +103,10 @@ message SpoolSettings {
   bool allow_child_creation = 4;
   bool require_review_to_land = 5;
   google.protobuf.Duration abandoned_thread_retention = 6;
+  // Omit if the selected policy is deleted/unreadable by this caller, retaining
+  // the stored reference. Unset/deleted/unreadable look identical; no hidden ID.
+  // Set only to an existing readable policy in this spool. Clear explicitly
+  // through ReviseSpool.settings_mask, with permission to read/clear its value.
   RecordRef default_review_policy = 7;
   HoldLifecycle hold_lifecycle = 8;
   // Local override, changed via ReviseSpool under resource administrator
@@ -114,8 +121,9 @@ message SpoolSettings {
   // retry/reimport must preserve an existing administrator selection.
   // Returned in SpoolOverview.settings. Omit for callers when deleted/unreadable
   // without clearing the stored selection or silently replacing it. No hidden
-  // ID/tombstone; unset/deleted/unreadable look identical. Complete submitted
-  // settings without this field explicitly clear it; filtered reads do not.
+  // ID/tombstone; unset/deleted/unreadable look identical. Omission from an
+  // unmasked revision leaves it unchanged. Clear explicitly through
+  // ReviseSpool.settings_mask, with permission to read/clear its current value.
   ThreadRef default_thread = 10;
   // Opaque compare-and-swap version belongs to the containing spool record.
 }
@@ -243,7 +251,7 @@ message CreateSpoolRequest {
   }
   optional string display_name = 6;
 }
-// Compare and replace display name and complete settings atomically. The stable
+// Compare and replace display name and patch selected settings atomically. The stable
 // UUID, parent, and immutable owner genesis are unchanged.
 // Owner signature is not a prerequisite. The mere existence of a signed-policy
 // tip does not block this RPC (independent CAS from expected_head).
@@ -260,6 +268,21 @@ message ReviseSpoolRequest {
   // Rename updates descendant addresses in the same transaction and preserves
   // UUID-based references, grants and ownership. Empty is invalid when present.
   optional string slug = 6;
+  // Paths relative to settings: only the ten top-level SpoolSettings field
+  // names are valid. Nested paths, wildcards, unknown and duplicate paths are
+  // INVALID_ARGUMENT. Omitted/empty mask leaves every setting unchanged;
+  // settings values outside the mask are ignored, even on a filtered overview.
+  // A selected path sets its supplied value, including false/empty/UNSPECIFIED.
+  // An absent selected message explicitly clears it (settings may be absent).
+  // Clears/reset-to-default require permission to read AND clear the current
+  // value. Replacing default_thread or default_review_policy also removes the
+  // current caller-filtered reference and requires that permission; setting an
+  // equal reference does not. Independently validate permission for the new
+  // target. Deny atomically with PERMISSION_DENIED and no hidden-value details.
+  // Bind the stored-value check and update to the same expected_version and
+  // recheck live authorization at commit. Validate resulting audience/policy
+  // together; no partial apply. There is no complete-record mode.
+  google.protobuf.FieldMask settings_mask = 7;
 }
 // Move a personal-root child to the account's root-level address at its current
 // slug. UUID, genesis, descendants, and direct grants survive.

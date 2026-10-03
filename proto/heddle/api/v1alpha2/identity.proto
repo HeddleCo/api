@@ -1237,6 +1237,8 @@ message HandleResolution {
 
 message ResolveHandlesResponse {
   repeated HandleResolution handles = 1;
+  // Mandatory, fully populated effective ReadBudget.
+  ReadBudget accepted_budget = 2;
 }
 message ClaimHandleRequest {
   string client_operation_id = 1;

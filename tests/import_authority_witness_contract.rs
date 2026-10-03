@@ -1614,7 +1614,7 @@ fn commit_negative(f: &Value, v: &Value) {
                 .expect("parent body");
             assert_eq!(now, prepared.reservation_expires_at_unix_seconds);
             assert!(
-                body.not_before_unix_seconds <= now - 1
+                body.not_before_unix_seconds < now
                     && body.expires_at_unix_seconds > now
                     && p.expires_at_unix_seconds > now,
                 "reservation must expire during otherwise valid authority"

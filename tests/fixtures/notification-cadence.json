@@ -1,0 +1,176 @@
+[
+  {
+    "name": "account interval absent",
+    "scope": "account",
+    "interval": null,
+    "violation": null
+  },
+  {
+    "name": "account interval 0",
+    "scope": "account",
+    "interval": {
+      "seconds": 0,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "account interval 3600",
+    "scope": "account",
+    "interval": {
+      "seconds": 3600,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "account interval 86400",
+    "scope": "account",
+    "interval": {
+      "seconds": 86400,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "account interval 604800",
+    "scope": "account",
+    "interval": {
+      "seconds": 604800,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "account interval negative",
+    "scope": "account",
+    "interval": {
+      "seconds": -1,
+      "nanos": 0
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "account interval unsupported",
+    "scope": "account",
+    "interval": {
+      "seconds": 1800,
+      "nanos": 0
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "account interval positive nanos",
+    "scope": "account",
+    "interval": {
+      "seconds": 86400,
+      "nanos": 1
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "account interval negative nanos",
+    "scope": "account",
+    "interval": {
+      "seconds": 3600,
+      "nanos": -1
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "account interval too large",
+    "scope": "account",
+    "interval": {
+      "seconds": 315576000001,
+      "nanos": 0
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "override interval 0",
+    "scope": "override",
+    "interval": {
+      "seconds": 0,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "override interval 3600",
+    "scope": "override",
+    "interval": {
+      "seconds": 3600,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "override interval 86400",
+    "scope": "override",
+    "interval": {
+      "seconds": 86400,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "override interval 604800",
+    "scope": "override",
+    "interval": {
+      "seconds": 604800,
+      "nanos": 0
+    },
+    "violation": null
+  },
+  {
+    "name": "override interval negative",
+    "scope": "override",
+    "interval": {
+      "seconds": -1,
+      "nanos": 0
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "override interval unsupported",
+    "scope": "override",
+    "interval": {
+      "seconds": 1800,
+      "nanos": 0
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "override interval positive nanos",
+    "scope": "override",
+    "interval": {
+      "seconds": 86400,
+      "nanos": 1
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "override interval negative nanos",
+    "scope": "override",
+    "interval": {
+      "seconds": 3600,
+      "nanos": -1
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "override interval too large",
+    "scope": "override",
+    "interval": {
+      "seconds": 315576000001,
+      "nanos": 0
+    },
+    "violation": "InvalidDigestInterval"
+  },
+  {
+    "name": "override interval missing",
+    "scope": "override",
+    "interval": null,
+    "violation": "InvalidDigestInterval"
+  }
+]

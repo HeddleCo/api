@@ -1,0 +1,902 @@
+[
+  {
+    "kind": "",
+    "channel": 0,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 0,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "",
+    "channel": 0,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "",
+    "channel": 0,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "",
+    "channel": 0,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 1,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 1,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "",
+    "channel": 1,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "",
+    "channel": 1,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "",
+    "channel": 1,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 2,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 2,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "",
+    "channel": 2,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "",
+    "channel": 2,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "",
+    "channel": 2,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 3,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 3,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "",
+    "channel": 3,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "",
+    "channel": 3,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "",
+    "channel": 3,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 99,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 99,
+    "delivery": 1,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 99,
+    "delivery": 2,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 99,
+    "delivery": 3,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "",
+    "channel": 99,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 0,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 0,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "*",
+    "channel": 0,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "*",
+    "channel": 0,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "*",
+    "channel": 0,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 1,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 1,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "*",
+    "channel": 1,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "*",
+    "channel": 1,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "*",
+    "channel": 1,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 2,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 2,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "*",
+    "channel": 2,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "*",
+    "channel": 2,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "*",
+    "channel": 2,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 3,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 3,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "*",
+    "channel": 3,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "*",
+    "channel": 3,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "*",
+    "channel": 3,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 99,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 99,
+    "delivery": 1,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 99,
+    "delivery": 2,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 99,
+    "delivery": 3,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "*",
+    "channel": 99,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 0,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 0,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 0,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "mention",
+    "channel": 0,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 0,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 1,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 1,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 1,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "mention",
+    "channel": 1,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 1,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 2,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 2,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 2,
+    "delivery": 2,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 2,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 2,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 3,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 3,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 3,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "mention",
+    "channel": 3,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "mention",
+    "channel": 3,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 99,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 99,
+    "delivery": 1,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 99,
+    "delivery": 2,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 99,
+    "delivery": 3,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "mention",
+    "channel": 99,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 0,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 0,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "account_security",
+    "channel": 0,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "account_security",
+    "channel": 0,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "account_security",
+    "channel": 0,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 1,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 1,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "account_security",
+    "channel": 1,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "account_security",
+    "channel": 1,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "account_security",
+    "channel": 1,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 2,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 2,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "account_security",
+    "channel": 2,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "account_security",
+    "channel": 2,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "account_security",
+    "channel": 2,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 3,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 3,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "account_security",
+    "channel": 3,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "account_security",
+    "channel": 3,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "account_security",
+    "channel": 3,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 99,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 99,
+    "delivery": 1,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 99,
+    "delivery": 2,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 99,
+    "delivery": 3,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "account_security",
+    "channel": 99,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 0,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 0,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "security_surface",
+    "channel": 0,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 0,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 0,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 1,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 1,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "security_surface",
+    "channel": 1,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 1,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "security_surface",
+    "channel": 1,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 2,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 2,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "security_surface",
+    "channel": 2,
+    "delivery": 2,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 2,
+    "delivery": 3,
+    "violation": "LockedEmail"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 2,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 3,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 3,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "security_surface",
+    "channel": 3,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 3,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "security_surface",
+    "channel": 3,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 99,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 99,
+    "delivery": 1,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 99,
+    "delivery": 2,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 99,
+    "delivery": 3,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "security_surface",
+    "channel": 99,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 0,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 0,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 0,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 0,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 0,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 1,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 1,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 1,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 1,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 1,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 2,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 2,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 2,
+    "delivery": 2,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 2,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 2,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 3,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 3,
+    "delivery": 1,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 3,
+    "delivery": 2,
+    "violation": "DigestRequiresEmail"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 3,
+    "delivery": 3,
+    "violation": null
+  },
+  {
+    "kind": "future_kind",
+    "channel": 3,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 99,
+    "delivery": 0,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 99,
+    "delivery": 1,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 99,
+    "delivery": 2,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 99,
+    "delivery": 3,
+    "violation": "InvalidRule"
+  },
+  {
+    "kind": "future_kind",
+    "channel": 99,
+    "delivery": 99,
+    "violation": "InvalidRule"
+  }
+]

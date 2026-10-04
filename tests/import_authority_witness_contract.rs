@@ -170,11 +170,21 @@ fn submission_changed_prepare_scope_is_rejected() {
 fn submission_commit_requires_source() {
     let f = fixture();
     assert_eq!(
-        import::validate_commit_request(&record(&f, "submission_missing_source"), "github"),
+        import::validate_commit_request(
+            &record(&f, "submission_missing_source"),
+            "github",
+            &record(&f, "source_connected"),
+            &record(&f, "import_configuration")
+        ),
         Err(codec::Reject::SourceSelection)
     );
-    import::validate_commit_request(&record(&f, "commit_request"), "github")
-        .expect("complete control");
+    import::validate_commit_request(
+        &record(&f, "commit_request"),
+        "github",
+        &record(&f, "source_connected"),
+        &record(&f, "import_configuration"),
+    )
+    .expect("complete control");
 }
 
 #[test]
@@ -184,8 +194,13 @@ fn submission_import_source_is_closed() {
         import::validate_import_source(&record(&f, "import_source_misuse")),
         Err(codec::Reject::ImportSourceRequiresCommit)
     );
-    import::validate_commit_request(&record(&f, "commit_request"), "github")
-        .expect("Commit control");
+    import::validate_commit_request(
+        &record(&f, "commit_request"),
+        "github",
+        &record(&f, "source_connected"),
+        &record(&f, "import_configuration"),
+    )
+    .expect("Commit control");
 }
 
 #[test]
@@ -270,8 +285,25 @@ fn submission_contract_vectors() {
         .as_array()
         .expect("commit negatives")
     {
-        let bad = record(&f, v["request"].as_str().expect("request"));
-        let actual = import::validate_commit_request(&bad, "github");
+        let bad: api::CommitImportJobRequest = record(&f, v["request"].as_str().expect("request"));
+        let provider = if bad.source.as_ref().is_some_and(|s| s.connection.is_none()) {
+            "public-git"
+        } else {
+            "github"
+        };
+        let actual = import::validate_commit_request(
+            &bad,
+            provider,
+            &record(
+                &f,
+                if provider == "public-git" {
+                    "source_public_github"
+                } else {
+                    "source_connected"
+                },
+            ),
+            &record(&f, "import_configuration"),
+        );
         assert_eq!(
             format!("{:?}", actual.expect_err("negative")),
             v["expected"].as_str().expect("reason")
@@ -281,23 +313,56 @@ fn submission_contract_vectors() {
             v["id"].as_str().expect("id"),
             actual.expect_err("negative")
         );
-        import::validate_commit_request(&record(&f, "commit_request"), "github")
-            .expect("complete Commit control");
+        import::validate_commit_request(
+            &record(&f, "commit_request"),
+            "github",
+            &record(&f, "source_connected"),
+            &record(&f, "import_configuration"),
+        )
+        .expect("complete Commit control");
         println!(
             "SUBMISSION PASS commit.{}: complete control",
             v["id"].as_str().expect("id")
         );
     }
     for name in ["commit_hosted_base", "commit_public_source"] {
-        import::validate_commit_request(&record(&f, name), "github")
-            .expect("optional base / public source");
+        import::validate_commit_request(
+            &record(&f, name),
+            if name == "commit_public_source" {
+                "public-git"
+            } else {
+                "github"
+            },
+            &record(
+                &f,
+                if name == "commit_public_source" {
+                    "source_public_github"
+                } else {
+                    "source_connected"
+                },
+            ),
+            &record(&f, "import_configuration"),
+        )
+        .expect("optional base / public source");
     }
     let commit: api::CommitImportJobRequest = record(&f, "commit_request");
     let c = Context::new(&f);
-    import::verify_commit_submission(&commit, &response, "github", &c.owner(1100))
-        .expect("complete signed initial submission");
+    import::verify_commit_submission(
+        &commit,
+        &response,
+        "github",
+        &record(&f, "source_connected"),
+        &record(&f, "import_configuration"),
+        &c.owner(1100),
+    )
+    .expect("complete signed initial submission");
     assert_eq!(
-        import::validate_commit_request(&commit, "gitlab"),
+        import::validate_commit_request(
+            &commit,
+            "gitlab",
+            &record(&f, "source_connected"),
+            &record(&f, "import_configuration")
+        ),
         Err(codec::Reject::SourceSelection)
     );
     let pending = record(&f, "commit_response");
@@ -326,7 +391,13 @@ fn submission_contract_vectors() {
         Err(codec::Reject::ImportSourceRequiresCommit)
     );
     println!("SUBMISSION REJECT ImportSource misuse: ImportSourceRequiresCommit");
-    import::validate_commit_request(&commit, "github").expect("use Commit instead");
+    import::validate_commit_request(
+        &commit,
+        "github",
+        &record(&f, "source_connected"),
+        &record(&f, "import_configuration"),
+    )
+    .expect("use Commit instead");
     println!("SUBMISSION PASS ImportSource misuse: Commit control");
     let observe: api::ImportPermissionScopeV1 = record(&f, "scope_observe_disclosed");
     let undisclosed = record(&f, "scope_observe_undisclosed");
@@ -2004,10 +2075,28 @@ fn p2_isolated_private_source() {
     bad.source.as_mut().expect("source").private = false;
     assert_eq!(bad, good);
     bad.source.as_mut().expect("source").private = true;
-    import::validate_commit_request(&good, "github").expect("public control");
+    import::validate_commit_request(
+        &good,
+        "public-git",
+        &record(&f, "source_public_github"),
+        &record(&f, "import_configuration"),
+    )
+    .expect("public control");
     println!("P2 PRIVATE CONTROL PASS");
     assert_eq!(
-        import::validate_commit_request(&bad, "github"),
+        import::validate_commit_request(
+            &bad,
+            "public-git",
+            &record(
+                &f,
+                if true {
+                    "source_public_github"
+                } else {
+                    "source_connected"
+                }
+            ),
+            &record(&f, "import_configuration")
+        ),
         Err(codec::Reject::SourceSelection)
     );
     println!("P2 PRIVATE NEGATIVE SourceSelection");
@@ -2034,6 +2123,8 @@ fn p2_isolated_signed_direct_owner_disclosure() {
         &good,
         &record(&f, "submission_observe_preparation"),
         "github",
+        &record(&f, "source_connected"),
+        &record(&f, "import_configuration"),
         &c.owner(1100),
     )
     .expect("signed direct owner control");
@@ -2043,6 +2134,8 @@ fn p2_isolated_signed_direct_owner_disclosure() {
             &record(&f, "submission_observe_undisclosed_request"),
             &record(&f, "submission_observe_undisclosed_preparation"),
             "github",
+            &record(&f, "source_connected"),
+            &record(&f, "import_configuration"),
             &c.owner(1100)
         )
         .err(),
@@ -2335,6 +2428,9 @@ fn alpha24_renew_and_read_negatives_reject_then_pass() {
     for v in vectors["negative"].as_array().expect("renew negatives") {
         let mut request: api::RenewImportJobRequest =
             record(&f, v["request"].as_str().expect("request"));
+        if let Some(size) = v["outer_field_bytes"].as_u64() {
+            request.client_operation_id = "x".repeat(size as usize);
+        }
         if let Some(size) = v["envelope_bytes"].as_u64() {
             request
                 .proof
@@ -2378,6 +2474,9 @@ fn alpha24_renew_and_read_negatives_reject_then_pass() {
         let request = record(&f, "job_state_request");
         let mut response: api::GetImportJobStateResponse =
             record(&f, v["response"].as_str().expect("response"));
+        if let Some(size) = v["outer_field_bytes"].as_u64() {
+            response.state.as_mut().expect("state").logical_job_id = vec![1; size as usize];
+        }
         if let Some(size) = v["envelope_bytes"].as_u64() {
             response
                 .retained_proof
@@ -2553,4 +2652,397 @@ fn alpha24_job_state_read_is_authenticated_writer_only_and_gated() {
         m.verify_protocol(&Default::default()),
         Err(codec::Reject::Protocol)
     );
+}
+
+fn alpha25_result(result: Result<(), codec::Reject>, v: &Value, failures: &mut Vec<String>) {
+    let actual = result
+        .err()
+        .map(|r| format!("{r:?}"))
+        .unwrap_or_else(|| "OK".into());
+    println!("ALPHA25 {}: {} -> control PASS", v["id"], actual);
+    if actual != v["expected"].as_str().expect("expected") {
+        failures.push(format!("{}: {actual}", v["id"]));
+    }
+}
+#[test]
+fn alpha25_configuration_negatives() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    for v in f["source_vectors"]["configuration_negative"]
+        .as_array()
+        .expect("cases")
+    {
+        alpha25_result(
+            import::validate_import_configuration(&record(
+                &f,
+                v["configuration"].as_str().expect("configuration"),
+            )),
+            v,
+            &mut failures,
+        );
+        import::validate_import_configuration(&record(&f, v["control"].as_str().expect("control")))
+            .expect("control");
+    }
+    import::validate_import_configuration(&record(&f, "configuration_no_default"))
+        .expect("explicit chooser");
+    assert!(failures.is_empty(), "{failures:?}");
+}
+#[test]
+fn alpha25_resolver_negatives() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    for v in f["source_vectors"]["resolution"].as_array().expect("cases") {
+        let result = import::resolve_import_provider(
+            &record(&f, v["source"].as_str().expect("source")),
+            v["connection_provider"].as_str(),
+        );
+        if v["expected"].is_string() {
+            alpha25_result(result.map(|_| ()), v, &mut failures);
+            import::resolve_import_provider(
+                &record(&f, v["control"].as_str().expect("control")),
+                v["control_connection_provider"].as_str(),
+            )
+            .expect("control");
+        } else {
+            assert_eq!(
+                result.expect("resolved provider"),
+                v["provider"].as_str().expect("provider")
+            );
+        }
+    }
+    assert!(failures.is_empty(), "{failures:?}");
+}
+#[test]
+fn alpha25_hash_discovery_negatives() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    for v in f["source_vectors"]["hash_negative"]
+        .as_array()
+        .expect("cases")
+    {
+        alpha25_result(
+            import::validate_repository_hash_algorithm(
+                &record(&f, v["source"].as_str().expect("source")),
+                v["known"].as_bool().expect("known"),
+            ),
+            v,
+            &mut failures,
+        );
+        import::validate_repository_hash_algorithm(
+            &record(&f, v["control"].as_str().expect("control")),
+            true,
+        )
+        .expect("control");
+    }
+    import::validate_repository_hash_algorithm(&record(&f, "source_unknown"), false)
+        .expect("retryable unknown discovery");
+    assert!(failures.is_empty(), "{failures:?}");
+}
+#[test]
+fn alpha25_discovered_scope_negatives() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    for v in f["source_vectors"]["scope_negative"]
+        .as_array()
+        .expect("cases")
+    {
+        alpha25_result(
+            import::validate_discovered_import_scope(
+                &record(&f, v["scope"].as_str().expect("scope")),
+                &record(&f, v["source"].as_str().expect("source")),
+            ),
+            v,
+            &mut failures,
+        );
+        import::validate_discovered_import_scope(
+            &record(&f, "scope_public_sha256_observe"),
+            &record(&f, "source_public_sha256"),
+        )
+        .expect("SHA256 observe control");
+    }
+    assert!(failures.is_empty(), "{failures:?}");
+}
+#[test]
+fn alpha25_prepare_source_negatives() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    let scope: api::ImportPermissionScopeV1 = record(&f, "scope");
+    for v in f["source_vectors"]["prepare_negative"]
+        .as_array()
+        .expect("cases")
+    {
+        alpha25_result(
+            import::prepare_import_source_scope(
+                &record(&f, v["request"].as_str().expect("request")),
+                &record(&f, "source_public_sha256"),
+                None,
+                &record(&f, "import_configuration"),
+                &scope.destination_version,
+                None,
+            )
+            .map(|_| ()),
+            v,
+            &mut failures,
+        );
+        import::prepare_import_source_scope(
+            &record(&f, "prepare_public_sha256"),
+            &record(&f, "source_public_sha256"),
+            None,
+            &record(&f, "import_configuration"),
+            &scope.destination_version,
+            None,
+        )
+        .expect("control");
+    }
+    assert!(failures.is_empty(), "{failures:?}");
+}
+fn alpha25_remaining_parent(id: &str) {
+    let f = fixture();
+    let c = Context::new(&f);
+    let old = delegation(&f, &c);
+    let v = f["amendment_vectors"]["permission_negatives"]
+        .as_array()
+        .expect("cases")
+        .iter()
+        .find(|v| v["id"] == id)
+        .expect("case");
+    let p: api::SignedImportMemberPermissionV1 = record(&f, v["parent"].as_str().expect("parent"));
+    let good: api::SignedImportMemberPermissionV1 = record(&f, "renewed_permission");
+    let a = p
+        .body
+        .as_ref()
+        .expect("body")
+        .scope
+        .as_ref()
+        .expect("scope");
+    let b = good
+        .body
+        .as_ref()
+        .expect("body")
+        .scope
+        .as_ref()
+        .expect("scope");
+    assert_eq!(a.branches, b.branches);
+    if id == "operations_budget" {
+        assert_eq!(a.max_result_bytes, b.max_result_bytes);
+    } else {
+        assert_eq!(a.max_operations, b.max_operations);
+    }
+    assert_eq!(
+        import::verify_renewal(
+            &record(&f, v["renewal"].as_str().expect("renewal")),
+            &old,
+            &record(&f, "partial_manifest"),
+            1,
+            Some(&p),
+            &c.owner(1200)
+        )
+        .err(),
+        Some(codec::Reject::RenewalFork)
+    );
+    import::verify_renewal(
+        &record(&f, "renewal"),
+        &old,
+        &record(&f, "partial_manifest"),
+        1,
+        Some(&good),
+        &c.owner(1200),
+    )
+    .expect("control");
+    println!("ALPHA25 REJECT then PASS remaining_parent.{id}: RenewalFork");
+}
+#[test]
+fn alpha25_remaining_parent_operations_budget() {
+    alpha25_remaining_parent("operations_budget");
+}
+#[test]
+fn alpha25_remaining_parent_result_bytes_budget() {
+    alpha25_remaining_parent("result_bytes_budget");
+}
+#[test]
+fn alpha25_commit_source_negatives() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    for v in f["source_vectors"]["commit_negative"]
+        .as_array()
+        .expect("cases")
+    {
+        alpha25_result(
+            import::validate_commit_request(
+                &record(&f, v["request"].as_str().expect("request")),
+                "github",
+                &record(&f, v["source"].as_str().expect("source")),
+                &record(&f, v["configuration"].as_str().expect("configuration")),
+            ),
+            v,
+            &mut failures,
+        );
+        import::validate_commit_request(
+            &record(&f, v["control"].as_str().expect("control")),
+            "github",
+            &record(&f, v["control_source"].as_str().expect("source")),
+            &record(&f, "import_configuration"),
+        )
+        .expect("control");
+    }
+    assert!(failures.is_empty(), "{failures:?}");
+}
+#[test]
+fn alpha25_signed_sha256_observe_and_converter_choice() {
+    let f = fixture();
+    let c = Context::new(&f);
+    for v in f["source_vectors"]["signed_observe"]
+        .as_array()
+        .expect("cases")
+    {
+        import::verify_commit_submission(
+            &record(&f, v["request"].as_str().expect("request")),
+            &record(&f, v["preparation"].as_str().expect("preparation")),
+            v["provider"].as_str().expect("provider"),
+            &record(&f, v["source"].as_str().expect("source")),
+            &record(&f, "import_configuration"),
+            &c.owner(1100),
+        )
+        .expect("signed SHA256 observe");
+        println!("ALPHA25 signed SHA256 observe {}: PASS", v["id"]);
+    }
+    import::validate_import_configuration(&record(&f, "configuration_multiple"))
+        .expect("later entry recommended");
+}
+#[test]
+fn alpha25_public_selector_may_omit_repository_id() {
+    let f = fixture();
+    let mut request: api::CommitImportJobRequest = record(&f, "commit_public_source");
+    request
+        .source
+        .as_mut()
+        .expect("source")
+        .provider_repository_id
+        .clear();
+    import::validate_commit_request(
+        &request,
+        "public-git",
+        &record(&f, "source_public_github"),
+        &record(&f, "import_configuration"),
+    )
+    .expect("current discovery binds exact URL");
+    let mut prepare: api::PrepareImportJobRequest = record(&f, "prepare_public_sha256");
+    prepare
+        .source
+        .as_mut()
+        .expect("selector")
+        .provider_repository_id
+        .clear();
+    let scope: api::ImportPermissionScopeV1 = record(&f, "scope");
+    import::prepare_import_source_scope(
+        &prepare,
+        &record(&f, "source_public_sha256"),
+        None,
+        &record(&f, "import_configuration"),
+        &scope.destination_version,
+        None,
+    )
+    .expect("public Prepare input may omit redundant ID");
+}
+#[test]
+fn alpha25_commit_preserves_frozen_pin_after_branch_movement() {
+    let f = fixture();
+    let request: api::CommitImportJobRequest = record(&f, "commit_request");
+    let current: api::ProviderRepository = record(&f, "commit_source_different_oid");
+    let scope = request.proof.as_ref().expect("proof").delegations[0]
+        .body
+        .as_ref()
+        .expect("body")
+        .scope
+        .as_ref()
+        .expect("scope");
+    assert_ne!(
+        scope.branches[0].pinned_commit_oid,
+        hex::decode(&current.refs[0].head_oid).expect("known moved head")
+    );
+    import::validate_commit_request(
+        &request,
+        "github",
+        &current,
+        &record(&f, "import_configuration"),
+    )
+    .expect("frozen pin remains the selected commit");
+}
+
+#[test]
+fn alpha25_renewal_source_prepare_vectors() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let read: api::GetImportJobStateResponse = record(&f, "job_state_partial");
+    let state = read.state.as_ref().expect("authenticated retained state");
+    let parent = record(&f, "permission");
+    let predecessor = import::verify_renewal_predecessor(state, Some(&parent), &c.owner(1600))
+        .expect("independently authenticated expired predecessor");
+    import::validate_renewal_preparation_from_read(
+        &record(&f, "renew_prepare_request"),
+        &record(&f, "renewal_preparation"),
+        &read,
+    )
+    .expect("exact retained Prepare/read control");
+    let mut failures = Vec::new();
+    for v in f["source_vectors"]["renewal_prepare"]
+        .as_array()
+        .expect("shared cases")
+    {
+        let request: api::PrepareImportJobRequest =
+            record(&f, v["request"].as_str().expect("request"));
+        let current: api::ProviderRepository = record(&f, v["source"].as_str().expect("source"));
+        if v["id"] == "replacement_pin" {
+            assert_eq!(
+                hex::encode(
+                    &request.proposed_scope.as_ref().expect("scope").branches[0].pinned_commit_oid
+                ),
+                current.refs[0].head_oid,
+                "replacement matches today's head but exceeds retained authority"
+            );
+        }
+        let configuration = record(
+            &f,
+            v["configuration"]
+                .as_str()
+                .unwrap_or("import_configuration"),
+        );
+        let scope = request.proposed_scope.as_ref().expect("scope");
+        let changed_state: api::ImportJobCasStateV1;
+        let current_state = if let Some(name) = v["state"].as_str() {
+            changed_state = record(&f, name);
+            &changed_state
+        } else {
+            state
+        };
+        let retained = v["retained"]
+            .as_bool()
+            .expect("retained state selection")
+            .then_some((&predecessor, current_state));
+        let result = import::prepare_import_source_scope(
+            &request,
+            &current,
+            Some("github"),
+            &configuration,
+            &record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version,
+            retained,
+        );
+        if let Ok(prepared) = &result {
+            let mut expected_scope = scope.clone();
+            if expected_scope.destination_version.is_empty() {
+                expected_scope.destination_version =
+                    record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version;
+            }
+            assert_eq!(prepared, &expected_scope, "retained selection stays exact");
+        }
+        let actual = result.map_or_else(|error| format!("{error:?}"), |_| "OK".into());
+        println!("ALPHA25 renewal_source.{}: {actual}", v["id"]);
+        if actual != v["expected"].as_str().expect("expected") {
+            failures.push(format!(
+                "{}: expected {}, got {actual}",
+                v["id"], v["expected"]
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:?}");
 }

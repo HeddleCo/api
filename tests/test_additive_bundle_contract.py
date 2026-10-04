@@ -92,6 +92,7 @@ class AdditiveBundleContractTest(unittest.TestCase):
                 ("default_branch", 8),
                 ("refs", 9),
                 ("refs_status", 10),
+                ("hash_algorithm", 11),
             ],
         )
         connection = body(INTEGRATION, "message", "ProviderConnection")

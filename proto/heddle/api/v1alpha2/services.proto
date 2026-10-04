@@ -2654,6 +2654,20 @@ service IntegrationService {
     deployment_targets: [DEPLOYMENT_TARGET_WEFT]
     maturity: SERVICE_MATURITY_PLANNED
   };
+  // Discover current source identity, repository format and optional ref page.
+  rpc ResolveImportSource(ResolveImportSourceRequest) returns (ResolveImportSourceResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // Read current CAS state and retained authority after lost responses/clients.
   // The authenticated principal MUST be a writer on the destination.
   rpc GetImportJobState(GetImportJobStateRequest) returns (GetImportJobStateResponse) {

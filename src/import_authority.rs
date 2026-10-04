@@ -273,6 +273,203 @@ pub fn conversion_options_digest(version: &str, options: &[u8]) -> Result<Vec<u8
     Ok(hash(&[b"heddle-import-conversion-options-v1", &bytes]))
 }
 
+/// Resolve explicit custody using a CURRENT authenticated connection provider.
+/// Public URLs never select an adapter by domain. Network/grant checks remain host gates.
+pub fn resolve_import_provider(
+    source: &ProviderRepository,
+    connection_provider: Option<&str>,
+) -> Result<&'static str, Reject> {
+    canonical_https(&source.clone_url, false)?;
+    if source.provider_repository_id.len() > 4096 || source.name.len() > 4096 {
+        return Err(Reject::Bounds);
+    }
+    if let Some(connection) = &source.connection {
+        let positive = |v: &str| {
+            !v.is_empty()
+                && v.bytes().all(|b| b.is_ascii_digit())
+                && v.parse::<u64>().is_ok_and(|id| id > 0)
+        };
+        if connection_provider != Some("github")
+            || connection.spool.is_some()
+            || connection.id.is_empty()
+            || !positive(&source.provider_repository_id)
+            || !positive(&source.installation_id)
+        {
+            return Err(Reject::SourceSelection);
+        }
+        let path = source
+            .clone_url
+            .strip_prefix("https://github.com/")
+            .ok_or(Reject::SourceSelection)?;
+        let parts: Vec<_> = path.split('/').collect();
+        if parts.len() != 2
+            || parts[0].is_empty()
+            || parts[1].strip_suffix(".git").is_none_or(str::is_empty)
+        {
+            return Err(Reject::SourceSelection);
+        }
+        Ok("github")
+    } else {
+        if connection_provider.is_some()
+            || source.private
+            || !source.installation_id.is_empty()
+            || (!source.provider_repository_id.is_empty()
+                && source.provider_repository_id != source.clone_url)
+        {
+            return Err(Reject::SourceSelection);
+        }
+        Ok("public-git")
+    }
+}
+
+/// Discovery may report unknown. Preparing/signing requires known=true; no SHA-1 fallback.
+pub fn validate_repository_hash_algorithm(
+    source: &ProviderRepository,
+    known: bool,
+) -> Result<(), Reject> {
+    let size = match source.hash_algorithm {
+        1 => Some(40),
+        2 => Some(64),
+        0 if !known => None,
+        _ => return Err(Reject::Version),
+    };
+    if source.refs.len() > 512 {
+        return Err(Reject::Bounds);
+    }
+    for (i, r) in source.refs.iter().enumerate() {
+        if r.hash_algorithm != source.hash_algorithm {
+            return Err(Reject::SourceSelection);
+        }
+        if i > 0 && source.refs[i - 1].name >= r.name {
+            return Err(Reject::Canonical);
+        }
+        if !r.head_oid.is_empty() {
+            let size = size.ok_or(Reject::Version)?;
+            if r.head_oid.len() != size {
+                return Err(Reject::SourceSelection);
+            }
+            if !r
+                .head_oid
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Err(Reject::Canonical);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Compare independent repository discovery before signing, including known-OID pinning.
+pub fn validate_discovered_import_scope(
+    scope: &ImportPermissionScopeV1,
+    source: &ProviderRepository,
+) -> Result<(), Reject> {
+    validate_discovered_import_scope_inner(scope, source, false)
+}
+
+fn validate_discovered_import_scope_inner(
+    scope: &ImportPermissionScopeV1,
+    source: &ProviderRepository,
+    retained: bool,
+) -> Result<(), Reject> {
+    validate_repository_hash_algorithm(source, true)?;
+    if scope.source_url != source.clone_url {
+        return Err(Reject::SourceSelection);
+    }
+    for b in &scope.branches {
+        if b.hash_algorithm != source.hash_algorithm {
+            return Err(Reject::SourceSelection);
+        }
+        let oid = source
+            .refs
+            .iter()
+            .find(|r| r.name == b.ref_name)
+            .filter(|r| !r.head_oid.is_empty())
+            .map(|r| hex::decode(&r.head_oid).map_err(|_| Reject::Canonical))
+            .transpose()?;
+        // An authenticated retained pin selects its original commit, not today's head.
+        validate_ref_selection(
+            b,
+            if retained && b.ref_mode == 1 {
+                None
+            } else {
+                oid.as_deref()
+            },
+        )?;
+    }
+    Ok(())
+}
+
+/// Host resolves the selector anew and checks current grants and selected-commit
+/// availability before issuing a reservation, including renewals. Retained state
+/// MUST come from an authenticated job-state read or receiver-owned durable state;
+/// the opaque predecessor binds its independently verified authority to that CAS.
+pub fn prepare_import_source_scope(
+    request: &PrepareImportJobRequest,
+    current_source: &ProviderRepository,
+    connection_provider: Option<&str>,
+    configuration: &GetImportConfigurationResponse,
+    current_destination_version: &[u8],
+    retained: Option<(&VerifiedImportRenewalPredecessor, &ImportJobCasStateV1)>,
+) -> Result<ImportPermissionScopeV1, Reject> {
+    let selector = request.source.as_ref().ok_or(Reject::SourceSelection)?;
+    if selector.connection != current_source.connection
+        || (selector.provider_repository_id != current_source.provider_repository_id
+            && (selector.connection.is_some() || !selector.provider_repository_id.is_empty()))
+        || selector.installation_id != current_source.installation_id
+        || selector.private != current_source.private
+    {
+        return Err(Reject::SourceSelection);
+    }
+    let scope = request.proposed_scope.as_ref().ok_or(Reject::Canonical)?;
+    let provider = resolve_import_provider(current_source, connection_provider)?;
+    if scope.provider != provider {
+        return Err(Reject::SourceSelection);
+    }
+    if let Some((predecessor, state)) = retained {
+        validate_cas_state(state)?;
+        let previous = &predecessor.previous.body;
+        let identity = previous.identity.as_ref().ok_or(Reject::Canonical)?;
+        if signing_digest("heddle-import-job-cas-state-v1", state)? != predecessor.state_digest
+            || request.renew_logical_job_id != previous.logical_job_id
+            || request.retry_lineage_id != previous.retry_lineage_id
+            || request.destination.as_ref().is_none_or(|s| {
+                initial_operation_id(&identity.spool_uuid, false).map_or(true, |id| s.id != id)
+            })
+        {
+            return Err(Reject::StaleContext);
+        }
+        let mut selected = scope.clone();
+        if selected.destination_version.is_empty() {
+            selected.destination_version = current_destination_version.to_vec();
+        }
+        remaining_scope(
+            &selected,
+            previous.scope.as_ref().ok_or(Reject::Canonical)?,
+            state.committed_manifest.as_ref().ok_or(Reject::Canonical)?,
+        )?;
+    } else if !request.renew_logical_job_id.is_empty() {
+        return Err(Reject::StaleContext);
+    }
+    validate_discovered_import_scope_inner(scope, current_source, retained.is_some())?;
+    prepare_scope(scope, configuration, current_destination_version)
+}
+
+fn validate_provider_support(
+    provider: &str,
+    configuration: &GetImportConfigurationResponse,
+) -> Result<(), Reject> {
+    if !configuration
+        .providers
+        .iter()
+        .any(|p| p.provider == provider)
+    {
+        return Err(Reject::SourceSelection);
+    }
+    Ok(())
+}
+
 pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Result<(), Reject> {
     use prost::Message;
     if v.encoded_len() > MAX_BUNDLE_BYTES || v.converters.is_empty() || v.converters.len() > 32 {
@@ -298,6 +495,27 @@ pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Resu
         {
             return Err(Reject::Canonical);
         }
+    }
+    if v.providers.is_empty() || v.providers.len() > 2 {
+        return Err(Reject::Bounds);
+    }
+    for (i, p) in v.providers.iter().enumerate() {
+        if i > 0 && v.providers[i - 1].provider >= p.provider {
+            return Err(Reject::Canonical);
+        }
+        let mode = match p.provider.as_str() {
+            "github" => 1,
+            "public-git" => 2,
+            _ => return Err(Reject::SourceSelection),
+        };
+        if p.source_modes != [mode] {
+            return Err(Reject::SourceSelection);
+        }
+    }
+    if let Some(default) = &v.default_converter_version
+        && !v.converters.iter().any(|c| &c.converter_version == default)
+    {
+        return Err(Reject::Canonical);
     }
     let l = v.limits.as_ref().ok_or(Reject::Canonical)?;
     if l.max_branches == 0
@@ -335,6 +553,8 @@ pub fn prepare_scope(
     let mut selected = proposed.clone();
     selected.destination_version = current_destination_version.to_vec();
     validate_scope(&selected).map_err(|_| Reject::PreparationRefused(Reason::InvalidScope))?;
+    validate_provider_support(&selected.provider, configuration)
+        .map_err(|_| Reject::PreparationRefused(Reason::InvalidScope))?;
     let converter = configuration
         .converters
         .iter()
@@ -423,6 +643,8 @@ pub fn validate_preparation_response(
 pub fn validate_commit_request(
     request: &CommitImportJobRequest,
     resolved_provider: &str,
+    current_source: &ProviderRepository,
+    configuration: &GetImportConfigurationResponse,
 ) -> Result<(), Reject> {
     use prost::Message;
     let source = request.source.as_ref().ok_or(Reject::SourceSelection)?;
@@ -479,21 +701,48 @@ pub fn validate_commit_request(
     {
         return Err(Reject::SourceSelection);
     }
-    if let Some(connection) = &source.connection {
-        if connection.spool.is_some()
-            || connection.id.is_empty()
-            || source.provider_repository_id.is_empty()
-            || source.installation_id.is_empty()
-        {
-            return Err(Reject::SourceSelection);
-        }
-    } else if source.private
-        || !source.installation_id.is_empty()
-        || (!source.provider_repository_id.is_empty()
-            && source.provider_repository_id != source.clone_url)
+    if source.connection != current_source.connection
+        || (source.provider_repository_id != current_source.provider_repository_id
+            && (source.connection.is_some() || !source.provider_repository_id.is_empty()))
+        || source.clone_url != current_source.clone_url
+        || source.installation_id != current_source.installation_id
+        || source.private != current_source.private
     {
         return Err(Reject::SourceSelection);
     }
+    let provider = resolve_import_provider(
+        current_source,
+        current_source
+            .connection
+            .as_ref()
+            .map(|_| resolved_provider),
+    )?;
+    if provider != resolved_provider {
+        return Err(Reject::SourceSelection);
+    }
+    validate_import_configuration(configuration)?;
+    validate_provider_support(provider, configuration)?;
+    validate_repository_hash_algorithm(current_source, true)?;
+    if source.hash_algorithm != current_source.hash_algorithm {
+        return Err(Reject::SourceSelection);
+    }
+    // A frozen pin names the selected commit, even if the branch head moves.
+    // OBSERVE still cannot hide a currently known selected OID by clearing hints.
+    for b in &scope.branches {
+        if b.hash_algorithm != current_source.hash_algorithm {
+            return Err(Reject::SourceSelection);
+        }
+        if b.ref_mode == 2
+            && current_source
+                .refs
+                .iter()
+                .any(|r| r.name == b.ref_name && !r.head_oid.is_empty())
+        {
+            return Err(Reject::RefPinning);
+        }
+    }
+    // Current converter/options/budget support is also rechecked at activation.
+    prepare_scope(scope, configuration, &scope.destination_version)?;
     if proof.original_geneses.len() != scope.branches.len()
         || proof.creator_authority_envelopes.len() != scope.branches.len()
         || proof.genesis_authorities.len() != scope.branches.len()
@@ -537,9 +786,11 @@ pub fn verify_commit_submission(
     request: &CommitImportJobRequest,
     prepared: &PrepareImportJobResponse,
     resolved_provider: &str,
+    current_source: &ProviderRepository,
+    configuration: &GetImportConfigurationResponse,
     expected: &ImportOwnerExpectation<'_>,
 ) -> Result<VerifiedImportDelegation, Reject> {
-    validate_commit_request(request, resolved_provider)?;
+    validate_commit_request(request, resolved_provider, current_source, configuration)?;
     let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
     let member = proof
         .member_permission

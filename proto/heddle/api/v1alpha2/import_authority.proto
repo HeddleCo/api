@@ -244,6 +244,15 @@ message ImportPublicProofBundleV1 {
   repeated ImportAuthorityWitnessV1 authority_witnesses = 21;
   repeated HostedLandingWitnessV1 landing_witnesses = 22;
 }
+// Explicit custody selector. The URL is proposed_scope.source_url. The host
+// resolves this selector for the authenticated caller at Prepare and Commit;
+// a domain alone NEVER selects credential custody.
+message ImportSourceSelectionV1 {
+  RecordRef connection = 1; // Absent for unconnected public HTTPS Git.
+  string provider_repository_id = 2;
+  string installation_id = 3;
+  bool private = 4;
+}
 message PrepareImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
@@ -254,6 +263,9 @@ message PrepareImportJobRequest {
   ImportPermissionScopeV1 proposed_scope = 4;
   bytes retry_lineage_id = 5;
   bytes renew_logical_job_id = 6; // Empty initially; no execution authority.
+  // Required. Revalidate current grants, provider support, repository object
+  // format and known OIDs before issuing a reservation. Unknown format blocks.
+  ImportSourceSelectionV1 source = 7;
 }
 // Exact server-frozen projection of ImportJobDelegationV1. No signer, parent
 // permission, genesis-binding digests or validity window exists at Prepare.
@@ -318,10 +330,27 @@ message ImportBudgetLimitsV1 {
   uint64 max_result_bytes = 3; // Positive, <=1 GiB; total per logical job.
   uint64 max_branch_result_bytes = 4; // Positive, <=max_result_bytes.
 }
+enum ImportSourceMode {
+  IMPORT_SOURCE_MODE_UNSPECIFIED = 0;
+  IMPORT_SOURCE_MODE_CONNECTED = 1;
+  IMPORT_SOURCE_MODE_PUBLIC_HTTPS = 2;
+}
+message ImportProviderConfigurationV1 {
+  // Launch registry: github -> CONNECTED; public-git -> PUBLIC_HTTPS.
+  // gitlab is reserved for a future connected adapter and is not advertised.
+  string provider = 1;
+  repeated ImportSourceMode source_modes = 2; // Exactly the registered mode.
+}
 message GetImportConfigurationResponse {
   // Complete sorted unique converter-version list, 1..32; <=1 MiB response.
   repeated ImportConverterConfigurationV1 converters = 1;
   ImportBudgetLimitsV1 limits = 2;
+  // Complete sorted unique provider list, 1..2 entries. Advice, not authority;
+  // both Prepare and Commit revalidate support using current configuration.
+  repeated ImportProviderConfigurationV1 providers = 3;
+  // Optional host recommendation; if present, nonempty and MUST reference one
+  // advertised converter. Absent -> explicit chooser; lexical order is not rank.
+  optional string default_converter_version = 4;
 }
 // Destination-writer-only, authenticated finite read. No listing, pagination or
 // seed/custody/bearer secrets. Unknown and unauthorized jobs use uniform NOT_FOUND.

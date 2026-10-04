@@ -39,8 +39,8 @@ for(const v of fixture.submission_vectors.changed_preparations)test(`submission 
  authority.validateImportPreparationResponse(request,vector(v.control));
 });
 for(const v of fixture.submission_vectors.commit_negatives)test(`submission Commit REJECT then PASS: ${v.id}`,async()=>{
- await assert.rejects(authority.validateImportCommitRequest(vector(v.request),'github'),expected(v.expected));
- await authority.validateImportCommitRequest(vector(v.control),'github');
+ await assert.rejects(authority.validateImportCommitRequest(vector(v.request),vector(v.request).source?.connection?'github':'public-git', vector(vector(v.request).source?.connection?'source_connected':'source_public_github'), vector('import_configuration')),expected(v.expected));
+ await authority.validateImportCommitRequest(vector(v.control),vector(v.control).source?.connection?'github':'public-git', vector(vector(v.control).source?.connection?'source_connected':'source_public_github'), vector('import_configuration'));
 });
 for(const v of fixture.submission_vectors.scope_refusals)test(`submission typed refusal REJECT then PASS: ${v.id}`,()=>{
  const scope=vector('scope'),configuration=vector(v.configuration);
@@ -59,18 +59,18 @@ test('submission CAS issuance preserves all choices and leaves the request untou
 });
 test('submission ImportSource misuse REJECT then PASS with Commit',async()=>{
  assert.throws(()=>authority.validateImportSource(vector('import_source_misuse')),expected('ImportSourceRequiresCommit'));
- await authority.validateImportCommitRequest(vector('commit_request'),'github');
+ await authority.validateImportCommitRequest(vector('commit_request'),'github', vector('source_connected'), vector('import_configuration'));
 });
 test('submission Commit pending operation and immutable replay',async()=>{
  const request=vector('commit_request'),response=vector('commit_response');
- await authority.verifyImportCommitSubmission(request,vector('commit_preparation'),'github',ownerContext());
+ await authority.verifyImportCommitSubmission(request,vector('commit_preparation'),'github', vector('source_connected'), vector('import_configuration'),ownerContext());
  authority.checkImportCommitReplay(request,vector('commit_request'),response);
  const changed=vector('commit_request');changed.initialBaseState=new Uint8Array();
  assert.throws(()=>authority.checkImportCommitReplay(changed,request,response),expected('OperationIdReused'));
  response.receipt.outcome={case:'applied',value:create(api.AppliedSchema)};
  assert.throws(()=>authority.validateImportCommitResponse(request,response),expected('PendingOperation'));
- await assert.rejects(authority.validateImportCommitRequest(request,'gitlab'),expected('SourceSelection'));
- for(const name of ['commit_hosted_base','commit_public_source'])await authority.validateImportCommitRequest(vector(name),'github');
+ await assert.rejects(authority.validateImportCommitRequest(request,'gitlab', vector('source_connected'), vector('import_configuration')),expected('SourceSelection'));
+ for(const name of ['commit_hosted_base','commit_public_source'])await authority.validateImportCommitRequest(vector(name),name==='commit_public_source'?'public-git':'github', vector(name==='commit_public_source'?'source_public_github':'source_connected'), vector('import_configuration'));
 });
 test('submission signed observe disclosure REJECT then PASS; known OID always pinned',async()=>{
  const pinned=vector('scope').branches[0],observe=vector('scope_observe_disclosed').branches[0];
@@ -347,8 +347,8 @@ for(const name of fixture.commit_vectors.passing)test(`browser-completed Commit:
 test('P2 isolated private-source gate: public control differs only by private',async()=>{
  const good=vector('commit_public_source'),bad=vector('submission_private_without_connection');
  bad.source.private=false;assert.deepEqual(bad,good);bad.source.private=true;
- await authority.validateImportCommitRequest(good,'github');console.log('P2 PRIVATE CONTROL PASS');
- await assert.rejects(authority.validateImportCommitRequest(bad,'github'),expected('SourceSelection'));
+ await authority.validateImportCommitRequest(good,'public-git', vector('source_public_github'), vector('import_configuration'));console.log('P2 PRIVATE CONTROL PASS');
+ await assert.rejects(authority.validateImportCommitRequest(bad,'public-git', vector('source_public_github'), vector('import_configuration')),expected('SourceSelection'));
  console.log('P2 PRIVATE NEGATIVE SourceSelection');
 });
 test('P2 isolated signed direct-owner disclosure gate',async()=>{
@@ -356,8 +356,8 @@ test('P2 isolated signed direct-owner disclosure gate',async()=>{
  const gd=good.proof.delegations[0].body,bd=bad.proof.delegations[0].body;
  bd.scope.branches[0].refDisclosure=1;bd.branchManifest[0].limit.refDisclosure=1;assert.deepEqual(bd,gd);
  assert.deepEqual(bad.proof.originalGeneses,good.proof.originalGeneses);assert.deepEqual(bad.proof.genesisAuthorities,good.proof.genesisAuthorities);
- await authority.verifyImportCommitSubmission(good,vector('submission_observe_preparation'),'github',ownerContext());console.log('P2 DISCLOSURE CONTROL PASS');
- await assert.rejects(authority.verifyImportCommitSubmission(vector('submission_observe_undisclosed_request'),vector('submission_observe_undisclosed_preparation'),'github',ownerContext()),expected('RefDisclosure'));
+ await authority.verifyImportCommitSubmission(good,vector('submission_observe_preparation'),'github', vector('source_connected'), vector('import_configuration'),ownerContext());console.log('P2 DISCLOSURE CONTROL PASS');
+ await assert.rejects(authority.verifyImportCommitSubmission(vector('submission_observe_undisclosed_request'),vector('submission_observe_undisclosed_preparation'),'github', vector('source_connected'), vector('import_configuration'),ownerContext()),expected('RefDisclosure'));
  console.log('P2 DISCLOSURE NEGATIVE RefDisclosure');
 });
 for(const v of fixture.amendment_vectors.permission_negatives)test(`remaining renewal parent: ${v.id}`,async()=>{
@@ -425,6 +425,7 @@ test('Commit receipt must name the reserved first physical operation',()=>{
 
 for(const v of fixture.renew_submission_vectors.negative)test(`alpha24 Renew REJECT then PASS: ${v.id}`,()=>{
   const read=vector(v.read),request=vector(v.request);
+  if(v.outer_field_bytes)request.clientOperationId='x'.repeat(v.outer_field_bytes);
   if(v.envelope_bytes)request.proof.creatorAuthorityEnvelopes=[new Uint8Array(v.envelope_bytes).fill(1)];
   assert.throws(()=>authority.validateImportRenewRequest(request,read),expected(v.expected));
   authority.validateImportRenewRequest(vector(v.control),read);
@@ -435,6 +436,7 @@ for(const v of fixture.renew_submission_vectors.read_request_negative)test(`alph
 });
 for(const v of fixture.renew_submission_vectors.read_negative)test(`alpha24 Read REJECT then PASS: ${v.id}`,()=>{
   const request=vector('job_state_request'),response=vector(v.response);
+  if(v.outer_field_bytes)response.state.logicalJobId=new Uint8Array(v.outer_field_bytes).fill(1);
   if(v.envelope_bytes)response.retainedProof.creatorAuthorityEnvelopes=[new Uint8Array(v.envelope_bytes).fill(1)];
   assert.throws(()=>authority.validateImportJobStateResponse(request,response),expected(v.expected));
   authority.validateImportJobStateResponse(request,vector(v.control));
@@ -477,4 +479,96 @@ test('alpha24 job-state read is authenticated destination-writer only, bounded a
  assert.deepEqual(contract.authorizationRequestTargets,[create(common.AuthorizationRequestTargetSchema,{path:'destination',role:common.AuthorizationRole.RESOURCE_WRITER})]);
  assert.deepEqual(contract.mandatoryFeatures,[1]);
  const empty=vector('job_state_empty');authority.validateImportJobStateResponse(vector('job_state_request'),empty);assert.deepEqual(empty.state.committedManifest.slots,[]);
+});
+
+for(const v of fixture.source_vectors.configuration_negative)test(`alpha25 configuration: ${v.id}`,()=>{
+ assert.throws(()=>authority.validateImportConfiguration(vector(v.configuration)),expected(v.expected));
+ authority.validateImportConfiguration(vector(v.control));console.log(`ALPHA25 REJECT then PASS configuration.${v.id}: ${v.expected}`);
+});
+for(const v of fixture.source_vectors.resolution)test(`alpha25 resolver: ${v.id}`,()=>{
+ if(v.expected){assert.throws(()=>authority.resolveImportProvider(vector(v.source),v.connection_provider),expected(v.expected));authority.resolveImportProvider(vector(v.control),v.control_connection_provider);console.log(`ALPHA25 REJECT then PASS resolver.${v.id}: ${v.expected}`);}
+ else assert.equal(authority.resolveImportProvider(vector(v.source),v.connection_provider),v.provider);
+});
+for(const v of fixture.source_vectors.hash_negative)test(`alpha25 discovery: ${v.id}`,()=>{
+ assert.throws(()=>authority.validateRepositoryHashAlgorithm(vector(v.source),v.known),expected(v.expected));
+ authority.validateRepositoryHashAlgorithm(vector(v.control),true);console.log(`ALPHA25 REJECT then PASS discovery.${v.id}: ${v.expected}`);
+});
+for(const v of fixture.source_vectors.scope_negative)test(`alpha25 discovered scope: ${v.id}`,()=>{
+ assert.throws(()=>authority.validateDiscoveredImportScope(vector(v.scope),vector(v.source)),expected(v.expected));
+ authority.validateDiscoveredImportScope(vector('scope_public_sha256_observe'),vector('source_public_sha256'));console.log(`ALPHA25 REJECT then PASS scope.${v.id}: ${v.expected}`);
+});
+for(const v of fixture.source_vectors.prepare_negative)test(`alpha25 Prepare source: ${v.id}`,()=>{
+ const scope=vector('scope');
+ assert.throws(()=>authority.prepareImportSourceScope(vector(v.request),vector('source_public_sha256'),undefined,vector('import_configuration'),scope.destinationVersion),expected(v.expected));
+ authority.prepareImportSourceScope(vector('prepare_public_sha256'),vector('source_public_sha256'),undefined,vector('import_configuration'),scope.destinationVersion);console.log(`ALPHA25 REJECT then PASS prepare.${v.id}: ${v.expected}`);
+});
+test('alpha25 unknown discovery is retryable, optional converter recommendation and SHA256 observe',()=>{
+ authority.validateRepositoryHashAlgorithm(vector('source_unknown'),false);
+ authority.validateImportConfiguration(vector('configuration_no_default'));
+ authority.validateDiscoveredImportScope(vector('scope_public_sha256_observe'),vector('source_public_sha256'));
+ const contract=getOption(api.IntegrationService.method.resolveImportSource,common.rpc_contract);
+ assert.equal(contract.effect,common.RpcEffect.READ_ONLY);assert.equal(contract.retryBehavior,common.RetryBehavior.SAFE);
+ assert.equal(contract.authorizationAccess,common.AuthorizationAccess.AUTHENTICATED_PRINCIPAL);
+ assert.equal(contract.authorizationRole,common.AuthorizationRole.CALLER_BOUND);assert.equal(contract.signingTier,common.SigningTier.PROOF_OF_POSSESSION);
+});
+for(const id of ['operations_budget','result_bytes_budget'])test(`alpha25 remaining parent: ${id}`,async()=>{
+ const v=fixture.amendment_vectors.permission_negatives.find(v=>v.id===id);
+ const old=await authority.verifyImportDelegation(vector('delegation'),vector('permission'),ownerContext());
+ const p=vector(v.parent).body.scope,good=vector('renewed_permission').body.scope;
+ assert.deepEqual(p.branches,good.branches);
+ if(id==='operations_budget')assert.equal(p.maxResultBytes,good.maxResultBytes);else assert.equal(p.maxOperations,good.maxOperations);
+ await assert.rejects(authority.verifyImportRenewal(vector(v.renewal),old,vector('partial_manifest'),1n,vector(v.parent),ownerContext(1200n)),expected('RenewalFork'));
+ await authority.verifyImportRenewal(vector('renewal'),old,vector('partial_manifest'),1n,vector('renewed_permission'),ownerContext(1200n));console.log(`ALPHA25 REJECT then PASS remaining_parent.${id}: RenewalFork`);
+});
+for(const v of fixture.source_vectors.signed_observe)test(`alpha25 signed SHA256 observe: ${v.id}`,async()=>{
+ await authority.verifyImportCommitSubmission(vector(v.request),vector(v.preparation),v.provider,vector(v.source),vector('import_configuration'),ownerContext());
+ console.log(`ALPHA25 signed SHA256 observe ${v.id}: PASS`);
+});
+for(const v of fixture.source_vectors.commit_negative)test(`alpha25 Commit source: ${v.id}`,async()=>{
+ await assert.rejects(authority.validateImportCommitRequest(vector(v.request),'github',vector(v.source),vector(v.configuration)),expected(v.expected));
+ await authority.validateImportCommitRequest(vector(v.control),'github',vector(v.control_source),vector('import_configuration'));
+ console.log(`ALPHA25 REJECT then PASS commit.${v.id}: ${v.expected}`);
+});
+test('alpha25 multiple converter recommendation can name a later advertised entry',()=>authority.validateImportConfiguration(vector('configuration_multiple')));
+test('alpha25 public selector may omit the repository ID while current discovery binds the exact URL',async()=>{
+ const request=vector('commit_public_source');request.source.providerRepositoryId='';
+ await authority.validateImportCommitRequest(request,'public-git',vector('source_public_github'),vector('import_configuration'));
+ const prepare=vector('prepare_public_sha256');prepare.source.providerRepositoryId='';
+ authority.prepareImportSourceScope(prepare,vector('source_public_sha256'),undefined,vector('import_configuration'),vector('scope').destinationVersion);
+});
+test('alpha25 Commit preserves a frozen pinned commit after branch movement',async()=>{
+ const request=vector('commit_request'),current=vector('commit_source_different_oid');
+ assert.notDeepEqual(request.proof.delegations[0].body.scope.branches[0].pinnedCommitOid,new Uint8Array(Buffer.from(current.refs[0].headOid,'hex')));
+ await authority.validateImportCommitRequest(request,'github',current,vector('import_configuration'));
+});
+
+test('alpha25 renewal source Prepare shared vectors',async()=>{
+ const read=vector('job_state_partial'),state=read.state;
+ const predecessor=await authority.verifyImportRenewalPredecessor(state,vector('permission'),ownerContext(1600n));
+ authority.validateRenewalPreparationFromRead(vector('renew_prepare_request'),vector('renewal_preparation'),read);
+ const failures=[];
+ for(const v of fixture.source_vectors.renewal_prepare){
+  const request=vector(v.request),source=vector(v.source),configuration=vector(v.configuration??'import_configuration');
+  if(v.id==='replacement_pin')assert.equal(Buffer.from(request.proposedScope.branches[0].pinnedCommitOid).toString('hex'),source.refs[0].headOid,'replacement matches current head but exceeds retained authority');
+  let actual='OK';
+  try{
+   const retained=v.retained?{predecessor,state:v.state?vector(v.state):state}:undefined;
+   const destinationVersion=vector('scope').destinationVersion;
+   const prepared=authority.prepareImportSourceScope(request,source,'github',configuration,destinationVersion,retained);
+   assert.deepEqual(prepared,{...request.proposedScope,destinationVersion},'retained selection stays exact');
+  }catch(e){actual=e.reason==='PreparationRefused'?`${e.reason}(${api.ImportPreparationRefusalReason[e.preparationRefusalReason].split('_').map(s=>s[0]+s.slice(1).toLowerCase()).join('')})`:e.reason;}
+  console.log(`ALPHA25 renewal_source.${v.id}: ${actual}`);
+  if(actual!==v.expected)failures.push(`${v.id}: expected ${v.expected}, got ${actual}`);
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('alpha25 renewal source Prepare rejects an unverified predecessor token',()=>{
+ const request=vector('renew_prepare_request');
+ assert.throws(()=>authority.prepareImportSourceScope(request,vector('renew_source_moved_head'),'github',vector('import_configuration'),request.proposedScope.destinationVersion,{predecessor:{},state:vector('job_state_partial').state}),expected('Canonical'));
+});
+
+test('alpha25 fresh source Prepare with null retained context still requires the known pin',()=>{
+ const request=vector('fresh_prepare_retained_pin');
+ assert.throws(()=>authority.prepareImportSourceScope(request,vector('renew_source_moved_head'),'github',vector('import_configuration'),request.proposedScope.destinationVersion,null),expected('RefPinning'));
 });

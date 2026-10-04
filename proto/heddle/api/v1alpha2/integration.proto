@@ -10,7 +10,7 @@ import "heddle/api/v1alpha2/stream.proto";
 message ProviderConnection {
   RecordRef ref = 1;
   bytes version = 2;
-  string provider = 3;
+  string provider = 3; // Connected imports support only github.
   string provider_account_id = 4;
   // All active installations authorized by this account's provider credential.
   repeated string installation_ids = 5;
@@ -42,6 +42,11 @@ message ProviderRepository {
   // Absent when unrequested. Section "provider_refs"; coverage plus PageInfo
   // distinguishes an exhausted known-empty page from partial/unavailable data.
   SectionStatus refs_status = 10;
+  // Independently discovered repository object format, including when refs or
+  // the selected commit are unavailable. Zero = unknown/unavailable; never
+  // infer SHA-1. Unknown blocks Prepare/signing; retry discovery. Every known
+  // OID and ProviderRef algorithm MUST agree with this repository format.
+  ImportGitHashAlgorithm hash_algorithm = 11;
 }
 
 message ProviderRef {
@@ -56,6 +61,10 @@ message ProviderRef {
   }
   // Zero/unknown means unknown, never implicitly a branch.
   Kind kind = 3;
+  // Independently obtained repository format; MUST agree with its repository.
+  // Empty head_oid means unavailable, not a format hint. Nonempty OIDs are
+  // lowercase hex, exactly 40/64 characters for SHA1/SHA256 respectively.
+  ImportGitHashAlgorithm hash_algorithm = 4;
 }
 
 message ProviderRefsRequest {
@@ -65,6 +74,24 @@ message ProviderRefsRequest {
   // Default 128, maximum 512. Cursor binds caller, connection, repository,
   // accepted bounds and provider snapshot; a changed snapshot invalidates it.
   PageRequest page = 3;
+}
+// Authenticated bounded discovery for BOTH connected and public HTTPS sources.
+// Public: no connection/installation, private=false, repository ID equals URL
+// (or is empty on input). Connected: current caller-owned GitHub connection,
+// exact repository and installation grant. Host applies URL/SSRF and redirect
+// checks before any fetch; discovery never enrolls or stores credentials.
+message ResolveImportSourceRequest {
+  ProviderRepository source = 1; // Projection hints are never trusted.
+  bool include_refs = 2;
+  // Default 128, max 512. Cursor binds caller, exact custody/source identity,
+  // accepted bounds and provider snapshot. Snapshot changes invalidate it.
+  PageRequest page = 3;
+}
+message ResolveImportSourceResponse {
+  // Authoritative resolved source; <=1 MiB entire response. No credentials.
+  // hash_algorithm may be unknown even with an exhausted/empty ref page.
+  // refs_status has the same coverage/PageInfo semantics as inventory discovery.
+  ProviderRepository source = 1;
 }
 message RemoteLinkRecord {
   RecordRef ref = 1;

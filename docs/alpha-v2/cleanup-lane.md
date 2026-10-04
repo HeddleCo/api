@@ -179,7 +179,14 @@ Continuation tokens bind exact caller authority, connection, repository, page,
 budget and provider snapshot. A moving provider snapshot invalidates the cursor
 with CURSOR_INVALID; never silently skip/duplicate entries across mutations.
 No provider tokens, secrets, or hidden refs appear in status/counts/cursors.
-Unknown/unrequested metadata must survive older servers as absence.
+Repository `hash_algorithm = 11` and ref `hash_algorithm = 4` expose independently
+discovered object format even without a selected OID. Zero is unknown/unavailable;
+never infer SHA-1 or sign/Prepare until discovery is known. Nonempty OIDs must be
+lowercase 40/64-hex for SHA-1/SHA-256 and agree with the repository format.
+Authenticated `ResolveImportSource` provides equivalent format/ref discovery for
+unconnected public HTTPS Git. Its bounded page/status/cursor semantics match this
+inventory read; it never selects connected custody by URL domain. See the
+[normative source rules](import-authority-host-witness.md).
 
 ## C7: capabilities and typed refusal
 

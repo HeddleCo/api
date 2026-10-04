@@ -93,6 +93,61 @@ Provider IDs are lowercase ASCII `[a-z0-9-]{1,64}`; branch refs are full
 `refs/heads/...`, ASCII `[A-Za-z0-9/_-.]`, no empty/dot-leading/`.lock` segments,
 `..`, `@{`, trailing slash/dot or duplicate refs. Converter version is explicit,
 nonempty ASCII, at most 128 bytes. Never silently normalize after signing.
+The launch registry has exactly two provider identities. `github` denotes the
+connected GitHub adapter: an authenticated caller-owned account connection and
+its exact repository/installation grant select credential custody. `public-git`
+denotes unconnected public HTTPS Git, including public github.com and gitlab.com
+URLs, with no connection or installation and `private = false`. A public
+repository ID is the exact URL (or empty on request input). A domain alone never
+selects custody. `gitlab` is reserved for a future connected adapter; connected
+or private GitLab is deferred and MUST NOT be advertised. `public_git` is
+rejected, with no alias. Weft must rename its existing public-source resolver in
+the coordinated cutover; this release changes API only.
+
+`IntegrationService.ResolveImportSource` is an authenticated, caller-bound,
+request-PoP finite read for both source modes. The host independently resolves
+current repository identity, visibility, connection and installation grants,
+applies its public URL/SSRF/redirect policy before fetch, and returns the
+repository `hash_algorithm`, even without a selected commit or ref page. The
+request's metadata is a hint, never evidence. Optional refs use the inventory
+coverage/PageInfo semantics, default 128 and max 512 per page; the whole response
+is at most 1 MiB. Cursors bind caller, exact custody/URL/repository identity,
+accepted bounds and provider snapshot. Unknown/unauthorized connected sources
+use uniform NOT_FOUND. No credential is returned or acquired by public discovery.
+
+Both repository and ref `hash_algorithm` come from independently established
+repository object format (for example an authenticated provider object-format
+read or Git's object-format advertisement), not the selected OID length, URL,
+default branch or a SHA-1 assumption. UNSPECIFIED (zero) means unknown/unavailable;
+unknown enum values are unsupported. Missing/failed format discovery blocks
+Prepare and signing and offers retrying discovery, even when OBSERVE is chosen.
+A discovery response can report zero with empty OIDs without authorizing work.
+Every ref's algorithm agrees with the repository, and each nonempty `head_oid`
+is exactly lowercase 40-hex for SHA-1 or 64-hex for SHA-256. Mismatch is refused.
+For fresh selections, the browser uses `validate_discovered_import_scope` /
+`validateDiscoveredImportScope` before preparing/signing: every selected branch
+must use that discovered format; a known selected OID must be pinned exactly. Algorithm discovery alone never
+waives signed observe disclosure or the settled known-OID pinning rule.
+
+Prepare carries required `ImportSourceSelectionV1`: connection/repository,
+installation and visibility, while its URL is `proposed_scope.source_url`.
+The host resolves it anew, compares the current source to the signed provider/URL
+and branch formats/OID selections, then uses current configuration and policy.
+`prepare_import_source_scope` / `prepareImportSourceScope` perform these portable
+checks using the independently resolved source. Commit repeats current grants,
+provider/mode support, object format, known OID and converter/options/budget
+checks before custody/activation. The independently resolved current repository is an explicit
+input to `validate_commit_request` / `validateImportCommitRequest`, separate from
+the untrusted source projection; current hash format and known OIDs come from
+that resolved snapshot, so clearing incoming refs cannot bypass known-OID pinning.
+A frozen PINNED_COMMIT continues to name its selected commit when the mutable
+branch head moves after Prepare; Commit and authenticated retained renewal Prepare
+never substitute or require a new head. Renewal Prepare uses the verified
+predecessor and authenticated CAS snapshot described below; a request's renewal
+ID alone cannot preserve a pin. Host lookup/fetch, current source grants,
+selected-commit availability, revocation and atomic mutation remain host
+responsibilities. Exact accepted replay retains its settled semantics.
+
 Unknown fields, versions, algorithms, purposes, duplicate fields, noncanonical
 order and trailing bytes fail closed. `strict_decode` / `strictDecode` compare
 decoded protobuf to its re-encoding at the untrusted boundary; signing functions
@@ -274,7 +329,7 @@ destinations, and returns one complete bounded snapshot. A dedicated unary RPC
 keeps this small configuration independent of provider inventory paging and
 observation replacement/resume. It is an ordinary read; the eight existing
 mandatory-feature import gates remain unchanged. Discovery grants no execution
-authority, and Prepare rechecks current support and policy.
+authority, and Prepare and Commit recheck current support and policy.
 
 The response carries 1–32 converters ordered uniquely by exact ASCII version,
 each with a versioned converter-owned `options_encoding`, 1–64 sorted unique
@@ -288,6 +343,21 @@ own specification; select returned octets verbatim instead of reserializing JSON
 or protobuf. Compute `options_digest` using `conversion_options_digest` /
 `conversionOptionsDigest` and the preimage below. Responses are at most 1 MiB;
 do not truncate supported choices.
+
+The response also carries a complete, bounded, sorted unique provider list
+(1–2 entries). Each entry has exactly its registered source mode:
+`github` -> CONNECTED, `public-git` -> PUBLIC_HTTPS. Zero, unknown, duplicate,
+missing or mismatched modes/providers are invalid; unsupported modes are never
+advertised. A deployment may advertise either supported path or both. Prepare
+and Commit refuse a path absent from the current advertisement.
+
+Optional `default_converter_version` is a host recommendation, not authority or
+silent negotiation. When present it is nonempty and references one advertised
+converter exactly. Absent means show an explicit chooser. Multiple converters
+are valid; lexical order does not express preference, and clients must not pick
+the first or latest-looking version. Alternatives remain explicitly selectable.
+The selected entry's exact `default_options` octets retain their existing digest
+rules; this marker does not change any signed HYBRID layout or domain.
 
 Positive host limits cover branches, logical-job operations, total result bytes
 and per-branch result bytes. They cannot exceed 256 branches/operations or 1 GiB
@@ -1078,6 +1148,20 @@ and snapshot; sign the exact snapshot epoch and manifest digest; activation
 still performs transactional CAS. A stale state or publication race requires
 another job-state read, recomputation/review and exact Prepare before signing.
 The dedicated `GetImportJobState` read below supplies discovery and recovery.
+
+Source validation during renewal Prepare uses the opaque
+`VerifiedImportRenewalPredecessor` from `verify_renewal_predecessor` /
+`verifyImportRenewalPredecessor` and the exact authenticated retained CAS state.
+`prepare_import_source_scope` / `prepareImportSourceScope` bind the token's CAS
+snapshot to the requested logical job, retry lineage and destination, then enforce
+the remaining-scope subset before preserving its authorized pins. An unchanged
+retained pin remains valid when the current ref head moves; a replacement pin
+rejects. An incoming `renew_logical_job_id` alone never supplies this exemption;
+renewal Prepare without authenticated retained context rejects. Fresh selections
+still require their pins to match independently known selected OIDs. Current
+source grants, provider support, repository format and OID encoding MUST be
+rechecked. The host MUST also check availability of each selected pinned commit;
+matching today's head is neither required nor a substitute for that check.
 
 Initial Commit installs epoch **1**. Successful renewal increments it exactly
 once; successful Cancel increments it exactly once and makes the job terminal.

@@ -78,7 +78,7 @@ export function validateDiscoveredImportScope(scope:api.ImportPermissionScopeV1,
 }
 export function prepareImportSourceScope(request:api.PrepareImportJobRequest, currentSource:ProviderRepository, connectionProvider:string|undefined, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array):api.ImportPermissionScopeV1 {
   const s=request.source??reject("SourceSelection");
-  if(s.connection?.id!==currentSource.connection?.id||s.connection?.spool?.id!==currentSource.connection?.spool?.id||s.providerRepositoryId!==currentSource.providerRepositoryId||s.installationId!==currentSource.installationId||s.private!==currentSource.private)reject("SourceSelection");
+  if(s.connection?.id!==currentSource.connection?.id||s.connection?.spool?.id!==currentSource.connection?.spool?.id||(s.providerRepositoryId!==currentSource.providerRepositoryId&&(s.connection!==undefined||s.providerRepositoryId!==""))||s.installationId!==currentSource.installationId||s.private!==currentSource.private)reject("SourceSelection");
   const scope=request.proposedScope??reject("Canonical");
   if(scope.provider!==resolveImportProvider(currentSource,connectionProvider))reject("SourceSelection");
   validateDiscoveredImportScope(scope,currentSource);
@@ -163,7 +163,7 @@ export async function validateImportCommitRequest(request:CommitImportJobRequest
   if (request.destination.id!==destinationId) reject("Scope");
   if (d.predecessorDelegationDigest.length!==32 || d.predecessorDelegationDigest.some(Boolean)) reject("Canonical");
   if (source.cloneUrl!==scope.sourceUrl || resolvedProvider!==scope.provider || utf8.encode(source.providerRepositoryId).length>4096 || utf8.encode(source.name).length>4096) reject("SourceSelection");
-  if(source.connection?.id!==currentSource.connection?.id||source.connection?.spool?.id!==currentSource.connection?.spool?.id||source.providerRepositoryId!==currentSource.providerRepositoryId||source.cloneUrl!==currentSource.cloneUrl||source.installationId!==currentSource.installationId||source.private!==currentSource.private)reject("SourceSelection");
+  if(source.connection?.id!==currentSource.connection?.id||source.connection?.spool?.id!==currentSource.connection?.spool?.id||(source.providerRepositoryId!==currentSource.providerRepositoryId&&(source.connection!==undefined||source.providerRepositoryId!==""))||source.cloneUrl!==currentSource.cloneUrl||source.installationId!==currentSource.installationId||source.private!==currentSource.private)reject("SourceSelection");
   const provider=resolveImportProvider(currentSource,currentSource.connection?resolvedProvider:undefined);
   if(provider!==resolvedProvider)reject("SourceSelection");
   validateImportConfiguration(configuration);validateProviderSupport(provider,configuration);

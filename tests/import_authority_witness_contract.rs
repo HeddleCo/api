@@ -2907,3 +2907,37 @@ fn alpha25_signed_sha256_observe_and_converter_choice() {
     import::validate_import_configuration(&record(&f, "configuration_multiple"))
         .expect("later entry recommended");
 }
+#[test]
+fn alpha25_public_selector_may_omit_repository_id() {
+    let f = fixture();
+    let mut request: api::CommitImportJobRequest = record(&f, "commit_public_source");
+    request
+        .source
+        .as_mut()
+        .expect("source")
+        .provider_repository_id
+        .clear();
+    import::validate_commit_request(
+        &request,
+        "public-git",
+        &record(&f, "source_public_github"),
+        &record(&f, "import_configuration"),
+    )
+    .expect("current discovery binds exact URL");
+    let mut prepare: api::PrepareImportJobRequest = record(&f, "prepare_public_sha256");
+    prepare
+        .source
+        .as_mut()
+        .expect("selector")
+        .provider_repository_id
+        .clear();
+    let scope: api::ImportPermissionScopeV1 = record(&f, "scope");
+    import::prepare_import_source_scope(
+        &prepare,
+        &record(&f, "source_public_sha256"),
+        None,
+        &record(&f, "import_configuration"),
+        &scope.destination_version,
+    )
+    .expect("public Prepare input may omit redundant ID");
+}

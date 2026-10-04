@@ -395,7 +395,8 @@ pub fn prepare_import_source_scope(
 ) -> Result<ImportPermissionScopeV1, Reject> {
     let selector = request.source.as_ref().ok_or(Reject::SourceSelection)?;
     if selector.connection != current_source.connection
-        || selector.provider_repository_id != current_source.provider_repository_id
+        || (selector.provider_repository_id != current_source.provider_repository_id
+            && (selector.connection.is_some() || !selector.provider_repository_id.is_empty()))
         || selector.installation_id != current_source.installation_id
         || selector.private != current_source.private
     {
@@ -656,7 +657,8 @@ pub fn validate_commit_request(
         return Err(Reject::SourceSelection);
     }
     if source.connection != current_source.connection
-        || source.provider_repository_id != current_source.provider_repository_id
+        || (source.provider_repository_id != current_source.provider_repository_id
+            && (source.connection.is_some() || !source.provider_repository_id.is_empty()))
         || source.clone_url != current_source.clone_url
         || source.installation_id != current_source.installation_id
         || source.private != current_source.private

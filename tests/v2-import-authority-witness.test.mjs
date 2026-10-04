@@ -530,3 +530,9 @@ for(const v of fixture.source_vectors.commit_negative)test(`alpha25 Commit sourc
  console.log(`ALPHA25 REJECT then PASS commit.${v.id}: ${v.expected}`);
 });
 test('alpha25 multiple converter recommendation can name a later advertised entry',()=>authority.validateImportConfiguration(vector('configuration_multiple')));
+test('alpha25 public selector may omit the repository ID while current discovery binds the exact URL',async()=>{
+ const request=vector('commit_public_source');request.source.providerRepositoryId='';
+ await authority.validateImportCommitRequest(request,'public-git',vector('source_public_github'),vector('import_configuration'));
+ const prepare=vector('prepare_public_sha256');prepare.source.providerRepositoryId='';
+ authority.prepareImportSourceScope(prepare,vector('source_public_sha256'),undefined,vector('import_configuration'),vector('scope').destinationVersion);
+});

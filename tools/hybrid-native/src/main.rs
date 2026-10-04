@@ -1333,14 +1333,82 @@ fn verify_native_witness_fixture() -> Result<()> {
         for p in &b.genesis_witnesses {
             let g = genesis(p.original_genesis.as_ref().context("original")?)?;
             let id = g.id()?;
+            let binding = p
+                .binding
+                .as_ref()
+                .and_then(|p| p.body.as_ref())
+                .context("binding")?;
+            let identity = binding.identity.as_ref().context("binding owner")?;
+            let payload = codec::canonical(p)?;
+            let admission = b
+                .statements
+                .iter()
+                .filter_map(|s| s.body.as_ref())
+                .find(|s| s.canonical_payload == payload)
+                .context("genesis admission")?;
+            let admitted_at = admission.observed_at_unix_millis / 1000;
+            let chain = b
+                .owner_chains
+                .iter()
+                .find(|c| {
+                    import::owner_chain_digest(c).is_ok_and(|d| d == binding.owner_chain_digest)
+                })
+                .context("binding chain")?;
+            let mut selected_owner = None;
+            let mut newest_sequence = 0;
+            for endpoint in &chain.owner_state_hashes {
+                let history = b
+                    .owner_histories
+                    .iter()
+                    .find(|h| &h.state_hash == endpoint)
+                    .context("retained endpoint")?;
+                let verified = verify_owner_history(history, admitted_at)?;
+                newest_sequence = newest_sequence.max(verified.sequence());
+                if history.state_hash == identity.owner_state_hash {
+                    selected_owner = Some(verified);
+                }
+            }
+            let selected_owner = selected_owner.context("selected owner at admission")?;
+            ensure!(
+                selected_owner.signed_root() == owner.signed_root(),
+                "selected history extends independently pinned root"
+            );
+            let mut expected_endpoints = vec![
+                owner.state_hash().to_vec(),
+                selected_owner.state_hash().to_vec(),
+            ];
+            expected_endpoints.sort();
+            expected_endpoints.dedup();
+            ensure!(
+                chain.owner_state_hashes == expected_endpoints,
+                "recomputed original-keyring and accepted-owner endpoints"
+            );
+            ensure!(
+                selected_owner.sequence() == newest_sequence,
+                "binding owner is chain state at admission"
+            );
+            ensure!(
+                selected_owner.owner_id().as_slice() == identity.owner_id,
+                "binding owner identity"
+            );
+            ensure!(
+                identity.ownership_transfer_sequence == 0 && chain.transfer_audit_hashes.is_empty(),
+                "fixture transfer timeline"
+            );
+            if admission.basis == 1 {
+                ensure!(
+                    identity.owner_state_hash == admission.owner_state_hash,
+                    "witnessed binding owner"
+                );
+            }
             if matches!(g.owner, GenesisOwner::Account(_)) && p.boundary_acceptance.is_none() {
                 verify_authority(
                     &p.creator_authority_envelope,
-                    &owner,
+                    &selected_owner,
                     &g.creator,
                     &actor,
                     "/heddle.api.v1alpha2.ThreadService/StartThread",
-                    1100,
+                    admitted_at,
                 )?;
             }
             if let Some(e) = &p.boundary_acceptance {
@@ -1522,6 +1590,25 @@ fn verify_native_witness_fixture() -> Result<()> {
     }
     Ok(())
 }
+
+fn verify_owner_history(
+    history: &wire::OwnerHistory,
+    now: i64,
+) -> Result<capability_verifier::VerifiedOwnerState> {
+    let history =
+        capability_verifier::wire::OwnerHistory::decode(history.encode_to_vec().as_slice())?;
+    let mut owner =
+        capability_verifier::verify_owner_root(history.root.as_ref().context("owner root")?)?;
+    let limits = capability_verifier::VerificationLimits::new(30 * 24 * 60 * 60)?;
+    for transition in &history.accepted_transitions {
+        owner = capability_verifier::apply_accepted_transition(&owner, transition, now, limits)?;
+    }
+    ensure!(
+        history.state_hash == owner.state_hash(),
+        "owner history endpoint"
+    );
+    Ok(owner)
+}
 fn verify_native_genesis_boundary(
     g: &ThreadGenesis,
     envelope: &[u8],
@@ -1648,6 +1735,12 @@ fn main() -> Result<()> {
             let format = args.get(2).context("native format required")?;
             println!("{}", hex::encode(encode(format, &input()?)?));
         }
+        Some("verify-owner-history") => {
+            let now: i64 = args.get(2).context("admission seconds required")?.parse()?;
+            let history = wire::OwnerHistory::decode(input()?.as_slice())?;
+            let owner = verify_owner_history(&history, now)?;
+            println!("{}", hex::encode(owner.state_hash()));
+        }
         Some("verify") => {
             let f = read_json(args.get(2).context("fixture path")?)?;
             verify_native(&f)?;
@@ -1706,6 +1799,24 @@ mod tests {
     #[test]
     fn native_witness_originals_and_start_thread_authority() {
         verify_native_witness_fixture().expect("native model and owner authority");
+    }
+    #[test]
+    fn owner_history_must_be_active_and_exact_at_admission() {
+        let f = fixture();
+        let mut history: wire::OwnerHistory =
+            record(&f, "renew_rotated_owner_history").expect("signed rotation control");
+        assert!(
+            verify_owner_history(&history, 1100).is_err(),
+            "future rotation must fail"
+        );
+        verify_owner_history(&history, 1300).expect("rotation active at admission");
+        history.state_hash = record::<wire::OwnerHistory>(&f, "owner_history")
+            .expect("original owner")
+            .state_hash;
+        assert!(
+            verify_owner_history(&history, 1300).is_err(),
+            "stale endpoint must fail"
+        );
     }
     #[test]
     fn prepared_commit_matches_native_original_branches() {

@@ -6,12 +6,15 @@ import { create, clone, fromBinary, toBinary } from '@bufbuild/protobuf';
 import * as api from '../packages/typescript/dist/v1alpha2/native_witness_pb.js';
 import * as imp from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
 import * as host from '../packages/typescript/dist/common/hosted_witness_pb.js';
-import { OwnerHistorySchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
+import { OwnerHistorySchema, AuthorizationSignatureSchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
+import { ThreadControlAuthoritySchema } from '../packages/typescript/dist/v1alpha2/identity_pb.js';
+import { mintRootAttachmentSigningDigest } from '../packages/typescript/dist/v1alpha2/owner-certificates.js';
+import { assertFixtureOwnerContext } from './assert-fixture-owner-context.mjs';
 import { SignedRecordSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import { StartThreadRequestSchema } from '../packages/typescript/dist/v1alpha2/thread_pb.js';
 import { ThreadGenesisRecordSchema } from '../packages/typescript/dist/v1alpha2/sync_pb.js';
 import { encode, decode } from '../packages/typescript/dist/v1alpha2/_collaboration-msgpack.js';
-import { canonicalHybridV1, signingDigest, hash, keyId, join, utf8, compare } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
+import { canonicalHybridV1, signingDigest, hash, keyId, join, utf8, compare, u32, sized, integer } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
 import { originalSignaturesDigest, signedNativeDigest, ownerChainDigest, boundaryOctetsDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import { signNativeGenesisAuthority, signedNativeGenesisAuthorityDigest } from '../packages/typescript/dist/v1alpha2/native-witness.js';
 import { threadGenesisId } from '../packages/typescript/dist/v1alpha2/thread-genesis.js';
@@ -91,11 +94,37 @@ cases.post_landing_capture.authorityWitnesses.push(capturePayload);
 cases.post_landing_capture.statements.push(authorityStatement(capturePayload,216));
 sortBundle(cases.post_landing_capture);
 // Different bindings select exact retained chains; no binding is rewritten on export.
-const longerChain=load('renew_rotated_chain',imp.ImportOwnerChainV1Schema);
+// Rotate before the second admission; retain both the original keyring endpoint
+// and the advanced accepted owner endpoint (the normative endpoint algorithm).
+const rotatedHistory=load('renew_rotated_owner_history',OwnerHistorySchema);
+const rotation=rotatedHistory.acceptedTransitions[0].transition;
+rotation.validFromUnixSeconds=1050n;rotation.previousKeyValidUntilUnixSeconds=1050n;
+const encodedKey=k=>join(u32(k.algorithm),sized(k.publicKey));
+const recovery=rotation.nextRecoveryPolicy;
+const rotationCanonical=join(u32(1),sized(rotation.ownerId),sized(rotation.previousStateHash),integer(1n),u32(1),encodedKey(rotation.nextAuthorityKey),u32(recovery.threshold),u32(recovery.guardians.length),...recovery.guardians.map(g=>join(u32(g.kind),encodedKey(g.key))),integer(604800n),integer(1050n,true),integer(1050n,true),sized(rotation.nonce));
+const rotationDigest=hash(str('heddle-owner-key-transition-v1'),rotationCanonical);
+const authorization=n=>create(AuthorizationSignatureSchema,{signerKeyId:keyId(key(n)),signature:sig(n,rotationDigest)});
+rotatedHistory.acceptedTransitions[0].authorizations=[authorization('owner')];
+rotatedHistory.acceptedTransitions[0].nextAuthorityKeyProof=authorization('rotated_owner');
+rotatedHistory.stateHash=rotationDigest;
+const rotatedIdentity=clone(imp.ImportIdentityV1Schema,identity);rotatedIdentity.ownerStateHash=rotationDigest;
+const longerChain=clone(imp.ImportOwnerChainV1Schema,chain);longerChain.ownerStateHashes=[identity.ownerStateHash,rotationDigest].sort(compare);
+const rotatedEnvelope=fromBinary(ThreadControlAuthoritySchema,envelope);rotatedEnvelope.owner=rotatedHistory;
+const attachment=rotatedEnvelope.mintRootAssociation.value.attachment;
+attachment.ownerStateHash=rotationDigest;attachment.ownerSequence=1n;attachment.ownerKey=rotation.nextAuthorityKey;attachment.notBeforeUnixSeconds=1050n;
+rotatedEnvelope.mintRootAssociation.value.ownerSignature=create(AuthorizationSignatureSchema,{signerKeyId:keyId(key('rotated_owner')),signature:sig('rotated_owner',mintRootAttachmentSigningDigest(attachment))});
+const advancedEnvelope=toBinary(ThreadControlAuthoritySchema,rotatedEnvelope);
 const selected=clone(api.NativeGenesisWitnessV1Schema,landingGeneses[0]);
-selected.binding=await signNativeGenesisAuthority(selected.originalGenesis,envelope,identity,longerChain,{publicKey:key('device'),sign:bytes=>sig('device',bytes)});
+selected.creatorAuthorityEnvelope=advancedEnvelope;
+selected.binding=await signNativeGenesisAuthority(selected.originalGenesis,advancedEnvelope,rotatedIdentity,longerChain,{publicKey:key('device'),sign:bytes=>sig('device',bytes)});
 cases.distinct_owner_chains=bundle([selected,landingGeneses[1]],[],[statement(217,selected,api.NativeGenesisWitnessV1Schema,signedNativeGenesisAuthorityDigest(selected.binding),originalSignaturesDigest([selected.originalGenesis])),statement(218,landingGeneses[1],api.NativeGenesisWitnessV1Schema,signedNativeGenesisAuthorityDigest(landingGeneses[1].binding),originalSignaturesDigest([landingGeneses[1].originalGenesis]))]);
-cases.distinct_owner_chains.ownerHistories.push(load('renew_rotated_owner_history',OwnerHistorySchema));
+for(const s of cases.distinct_owner_chains.statements){
+ if(s.body.hostTransactionId[0]===217)s.body.ownerStateHash=rotationDigest;
+ else s.body.observedAtUnixMillis=1000000n;
+ s.signature=sig('witness',statementSigningDigest(s.body));
+}
+// Do not mutate oldBundle's shared history list, used by every other case.
+cases.distinct_owner_chains.ownerHistories=[...oldBundle.ownerHistories,rotatedHistory];
 cases.distinct_owner_chains.ownerChains.push(longerChain);
 sortBundle(cases.distinct_owner_chains);
 // Exact native boundary evidence over the account genesis + native envelope.
@@ -117,13 +146,31 @@ const statements=Object.values(cases).flatMap(b=>b.statements),unique=[...new Ma
 const currentBody=create(host.HostedWitnessSetV1Schema,{formatVersion:1,deploymentAuthority:'https://weft.example.test',descriptorRootId:'descriptor-root-1',generation:50n,issuedAtUnixMillis:1100000n,validUntilUnixMillis:1200000n,currentExecutorId:witnessId(key('witness')),entries:[{executorId:witnessId(key('witness')),publicKey:key('witness'),role:1,state:1,purposes:[1,2,3,4],activeFromUnixMillis:1000000n,activeUntilUnixMillis:1300000n}]});
 function set(body){const input=setSigningBytes(body);return create(host.SignedHostedWitnessSetV1Schema,{body,bodyDigest:hash(input),rootSignature:sig('root',input)});}
 const currentSet=set(currentBody);wire('current_set',host.SignedHostedWitnessSetV1Schema,currentSet);
-for(const [name,b] of Object.entries(cases)){b.witnessSet=currentSet;wire(name,api.NativePublicProofBundleV1Schema,b);fixture.positive.push(name);}
-const leaves=unique.map(s=>({s,h:leafDigest(s.body.purpose,canonicalHybridV1(host.HostedWitnessStatementV1Schema,s.body),s.signature)})).sort((a,b)=>compare(a.h,b.h));
+function assertPositive(name,b){
+ for(const s of b.statements){
+  const body=s.body;
+  const p=b.genesisWitnesses.find(p=>hex(canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p))===hex(body.canonicalPayload));
+  const id=p&&body.basis===1?p.binding.body.identity:{...identity,ownerId:body.ownerId,ownerStateHash:body.ownerStateHash,ownershipTransferSequence:body.ownershipTransferSequence};
+  if(p&&body.basis===1){
+   if(hex(id.ownerStateHash)!==hex(body.ownerStateHash)||id.ownershipTransferSequence!==body.ownershipTransferSequence)throw new Error(`${name}: binding differs from witnessed owner`);
+  }
+  const c=p&&body.basis===1?b.ownerChains.find(c=>hex(ownerChainDigest(c))===hex(p.binding.body.ownerChainDigest)):b.ownerChains.find(c=>c.ownerStateHashes.some(h=>hex(h)===hex(body.ownerStateHash)));
+  if(!c)throw new Error(`${name}: selected chain missing`);
+  assertFixtureOwnerContext(codec,name,b.ownerHistories,c,id,body.observedAtUnixMillis,b.ownershipTransfers);
+ }
+}
+for(const [name,b] of Object.entries(cases)){assertPositive(name,b);b.witnessSet=currentSet;wire(name,api.NativePublicProofBundleV1Schema,b);fixture.positive.push(name);}
+// The alpha.28 archive is immutable evidence. Its two superseded leaves stay
+// sealed, but are no longer published as passing admissions. Replacing a current
+// fixture must not rewrite the signed retired set or unrelated inclusion proofs.
+const legacyDistinctLeaves=['2e38cb7d1e26ba3949394639b29f62f0140b4dbfc7b85751eb321f7789a55fad','27dd276da2c3fb7e9bec370f1188fb579aff6f1d8e6f435014ddb34e277e2a8a'];
+const leaves=[...unique.filter(s=>![217,218].includes(s.body.hostTransactionId[0])).map(s=>({s,h:leafDigest(s.body.purpose,canonicalHybridV1(host.HostedWitnessStatementV1Schema,s.body),s.signature)})),...legacyDistinctLeaves.map(h=>({h:raw(h)}))].sort((a,b)=>compare(a.h,b.h));
 function proofPath(i,items){if(items.length===1)return [];let k=1;while(k*2<items.length)k*=2;return i<k?[...proofPath(i,items.slice(0,k)),merkleRoot(items.slice(k))]:[...proofPath(i-k,items.slice(k)),merkleRoot(items.slice(0,k))];}
 const retiredBody=clone(host.HostedWitnessSetV1Schema,currentBody);retiredBody.generation=51n;retiredBody.issuedAtUnixMillis=1300000n;retiredBody.validUntilUnixMillis=1400000n;retiredBody.currentExecutorId=witnessId(key('next_witness'));retiredBody.entries[0].state=2;retiredBody.entries[0].activeUntilUnixMillis=1300000n;retiredBody.entries[0].archiveRoot=merkleRoot(leaves.map(l=>l.h));retiredBody.entries[0].archiveLeafCount=BigInt(leaves.length);retiredBody.entries.push(create(host.HostedWitnessEntryV1Schema,{...currentBody.entries[0],executorId:witnessId(key('next_witness')),publicKey:key('next_witness'),activeFromUnixMillis:1300000n,activeUntilUnixMillis:1500000n}));retiredBody.entries.sort((a,b)=>compare(a.executorId,b.executorId));
 const retiredSet=set(retiredBody);wire('retired_set',host.SignedHostedWitnessSetV1Schema,retiredSet);
 const retired=clone(api.NativePublicProofBundleV1Schema,cases.start_thread);retired.witnessSet=retiredSet;
-retired.historyProofs=retired.statements.map(s=>{const i=leaves.findIndex(l=>hex(statementSigningDigest(l.s.body))===hex(statementSigningDigest(s.body)));return create(host.HostedWitnessHistoryProofV1Schema,{executorId:s.body.executorId,purpose:s.body.purpose,leafIndex:BigInt(i),leafCount:BigInt(leaves.length),siblings:proofPath(i,leaves.map(l=>l.h))});});
+retired.historyProofs=retired.statements.map(s=>{const i=leaves.findIndex(l=>l.s&&hex(statementSigningDigest(l.s.body))===hex(statementSigningDigest(s.body)));return create(host.HostedWitnessHistoryProofV1Schema,{executorId:s.body.executorId,purpose:s.body.purpose,leafIndex:BigInt(i),leafCount:BigInt(leaves.length),siblings:proofPath(i,leaves.map(l=>l.h))});});
+assertPositive('retired_start_thread',retired);
 wire('retired_start_thread',api.NativePublicProofBundleV1Schema,retired);fixture.positive.push('retired_start_thread');
 function negative(name,control,edit,expected,gate='bundle'){const b=clone(api.NativePublicProofBundleV1Schema,cases[control]??retired);edit(b);wire(name,api.NativePublicProofBundleV1Schema,b);fixture.negative.push({id:name,control,expected,gate});}
 // Alpha.30 cases use the unchanged current set. Append after sealing the
@@ -149,6 +196,7 @@ function localIntegrationBundle(original){
  return sortBundle(b);
 }
 cases.local_integration_push=localIntegrationBundle(localIntegration);
+assertPositive('local_integration_push',cases.local_integration_push);
 wire('local_integration_push',api.NativePublicProofBundleV1Schema,cases.local_integration_push);fixture.positive.push('local_integration_push');
 negative('local_integration_forged_signature','local_integration_push',b=>{
  const p=b.authorityWitnesses.find(p=>p.kind===2),r=p.dependencies.find(r=>hex(signedNativeDigest(r))===hex(signedNativeDigest(localIntegration)));

@@ -106,6 +106,8 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     }else{
       // Local captures and LocalKey integrations retain native proof and the
       // thread's exact hosted ownership claim, never an authority/landing receipt.
+      // This is reference closure only. Native authorization must bind publisher
+      // to genesis.owner.local_key and enforce the selected signed cutoff.
       await verifyNativeRecord(original,"heddle-thread-operation-v1");
       const p=b.authorityWitnesses.find(p=>p.kind===2&&p.original&&equal(thread(p.original),thread(original)))??reject("Scope");
       requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));

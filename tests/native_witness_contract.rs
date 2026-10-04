@@ -69,7 +69,8 @@ fn signed_native_authority_negatives_require_the_native_gate() {
         let name = v["id"].as_str().expect("name");
         verify(&f, &wire(&f, v["control"].as_str().expect("control")))
             .expect("passing signed control");
-        verify(&f, &wire(&f, name)).expect("portable closure is valid; native authority must reject");
+        verify(&f, &wire(&f, name))
+            .expect("portable closure is valid; native authority must reject");
         println!("PORTABLE PASS {name}; native authorization required");
     }
 }

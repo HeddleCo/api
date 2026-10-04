@@ -21,7 +21,7 @@ use objects::object::{
 };
 use prost::Message;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 
 fn hex_field(value: &Value) -> Result<Vec<u8>> {
@@ -67,6 +67,84 @@ fn genesis(record: &wire::SignedRecord) -> Result<ThreadGenesis> {
 }
 fn operation(record: &wire::SignedRecord) -> Result<ThreadOperation> {
     Ok(thread_api::replication::decode_record(native_wire(record)?)?.verify()?)
+}
+
+// Fixed-corpus counterpart of ThreadReplica::verify_local_source_owner and its
+// indexed ownership cutoff. Inputs have verified signatures, native parents,
+// claim/resolution signatures and independently admitted account authority.
+// This does not replace heddle's durable conflict/admission authorization.
+fn verify_local_work(
+    geneses: &BTreeMap<ContentHash, ThreadGenesis>,
+    operations: &BTreeMap<ContentHash, ThreadOperation>,
+    claims: &BTreeMap<ContentHash, ThreadOwnershipClaim>,
+    resolutions: &BTreeMap<ContentHash, ThreadOwnershipResolution>,
+) -> Result<()> {
+    use objects::object::thread_replication::{GenesisOwner, SourceAuthor};
+    let mut histories = BTreeMap::new();
+    for (thread, genesis) in geneses {
+        if !matches!(genesis.owner, GenesisOwner::LocalKey(_)) {
+            continue;
+        }
+        let candidates: Vec<_> = claims.values().filter(|c| c.thread == *thread).collect();
+        let choices: Vec<_> = resolutions
+            .values()
+            .filter(|r| r.thread == *thread)
+            .collect();
+        let frontier = match (candidates.as_slice(), choices.as_slice()) {
+            ([claim], []) => &claim.source_frontier,
+            (_, [resolution]) => {
+                let ids: BTreeSet<_> = candidates
+                    .iter()
+                    .map(|c| c.id())
+                    .collect::<std::result::Result<_, _>>()?;
+                ensure!(
+                    ids == resolution.conflicting_claims,
+                    "resolution differs from exact witnessed claim set"
+                );
+                ensure!(
+                    ids.contains(&resolution.winning_claim),
+                    "winning claim absent"
+                );
+                &resolution.frontier
+            }
+            _ => bail!("local work requires a sole witnessed claim or explicit resolution"),
+        };
+        let mut history = BTreeSet::new();
+        let mut pending = frontier.clone();
+        while let Some(id) = pending.pop_first() {
+            if !history.insert(id) {
+                continue;
+            }
+            // Each verified operation is visited once; missing/foreign edges
+            // fail closed. The bundle's byte/dependency bounds cap this walk.
+            ensure!(
+                history.len() <= operations.len(),
+                "ownership ancestry bound"
+            );
+            let ancestor = operations.get(&id).context("ownership cutoff ancestry")?;
+            ensure!(
+                ancestor.thread == *thread,
+                "ownership cutoff crosses Thread"
+            );
+            pending.extend(&ancestor.parents);
+        }
+        histories.insert(*thread, history);
+    }
+    for (id, op) in operations {
+        if !matches!(op.source_author()?, Some(SourceAuthor::LocalKey)) {
+            continue;
+        }
+        let genesis = geneses.get(&op.thread).context("local owner genesis")?;
+        ensure!(
+            genesis.owner == GenesisOwner::LocalKey(op.publisher),
+            "local signer differs from genesis owner"
+        );
+        ensure!(
+            histories.get(&op.thread).is_some_and(|h| h.contains(id)),
+            "local work outside selected ownership cutoff"
+        );
+    }
+    Ok(())
 }
 fn verify_old_capture(value: &Value) -> Result<()> {
     let g = SignedGenesis {
@@ -1273,7 +1351,7 @@ fn verify_native_witness_vectors(f: &Value) -> Result<()> {
         CollaborationActor,
         thread_replication::{GenesisOwner, SourceAuthor, ThreadOperationBody},
     };
-    let reference: wire::NativePublicProofBundleV1 = record(&f, "local_adopt_push")?;
+    let reference: wire::NativePublicProofBundleV1 = record(f, "local_adopt_push")?;
     let claim = ThreadOwnershipClaim::decode(
         &reference.authority_witnesses[0]
             .original
@@ -1310,7 +1388,7 @@ fn verify_native_witness_vectors(f: &Value) -> Result<()> {
     capability_verifier::verify_spool_owner_genesis(&spool)?;
     for name in f["positive"].as_array().context("positive cases")? {
         let name = name.as_str().context("case")?;
-        let b: wire::NativePublicProofBundleV1 = record(&f, name)?;
+        let b: wire::NativePublicProofBundleV1 = record(f, name)?;
         let now = b
             .witness_set
             .as_ref()
@@ -1429,6 +1507,7 @@ fn verify_native_witness_vectors(f: &Value) -> Result<()> {
         }
         let mut claims = BTreeMap::new();
         let mut operations = BTreeMap::new();
+        let mut resolutions = BTreeMap::new();
         for p in &b.authority_witnesses {
             for r in p.original.iter().chain(p.dependencies.iter()) {
                 match r.format.as_str() {
@@ -1561,6 +1640,10 @@ fn verify_native_witness_vectors(f: &Value) -> Result<()> {
                         acceptance_signature: signature(r, &v.accepting_publisher)?,
                     }
                     .verify(claims.get(&v.winning_claim).context("winner")?)?;
+                    ensure!(
+                        resolutions.insert(v.id()?, v.clone()).is_none(),
+                        "duplicate witnessed resolution"
+                    );
                     let SourceAuthor::Account {
                         actor, authority, ..
                     } = v.acceptance
@@ -1588,6 +1671,7 @@ fn verify_native_witness_vectors(f: &Value) -> Result<()> {
                 1100,
             )?;
         }
+        verify_local_work(&geneses, &operations, &claims, &resolutions)?;
         println!(
             "NATIVE MODEL PASS {name}: original signatures, StartThread/ownership/source authority, causal and acceptance closure"
         );

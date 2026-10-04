@@ -174,7 +174,10 @@ assertPositive('retired_start_thread',retired);
 wire('retired_start_thread',api.NativePublicProofBundleV1Schema,retired);fixture.positive.push('retired_start_thread');
 function negative(name,control,edit,expected,gate='bundle'){const b=clone(api.NativePublicProofBundleV1Schema,cases[control]??retired);edit(b);wire(name,api.NativePublicProofBundleV1Schema,b);fixture.negative.push({id:name,control,expected,gate});}
 // Alpha.30 cases use the unchanged current set. Append after sealing the
-// alpha.28 archive so every existing signed vector and retirement proof stays exact.
+// alpha.28 archive. Only distinct_owner_chains and missing_selected_owner_chain
+// were replaced: the positive now selects the owner active at each admission
+// instead of a future rotation/stale identity; the negative removes its selected
+// chain. Every other existing vector and retirement proof stays exact.
 const localCapture=localAuthority.dependencies.find(r=>r.format==='heddle-thread-operation-v1');
 const targetValue=decode(localCapture.canonicalRecord),sourceValue=decode(sourceTemplate.canonicalRecord);
 const merged=JSON.parse(execFileSync(codec,['merge-state'],{input:hex(encode([sourceValue.body.canonical.result.state,targetValue.body.canonical.result.state])),encoding:'utf8'}));
@@ -270,4 +273,4 @@ negative('retired_proof_substitution','retired_start_thread',b=>b.historyProofs[
 const malformedImport=clone(imp.ImportPublicProofBundleV1Schema,oldBundle);malformedImport.delegations=[];wire('import_without_delegation',imp.ImportPublicProofBundleV1Schema,malformedImport);fixture.negative.push({id:'import_without_delegation',control:'import_complete',expected:'Canonical',gate:'import'});wire('import_complete',imp.ImportPublicProofBundleV1Schema,oldBundle);
 fixture.negative.push({id:'dual_carriers',control:'start_thread',expected:'Protocol',gate:'dispatch'});
 writeFileSync('tests/fixtures/native-host-witness-v1.json',JSON.stringify(fixture,null,2)+'\n');
-console.log(`generated ${fixture.positive.length} native positives, ${fixture.negative.length} negatives`);
+console.log(`generated ${fixture.positive.length} native positives, ${fixture.negative.length} portable negatives, ${fixture.native_negative.length} native authority negatives`);

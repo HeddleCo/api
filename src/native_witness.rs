@@ -475,6 +475,8 @@ fn require_native_dependency(
     }
     // Local captures and LocalKey integrations retain native proof and the
     // thread's exact hosted ownership claim, never an authority/landing receipt.
+    // This establishes reference closure only. Native authorization must bind
+    // publisher to genesis.owner.local_key and enforce the selected signed cutoff.
     import::verify_native(original, "heddle-thread-operation-v1")?;
     let t = thread(original)?;
     let claim = b

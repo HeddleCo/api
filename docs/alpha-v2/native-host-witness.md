@@ -173,9 +173,24 @@ its byte-identical purpose-4 execution and matching statement; it must never be
 given a purpose-2 source-author receipt. Local captures and LocalKey
 `LocalIntegration` dependencies resolve as **local work**: preserve the valid
 original LocalKey signature and the same Thread's exact witnessed ownership
-claim (purpose 2). The claim retains the complete observed source frontier,
-including the local integration and its dependency closure. A local integration
-has no account-authority envelope: never manufacture an empty-envelope purpose-2
+claim (purpose 2). For `SourceAuthor::LocalKey`, implementers MUST verify the
+original signature and require the verified operation publisher to equal the
+target genesis's immutable `genesis.owner.local_key` (and the integration's
+embedded device). A valid signature by any other key MUST reject, even with a
+valid ownership claim and complete causal closure.
+
+Implementers MUST also enforce the native ownership cutoff: select the sole
+authorized witnessed claim, or the authorized co-signed resolution with its
+winning claim and exact complete conflict set; unresolved conflicts MUST reject.
+The integration and its same-Thread causal closure MUST be covered by ancestry
+of that claim's signed `source_frontier`, or the selected resolution's signed
+`frontier`. Walk from those heads through verified native causal parents; a head
+covers itself and its ancestors, so literal frontier membership is not required.
+Descendants beyond the signed cutoff MUST reject even if supplied as extra
+dependencies under an unchanged, validly signed claim. Cross-Thread source
+closure retains each source's own native authorization and ownership cutoff.
+A local integration has no account-authority envelope: never manufacture an
+empty-envelope purpose-2
 receipt or present it as a purpose-4 hosted execution. Select its role from the
 embedded native `LocalIntegration.author`, not merely the outer body kind:
 an account-authored integration still requires its exact purpose-2 authority
@@ -199,8 +214,10 @@ selected policy head has its complete sequence/hash chain back to zero.
 `validate_public_bundle` / `validatePublicNativeBundle` check reference closure,
 original signatures and payload commitments. They deliberately do not replace
 heddle's full canonical native model, owner/capability, transfer, policy,
-revocation, boundary-subject or causal verification. Authenticate the witness set
-from independently chosen descriptor-root context and resolve **every** statement
+revocation, boundary-subject or causal verification, including the mandatory
+LocalKey publisher-to-genesis-owner and selected signed-cutoff checks above.
+Authenticate the witness set from independently chosen descriptor-root context
+and resolve **every** statement
 separately. CURRENT needs interval/signature; RETIRED also needs its **exact**
 original leaf inclusion; REVOKED rejects. The proof-only lookup remains usable
 after access loss/deletion and returns no originals. Recheck the fresh set,

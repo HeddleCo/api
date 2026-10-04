@@ -2941,3 +2941,27 @@ fn alpha25_public_selector_may_omit_repository_id() {
     )
     .expect("public Prepare input may omit redundant ID");
 }
+#[test]
+fn alpha25_commit_preserves_frozen_pin_after_branch_movement() {
+    let f = fixture();
+    let request: api::CommitImportJobRequest = record(&f, "commit_request");
+    let current: api::ProviderRepository = record(&f, "commit_source_different_oid");
+    let scope = request.proof.as_ref().expect("proof").delegations[0]
+        .body
+        .as_ref()
+        .expect("body")
+        .scope
+        .as_ref()
+        .expect("scope");
+    assert_ne!(
+        scope.branches[0].pinned_commit_oid,
+        hex::decode(&current.refs[0].head_oid).expect("known moved head")
+    );
+    import::validate_commit_request(
+        &request,
+        "github",
+        &current,
+        &record(&f, "import_configuration"),
+    )
+    .expect("frozen pin remains the selected commit");
+}

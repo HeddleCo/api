@@ -712,9 +712,9 @@ for(const [id,request,source,configuration,expected] of [
  ['unknown_current_format','commit_request','commit_source_unknown','import_configuration','Version'],
  ['changed_current_identity','commit_request','commit_source_changed','import_configuration','SourceSelection'],
  ['incoming_format_mismatch','commit_bad_source_format','source_connected','import_configuration','SourceSelection'],
- ['cleared_incoming_refs','commit_request','commit_source_different_oid','import_configuration','RefPinning'],
+ ['cleared_incoming_refs','submission_observe_request','commit_source_different_oid','import_configuration','RefPinning'],
  ['support_removed','commit_request','source_connected','configuration_no_github','SourceSelection'],
-])sv.commit_negative.push({id,request,source,configuration,expected,control:'commit_request',control_source:'commit_source_known_control'});
+])sv.commit_negative.push({id,request,source,configuration,expected,control:id==='cleared_incoming_refs'?'submission_observe_request':'commit_request',control_source:id==='cleared_incoming_refs'?'source_connected':'commit_source_known_control'});
 const multiple=clone(api.GetImportConfigurationResponseSchema,config);multiple.converters.push(create(api.ImportConverterConfigurationV1Schema,{...multiple.converters[0],converterVersion:'zzz-converter/1'}));multiple.defaultConverterVersion='zzz-converter/1';wire('configuration_multiple',api.GetImportConfigurationResponseSchema,multiple);
 wire('resolve_public_request',ResolveImportSourceRequestSchema,create(ResolveImportSourceRequestSchema,{source:pub,includeRefs:true,page:{size:128}}));
 wire('resolve_public_response',ResolveImportSourceResponseSchema,create(ResolveImportSourceResponseSchema,{source:sha256}));

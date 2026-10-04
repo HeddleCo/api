@@ -536,3 +536,8 @@ test('alpha25 public selector may omit the repository ID while current discovery
  const prepare=vector('prepare_public_sha256');prepare.source.providerRepositoryId='';
  authority.prepareImportSourceScope(prepare,vector('source_public_sha256'),undefined,vector('import_configuration'),vector('scope').destinationVersion);
 });
+test('alpha25 Commit preserves a frozen pinned commit after branch movement',async()=>{
+ const request=vector('commit_request'),current=vector('commit_source_different_oid');
+ assert.notDeepEqual(request.proof.delegations[0].body.scope.branches[0].pinnedCommitOid,new Uint8Array(Buffer.from(current.refs[0].headOid,'hex')));
+ await authority.validateImportCommitRequest(request,'github',current,vector('import_configuration'));
+});

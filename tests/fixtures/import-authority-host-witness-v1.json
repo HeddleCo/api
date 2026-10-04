@@ -8748,12 +8748,12 @@
       },
       {
         "id": "cleared_incoming_refs",
-        "request": "commit_request",
+        "request": "submission_observe_request",
         "source": "commit_source_different_oid",
         "configuration": "import_configuration",
         "expected": "RefPinning",
-        "control": "commit_request",
-        "control_source": "commit_source_known_control"
+        "control": "submission_observe_request",
+        "control_source": "source_connected"
       },
       {
         "id": "support_removed",

@@ -681,7 +681,21 @@ pub fn validate_commit_request(
     if source.hash_algorithm != current_source.hash_algorithm {
         return Err(Reject::SourceSelection);
     }
-    validate_discovered_import_scope(scope, current_source)?;
+    // A frozen pin names the selected commit, even if the branch head moves.
+    // OBSERVE still cannot hide a currently known selected OID by clearing hints.
+    for b in &scope.branches {
+        if b.hash_algorithm != current_source.hash_algorithm {
+            return Err(Reject::SourceSelection);
+        }
+        if b.ref_mode == 2
+            && current_source
+                .refs
+                .iter()
+                .any(|r| r.name == b.ref_name && !r.head_oid.is_empty())
+        {
+            return Err(Reject::RefPinning);
+        }
+    }
     // Current converter/options/budget support is also rechecked at activation.
     prepare_scope(scope, configuration, &scope.destination_version)?;
     if proof.original_geneses.len() != scope.branches.len()

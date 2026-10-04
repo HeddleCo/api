@@ -139,7 +139,9 @@ provider/mode support, object format, known OID and converter/options/budget
 checks before custody/activation. The independently resolved current repository is an explicit
 input to `validate_commit_request` / `validateImportCommitRequest`, separate from
 the untrusted source projection; current hash format and known OIDs come from
-that resolved snapshot, so clearing incoming refs cannot bypass known-OID pinning. Host lookup/fetch, revocation and atomic mutation
+that resolved snapshot, so clearing incoming refs cannot bypass known-OID pinning.
+A frozen PINNED_COMMIT continues to name its selected commit when the mutable
+branch head moves after Prepare; Commit never substitutes or requires a new head. Host lookup/fetch, revocation and atomic mutation
 remain host responsibilities. Exact accepted replay retains its settled semantics.
 
 Unknown fields, versions, algorithms, purposes, duplicate fields, noncanonical

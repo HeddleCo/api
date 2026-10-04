@@ -169,7 +169,11 @@ export async function validateImportCommitRequest(request:CommitImportJobRequest
   validateImportConfiguration(configuration);validateProviderSupport(provider,configuration);
   validateRepositoryHashAlgorithm(currentSource,true);
   if(source.hashAlgorithm!==currentSource.hashAlgorithm)reject("SourceSelection");
-  validateDiscoveredImportScope(scope,currentSource);
+  // Frozen pins survive branch movement; known OIDs cannot be hidden in OBSERVE.
+  for(const b of scope.branches){
+    if(b.hashAlgorithm!==currentSource.hashAlgorithm)reject("SourceSelection");
+    if(b.refMode===2&&currentSource.refs.some(r=>r.name===b.refName&&r.headOid!==""))reject("RefPinning");
+  }
   prepareImportScope(scope,configuration,scope.destinationVersion);
   if (proof.originalGeneses.length!==scope.branches.length || proof.creatorAuthorityEnvelopes.length!==scope.branches.length || proof.genesisAuthorities.length!==scope.branches.length || d.branchManifest.length!==scope.branches.length) reject("GenesisBinding");
   for (const [i,b] of scope.branches.entries()) {

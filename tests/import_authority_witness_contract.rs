@@ -2778,6 +2778,7 @@ fn alpha25_prepare_source_negatives() {
                 None,
                 &record(&f, "import_configuration"),
                 &scope.destination_version,
+                None,
             )
             .map(|_| ()),
             v,
@@ -2789,6 +2790,7 @@ fn alpha25_prepare_source_negatives() {
             None,
             &record(&f, "import_configuration"),
             &scope.destination_version,
+            None,
         )
         .expect("control");
     }
@@ -2938,6 +2940,7 @@ fn alpha25_public_selector_may_omit_repository_id() {
         None,
         &record(&f, "import_configuration"),
         &scope.destination_version,
+        None,
     )
     .expect("public Prepare input may omit redundant ID");
 }
@@ -2973,7 +2976,7 @@ fn alpha25_renewal_source_prepare_vectors() {
     let read: api::GetImportJobStateResponse = record(&f, "job_state_partial");
     let state = read.state.as_ref().expect("authenticated retained state");
     let parent = record(&f, "permission");
-    let _predecessor = import::verify_renewal_predecessor(state, Some(&parent), &c.owner(1600))
+    let predecessor = import::verify_renewal_predecessor(state, Some(&parent), &c.owner(1600))
         .expect("independently authenticated expired predecessor");
     import::validate_renewal_preparation_from_read(
         &record(&f, "renew_prepare_request"),
@@ -2988,7 +2991,16 @@ fn alpha25_renewal_source_prepare_vectors() {
     {
         let request: api::PrepareImportJobRequest =
             record(&f, v["request"].as_str().expect("request"));
-        let current = record(&f, v["source"].as_str().expect("source"));
+        let current: api::ProviderRepository = record(&f, v["source"].as_str().expect("source"));
+        if v["id"] == "replacement_pin" {
+            assert_eq!(
+                hex::encode(
+                    &request.proposed_scope.as_ref().expect("scope").branches[0].pinned_commit_oid
+                ),
+                current.refs[0].head_oid,
+                "replacement matches today's head but exceeds retained authority"
+            );
+        }
         let configuration = record(
             &f,
             v["configuration"]
@@ -2996,15 +3008,32 @@ fn alpha25_renewal_source_prepare_vectors() {
                 .unwrap_or("import_configuration"),
         );
         let scope = request.proposed_scope.as_ref().expect("scope");
+        let changed_state: api::ImportJobCasStateV1;
+        let current_state = if let Some(name) = v["state"].as_str() {
+            changed_state = record(&f, name);
+            &changed_state
+        } else {
+            state
+        };
+        let retained = v["retained"]
+            .as_bool()
+            .expect("retained state selection")
+            .then_some((&predecessor, current_state));
         let result = import::prepare_import_source_scope(
             &request,
             &current,
             Some("github"),
             &configuration,
-            &scope.destination_version,
+            &record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version,
+            retained,
         );
         if let Ok(prepared) = &result {
-            assert_eq!(prepared, scope, "retained selection stays exact");
+            let mut expected_scope = scope.clone();
+            if expected_scope.destination_version.is_empty() {
+                expected_scope.destination_version =
+                    record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version;
+            }
+            assert_eq!(prepared, &expected_scope, "retained selection stays exact");
         }
         let actual = result.map_or_else(|error| format!("{error:?}"), |_| "OK".into());
         println!("ALPHA25 renewal_source.{}: {actual}", v["id"]);

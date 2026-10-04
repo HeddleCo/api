@@ -67,21 +67,36 @@ export function validateRepositoryHashAlgorithm(source:ProviderRepository, known
   });
 }
 export function validateDiscoveredImportScope(scope:api.ImportPermissionScopeV1, source:ProviderRepository):void {
+  validateDiscoveredImportScopeInner(scope,source,false);
+}
+function validateDiscoveredImportScopeInner(scope:api.ImportPermissionScopeV1, source:ProviderRepository, retained:boolean):void {
   validateRepositoryHashAlgorithm(source,true);
   if(scope.sourceUrl!==source.cloneUrl)reject("SourceSelection");
   for(const b of scope.branches){
     if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
     const text=source.refs.find(r=>r.name===b.refName)?.headOid;
     const oid=text?Uint8Array.from(text.match(/../g)!,v=>parseInt(v,16)):undefined;
-    validateImportRefSelection(b,oid);
+    validateImportRefSelection(b,retained&&b.refMode===1?undefined:oid);
   }
 }
-export function prepareImportSourceScope(request:api.PrepareImportJobRequest, currentSource:ProviderRepository, connectionProvider:string|undefined, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array):api.ImportPermissionScopeV1 {
+/** Host rechecks current grants and selected-commit availability. Retained state
+ * comes from an authenticated read or durable host state, bound to the verified token. */
+export function prepareImportSourceScope(request:api.PrepareImportJobRequest, currentSource:ProviderRepository, connectionProvider:string|undefined, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array, retained?:{predecessor:VerifiedImportRenewalPredecessor;state:api.ImportJobCasStateV1}):api.ImportPermissionScopeV1 {
   const s=request.source??reject("SourceSelection");
   if(s.connection?.id!==currentSource.connection?.id||s.connection?.spool?.id!==currentSource.connection?.spool?.id||(s.providerRepositoryId!==currentSource.providerRepositoryId&&(s.connection!==undefined||s.providerRepositoryId!==""))||s.installationId!==currentSource.installationId||s.private!==currentSource.private)reject("SourceSelection");
   const scope=request.proposedScope??reject("Canonical");
   if(scope.provider!==resolveImportProvider(currentSource,connectionProvider))reject("SourceSelection");
-  validateDiscoveredImportScope(scope,currentSource);
+  if(retained){
+    const old=predecessors.get(retained.predecessor)??reject("Canonical"),state=retained.state;
+    validateCasState(state);const previous=read(old.previous).body;
+    if(!equal(signingDigest("heddle-import-job-cas-state-v1",api.ImportJobCasStateV1Schema,state),old.stateDigest)
+      ||!equal(request.renewLogicalJobId,previous.logicalJobId)||!equal(request.retryLineageId,previous.retryLineageId)
+      ||request.destination?.id!==initialImportOperationId(previous.identity!.spoolUuid,false))reject("StaleContext");
+    const selected=clone(api.ImportPermissionScopeV1Schema,scope);
+    if(!selected.destinationVersion.length)selected.destinationVersion=currentDestinationVersion.slice();
+    remainingScope(selected,previous.scope!,state.committedManifest!);
+  }else if(request.renewLogicalJobId.length)reject("StaleContext");
+  validateDiscoveredImportScopeInner(scope,currentSource,Boolean(retained));
   return prepareImportScope(scope,configuration,currentDestinationVersion);
 }
 function validateProviderSupport(provider:string,configuration:api.GetImportConfigurationResponse):void {

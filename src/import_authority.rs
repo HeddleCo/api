@@ -365,6 +365,14 @@ pub fn validate_discovered_import_scope(
     scope: &ImportPermissionScopeV1,
     source: &ProviderRepository,
 ) -> Result<(), Reject> {
+    validate_discovered_import_scope_inner(scope, source, false)
+}
+
+fn validate_discovered_import_scope_inner(
+    scope: &ImportPermissionScopeV1,
+    source: &ProviderRepository,
+    retained: bool,
+) -> Result<(), Reject> {
     validate_repository_hash_algorithm(source, true)?;
     if scope.source_url != source.clone_url {
         return Err(Reject::SourceSelection);
@@ -380,18 +388,30 @@ pub fn validate_discovered_import_scope(
             .filter(|r| !r.head_oid.is_empty())
             .map(|r| hex::decode(&r.head_oid).map_err(|_| Reject::Canonical))
             .transpose()?;
-        validate_ref_selection(b, oid.as_deref())?;
+        // An authenticated retained pin selects its original commit, not today's head.
+        validate_ref_selection(
+            b,
+            if retained && b.ref_mode == 1 {
+                None
+            } else {
+                oid.as_deref()
+            },
+        )?;
     }
     Ok(())
 }
 
-/// Host resolves the selector anew before issuing a reservation, including renewals.
+/// Host resolves the selector anew and checks current grants and selected-commit
+/// availability before issuing a reservation, including renewals. Retained state
+/// MUST come from an authenticated job-state read or receiver-owned durable state;
+/// the opaque predecessor binds its independently verified authority to that CAS.
 pub fn prepare_import_source_scope(
     request: &PrepareImportJobRequest,
     current_source: &ProviderRepository,
     connection_provider: Option<&str>,
     configuration: &GetImportConfigurationResponse,
     current_destination_version: &[u8],
+    retained: Option<(&VerifiedImportRenewalPredecessor, &ImportJobCasStateV1)>,
 ) -> Result<ImportPermissionScopeV1, Reject> {
     let selector = request.source.as_ref().ok_or(Reject::SourceSelection)?;
     if selector.connection != current_source.connection
@@ -407,7 +427,32 @@ pub fn prepare_import_source_scope(
     if scope.provider != provider {
         return Err(Reject::SourceSelection);
     }
-    validate_discovered_import_scope(scope, current_source)?;
+    if let Some((predecessor, state)) = retained {
+        validate_cas_state(state)?;
+        let previous = &predecessor.previous.body;
+        let identity = previous.identity.as_ref().ok_or(Reject::Canonical)?;
+        if signing_digest("heddle-import-job-cas-state-v1", state)? != predecessor.state_digest
+            || request.renew_logical_job_id != previous.logical_job_id
+            || request.retry_lineage_id != previous.retry_lineage_id
+            || request.destination.as_ref().is_none_or(|s| {
+                initial_operation_id(&identity.spool_uuid, false).map_or(true, |id| s.id != id)
+            })
+        {
+            return Err(Reject::StaleContext);
+        }
+        let mut selected = scope.clone();
+        if selected.destination_version.is_empty() {
+            selected.destination_version = current_destination_version.to_vec();
+        }
+        remaining_scope(
+            &selected,
+            previous.scope.as_ref().ok_or(Reject::Canonical)?,
+            state.committed_manifest.as_ref().ok_or(Reject::Canonical)?,
+        )?;
+    } else if !request.renew_logical_job_id.is_empty() {
+        return Err(Reject::StaleContext);
+    }
+    validate_discovered_import_scope_inner(scope, current_source, retained.is_some())?;
     prepare_scope(scope, configuration, current_destination_version)
 }
 

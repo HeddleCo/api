@@ -124,9 +124,9 @@ Prepare and signing and offers retrying discovery, even when OBSERVE is chosen.
 A discovery response can report zero with empty OIDs without authorizing work.
 Every ref's algorithm agrees with the repository, and each nonempty `head_oid`
 is exactly lowercase 40-hex for SHA-1 or 64-hex for SHA-256. Mismatch is refused.
-The browser uses `validate_discovered_import_scope` / `validateDiscoveredImportScope`
-before preparing/signing: every selected branch must use that discovered format;
-a known selected OID must be pinned exactly. Algorithm discovery alone never
+For fresh selections, the browser uses `validate_discovered_import_scope` /
+`validateDiscoveredImportScope` before preparing/signing: every selected branch
+must use that discovered format; a known selected OID must be pinned exactly. Algorithm discovery alone never
 waives signed observe disclosure or the settled known-OID pinning rule.
 
 Prepare carries required `ImportSourceSelectionV1`: connection/repository,
@@ -141,8 +141,12 @@ input to `validate_commit_request` / `validateImportCommitRequest`, separate fro
 the untrusted source projection; current hash format and known OIDs come from
 that resolved snapshot, so clearing incoming refs cannot bypass known-OID pinning.
 A frozen PINNED_COMMIT continues to name its selected commit when the mutable
-branch head moves after Prepare; Commit never substitutes or requires a new head. Host lookup/fetch, revocation and atomic mutation
-remain host responsibilities. Exact accepted replay retains its settled semantics.
+branch head moves after Prepare; Commit and authenticated retained renewal Prepare
+never substitute or require a new head. Renewal Prepare uses the verified
+predecessor and authenticated CAS snapshot described below; a request's renewal
+ID alone cannot preserve a pin. Host lookup/fetch, current source grants,
+selected-commit availability, revocation and atomic mutation remain host
+responsibilities. Exact accepted replay retains its settled semantics.
 
 Unknown fields, versions, algorithms, purposes, duplicate fields, noncanonical
 order and trailing bytes fail closed. `strict_decode` / `strictDecode` compare
@@ -1144,6 +1148,20 @@ and snapshot; sign the exact snapshot epoch and manifest digest; activation
 still performs transactional CAS. A stale state or publication race requires
 another job-state read, recomputation/review and exact Prepare before signing.
 The dedicated `GetImportJobState` read below supplies discovery and recovery.
+
+Source validation during renewal Prepare uses the opaque
+`VerifiedImportRenewalPredecessor` from `verify_renewal_predecessor` /
+`verifyImportRenewalPredecessor` and the exact authenticated retained CAS state.
+`prepare_import_source_scope` / `prepareImportSourceScope` bind the token's CAS
+snapshot to the requested logical job, retry lineage and destination, then enforce
+the remaining-scope subset before preserving its authorized pins. An unchanged
+retained pin remains valid when the current ref head moves; a replacement pin
+rejects. An incoming `renew_logical_job_id` alone never supplies this exemption;
+renewal Prepare without authenticated retained context rejects. Fresh selections
+still require their pins to match independently known selected OIDs. Current
+source grants, provider support, repository format and OID encoding MUST be
+rechecked. The host MUST also check availability of each selected pinned commit;
+matching today's head is neither required nor a substitute for that check.
 
 Initial Commit installs epoch **1**. Successful renewal increments it exactly
 once; successful Cancel increments it exactly once and makes the job terminal.

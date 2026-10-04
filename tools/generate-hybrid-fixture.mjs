@@ -729,13 +729,20 @@ const replacedPin=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest)
 wire('renew_prepare_replaced_pin',api.PrepareImportJobRequestSchema,replacedPin);
 const freshPin=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest);freshPin.renewLogicalJobId=new Uint8Array();
 wire('fresh_prepare_retained_pin',api.PrepareImportJobRequestSchema,freshPin);
+const freshReplacedPin=clone(api.PrepareImportJobRequestSchema,replacedPin);freshReplacedPin.renewLogicalJobId=new Uint8Array();
+wire('fresh_prepare_replaced_pin',api.PrepareImportJobRequestSchema,freshReplacedPin);
+const renewalIssueToken=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest);renewalIssueToken.proposedScope.destinationVersion=new Uint8Array();
+wire('renew_prepare_issue_token',api.PrepareImportJobRequestSchema,renewalIssueToken);
 const changedCas=clone(api.ImportJobCasStateV1Schema,readPartial.state);changedCas.authorityEpoch++;
 wire('renew_source_changed_cas',api.ImportJobCasStateV1Schema,changedCas);
 sv.renewal_prepare=[
+ {id:'fresh_before_movement',request:'fresh_prepare_retained_pin',source:'renew_source_retained_head',retained:false,expected:'OK'},
  {id:'retained_before_movement',request:'renew_prepare_request',source:'renew_source_retained_head',retained:true,expected:'OK'},
  {id:'retained_after_movement',request:'renew_prepare_request',source:'renew_source_moved_head',retained:true,expected:'OK'},
+ {id:'retained_issue_destination_token',request:'renew_prepare_issue_token',source:'renew_source_moved_head',retained:true,expected:'OK'},
  {id:'replacement_pin',request:'renew_prepare_replaced_pin',source:'renew_source_moved_head',retained:true,expected:'RenewalFork'},
  {id:'fresh_moved_head',request:'fresh_prepare_retained_pin',source:'renew_source_moved_head',retained:false,expected:'RefPinning'},
+ {id:'fresh_after_movement_repin',request:'fresh_prepare_replaced_pin',source:'renew_source_moved_head',retained:false,expected:'OK'},
  {id:'forged_renewal_id',request:'renew_prepare_request',source:'renew_source_moved_head',retained:false,expected:'StaleContext'},
  {id:'missing_retained_state',request:'renew_prepare_request',source:'renew_source_retained_head',retained:false,expected:'StaleContext'},
  {id:'changed_cas',request:'renew_prepare_request',source:'renew_source_moved_head',retained:true,state:'renew_source_changed_cas',expected:'StaleContext'},
@@ -746,7 +753,7 @@ for(const [id,mutate,expected] of [
  ['uppercase_current_oid',r=>r.refs[0].headOid='AB'.repeat(20),'Canonical'],
  ['wrong_current_oid_width',r=>r.refs[0].headOid='ab'.repeat(32),'SourceSelection'],
  ['changed_repository_format',r=>{r.hashAlgorithm=2;r.refs[0].hashAlgorithm=2;r.refs[0].headOid='ab'.repeat(32);},'SourceSelection'],
- ['changed_source_grant',r=>r.connection.id='27272727-2727-2727-2727-272727272727','SourceSelection'],
+ ['changed_current_connection',r=>r.connection.id='27272727-2727-2727-2727-272727272727','SourceSelection'],
 ]){const r=clone(ProviderRepositorySchema,movedHead);mutate(r);const name='renew_source_bad_'+id;wire(name,ProviderRepositorySchema,r);sv.renewal_prepare.push({id,request:'renew_prepare_request',source:name,retained:true,expected});}
 for(const [id,mutate] of [
  ['wrong_logical_job',r=>r.renewLogicalJobId=raw(0xfe,16)],

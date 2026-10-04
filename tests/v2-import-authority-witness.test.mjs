@@ -549,13 +549,26 @@ test('alpha25 renewal source Prepare shared vectors',async()=>{
  const failures=[];
  for(const v of fixture.source_vectors.renewal_prepare){
   const request=vector(v.request),source=vector(v.source),configuration=vector(v.configuration??'import_configuration');
+  if(v.id==='replacement_pin')assert.equal(Buffer.from(request.proposedScope.branches[0].pinnedCommitOid).toString('hex'),source.refs[0].headOid,'replacement matches current head but exceeds retained authority');
   let actual='OK';
   try{
-   const prepared=authority.prepareImportSourceScope(request,source,'github',configuration,request.proposedScope.destinationVersion);
-   assert.deepEqual(prepared,request.proposedScope,'retained selection stays exact');
+   const retained=v.retained?{predecessor,state:v.state?vector(v.state):state}:undefined;
+   const destinationVersion=vector('scope').destinationVersion;
+   const prepared=authority.prepareImportSourceScope(request,source,'github',configuration,destinationVersion,retained);
+   assert.deepEqual(prepared,{...request.proposedScope,destinationVersion},'retained selection stays exact');
   }catch(e){actual=e.reason==='PreparationRefused'?`${e.reason}(${api.ImportPreparationRefusalReason[e.preparationRefusalReason].split('_').map(s=>s[0]+s.slice(1).toLowerCase()).join('')})`:e.reason;}
   console.log(`ALPHA25 renewal_source.${v.id}: ${actual}`);
   if(actual!==v.expected)failures.push(`${v.id}: expected ${v.expected}, got ${actual}`);
  }
  assert.deepEqual(failures,[]);
+});
+
+test('alpha25 renewal source Prepare rejects an unverified predecessor token',()=>{
+ const request=vector('renew_prepare_request');
+ assert.throws(()=>authority.prepareImportSourceScope(request,vector('renew_source_moved_head'),'github',vector('import_configuration'),request.proposedScope.destinationVersion,{predecessor:{},state:vector('job_state_partial').state}),expected('Canonical'));
+});
+
+test('alpha25 fresh source Prepare with null retained context still requires the known pin',()=>{
+ const request=vector('fresh_prepare_retained_pin');
+ assert.throws(()=>authority.prepareImportSourceScope(request,vector('renew_source_moved_head'),'github',vector('import_configuration'),request.proposedScope.destinationVersion,null),expected('RefPinning'));
 });

@@ -1,6 +1,6 @@
-# Native host witnessing v1 (alpha.28)
+# Native host witnessing v1 (alpha.30)
 
-Normative companion to `import-authority-host-witness.md`; closes api#339.
+Normative companion to `import-authority-host-witness.md`; closes api#339 and api#343.
 The original native formats, import formats, witness statement/set formats,
 purpose domains and retirement leaf algorithm are unchanged. Native evidence is
 an explicit separate carrier, never the result of failing import verification.
@@ -119,8 +119,9 @@ purpose-2 original, envelope, admission and dependencies must be exported.
 Uploading, account equality or a witness does not turn LocalKey into Account.
 Conflicting claims retain all claims and require the co-signed native resolution,
 winning claim, complete conflict set and accepted source frontier. A purely
-local capture remains verified by its local creator plus the explicitly claimed
-hosting ownership; an account source/control dependency requires purpose 2.
+local capture or LocalKey `LocalIntegration` remains verified by its local
+creator plus the explicitly claimed hosting ownership; an account source/control
+dependency, including an account-authored `LocalIntegration`, requires purpose 2.
 
 `OriginalAuthority` verifies the original native authority at first admission;
 the witness's owner state/transfer must equal the binding's selected state.
@@ -169,8 +170,25 @@ byte-identical genesis dependencies, purpose-2 sidecars for every account
 source/control/claim/resolution dependency and an explicit witnessed claim for
 every hosted LocalKey genesis. A hosted integration dependency resolves through
 its byte-identical purpose-4 execution and matching statement; it must never be
-given a purpose-2 source-author receipt. Local captures retain their native proof
-and required witnessed ownership claim. Apply these same role-specific rules to
+given a purpose-2 source-author receipt. Local captures and LocalKey
+`LocalIntegration` dependencies resolve as **local work**: preserve the valid
+original LocalKey signature and the same Thread's exact witnessed ownership
+claim (purpose 2). The claim retains the complete observed source frontier,
+including the local integration and its dependency closure. A local integration
+has no account-authority envelope: never manufacture an empty-envelope purpose-2
+receipt or present it as a purpose-4 hosted execution. Select its role from the
+embedded native `LocalIntegration.author`, not merely the outer body kind:
+an account-authored integration still requires its exact purpose-2 authority
+sidecar and cannot use the local-work exception.
+
+Retain the exact cross-Thread source operation and both witnessed geneses, the
+target's causal parents, and every dependency needed to verify source revision
+and result State ancestry. Resolve each source dependency by its own role
+(account source: purpose 2; LocalKey work: native proof plus its Thread's witnessed
+claim; hosted integration: purpose 4). The native codecs must independently
+verify the canonical original, LocalKey signing role, exact source operation and
+revision, target frontier and causal parents, and complete merge State ancestry;
+the witness carrier does not replace those checks. Apply these same role-specific rules to
 landing source/review closure. Retain every causal parent, ownership claim,
 conflict resolution and acceptance dependency required by the native model.
 Hosted landing resolves its own exact source/review/target and witness history;

@@ -69,7 +69,19 @@ export async function verifyNativeGenesisPayload(s:HostedWitnessStatementV1,p:ap
 const authorityDigest=(p:import("./import_authority_pb.js").ImportAuthorityWitnessV1)=>signingDigest("heddle-import-authority-witness-payload-v1",ImportAuthorityWitnessV1Schema,p);
 function sorted<T>(values:T[],digest:(v:T)=>Uint8Array){values.forEach((v,i)=>{if(i&&compare(digest(values[i-1]!),digest(v))>=0)reject("Canonical");});}
 function thread(r:SignedRecord){return r.format==="heddle-thread-genesis-v1"?threadGenesisId(r.canonicalRecord):octets(selectors(r).thread,32);}
-function requiresAuthority(r:SignedRecord){if(r.format!=="heddle-thread-operation-v1")return true;const body=map(selectors(r).body);return body.kind!=="integration"&&(body.kind!=="capture"||map(map(body.canonical).author).kind!=="local_key");}
+function requiresAuthority(r:SignedRecord){
+  if(r.format!=="heddle-thread-operation-v1")return true;
+  const body=map(selectors(r).body);
+  if(body.kind==="integration")return false;
+  if(body.kind==="capture")return map(map(body.canonical).author).kind!=="local_key";
+  if(body.kind==="local_integration"){
+    const bytes=body.canonical;
+    if(!(bytes instanceof Uint8Array)&&(!Array.isArray(bytes)||bytes.some(b=>typeof b!=="number"||!Number.isInteger(b)||b<0||b>255)))reject("Canonical");
+    try{return map(map(decode(Uint8Array.from(bytes as Uint8Array|number[]))).author).kind!=="local_key";}
+    catch{reject("Canonical");}
+  }
+  return true;
+}
 /** Reference completeness and original signatures. This cannot enroll an owner,
  * authenticate a carried set or replace native causal/authority verification. */
 export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1):Promise<void> {
@@ -92,7 +104,8 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
       const p=b.landingWitnesses.find(p=>exact(p.execution,original))??reject("Scope");
       requireStatement(4,canonicalHybridV1(HostedLandingWitnessV1Schema,p));
     }else{
-      // Local captures retain their native proof and exact hosted ownership claim.
+      // Local captures and LocalKey integrations retain native proof and the
+      // thread's exact hosted ownership claim, never an authority/landing receipt.
       await verifyNativeRecord(original,"heddle-thread-operation-v1");
       const p=b.authorityWitnesses.find(p=>p.kind===2&&p.original&&equal(thread(p.original),thread(original)))??reject("Scope");
       requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
@@ -120,6 +133,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   for(const p of b.landingWitnesses){
     requireStatement(4,canonicalHybridV1(HostedLandingWitnessV1Schema,p));
     const execution=p.execution??reject("Canonical");
+    if(execution.format!=="heddle-thread-operation-v1"||map(selectors(execution).body).kind!=="integration")reject("Scope");
     if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(execution))))reject("Scope");
     for(const original of [...(p.sourceOperation?[p.sourceOperation]:[]),...p.reviewEvidence]){
       if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(original))))reject("Scope");

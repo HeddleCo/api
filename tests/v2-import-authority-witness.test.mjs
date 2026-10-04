@@ -469,6 +469,54 @@ for(const v of fixture.renew_submission_vectors.passing)test(`alpha24 frozen act
   assert.deepEqual(request.proof.delegations,read.retainedProof.delegations);
   assert.deepEqual(request.proof.renewals,read.retainedProof.renewals);
 });
+test('superseded renewal recovery remains settled and replays the stored receipt',async()=>{
+ const v=fixture.superseded_renewal_vectors,context=ownerContext(BigInt(v.now_seconds));
+ for(const [requestName,readName,delegationName,epoch] of [[v.r1_request,v.r1_read,v.r1_delegation,1n],[v.r2_request,v.r2_read,v.r2_delegation,2n]]){
+  const request=vector(requestName),read=vector(readName);
+  assert.equal(read.state.authorityEpoch,epoch);
+  const verified=await authority.verifyImportRenewSubmission(request,read,context,context);
+  assert.deepEqual(verified.digest,authority.signedDelegationDigest(vector(delegationName)));
+ }
+ const read=vector(v.read),r1=vector(v.r1_request),digest=bytes(v.recovery_digest_hex);
+ authority.validateImportJobStateResponse(vector('job_state_request'),read);
+ assert.equal(read.state.authorityEpoch,3n);
+ assert.equal(read.retainedProof.renewals.length,2);
+ assert.deepEqual(read.state.activePredecessor,vector(v.r2_delegation));
+ assert.notDeepEqual(digest,authority.signedDelegationDigest(read.state.activePredecessor));
+ assert.deepEqual(digest,authority.signedDelegationDigest(r1.renewal.body.replacement));
+ const accepted=read.retainedProof.renewals.find(r=>Buffer.from(authority.signedDelegationDigest(r.body.replacement)).equals(Buffer.from(digest)));
+ assert.deepEqual(accepted,r1.renewal);
+ assert.equal(accepted?'settled':'unsettled',v.expected_recovery);
+ // This replay lookup precedes current CAS and expiry checks, even after R2.
+ const stored={request:bytes(fixture.wire_vectors[v.r1_request].wire_hex),response:bytes(fixture.wire_vectors[v.r1_response].wire_hex)};
+ const replay=wire=>{authority.checkImportRenewReplay(wire,stored.request);return stored.response;};
+ const frozen=toBinary(api.RenewImportJobRequestSchema,r1);
+ assert.deepEqual(frozen,stored.request);
+ const response=authority.strictDecode(api.MutationResponseSchema,replay(frozen));
+ assert.equal(response.receipt.clientOperationId,r1.clientOperationId);
+ assert.equal(response.receipt.outcome.case,'applied');
+ assert.deepEqual(toBinary(api.MutationResponseSchema,response),stored.response);
+ assert.throws(()=>authority.validateImportRenewRequest(r1,read),expected('StaleContext'));
+ await assert.rejects(authority.verifyImportRenewSubmission(r1,vector(v.r1_read),ownerContext(BigInt(v.replay_now_seconds)),ownerContext(BigInt(v.replay_now_seconds))),expected('Expired'));
+ console.log('SUPERSEDED recovery: settled; replay: stored receipt; active epoch: 3');
+});
+for(const v of fixture.superseded_renewal_vectors.negative)test(`superseded renewal REJECT then PASS: ${v.id}`,async()=>{
+ const request=vector(v.request),s=fixture.superseded_renewal_vectors;
+ if(v.read){
+  const context=ownerContext(BigInt(s.now_seconds));
+  assert.throws(()=>authority.validateImportRenewRequest(request,vector(v.read)),expected(v.expected));
+  await assert.rejects(authority.verifyImportRenewSubmission(request,vector(v.read),context,context),expected(v.expected));
+  await authority.verifyImportRenewSubmission(request,vector(v.control_read),context,context);
+  assert.notEqual(request.clientOperationId,vector(s.r1_request).clientOperationId);
+  assert.notDeepEqual(authority.signedDelegationDigest(request.renewal.body.replacement),bytes(s.recovery_digest_hex));
+ }else{
+  const stored=bytes(fixture.wire_vectors[s.r1_request].wire_hex);
+  assert.equal(request.clientOperationId,vector(s.r1_request).clientOperationId);
+  assert.throws(()=>authority.checkImportRenewReplay(bytes(fixture.wire_vectors[v.request].wire_hex),stored),expected(v.expected));
+  authority.checkImportRenewReplay(bytes(fixture.wire_vectors[v.control].wire_hex),stored);
+ }
+ console.log(`SUPERSEDED REJECT then PASS ${v.id}: ${v.expected}`);
+});
 test('alpha24 job-state read is authenticated destination-writer only, bounded and gated',()=>{
  const contract=getOption(api.IntegrationService.method.getImportJobState,common.rpc_contract);
  assert.equal(contract.effect,common.RpcEffect.READ_ONLY);assert.equal(contract.retryBehavior,common.RetryBehavior.SAFE);

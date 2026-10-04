@@ -2529,6 +2529,178 @@ fn alpha24_renew_and_read_negatives_reject_then_pass() {
 }
 
 #[test]
+fn superseded_renewal_recovery_remains_settled_and_replays_stored_receipt() {
+    let f = fixture();
+    let v = &f["superseded_renewal_vectors"];
+    let c = Context::from_export(&f, &record(&f, "complete_renewed_export"));
+    let now = v["now_seconds"].as_i64().expect("verification time");
+    for (request_field, read_field, delegation_field, epoch) in [
+        ("r1_request", "r1_read", "r1_delegation", 1),
+        ("r2_request", "r2_read", "r2_delegation", 2),
+    ] {
+        let request = record(&f, v[request_field].as_str().expect("request"));
+        let read: api::GetImportJobStateResponse =
+            record(&f, v[read_field].as_str().expect("read"));
+        assert_eq!(
+            read.state.as_ref().expect("CAS state").authority_epoch,
+            epoch
+        );
+        let verified =
+            import::verify_renew_submission(&request, &read, &c.owner(now), &c.owner(now))
+                .expect("accepted signed renewal");
+        assert_eq!(
+            verified.digest(),
+            import::signed_delegation_digest(&record(
+                &f,
+                v[delegation_field].as_str().expect("replacement"),
+            ))
+            .expect("replacement digest")
+        );
+    }
+    let read: api::GetImportJobStateResponse = record(&f, v["read"].as_str().expect("read"));
+    let r1: api::RenewImportJobRequest = record(&f, v["r1_request"].as_str().expect("R1"));
+    import::validate_job_state_response(&record(&f, "job_state_request"), &read)
+        .expect("authenticated two-renewal read");
+    let state = read.state.as_ref().expect("CAS state");
+    let proof = read.retained_proof.as_ref().expect("accepted history");
+    let digest = bytes(&v["recovery_digest_hex"]);
+    assert_eq!(state.authority_epoch, 3);
+    assert_eq!(proof.renewals.len(), 2);
+    assert_eq!(
+        state.active_predecessor,
+        Some(record(&f, v["r2_delegation"].as_str().expect("R2")))
+    );
+    assert_ne!(
+        digest,
+        import::signed_delegation_digest(state.active_predecessor.as_ref().expect("ACTIVE"))
+            .expect("active digest")
+    );
+    let r1_certificate = r1.renewal.as_ref().expect("R1 certificate");
+    assert_eq!(
+        digest,
+        import::signed_delegation_digest(
+            r1_certificate
+                .body
+                .as_ref()
+                .expect("R1 body")
+                .replacement
+                .as_ref()
+                .expect("R1 replacement"),
+        )
+        .expect("R1 digest")
+    );
+    let accepted = proof.renewals.iter().find(|r| {
+        r.body
+            .as_ref()
+            .and_then(|body| body.replacement.as_ref())
+            .is_some_and(|d| import::signed_delegation_digest(d).expect("history digest") == digest)
+    });
+    assert_eq!(accepted, Some(r1_certificate));
+    assert_eq!(
+        if accepted.is_some() {
+            "settled"
+        } else {
+            "unsettled"
+        },
+        v["expected_recovery"].as_str().expect("classification")
+    );
+    // Replay lookup precedes current CAS and expiry checks, even after R2.
+    let stored = bytes(&f["wire_vectors"][v["r1_request"].as_str().expect("R1")]["wire_hex"]);
+    let stored_response =
+        bytes(&f["wire_vectors"][v["r1_response"].as_str().expect("receipt")]["wire_hex"]);
+    let replay = |wire: &[u8]| {
+        import::check_renew_replay(wire, &stored)?;
+        Ok::<_, codec::Reject>(&stored_response)
+    };
+    let frozen = r1.encode_to_vec();
+    assert_eq!(frozen, stored);
+    let response: api::MutationResponse = codec::strict_decode(
+        replay(&frozen).expect("exact replay"),
+        import::MAX_BUNDLE_BYTES,
+    )
+    .expect("stored response");
+    let receipt = response.receipt.as_ref().expect("stored receipt");
+    assert_eq!(receipt.client_operation_id, r1.client_operation_id);
+    assert!(matches!(
+        receipt.outcome,
+        Some(api::mutation_receipt::Outcome::Applied(_))
+    ));
+    assert_eq!(response.encode_to_vec(), stored_response);
+    assert_eq!(
+        import::validate_renew_request(&r1, &read),
+        Err(codec::Reject::StaleContext)
+    );
+    let expired = v["replay_now_seconds"].as_i64().expect("replay time");
+    assert_eq!(
+        import::verify_renew_submission(
+            &r1,
+            &record(&f, v["r1_read"].as_str().expect("old read")),
+            &c.owner(expired),
+            &c.owner(expired),
+        )
+        .err(),
+        Some(codec::Reject::Expired)
+    );
+    println!("SUPERSEDED recovery: settled; replay: stored receipt; active epoch: 3");
+}
+
+#[test]
+fn superseded_renewal_negatives_reject_then_pass() {
+    let f = fixture();
+    let s = &f["superseded_renewal_vectors"];
+    let c = Context::from_export(&f, &record(&f, "complete_renewed_export"));
+    let now = s["now_seconds"].as_i64().expect("verification time");
+    let r1: api::RenewImportJobRequest = record(&f, s["r1_request"].as_str().expect("R1"));
+    for v in s["negative"].as_array().expect("negatives") {
+        let request: api::RenewImportJobRequest =
+            record(&f, v["request"].as_str().expect("request"));
+        let actual = if let Some(read_name) = v["read"].as_str() {
+            let read = record(&f, read_name);
+            let reason = import::validate_renew_request(&request, &read)
+                .expect_err("new candidate uses stale snapshot");
+            assert_eq!(
+                import::verify_renew_submission(&request, &read, &c.owner(now), &c.owner(now))
+                    .err(),
+                Some(reason)
+            );
+            import::verify_renew_submission(
+                &request,
+                &record(&f, v["control_read"].as_str().expect("original snapshot")),
+                &c.owner(now),
+                &c.owner(now),
+            )
+            .expect("same signed candidate passes against original snapshot");
+            assert_ne!(request.client_operation_id, r1.client_operation_id);
+            assert_ne!(request.renewal, r1.renewal);
+            reason
+        } else {
+            let stored =
+                bytes(&f["wire_vectors"][s["r1_request"].as_str().expect("R1")]["wire_hex"]);
+            assert_eq!(request.client_operation_id, r1.client_operation_id);
+            let reason = import::check_renew_replay(
+                &bytes(&f["wire_vectors"][v["request"].as_str().expect("request")]["wire_hex"]),
+                &stored,
+            )
+            .expect_err("changed bytes cannot replay R1");
+            import::check_renew_replay(
+                &bytes(&f["wire_vectors"][v["control"].as_str().expect("control")]["wire_hex"]),
+                &stored,
+            )
+            .expect("exact frozen replay passes");
+            reason
+        };
+        assert_eq!(
+            format!("{actual:?}"),
+            v["expected"].as_str().expect("reason")
+        );
+        println!(
+            "SUPERSEDED REJECT then PASS {}: {actual:?}",
+            v["id"].as_str().expect("id")
+        );
+    }
+}
+
+#[test]
 fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
     let f = fixture();
     let original = Context::from_export(&f, &record(&f, "complete_renewed_export"));

@@ -634,6 +634,34 @@ for(const [id,mutate,expected] of [
 ]){const r=create(api.GetImportJobStateRequestSchema,{destination,logicalJobId});mutate(r);const name=`job_state_request_bad_${id}`;wire(name,api.GetImportJobStateRequestSchema,r);artifact.renew_submission_vectors.read_request_negative.push({id,request:name,expected,control:'job_state_request'});}
 const renewalPrepareRequest=wire('renew_prepare_request',api.PrepareImportJobRequestSchema,create(api.PrepareImportJobRequestSchema,{...prepareRequest,proposedScope:nextBody.scope,renewLogicalJobId:logicalJobId}));
 artifact.renew_submission_vectors.prepare_negative.push({id:'publication_race',request:'renew_prepare_request',response:'renewal_preparation',read:'job_state_empty',expected:'StaleContext',control:'job_state_partial'});
+// Superseded recovery: R1 remains accepted after R2 becomes ACTIVE. Reuse the
+// existing signed certificates without changing any original bytes or trees.
+const retainedR1=clone(api.ImportPublicProofBundleV1Schema,retainedPartial);
+retainedR1.memberPermissions=[permission,renewedPermission].sort((a,b)=>compare(signedPermissionDigest(a),signedPermissionDigest(b)));
+retainedR1.delegations.push(next);retainedR1.renewals.push(renewal);
+const readR1=wire('job_state_after_r1',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{...readPartial,state:{...readPartial.state,activePredecessor:next,authorityEpoch:2n},retainedProof:retainedR1}));
+const r2=fromBinary(api.SignedImportJobRenewalV1Schema,Buffer.from(artifact.signed_vectors.reused_parent_renewal.wire_hex,'hex'));
+wire('renew_request_r2',api.RenewImportJobRequestSchema,create(api.RenewImportJobRequestSchema,{clientOperationId:'renew_request_r2',destination,renewal:r2,proof:{...retainedR1,memberPermission:renewedPermission}}));
+const retainedR2=clone(api.ImportPublicProofBundleV1Schema,retainedR1);
+retainedR2.delegations.push(reuseChild);retainedR2.renewals.push(r2);
+wire('job_state_after_r2',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{...readR1,state:{...readR1.state,activePredecessor:reuseChild,authorityEpoch:3n},retainedProof:retainedR2}));
+wire('renew_r1_stored_response',MutationResponseSchema,create(MutationResponseSchema,{receipt:{clientOperationId:partialRequest.clientOperationId,outcome:{case:'applied',value:{}}}}));
+// A distinct signed candidate from the same old snapshot must be re-prepared.
+const staleCandidate=clone(api.RenewImportJobRequestSchema,partialRequest);
+staleCandidate.clientOperationId='renew_request_new_from_r1_snapshot';
+staleCandidate.renewal=fromBinary(api.SignedImportJobRenewalV1Schema,Buffer.from(artifact.signed_vectors.competing_renewal.wire_hex,'hex'));
+wire(staleCandidate.clientOperationId,api.RenewImportJobRequestSchema,staleCandidate);
+const changedReplay=clone(api.RenewImportJobRequestSchema,partialRequest);changedReplay.proof.memberPermission=permission;
+wire('renew_r1_changed_replay',api.RenewImportJobRequestSchema,changedReplay);
+artifact.superseded_renewal_vectors={
+ r1_request:'renew_request_partial',r1_read:'job_state_partial',r1_delegation:'renewed_delegation',r1_response:'renew_r1_stored_response',
+ r2_request:'renew_request_r2',r2_read:'job_state_after_r1',r2_delegation:'reused_parent_delegation',read:'job_state_after_r2',
+ recovery_digest_hex:hex(signedDelegationDigest(next)),expected_recovery:'settled',now_seconds:1350,replay_now_seconds:1900,
+ negative:[
+  {id:'new_candidate_from_r1_snapshot',request:staleCandidate.clientOperationId,read:'job_state_after_r2',expected:'StaleContext',control_read:'job_state_partial'},
+  {id:'changed_r1_replay',request:'renew_r1_changed_replay',expected:'OperationIdReused',control:'renew_request_partial'},
+ ],
+};
 for(const [name,v] of Object.entries(artifact.signed_vectors)){const domains={SignedImportMemberPermissionV1:'heddle-signed-import-member-permission-v1',SignedImportGenesisAuthorityV1:'heddle-signed-import-genesis-authority-v1',SignedImportJobDelegationV1:'heddle-signed-import-job-delegation-v1',SignedDelegatedImportOperationV1:'heddle-signed-delegated-import-operation-v1'};const domain=domains[v.schema.split('.').at(-1)];if(domain){const schema=api[v.schema.split('.').at(-1)+'Schema'],value=(await import('@bufbuild/protobuf')).fromBinary(schema,new Uint8Array(Buffer.from(v.wire_hex,'hex')));commitment(`signed_${name}`,schema,value,domain);}}
 const checks={forged_wrong_root:'root_signature',root_signed_invalid_current_set:'current_entry_has_no_archive_seal',job_key_as_witness:'known_job_key_role',encoded_job_role_as_witness:'witness_role_enum',set_rollback_below_persisted_high_water:'persisted_generation_high_water',retired_seed_backdating_new_leaf:'exact_retirement_leaf_inclusion',retired_key_cannot_admit_new_work:'current_issuance_window',revoked_key_rejects_exact_history:'revoked_tombstone',delegation_target_scope_violation:'exact_operation_target_scope',expired_delegation:'new_operation_validity_window',renewal_forks_logical_job:'logical_job_lineage',renewal_resets_result_budget:'remaining_operation_budget'};
 for(const v of artifact.negative_vectors)v.first_failing_check=checks[v.id];

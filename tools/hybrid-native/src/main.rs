@@ -15,8 +15,8 @@ use objects::object::{
     thread_genesis_admission::ThreadGenesisAdmission,
     thread_replication::{
         Capture, ThreadGenesis, ThreadOperation, integration::HostedIntegration,
-        metadata::ThreadControl, ownership_claim::ThreadOwnershipClaim,
-        ownership_resolution::ThreadOwnershipResolution,
+        local_integration::LocalIntegration, metadata::ThreadControl,
+        ownership_claim::ThreadOwnershipClaim, ownership_resolution::ThreadOwnershipResolution,
     },
 };
 use prost::Message;
@@ -506,6 +506,9 @@ fn encode(format: &str, bytes: &[u8]) -> Result<Vec<u8>> {
         "heddle-thread-control-v1" => rmp_serde::from_slice::<ThreadControl>(bytes)?.encode()?,
         "heddle-hosted-integration-v1" => {
             rmp_serde::from_slice::<HostedIntegration>(bytes)?.encode()?
+        }
+        "heddle-local-integration-v1" => {
+            rmp_serde::from_slice::<LocalIntegration>(bytes)?.encode()?
         }
         "heddle-original-boundary-acceptance-v1" => {
             rmp_serde::from_slice::<OriginalBoundaryAcceptance>(bytes)?.encode()?
@@ -1400,6 +1403,14 @@ fn verify_native_witness_fixture() -> Result<()> {
                 geneses.get(&op.thread).context("operation genesis")?,
                 &parents,
             )?;
+            if let ThreadOperationBody::LocalIntegration(bytes) = &op.body {
+                let integration = LocalIntegration::decode(bytes)?;
+                integration.validate_source(
+                    operations
+                        .get(&integration.source_operation)
+                        .context("local integration source closure")?,
+                )?;
+            }
         }
         for p in &b.authority_witnesses {
             let r = p.original.as_ref().context("authority original")?;
@@ -1597,6 +1608,24 @@ fn verify_native_genesis_boundary(
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
+        Some("merge-state") => {
+            let states: Vec<Vec<u8>> = rmp_serde::from_slice(&input()?)?;
+            ensure!(states.len() == 2, "source and target States required");
+            let source = State::decode_current_msgpack(&states[0])?;
+            let mut target = State::decode_current_msgpack(&states[1])?;
+            let mut parents = vec![source.id(), target.id()];
+            parents.sort();
+            parents.dedup();
+            target.parents = parents;
+            println!(
+                "{}",
+                serde_json::json!({
+                    "source_id_hex": hex::encode(source.id().as_bytes()),
+                    "id_hex": hex::encode(target.id().as_bytes()),
+                    "state_hex": hex::encode(target.encode_current_msgpack()?),
+                })
+            );
+        }
         Some("child-state" | "descendant-state") => {
             let mut state = State::decode_current_msgpack(&input()?)?;
             ensure!(

@@ -126,6 +126,54 @@ const retired=clone(api.NativePublicProofBundleV1Schema,cases.start_thread);reti
 retired.historyProofs=retired.statements.map(s=>{const i=leaves.findIndex(l=>hex(statementSigningDigest(l.s.body))===hex(statementSigningDigest(s.body)));return create(host.HostedWitnessHistoryProofV1Schema,{executorId:s.body.executorId,purpose:s.body.purpose,leafIndex:BigInt(i),leafCount:BigInt(leaves.length),siblings:proofPath(i,leaves.map(l=>l.h))});});
 wire('retired_start_thread',api.NativePublicProofBundleV1Schema,retired);fixture.positive.push('retired_start_thread');
 function negative(name,control,edit,expected,gate='bundle'){const b=clone(api.NativePublicProofBundleV1Schema,cases[control]??retired);edit(b);wire(name,api.NativePublicProofBundleV1Schema,b);fixture.negative.push({id:name,control,expected,gate});}
+// Alpha.30 cases use the unchanged current set. Append after sealing the
+// alpha.28 archive so every existing signed vector and retirement proof stays exact.
+const localCapture=localAuthority.dependencies.find(r=>r.format==='heddle-thread-operation-v1');
+const targetValue=decode(localCapture.canonicalRecord),sourceValue=decode(sourceTemplate.canonicalRecord);
+const merged=JSON.parse(execFileSync(codec,['merge-state'],{input:hex(encode([sourceValue.body.canonical.result.state,targetValue.body.canonical.result.state])),encoding:'utf8'}));
+const localIntegrationValue={version:1,spool:decode(localAuthority.original.canonicalRecord).acceptance.spool,device:Array.from(key('owner')),author:{kind:'local_key'},source_thread:sourceValue.thread,source_operation:Array.from(nativeId(sourceTemplate.format,sourceTemplate.canonicalRecord)),source_revision:Array.from(raw(merged.source_id_hex)),target_thread:targetValue.thread,expected_target_frontier:[Array.from(nativeId(localCapture.format,localCapture.canonicalRecord))],result:{...targetValue.body.canonical.result,state:Array.from(raw(merged.state_hex))},result_visibility:'Internal',initiating_request_proof:Array.from(fill(19)),local_policy_version:Array.from(fill(20)),executed_at_ms:1000000n};
+function integrationOriginal(value,signer='owner'){
+ const canonical=raw(execFileSync(codec,['encode','heddle-local-integration-v1'],{input:hex(encode(value)),encoding:'utf8'}).trim());
+ return native('heddle-thread-operation-v1',{version:1,thread:value.target_thread,parents:value.expected_target_frontier,publisher:value.device,body:{kind:'local_integration',canonical:Array.from(canonical)}},[signer]);
+}
+const localIntegration=integrationOriginal(localIntegrationValue);
+function localIntegrationBundle(original){
+ const claimValue=decode(localAuthority.original.canonicalRecord);
+ claimValue.source_frontier=[Array.from(nativeId(original.format,original.canonicalRecord))];
+ const p=clone(imp.ImportAuthorityWitnessV1Schema,localAuthority);
+ p.original=native('heddle-thread-ownership-claim-v1',claimValue,['owner','device']);
+ p.dependencies.push(accountSource.originalGenesis,sourceTemplate,original);
+ p.dependencies.sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));
+ const b=bundle([local,accountSource],[p,sourcePayload],[localStatement,sourceGenesisStatement,authorityStatement(sourcePayload,204),authorityStatement(p,219)]);
+ b.witnessSet=currentSet;
+ return sortBundle(b);
+}
+cases.local_integration_push=localIntegrationBundle(localIntegration);
+wire('local_integration_push',api.NativePublicProofBundleV1Schema,cases.local_integration_push);fixture.positive.push('local_integration_push');
+negative('local_integration_forged_signature','local_integration_push',b=>{
+ const p=b.authorityWitnesses.find(p=>p.kind===2),r=p.dependencies.find(r=>hex(signedNativeDigest(r))===hex(signedNativeDigest(localIntegration)));
+ r.signatures[0].signature[0]^=1;p.dependencies.sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));
+ b.statements=b.statements.filter(s=>s.body.purpose!==2||hex(s.body.canonicalPayload)===hex(canonicalHybridV1(imp.ImportAuthorityWitnessV1Schema,sourcePayload)));
+ b.statements.push(authorityStatement(p,219));sortBundle(b);
+},'Signature');
+negative('local_integration_missing_claim','local_integration_push',b=>{
+ // Retain the integration in a witnessed dependency even when the claim is absent.
+ b.authorityWitnesses=b.authorityWitnesses.filter(p=>p.kind!==2);
+ const p=b.authorityWitnesses[0];p.dependencies=[localIntegration];
+ b.statements=b.statements.filter(s=>s.body.purpose===1);b.statements.push(authorityStatement(p,204));sortBundle(b);
+},'Scope');
+for(const [name,env] of [['local_integration_purpose2',envelope],['local_integration_empty_purpose2',new Uint8Array()]])negative(name,'local_integration_push',b=>{
+ const p=create(imp.ImportAuthorityWitnessV1Schema,{formatVersion:1,kind:1,original:localIntegration,authorityEnvelope:env});
+ b.authorityWitnesses.push(p);const s=authorityStatement(p,220);s.body.publisherKeyId=keyId(key('owner'));s.signature=sig('witness',statementSigningDigest(s.body));b.statements.push(s);sortBundle(b);
+},'Scope');
+negative('local_integration_purpose4','local_integration_push',b=>{
+ const p=clone(imp.HostedLandingWitnessV1Schema,landing);p.execution=localIntegration;p.sourceOperation=sourceTemplate;p.reviewEvidence=[];
+ b.landingWitnesses.push(p);b.statements.push(landingStatement(p,221));sortBundle(b);
+},'Scope');
+negative('account_integration_as_local','local_integration_push',b=>{
+ const value={...localIntegrationValue,device:Array.from(key('device')),author:decode(sourceTemplate.canonicalRecord).body.canonical.author};
+ Object.assign(b,localIntegrationBundle(integrationOriginal(value,'device')));
+},'Scope');
 negative('missing_binding','start_thread',b=>b.genesisWitnesses[0].binding=undefined,'GenesisBinding');
 negative('forged_binding','start_thread',b=>b.genesisWitnesses[0].binding.creatorSignature.signature[0]^=1,'Signature');
 negative('substituted_envelope','start_thread',b=>b.genesisWitnesses[0].creatorAuthorityEnvelope[5]^=1,'GenesisBinding');

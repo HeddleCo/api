@@ -205,6 +205,36 @@ negatives!(
     import_without_delegation,
     dual_carriers
 );
+negatives!(
+    local_integration_forged_signature,
+    local_integration_missing_claim,
+    local_integration_purpose2,
+    local_integration_empty_purpose2,
+    local_integration_purpose4,
+    account_integration_as_local
+);
+#[test]
+fn local_integration_push_retains_native_work_and_claim() {
+    let f = fixture();
+    let b: api::NativePublicProofBundleV1 = wire(&f, "local_integration_push");
+    verify(&f, &b).expect("local capture, integration and push");
+    let claim = b
+        .authority_witnesses
+        .iter()
+        .find(|p| p.kind == 2)
+        .expect("claim");
+    assert_eq!(
+        claim.dependencies.len(),
+        5,
+        "both geneses, captures and integration"
+    );
+    assert_eq!(
+        b.authority_witnesses.len(),
+        2,
+        "account source and ownership claim only"
+    );
+    assert!(b.landing_witnesses.is_empty());
+}
 #[test]
 fn producers_carry_exact_binding() {
     let f = fixture();

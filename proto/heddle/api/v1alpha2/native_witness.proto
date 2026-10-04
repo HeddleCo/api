@@ -1,0 +1,62 @@
+syntax = "proto3";
+package heddle.api.v1alpha2;
+
+import "heddle/api/common/hosted_witness.proto";
+import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/import_authority.proto";
+import "heddle/api/v1alpha2/owner_records.proto";
+
+// Separate native contract; never selected because an import lacks delegation.
+// Canonical layouts and producer order: docs/alpha-v2/native-host-witness.md.
+enum NativeGenesisOwnerKind {
+  NATIVE_GENESIS_OWNER_KIND_UNSPECIFIED = 0;
+  NATIVE_GENESIS_OWNER_KIND_ACCOUNT = 1;
+  NATIVE_GENESIS_OWNER_KIND_LOCAL_KEY = 2;
+}
+// Explicit canonical purpose-1 discriminator. Import payloads have binding
+// format_version=1 at this position; native payloads have this value=2.
+enum NativeGenesisPayloadKind {
+  NATIVE_GENESIS_PAYLOAD_KIND_UNSPECIFIED = 0;
+  NATIVE_GENESIS_PAYLOAD_KIND_NATIVE_V1 = 2;
+}
+message NativeGenesisAuthorityV1 {
+  uint32 format_version = 1;
+  ImportIdentityV1 identity = 2; // Selected hosting Spool/owner lineage, no job.
+  NativeGenesisOwnerKind owner_kind = 3; // Original immutable genesis variant.
+  bytes genesis_digest = 4; // Original native typed BLAKE3 ID.
+  bytes original_signatures_digest = 5;
+  bytes creator_public_key = 6;
+  bytes creator_authority_envelope_digest = 7; // SHA256(exact envelope), even empty.
+  bytes owner_chain_digest = 8;
+  bytes publisher_key_id = 9; // heddle-key-v1 of the original creator.
+}
+message SignedNativeGenesisAuthorityV1 {
+  NativeGenesisAuthorityV1 body = 1;
+  AuthorizationSignature creator_signature = 2;
+}
+message NativeGenesisWitnessV1 {
+  uint32 format_version = 1;
+  NativeGenesisPayloadKind kind = 2;
+  SignedNativeGenesisAuthorityV1 binding = 3;
+  SignedRecord original_genesis = 4;
+  bytes creator_authority_envelope = 5;
+  ImportBoundaryAcceptanceV1 boundary_acceptance = 6;
+}
+// Public closure for native history. No job/delegation/terminal manifest.
+// Original bytes are embedded in payloads; all dependencies must resolve inside
+// this carrier. Purpose 2 and 4 reuse their unchanged public native layouts.
+// This is reference/signature evidence, never owner enrollment or disclosure.
+message NativePublicProofBundleV1 {
+  uint32 format_version = 1;
+  SignedSpoolOwnerGenesis owner_genesis = 2;
+  repeated OwnerHistory owner_histories = 3;
+  repeated ResourceTransferAuditRecord ownership_transfers = 4;
+  ImportOwnerChainV1 owner_chain = 5;
+  repeated SignedSpoolPolicyRecord policies = 6;
+  repeated NativeGenesisWitnessV1 genesis_witnesses = 7;
+  repeated ImportAuthorityWitnessV1 authority_witnesses = 8;
+  repeated HostedLandingWitnessV1 landing_witnesses = 9;
+  heddle.api.common.SignedHostedWitnessSetV1 witness_set = 10;
+  repeated heddle.api.common.SignedHostedWitnessStatementV1 statements = 11;
+  repeated heddle.api.common.HostedWitnessHistoryProofV1 history_proofs = 12;
+}

@@ -6,6 +6,7 @@ pub mod framing;
 pub mod hybrid_codec;
 pub mod import_authority;
 pub mod mint_root_association;
+pub mod native_witness;
 pub mod passkey_mint_grant;
 pub mod password_owner;
 pub mod provider_v2;
@@ -17,7 +18,11 @@ pub mod treadle;
 pub mod v2;
 pub mod witness_trust;
 
-/// The single fixed cross-language HYBRID wire/signature/history fixture.
+/// Fixed native HYBRID binding/closure fixture, shared with TypeScript.
+pub const NATIVE_HOST_WITNESS_V1_FIXTURE_JSON: &str =
+    include_str!("../tests/fixtures/native-host-witness-v1.json");
+
+/// The single fixed cross-language HYBRID import wire/signature/history fixture.
 pub const IMPORT_AUTHORITY_HOST_WITNESS_V1_FIXTURE_JSON: &str =
     include_str!("../tests/fixtures/import-authority-host-witness-v1.json");
 

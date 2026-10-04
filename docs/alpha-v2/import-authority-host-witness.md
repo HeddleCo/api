@@ -887,9 +887,10 @@ before body parsing. HTTPS equivalents advertise/require
 `Heddle-Mandatory-Features: import-authority-host-witness-v1` on those import routes.
 Capability/method listing alone does not establish semantic support.
 
-**SyncService Fetch, PublishContent and ReplicateThread do not declare or enforce
-that mandatory feature in this release.** Their native Fetch/Publish/replication
-openings and ready replies likewise do not require HYBRID protocol negotiation.
+**SyncService Fetch, PublishContent and ReplicateThread do not declare a
+method-wide mandatory feature in this release.** Ordinary openings and ready
+replies without HYBRID evidence do not require HYBRID protocol negotiation.
+Present HYBRID evidence still requires explicit compatible consumer support.
 The optional protocol and public proof fields remain additive in the schema.
 The Sync gate is deferred to the **same release that ships real HYBRID support
 in both heddle and weft**, tracked by
@@ -899,7 +900,14 @@ still-gated import RPCs can create them, and no peer can serve those RPCs until
 HYBRID support ships.
 
 Until that release, **peers MUST NOT create or serve HYBRID records over Sync**.
+Alpha.28 adds a separate `native_authority` carrier and creator binding, defined
+by [Native host witnessing v1](native-host-witness.md). It has no import job or
+delegation; purpose 1 uses an explicit native discriminator and second creator
+signature, while purpose 2/4 retain their exact bytes. This does not change the
+coordinated Sync cutover or permit creation/serving before compatible consumers.
+
 A non-HYBRID peer **MUST reject any Sync record/frame carrying `import_authority`
+or `native_authority`
 before staging, installation, relay or publication, never silently ignore it**;
 this includes an empty-but-present bundle. The existing message fields on
 TransferReady, PublishContentOpen, PublicationReceipt, ReplicationOpen,
@@ -908,7 +916,8 @@ ReplicationReady and ReplicationOperations expose presence as Rust
 rejection needs no schema change. Generated clients and generic proof helpers do
 not automatically enforce that consumer support policy; consumers must implement
 the presence check in their Sync dispatch/record handlers. Keeping the fields
-optional does not authorize ignoring imported authority.
+optional does not authorize ignoring imported or native authority. Reject dual
+carriers and never select native validation because an import lacks delegation.
 No old-key enrollment, automatic owner/root replacement or immutable receipt
 re-signing is allowed. Operational reset/re-import is a separate task.
 

@@ -75,7 +75,10 @@ message HostedWitnessBoundaryAcceptanceV1 {
 // New format: never reinterpret any legacy admission/HostedIntegration bytes.
 // Payloads are exactly ImportGenesisWitnessV1 (1), ImportAuthorityWitnessV1 (2),
 // ImportPublicationWitnessV1 (3), HostedLandingWitnessV1 (4), with no prefix. Receivers
-// parse the declared purpose and verify all original signatures independently.
+// Native carriers use NativeGenesisWitnessV1 for purpose 1: version=1 then
+// kind=2 disambiguates it from the unchanged import binding version=1. Purpose
+// 2/4 bytes are shared unchanged. Dispatch by typed carrier, never missing job.
+// Parse the declared purpose and verify all original signatures independently.
 message HostedWitnessStatementV1 {
   uint32 format_version = 1;
   bytes executor_id = 2;

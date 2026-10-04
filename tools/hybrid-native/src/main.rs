@@ -1257,6 +1257,332 @@ fn request_binding(
     Ok(())
 }
 
+// alpha.28 contract verification uses the unchanged published native codecs.
+fn verify_native_witness_fixture() -> Result<()> {
+    use objects::object::{
+        CollaborationActor,
+        thread_replication::{GenesisOwner, SourceAuthor, ThreadOperationBody},
+    };
+    let f: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/native-host-witness-v1.json"
+    ))?;
+    let reference: wire::NativePublicProofBundleV1 = record(&f, "local_adopt_push")?;
+    let claim = ThreadOwnershipClaim::decode(
+        &reference.authority_witnesses[0]
+            .original
+            .as_ref()
+            .context("claim")?
+            .canonical_record,
+    )?;
+    let SourceAuthor::Account { actor, .. } = claim.acceptance else {
+        bail!("account claim")
+    };
+    let history = reference.owner_histories.first().context("owner history")?;
+    let root = capability_verifier::wire::SignedOwnerRoot::decode(
+        history
+            .root
+            .as_ref()
+            .context("owner root")?
+            .encode_to_vec()
+            .as_slice(),
+    )?;
+    let owner = capability_verifier::verify_owner_root(&root)?;
+    ensure!(
+        owner.authority_key().public_key == hex_field(&f["keys"]["owner"]["public_key_hex"])?
+            && history.state_hash == owner.state_hash(),
+        "independent owner pin"
+    );
+    let spool = capability_verifier::wire::SignedSpoolOwnerGenesis::decode(
+        reference
+            .owner_genesis
+            .as_ref()
+            .context("spool")?
+            .encode_to_vec()
+            .as_slice(),
+    )?;
+    capability_verifier::verify_spool_owner_genesis(&spool)?;
+    for name in f["positive"].as_array().context("positive cases")? {
+        let name = name.as_str().context("case")?;
+        let b: wire::NativePublicProofBundleV1 = record(&f, name)?;
+        let now = b
+            .witness_set
+            .as_ref()
+            .and_then(|s| s.body.as_ref())
+            .context("set body")?
+            .issued_at_unix_millis
+            + 1;
+        let root_key = hex_field(&f["keys"]["root"]["public_key_hex"])?;
+        let set = witness::verify_set(
+            b.witness_set.as_ref().context("set")?,
+            &witness::SetExpectation {
+                authority: "https://weft.example.test",
+                root_id: "descriptor-root-1",
+                root_public_key: &root_key,
+                root_epoch: 1,
+                now_unix_millis: now,
+                clock_floor_unix_millis: 1_000_000,
+                known_job_keys: &[],
+            },
+            None,
+        )?;
+        contract::native_witness::verify_bundle_witnesses(&b, &set, now)?;
+        let mut geneses = BTreeMap::new();
+        for p in &b.genesis_witnesses {
+            let g = genesis(p.original_genesis.as_ref().context("original")?)?;
+            let id = g.id()?;
+            if matches!(g.owner, GenesisOwner::Account(_)) && p.boundary_acceptance.is_none() {
+                verify_authority(
+                    &p.creator_authority_envelope,
+                    &owner,
+                    &g.creator,
+                    &actor,
+                    "/heddle.api.v1alpha2.ThreadService/StartThread",
+                    1100,
+                )?;
+            }
+            if let Some(e) = &p.boundary_acceptance {
+                verify_native_genesis_boundary(
+                    &g,
+                    &p.creator_authority_envelope,
+                    e,
+                    &owner,
+                    &set,
+                    &hex_field(&f["keys"]["witness"]["public_key_hex"])?,
+                )?;
+            }
+            geneses.insert(id, g);
+        }
+        let mut claims = BTreeMap::new();
+        let mut operations = BTreeMap::new();
+        for p in &b.authority_witnesses {
+            for r in p.original.iter().chain(p.dependencies.iter()) {
+                match r.format.as_str() {
+                    "heddle-thread-operation-v1" => {
+                        let op = operation(r)?;
+                        operations.insert(op.id()?, op);
+                    }
+                    "heddle-thread-ownership-claim-v1" => {
+                        let value = ThreadOwnershipClaim::decode(&r.canonical_record)?;
+                        let signed = crypto::thread_ownership_claim::SignedOwnershipClaim {
+                            canonical: r.canonical_record.clone(),
+                            local_signature: signature(r, &value.prior_local_key)?,
+                            acceptance_signature: signature(r, &value.accepting_publisher)?,
+                        };
+                        let value = signed.verify()?;
+                        value.validate_genesis(
+                            geneses.get(&value.thread).context("claim genesis")?,
+                        )?;
+                        claims.insert(value.id()?, value);
+                    }
+                    "heddle-thread-genesis-v1" | "heddle-thread-ownership-resolution-v1" => (),
+                    _ => bail!("unexpected native original"),
+                }
+            }
+        }
+        for op in operations.values() {
+            let parents = op
+                .parents
+                .iter()
+                .map(|id| operations.get(id).cloned().context("causal parent"))
+                .collect::<Result<Vec<_>>>()?;
+            op.validate_parents(
+                geneses.get(&op.thread).context("operation genesis")?,
+                &parents,
+            )?;
+        }
+        for p in &b.authority_witnesses {
+            let r = p.original.as_ref().context("authority original")?;
+            let (publisher, actor, method): ([u8; 32], CollaborationActor, &str) = match p.kind {
+                1 => {
+                    let op = operation(r)?;
+                    match op.body {
+                        ThreadOperationBody::Capture(c) => {
+                            let SourceAuthor::Account {
+                                actor, authority, ..
+                            } = c.author
+                            else {
+                                bail!("account source")
+                            };
+                            ensure!(authority == p.authority_envelope, "exact source authority");
+                            (
+                                op.publisher,
+                                actor,
+                                "/heddle.api.v1alpha2.SyncService/PublishContent",
+                            )
+                        }
+                        ThreadOperationBody::Metadata(bytes) => {
+                            let control = ThreadControl::decode(&bytes)?;
+                            ensure!(
+                                control.authority_envelope == p.authority_envelope,
+                                "exact metadata authority"
+                            );
+                            (
+                                op.publisher,
+                                control.actor.clone(),
+                                control.authorization_method(),
+                            )
+                        }
+                        _ => bail!("native source/control operation"),
+                    }
+                }
+                2 => {
+                    let c = ThreadOwnershipClaim::decode(&r.canonical_record)?;
+                    for id in &c.source_frontier {
+                        ensure!(
+                            operations.get(id).is_some_and(|o| o.thread == c.thread),
+                            "claim frontier closure"
+                        );
+                    }
+                    let SourceAuthor::Account {
+                        actor, authority, ..
+                    } = c.acceptance
+                    else {
+                        bail!("account claim")
+                    };
+                    ensure!(authority == p.authority_envelope, "exact claim authority");
+                    (
+                        c.accepting_publisher,
+                        actor,
+                        "/heddle.api.v1alpha2.ThreadService/ClaimThreadOwnership",
+                    )
+                }
+                3 => {
+                    let v = ThreadOwnershipResolution::decode(&r.canonical_record)?;
+                    v.validate_genesis(geneses.get(&v.thread).context("resolution genesis")?)?;
+                    for id in &v.conflicting_claims {
+                        ensure!(
+                            claims.get(id).is_some_and(|c| c.thread == v.thread),
+                            "conflict closure"
+                        );
+                    }
+                    for id in &v.frontier {
+                        ensure!(
+                            operations.get(id).is_some_and(|o| o.thread == v.thread),
+                            "resolution frontier"
+                        );
+                    }
+                    crypto::thread_ownership_resolution::SignedOwnershipResolution {
+                        canonical: r.canonical_record.clone(),
+                        local_signature: signature(r, &v.local_owner)?,
+                        acceptance_signature: signature(r, &v.accepting_publisher)?,
+                    }
+                    .verify(claims.get(&v.winning_claim).context("winner")?)?;
+                    let SourceAuthor::Account {
+                        actor, authority, ..
+                    } = v.acceptance
+                    else {
+                        bail!("account resolution")
+                    };
+                    ensure!(
+                        authority == p.authority_envelope,
+                        "exact resolution authority"
+                    );
+                    (
+                        v.accepting_publisher,
+                        actor,
+                        "/heddle.api.v1alpha2.ThreadService/ResolveOwnershipConflict",
+                    )
+                }
+                _ => bail!("native authority kind"),
+            };
+            verify_authority(
+                &p.authority_envelope,
+                &owner,
+                &publisher,
+                &actor,
+                method,
+                1100,
+            )?;
+        }
+        println!(
+            "NATIVE MODEL PASS {name}: original signatures, StartThread/ownership/source authority, causal and acceptance closure"
+        );
+    }
+    Ok(())
+}
+fn verify_native_genesis_boundary(
+    g: &ThreadGenesis,
+    envelope: &[u8],
+    e: &wire::ImportBoundaryAcceptanceV1,
+    owner: &capability_verifier::VerifiedOwnerState,
+    set: &witness::VerifiedWitnessSet,
+    issuer_key: &[u8],
+) -> Result<()> {
+    use objects::object::{
+        original_boundary_acceptance::OriginalManifestEntry,
+        thread_replication::{SourceAuthor, integration::TrustedHostedExecutor},
+    };
+    let a = e.signed_acceptance.as_ref().context("acceptance")?;
+    let acceptance = crypto::original_boundary_acceptance::SignedBoundaryAcceptance {
+        canonical: a.canonical_record.clone(),
+        signature: signature(
+            a,
+            &OriginalBoundaryAcceptance::decode(&a.canonical_record)?.accepting_publisher,
+        )?,
+    }
+    .verify_signature()?;
+    let manifest = OriginalPublicationManifest::decode(&e.originals_manifest)?;
+    let intent: PublicationIntent = rmp_serde::from_slice(&e.publication_intent)?;
+    ensure!(
+        rmp_serde::to_vec_named(&intent)? == e.publication_intent,
+        "native canonical intent"
+    );
+    let descriptor = OriginalManifestEntry::from_genesis(g, envelope)?;
+    let selected = acceptance.selected(&intent, &manifest)?;
+    ensure!(
+        selected.len() == 1 && selected.contains(&&descriptor),
+        "exact native genesis selected"
+    );
+    let issuer = set
+        .body()
+        .entries
+        .iter()
+        .find(|i| i.public_key == issuer_key)
+        .context("witness issuer")?;
+    let trust = TrustedHostedExecutor {
+        spool: intent.spool,
+        spool_genesis: intent.spool_genesis,
+        executor: issuer.public_key.as_slice().try_into()?,
+    };
+    let receipt = e.original_receipts.first().context("receipt")?;
+    crypto::thread_genesis_admission::SignedGenesisAdmission {
+        canonical: receipt.canonical_record.clone(),
+        signature: signature(receipt, &trust.executor)?,
+        boundary_acceptance: None,
+    }
+    .verify_signature()?
+    .authorize_with_acceptance(g, envelope, &trust, Some(&acceptance))?;
+    let SourceAuthor::Account {
+        actor, authority, ..
+    } = &acceptance.accepting_author
+    else {
+        bail!("account accepting authority")
+    };
+    capability_verifier::boundary_authority::verify_accepting_authority(
+        authority,
+        capability_verifier::thread_control_authority::Context {
+            owner,
+            account_uuid: actor.principal_id.as_bytes(),
+            publisher: &acceptance.accepting_publisher,
+            agent_id: actor.agent_id.as_deref(),
+            method: "/heddle.api.v1alpha2.ThreadService/StartThread",
+            spool_path: "example",
+            now: 1100,
+        },
+        capability_verifier::boundary_authority::OriginalSubjectScope {
+            kind: capability_verifier::boundary_authority::BoundarySubjectKind::AccountGenesis,
+            account: acceptance.original_account.as_bytes(),
+            thread: descriptor.thread.as_bytes(),
+            subject: descriptor.subject.id().as_bytes(),
+            publisher: &descriptor.publisher,
+            agent_id: None,
+        },
+        &[],
+        |_| false,
+    )?;
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
@@ -1288,6 +1614,7 @@ fn main() -> Result<()> {
             verify_boundaries(&f)?;
             verify_export(&f, &record(&f, "complete_renewed_export")?)?;
         }
+        Some("verify-native-witness") => verify_native_witness_fixture()?,
         Some("verify-capture") => {
             verify_old_capture(&read_json(args.get(2).context("old vector path")?)?)?
         }
@@ -1321,7 +1648,7 @@ fn main() -> Result<()> {
             println!("export closure accepted");
         }
         _ => bail!(
-            "usage: hybrid-native-conformance child-state | encode FORMAT | verify FIXTURE | verify-capture OLD_VECTOR | verify-export FIXTURE"
+            "usage: hybrid-native-conformance child-state | encode FORMAT | verify FIXTURE | verify-native-witness | verify-capture OLD_VECTOR | verify-export FIXTURE"
         ),
     }
     Ok(())
@@ -1335,6 +1662,10 @@ mod tests {
             "../../../tests/fixtures/import-authority-host-witness-v1.json"
         ))
         .expect("fixed vectors")
+    }
+    #[test]
+    fn native_witness_originals_and_start_thread_authority() {
+        verify_native_witness_fixture().expect("native model and owner authority");
     }
     #[test]
     fn prepared_commit_matches_native_original_branches() {

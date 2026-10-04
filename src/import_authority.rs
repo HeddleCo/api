@@ -1780,7 +1780,7 @@ pub fn content_digest(content: &ImportContentV1) -> Result<Vec<u8>, Reject> {
 pub fn signed_native_digest(record: &SignedRecord) -> Result<Vec<u8>, Reject> {
     signing_digest("heddle-signed-native-record-v1", record)
 }
-fn verify_native(record: &SignedRecord, format: &str) -> Result<(), Reject> {
+pub(crate) fn verify_native(record: &SignedRecord, format: &str) -> Result<(), Reject> {
     if record.format != format {
         return Err(Reject::Version);
     }
@@ -1921,7 +1921,7 @@ fn native_octets_id(format: &str, bytes: &[u8]) -> Vec<u8> {
     h.update(bytes);
     h.finalize().as_bytes().to_vec()
 }
-fn boundary_original(
+pub(crate) fn boundary_original(
     e: &ImportBoundaryAcceptanceV1,
     original: &SignedRecord,
 ) -> Result<(), Reject> {
@@ -1989,7 +1989,7 @@ pub fn validate_statement_boundary(
         _ => Err(Reject::BoundaryAcceptance),
     }
 }
-fn match_boundary(
+pub(crate) fn match_boundary(
     s: &crate::heddle::api::common::HostedWitnessStatementV1,
     evidence: &[ImportBoundaryAcceptanceV1],
 ) -> Result<(), Reject> {
@@ -2045,7 +2045,7 @@ fn native_dependencies(
     }
     Ok(())
 }
-fn original_signatures(
+pub(crate) fn original_signatures(
     records: &[&SignedRecord],
     extra: &[RecordSignature],
 ) -> Result<Vec<u8>, Reject> {
@@ -2329,7 +2329,7 @@ fn validate_bundle_history(
         let s = statement.body.as_ref().ok_or(Reject::Canonical)?;
         validate_statement_boundary(s)?;
         require_policy_history(
-            bundle,
+            &bundle.policies,
             &s.spool_uuid,
             s.policy_sequence,
             &s.policy_state_hash,
@@ -2493,14 +2493,14 @@ fn validate_bundle_history(
 }
 /// Reference completeness only. Native verification must authenticate every
 /// selected policy, its owner context and the receipt before using its time.
-fn require_policy_history(
-    bundle: &ImportPublicProofBundleV1,
+pub(crate) fn require_policy_history(
+    policies: &[SignedSpoolPolicyRecord],
     spool: &[u8],
     mut sequence: u64,
     state_hash: &[u8],
 ) -> Result<(), Reject> {
     let mut state_hash = state_hash.to_vec();
-    for _ in 0..=bundle.policies.len() {
+    for _ in 0..=policies.len() {
         width(&state_hash, 32)?;
         if sequence == 0 {
             return if state_hash == [0; 32] {
@@ -2509,13 +2509,9 @@ fn require_policy_history(
                 Err(Reject::Scope)
             };
         }
-        let mut matches = bundle
-            .policies
-            .iter()
-            .filter_map(|p| p.body.as_ref())
-            .filter(|p| {
-                p.spool_uuid == spool && p.sequence == sequence && p.policy_state_hash == state_hash
-            });
+        let mut matches = policies.iter().filter_map(|p| p.body.as_ref()).filter(|p| {
+            p.spool_uuid == spool && p.sequence == sequence && p.policy_state_hash == state_hash
+        });
         let policy = matches.next().ok_or(Reject::Scope)?;
         if matches.next().is_some() {
             return Err(Reject::Canonical);
@@ -2529,7 +2525,7 @@ fn require_policy_history(
     }
     Err(Reject::Scope)
 }
-fn native_id(record: &SignedRecord) -> Vec<u8> {
+pub(crate) fn native_id(record: &SignedRecord) -> Vec<u8> {
     let mut h = blake3::Hasher::new();
     h.update(record.format.as_bytes());
     h.update(&(record.canonical_record.len() as u64).to_le_bytes());

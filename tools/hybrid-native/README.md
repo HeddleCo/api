@@ -48,3 +48,13 @@ The generator sends native drafts to the published codecs, then regenerates
 native IDs, signatures, typed commitments, receipts, archive roots and paths
 together. The Biscuit uses public fixture seeds and contains no appendable proof
 secret. Both maintenance commands must reproduce the checked-in bytes exactly.
+
+Alpha.28's `native_witness_originals_and_start_thread_authority` verifies the fixed
+`native-host-witness-v1.json` through these same published codecs, original
+StartThread/source/ownership capabilities, native ancestry and exact boundary
+manifest/intent/receipt gates. Run `cargo run --locked --manifest-path
+tools/hybrid-native/Cargo.toml -- verify-native-witness` for its explicit output.
+The maintenance generator is `node tools/generate-native-witness-fixture.mjs`
+after `npm run build` and `node tools/generate-hybrid-fixture.mjs`. Tests never
+regenerate expected bytes. This API conformance gate does not implement heddle
+native install/storage or claim a hosted PG/S3 round trip.

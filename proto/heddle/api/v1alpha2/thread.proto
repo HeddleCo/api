@@ -6,6 +6,7 @@ import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha2/administration.proto";
 import "heddle/api/v1alpha2/collaboration.proto";
 import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/native_witness.proto";
 import "heddle/api/v1alpha2/stream.proto";
 
 enum ThreadLifecycle {
@@ -585,6 +586,9 @@ message StartThreadRequest {
   // Original portable account/key authority, independently verified against the
   // creator and owner bound by the canonical genesis. Never the courier's proof.
   bytes creator_authority = 4;
+  // Creator signs AFTER freezing the original genesis and exact authority.
+  // Required for new hosted native admission at the coordinated cutover.
+  SignedNativeGenesisAuthorityV1 native_genesis_authority = 5;
 }
 
 // The owner and accepting account publisher co-sign one exact canonical claim.

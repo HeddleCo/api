@@ -2,7 +2,7 @@ import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
 import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse } from "./integration_pb.js";
 import type { HybridImportJobSelector, MutationResponse, OperationRecord } from "./common_pb.js";
-import { OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
+import { SignedSpoolOwnerGenesisSchema, OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { SignedHostedWitnessSetV1Schema, HostedWitnessStatementV1Schema, SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessSetV1, type HostedWitnessStatementV1, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
 import { resolveWitnessStatement, restoreWitnessHistorySnapshot, verifyWitnessSetAfterRootReplacement, verifyWitnessSet, verifyWitnessInclusion, leafDigest, recheckWitnessContext, type WitnessSetExpectation, type ResolvedWitnessStatement, type VerifiedWitnessSet } from "./witness-trust.js";
@@ -604,10 +604,11 @@ export async function verifyImportBundleWitnesses(
 ):Promise<VerifiedImportBundleWitnesses> {
   bundle=clone(api.ImportPublicProofBundleV1Schema,bundle);pin={...pin,publicKey:pin.publicKey.slice()};
   snapshot=snapshot?cloneImportWitnessSnapshot(snapshot):undefined;owners=owners.map(snapshotExpectation);
-  width(pin.publicKey,32);if(pin.epoch===0n)reject("StaleContext");
+  width(pin.publicKey,32);if(pin.epoch<=0n||pin.epoch>0xffffffffffffffffn)reject("StaleContext");
   validateBundleBounds(bundle);const terminal=bundle.terminalManifest??reject("Canonical");
   validateBundle(bundle,terminal.slots.length>0);if(owners.length!==bundle.delegations.length)reject("Root");
   const associations=snapshot?.jobAssociations??[];
+  for(const owner of owners)for(const a of owner.knownJobAssociations){if(associations.some(old=>equal(old.key,a.key)&&!equal(old.logicalJobId,a.logicalJobId)))reject("KeyRole");if(!associations.some(old=>equal(old.key,a.key)))associations.push({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()});}
   for(const {body:b} of bundle.delegations){if(!b)reject("Canonical");if(associations.some(a=>equal(a.key,b.jobPublicKey)&&!equal(a.logicalJobId,b.logicalJobId)))reject("KeyRole");if(!associations.some(a=>equal(a.key,b.jobPublicKey)))associations.push({key:b.jobPublicKey.slice(),logicalJobId:b.logicalJobId.slice()});}
   const expectation=(root:ImportWitnessRootPin,floor:bigint):WitnessSetExpectation=>({authority:root.authority,rootId:root.rootId,rootPublicKey:root.publicKey,rootEpoch:root.epoch,nowUnixMillis:now,clockFloorUnixMillis:floor,knownJobKeys:associations.map(a=>a.key)});
   let previous:VerifiedWitnessSet|undefined;let replacing=false;
@@ -634,8 +635,23 @@ export async function verifyImportBundleWitnesses(
   const progressive=clone(api.ImportResultManifestV1Schema,terminal);progressive.slots=[];let order=0n,observed=0n;
   for(const o of bundle.operations){const digest=signedOperationDigest(o),slot=terminal.slots.find(s=>equal(s.signedOperationDigest,digest))??reject("Scope");progressive.slots.push(slot);progressive.slots.sort((a,b)=>a.refName<b.refName?-1:a.refName>b.refName?1:a.slotId<b.slotId?-1:a.slotId>b.slotId?1:0);const payload=canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,progressive)),s=bundle.statements.find(s=>s.body?.purpose===3&&equal(s.body.canonicalPayload,payload))?.body??reject("Transition");if(s.admissionOrder<=order||s.observedAtUnixMillis<observed)reject("Transition");order=s.admissionOrder;observed=s.observedAtUnixMillis;}
   if(!equal(toBinary(api.ImportResultManifestV1Schema,progressive),toBinary(api.ImportResultManifestV1Schema,terminal)))reject("Scope");
-  const history=snapshot?.acceptedHistory??[],index=history.findIndex(b=>equal(b.terminalManifest!.logicalJobId,terminal.logicalJobId));
-  if(index>=0){const old=history[index]!;if(!old.delegations.every((d,i)=>bundle.delegations[i]&&equal(toBinary(api.SignedImportJobDelegationV1Schema,d),toBinary(api.SignedImportJobDelegationV1Schema,bundle.delegations[i]!)))||!old.renewals.every((r,i)=>bundle.renewals[i]&&equal(toBinary(api.SignedImportJobRenewalV1Schema,r),toBinary(api.SignedImportJobRenewalV1Schema,bundle.renewals[i]!)))||!old.operations.every((o,i)=>bundle.operations[i]&&equal(toBinary(api.SignedDelegatedImportOperationV1Schema,o),toBinary(api.SignedDelegatedImportOperationV1Schema,bundle.operations[i]!))))reject("HighWater");history[index]=bundle;}else history.push(bundle);
+  const history=snapshot?.acceptedHistory??[],index=history.findIndex(b=>equal(b.terminalManifest!.logicalJobId,terminal.logicalJobId)&&equal(b.delegations[0]!.body!.identity!.spoolUuid,bundle.delegations[0]!.body!.identity!.spoolUuid));
+  if(index>=0){const old=history[index]!;if(!old.delegations.every((d,i)=>bundle.delegations[i]&&equal(toBinary(api.SignedImportJobDelegationV1Schema,d),toBinary(api.SignedImportJobDelegationV1Schema,bundle.delegations[i]!)))||!old.renewals.every((r,i)=>bundle.renewals[i]&&equal(toBinary(api.SignedImportJobRenewalV1Schema,r),toBinary(api.SignedImportJobRenewalV1Schema,bundle.renewals[i]!)))||!old.operations.every((o,i)=>bundle.operations[i]&&equal(toBinary(api.SignedDelegatedImportOperationV1Schema,o),toBinary(api.SignedDelegatedImportOperationV1Schema,bundle.operations[i]!))))reject("HighWater");
+    const contains=<T extends import("@bufbuild/protobuf").Message>(schema:import("@bufbuild/protobuf").DescMessage,newValues:T[],oldValues:T[])=>oldValues.every(v=>newValues.some(n=>equal(toBinary(schema,n),toBinary(schema,v))));
+    if(Boolean(old.ownerGenesis)!==Boolean(bundle.ownerGenesis)||(old.ownerGenesis&&bundle.ownerGenesis&&!equal(toBinary(SignedSpoolOwnerGenesisSchema,old.ownerGenesis),toBinary(SignedSpoolOwnerGenesisSchema,bundle.ownerGenesis)))
+      ||!contains(OwnerHistorySchema,bundle.ownerHistories,old.ownerHistories)
+      ||!old.ownershipTransfers.every((v,i)=>bundle.ownershipTransfers[i]&&equal(toBinary(ResourceTransferAuditRecordSchema,v),toBinary(ResourceTransferAuditRecordSchema,bundle.ownershipTransfers[i]!)))
+      ||!contains(api.SignedImportMemberPermissionV1Schema,bundle.memberPermissions,old.memberPermissions)
+      ||!contains(api.SignedImportGenesisAuthorityV1Schema,bundle.genesisAuthorities,old.genesisAuthorities)
+      ||!contains(SignedRecordSchema,bundle.originalGeneses,old.originalGeneses)
+      ||!old.creatorAuthorityEnvelopes.every(v=>bundle.creatorAuthorityEnvelopes.some(n=>equal(v,n)))
+      ||!contains(api.ImportResultManifestV1Schema,bundle.manifests,old.manifests)
+      ||!contains(SignedHostedWitnessStatementV1Schema,bundle.statements,old.statements)
+      ||!contains(SignedSpoolPolicyRecordSchema,bundle.policies,old.policies)
+      ||!contains(api.ImportGenesisWitnessV1Schema,bundle.genesisWitnesses,old.genesisWitnesses)
+      ||!contains(api.ImportAuthorityWitnessV1Schema,bundle.authorityWitnesses,old.authorityWitnesses)
+      ||!contains(api.HostedLandingWitnessV1Schema,bundle.landingWitnesses,old.landingWitnesses))reject("HighWater");
+    history[index]=bundle;}else history.push(bundle);
   return {acceptedHistory:create(api.ImportJobCasStateV1Schema,{formatVersion:1,logicalJobId:terminal.logicalJobId,retryLineageId:terminal.retryLineageId,activePredecessor:bundle.delegations.at(-1),authorityEpoch:BigInt(bundle.delegations.length),committedManifest:terminal}),snapshot:cloneImportWitnessSnapshot({root:pin,witnessSet:carried,clockFloorUnixMillis:now,jobAssociations:associations,acceptedHistory:history})};
 }
 function cloneImportWitnessSnapshot(s:ImportWitnessSnapshot):ImportWitnessSnapshot{return {root:{...s.root,publicKey:s.root.publicKey.slice()},witnessSet:clone(SignedHostedWitnessSetV1Schema,s.witnessSet),clockFloorUnixMillis:s.clockFloorUnixMillis,jobAssociations:s.jobAssociations.map(a=>({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()})),acceptedHistory:s.acceptedHistory.map(b=>clone(api.ImportPublicProofBundleV1Schema,b))};}

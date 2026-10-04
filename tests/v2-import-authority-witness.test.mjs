@@ -653,7 +653,7 @@ const alpha31Owners=()=>[ownerContext(1100n),ownerContext(1200n)];
 // bytes here as the already-verified policy-chain hook; do not infer trust from
 // carried policy hashes. Production uses heddle WASM at the supplied time.
 function alpha31Policy(b,s){assert.equal(b.policies.length,1);assert.deepEqual(toBinary(api.SignedSpoolPolicyRecordSchema,b.policies[0]),toBinary(api.SignedSpoolPolicyRecordSchema,vector('signed_policy')));authority.requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);}
-async function alpha31Verify(name,pin=alpha31Pin(),snapshot){return authority.verifyImportBundleWitnesses(vector(name),pin,snapshot,1350000n,alpha31Owners(),alpha31Policy);}
+async function alpha31Verify(name,pin=alpha31Pin(),snapshot,conflict=false){const owners=alpha31Owners();if(conflict)owners[0].knownJobAssociations=[{key:bytes(fixture.keys.job.public_key_hex),logicalJobId:new Uint8Array(16).fill(0xee)}];return authority.verifyImportBundleWitnesses(vector(name),pin,snapshot,1350000n,owners,alpha31Policy);}
 for(const name of fixture.import_bundle_vectors.positive)test(`alpha31 bundle authenticated PASS: ${name}`,async()=>{
  const r=await alpha31Verify(name);assert.equal(r.acceptedHistory.authorityEpoch,2n);assert.equal(r.acceptedHistory.committedManifest.slots.length,2);assert.equal(r.snapshot.witnessSet.body.generation,12n);assert.equal(r.snapshot.clockFloorUnixMillis,1350000n);assert.equal(r.snapshot.jobAssociations.length,2);
 });
@@ -662,7 +662,7 @@ for(const v of fixture.import_bundle_vectors.negative)test(`alpha31 bundle REJEC
  if(v.snapshot_clock)snapshot.clockFloorUnixMillis=BigInt(v.snapshot_clock);
  const original=snapshot?structuredClone(snapshot):undefined;
  const pin=alpha31Pin(v.replacement,v.pin_epoch===undefined?(v.replacement?2n:1n):BigInt(v.pin_epoch));
- await assert.rejects(alpha31Verify(v.bundle,pin,snapshot),expected(v.expected));assert.deepEqual(snapshot,original,'failure preserves durable snapshot');
+ await assert.rejects(alpha31Verify(v.bundle,pin,snapshot,v.known_association_conflict),expected(v.expected));assert.deepEqual(snapshot,original,'failure preserves durable snapshot');
  if(v.snapshot_clock)snapshot.clockFloorUnixMillis=1350000n;
  const result=await alpha31Verify(v.control,alpha31Pin(v.replacement),snapshot);
  if(v.replacement){assert.equal(result.snapshot.witnessSet.body.generation,14n);assert.equal(result.snapshot.root.epoch,2n);assert.deepEqual(result.snapshot.jobAssociations,original.jobAssociations);assert.equal(result.snapshot.acceptedHistory.length,original.acceptedHistory.length);}

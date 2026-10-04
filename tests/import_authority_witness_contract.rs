@@ -3344,13 +3344,24 @@ fn alpha31_verify(
     pin: &import::ImportWitnessRootPin,
     snapshot: Option<&import::ImportWitnessSnapshot>,
 ) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
+    alpha31_verify_with_associations(f, name, pin, snapshot, &[])
+}
+fn alpha31_verify_with_associations(
+    f: &Value,
+    name: &str,
+    pin: &import::ImportWitnessRootPin,
+    snapshot: Option<&import::ImportWitnessSnapshot>,
+    associations: &[(Vec<u8>, Vec<u8>)],
+) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
     let c = Context::new(f);
+    let mut first = c.owner(1100);
+    first.known_job_associations = associations;
     import::verify_import_bundle_witnesses(
         &record(f, name),
         pin,
         snapshot,
         1_350_000,
-        &[c.owner(1100), c.owner(1200)],
+        &[first, c.owner(1200)],
         |b, s| {
             // Exact previously signature-verified policy input, as the WASM hook.
             if b.policies != vec![record(f, "signed_policy")] {
@@ -3411,11 +3422,17 @@ fn alpha31_bundle_negative(id: &str) {
     if let Some(epoch) = v["pin_epoch"].as_u64() {
         pin.epoch = epoch;
     }
-    let result = alpha31_verify(
+    let associations = if v["known_association_conflict"].as_bool().unwrap_or(false) {
+        vec![(bytes(&f["keys"]["job"]["public_key_hex"]), vec![0xee; 16])]
+    } else {
+        vec![]
+    };
+    let result = alpha31_verify_with_associations(
         &f,
         v["bundle"].as_str().expect("bundle"),
         &pin,
         snapshot.as_ref(),
+        &associations,
     );
     let actual = format!("{:?}", result.expect_err("must reject"));
     assert_eq!(actual, v["expected"].as_str().expect("reason"), "{id}");
@@ -3469,7 +3486,9 @@ alpha31_negative_tests!(
     alpha31_stale_epoch,
     alpha31_replacement_carries_high_water,
     alpha31_replacement_preserves_seal,
-    alpha31_clock_rollback
+    alpha31_clock_rollback,
+    alpha31_accepted_history_omission,
+    alpha31_known_job_association_conflict
 );
 #[test]
 fn alpha31_policy_hook_rejects_then_passes() {

@@ -3194,6 +3194,16 @@ pub fn verify_import_bundle_witnesses(
         return Err(Reject::Root);
     }
     let mut associations = snapshot.map_or_else(Vec::new, |s| s.job_associations.clone());
+    for owner in owners {
+        for (key, job) in owner.known_job_associations {
+            if associations.iter().any(|(k, j)| k == key && j != job) {
+                return Err(Reject::KeyRole);
+            }
+            if !associations.iter().any(|(k, _)| k == key) {
+                associations.push((key.clone(), job.clone()));
+            }
+        }
+    }
     for d in &bundle.delegations {
         let b = d.body.as_ref().ok_or(Reject::Canonical)?;
         if associations
@@ -3401,10 +3411,60 @@ pub fn verify_import_bundle_witnesses(
         b.terminal_manifest
             .as_ref()
             .is_some_and(|m| m.logical_job_id == terminal.logical_job_id)
+            && b.delegations
+                .first()
+                .and_then(|d| d.body.as_ref())
+                .and_then(|d| d.identity.as_ref())
+                .map(|id| &id.spool_uuid)
+                == bundle
+                    .delegations
+                    .first()
+                    .and_then(|d| d.body.as_ref())
+                    .and_then(|d| d.identity.as_ref())
+                    .map(|id| &id.spool_uuid)
     }) {
         if !bundle.delegations.starts_with(&old.delegations)
             || !bundle.renewals.starts_with(&old.renewals)
             || !bundle.operations.starts_with(&old.operations)
+            || bundle.owner_genesis != old.owner_genesis
+            || !bundle
+                .ownership_transfers
+                .starts_with(&old.ownership_transfers)
+            || !old
+                .owner_histories
+                .iter()
+                .all(|v| bundle.owner_histories.contains(v))
+            || !old
+                .member_permissions
+                .iter()
+                .all(|v| bundle.member_permissions.contains(v))
+            || !old
+                .genesis_authorities
+                .iter()
+                .all(|v| bundle.genesis_authorities.contains(v))
+            || !old
+                .original_geneses
+                .iter()
+                .all(|v| bundle.original_geneses.contains(v))
+            || !old
+                .creator_authority_envelopes
+                .iter()
+                .all(|v| bundle.creator_authority_envelopes.contains(v))
+            || !old.manifests.iter().all(|v| bundle.manifests.contains(v))
+            || !old.statements.iter().all(|v| bundle.statements.contains(v))
+            || !old.policies.iter().all(|v| bundle.policies.contains(v))
+            || !old
+                .genesis_witnesses
+                .iter()
+                .all(|v| bundle.genesis_witnesses.contains(v))
+            || !old
+                .authority_witnesses
+                .iter()
+                .all(|v| bundle.authority_witnesses.contains(v))
+            || !old
+                .landing_witnesses
+                .iter()
+                .all(|v| bundle.landing_witnesses.contains(v))
         {
             return Err(Reject::HighWater);
         }

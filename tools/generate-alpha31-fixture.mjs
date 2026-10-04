@@ -40,6 +40,8 @@ export function addAlpha31Vectors(f){
  bad('clock_rollback',()=>{},'StaleContext',{snapshot_bundle:'alpha31_bundle',snapshot_clock:1350001});
  // Exercise purpose 2 and 4 through the same composition, with exact archived paths.
  const all=clone(api.ImportPublicProofBundleV1Schema,bundle);all.authorityWitnesses=['authority_admission_payload','ownership_admission_payload','resolution_admission_payload'].map(v);all.landingWitnesses=[v('landing_payload')];all.statements.push(...['authority_admission','ownership_admission','resolution_admission','landing_statement'].map(v));all.historyProofs.push(...['authority_proof','ownership_proof','resolution_proof','landing_proof'].map(v));wire('alpha31_all_purposes_bundle',api.ImportPublicProofBundleV1Schema,all);
+ bad('accepted_history_omission',()=>{},'HighWater',{snapshot_bundle:'alpha31_all_purposes_bundle',control:'alpha31_all_purposes_bundle'});
+ bad('known_job_association_conflict',()=>{},'KeyRole',{known_association_conflict:true});
  f.import_bundle_vectors={positive:['alpha31_bundle','alpha31_all_purposes_bundle'],negative,now_ms:1350000,owner_times:[1100,1200]};
  // #345: exact signed S request, publication S -> S', definitive refusal, new signature.
  const old=v('renew_request_zero'),fresh=clone(api.RenewImportJobRequestSchema,v('renew_request_partial'));

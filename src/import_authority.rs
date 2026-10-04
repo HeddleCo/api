@@ -1383,6 +1383,10 @@ pub fn check_job_fence(
     Ok(())
 }
 pub fn validate_public_bundle(bundle: &ImportPublicProofBundleV1) -> Result<(), Reject> {
+    validate_bundle_bounds(bundle)?;
+    validate_bundle_history(bundle, true)
+}
+fn validate_bundle_bounds(bundle: &ImportPublicProofBundleV1) -> Result<(), Reject> {
     use prost::Message;
     if bundle.format_version != 1 {
         return Err(Reject::Version);
@@ -1407,7 +1411,7 @@ pub fn validate_public_bundle(bundle: &ImportPublicProofBundleV1) -> Result<(), 
     {
         return Err(Reject::Bounds);
     }
-    validate_bundle_history(bundle)
+    Ok(())
 }
 
 /// Typed adapter boundary: an authentic unrelated capability/online role must
@@ -1991,7 +1995,10 @@ pub fn publication_payload(
 }
 /// Completeness and digest addressing only. Trust/signature verification still
 /// uses independently selected owner contexts at each witnessed historical time.
-fn validate_bundle_history(bundle: &ImportPublicProofBundleV1) -> Result<(), Reject> {
+fn validate_bundle_history(
+    bundle: &ImportPublicProofBundleV1,
+    require_admissions: bool,
+) -> Result<(), Reject> {
     fn sorted<T>(
         values: &[T],
         digest: impl Fn(&T) -> Result<Vec<u8>, Reject>,
@@ -2075,21 +2082,23 @@ fn validate_bundle_history(bundle: &ImportPublicProofBundleV1) -> Result<(), Rej
             }
             // Every branch needs its original admission, not merely its
             // binding. Proof-only retirement lookup cannot recover a payload.
-            if !bundle.genesis_witnesses.iter().any(|payload| {
-                payload.binding.as_ref() == Some(g)
-                    && payload.original_genesis.as_ref().is_some_and(|o| {
-                        native_id(o) == b.genesis_digest && bundle.original_geneses.contains(o)
-                    })
-                    && hash(&[&payload.creator_authority_envelope])
-                        == b.creator_authority_envelope_digest
-                    && canonical(payload).is_ok_and(|bytes| {
-                        bundle.statements.iter().any(|s| {
-                            s.body
-                                .as_ref()
-                                .is_some_and(|s| s.purpose == 1 && s.canonical_payload == bytes)
+            if require_admissions
+                && !bundle.genesis_witnesses.iter().any(|payload| {
+                    payload.binding.as_ref() == Some(g)
+                        && payload.original_genesis.as_ref().is_some_and(|o| {
+                            native_id(o) == b.genesis_digest && bundle.original_geneses.contains(o)
                         })
-                    })
-            }) {
+                        && hash(&[&payload.creator_authority_envelope])
+                            == b.creator_authority_envelope_digest
+                        && canonical(payload).is_ok_and(|bytes| {
+                            bundle.statements.iter().any(|s| {
+                                s.body
+                                    .as_ref()
+                                    .is_some_and(|s| s.purpose == 1 && s.canonical_payload == bytes)
+                            })
+                        })
+                })
+            {
                 return Err(Reject::Scope);
             }
         }
@@ -2402,7 +2411,7 @@ fn validate_cas_state(state: &ImportJobCasStateV1) -> Result<(), Reject> {
     }
     Ok(())
 }
-/// State MUST come from authenticated Prepare or receiver-owned durable state.
+/// State MUST come from authenticated job-state read / Prepare or receiver-owned durable state.
 /// Expected owner context independently verifies the predecessor's selected history.
 pub fn verify_renewal_predecessor(
     state: &ImportJobCasStateV1,
@@ -2442,4 +2451,320 @@ pub fn verify_renewal_from_state(
         member,
         expected,
     )
+}
+
+/// Finite destination-writer read; transport authentication/authorization belongs
+/// to the generated RPC contract. Validate before any storage lookup.
+pub fn validate_job_state_request(request: &GetImportJobStateRequest) -> Result<(), Reject> {
+    use prost::Message;
+    if request.encoded_len() > 4096 {
+        return Err(Reject::Bounds);
+    }
+    initial_operation_id(&request.logical_job_id, false)?;
+    let destination = request.destination.as_ref().ok_or(Reject::Scope)?;
+    let compact = destination.id.replace('-', "");
+    let raw = hex::decode(&compact).map_err(|_| Reject::Scope)?;
+    if initial_operation_id(&raw, false).map_or(true, |id| id != destination.id) {
+        return Err(Reject::Scope);
+    }
+    Ok(())
+}
+
+fn bundle_owner_reference(
+    bundle: &ImportPublicProofBundleV1,
+    id: &ImportIdentityV1,
+) -> Result<(), Reject> {
+    identity(id)?;
+    if !bundle.owner_histories.iter().any(|h| {
+        h.state_hash == id.owner_state_hash
+            && h.root
+                .as_ref()
+                .and_then(|r| r.root.as_ref())
+                .is_some_and(|r| {
+                    r.owner_id == id.owner_id && r.account_uuid == id.owner_account_uuid
+                })
+    }) {
+        return Err(Reject::Root);
+    }
+    Ok(())
+}
+
+fn validate_retained_proof(
+    state: &ImportJobCasStateV1,
+    proof: &ImportPublicProofBundleV1,
+) -> Result<(), Reject> {
+    validate_cas_state(state)?;
+    validate_bundle_bounds(proof)?;
+    let manifest = state.committed_manifest.as_ref().ok_or(Reject::Canonical)?;
+    if proof.delegations.last() != state.active_predecessor.as_ref()
+        || proof.terminal_manifest.as_ref() != Some(manifest)
+    {
+        return Err(Reject::StaleContext);
+    }
+    // An empty authenticated snapshot is recovery evidence, not proof of past
+    // admission. Nonempty snapshots retain the full public export closure.
+    validate_bundle_history(proof, !manifest.slots.is_empty())?;
+    let active = state
+        .active_predecessor
+        .as_ref()
+        .and_then(|d| d.body.as_ref())
+        .ok_or(Reject::Canonical)?;
+    let id = active.identity.as_ref().ok_or(Reject::Canonical)?;
+    let genesis = proof
+        .owner_genesis
+        .as_ref()
+        .and_then(|g| g.genesis.as_ref())
+        .ok_or(Reject::Root)?;
+    if genesis.spool_uuid != id.spool_uuid {
+        return Err(Reject::Root);
+    }
+    let chain = proof.owner_chain.as_ref().ok_or(Reject::Root)?;
+    if owner_chain_digest(chain)? != active.owner_chain_digest
+        || chain.spool_genesis_digest != id.spool_genesis_digest
+    {
+        return Err(Reject::Root);
+    }
+    for d in &proof.delegations {
+        let body = d.body.as_ref().ok_or(Reject::Canonical)?;
+        if body.logical_job_id != state.logical_job_id
+            || body.retry_lineage_id != state.retry_lineage_id
+        {
+            return Err(Reject::Scope);
+        }
+        bundle_owner_reference(proof, body.identity.as_ref().ok_or(Reject::Canonical)?)?;
+    }
+    for g in &proof.genesis_authorities {
+        bundle_owner_reference(
+            proof,
+            g.body
+                .as_ref()
+                .and_then(|g| g.identity.as_ref())
+                .ok_or(Reject::Canonical)?,
+        )?;
+    }
+    Ok(())
+}
+
+/// Supply the authenticated read, never an incoming untrusted state assertion.
+pub fn validate_job_state_response(
+    request: &GetImportJobStateRequest,
+    response: &GetImportJobStateResponse,
+) -> Result<(), Reject> {
+    use prost::Message;
+    validate_job_state_request(request)?;
+    if response.encoded_len() > 2 * MAX_BUNDLE_BYTES {
+        return Err(Reject::Bounds);
+    }
+    let state = response.state.as_ref().ok_or(Reject::Canonical)?;
+    let proof = response.retained_proof.as_ref().ok_or(Reject::Canonical)?;
+    validate_retained_proof(state, proof)?;
+    let id = state
+        .active_predecessor
+        .as_ref()
+        .and_then(|d| d.body.as_ref())
+        .and_then(|d| d.identity.as_ref())
+        .ok_or(Reject::Canonical)?;
+    if state.logical_job_id != request.logical_job_id
+        || request.destination.as_ref().is_none_or(|s| {
+            initial_operation_id(&id.spool_uuid, false).map_or(true, |uuid| s.id != uuid)
+        })
+    {
+        return Err(Reject::Scope);
+    }
+    Ok(())
+}
+
+/// A publication/renewal race requires recomputation and a new exact Prepare
+/// before signing. Compare the complete snapshot, including signed predecessor.
+pub fn validate_renewal_preparation_from_read(
+    request: &PrepareImportJobRequest,
+    response: &PrepareImportJobResponse,
+    read: &GetImportJobStateResponse,
+) -> Result<(), Reject> {
+    validate_preparation_response(request, response)?;
+    let state = read.state.as_ref().ok_or(Reject::Canonical)?;
+    validate_job_state_response(
+        &GetImportJobStateRequest {
+            destination: request.destination.clone(),
+            logical_job_id: request.renew_logical_job_id.clone(),
+        },
+        read,
+    )?;
+    if response.renewal_state.as_ref() != Some(state) {
+        return Err(Reject::StaleContext);
+    }
+    Ok(())
+}
+
+/// Composition/reference validation only. Independently verify owner histories,
+/// policies, accepted admissions/publications and the current owner head before
+/// using them. The authenticated read supplies exact retained evidence.
+pub fn validate_renew_request(
+    request: &RenewImportJobRequest,
+    read: &GetImportJobStateResponse,
+) -> Result<(), Reject> {
+    use prost::Message;
+    if request.encoded_len() > 2 * MAX_BUNDLE_BYTES {
+        return Err(Reject::Bounds);
+    }
+    if request.client_operation_id.is_empty() || request.client_operation_id.len() > 128 {
+        return Err(Reject::Canonical);
+    }
+    let signed = request.renewal.as_ref().ok_or(Reject::Canonical)?;
+    let renewal = signed.body.as_ref().ok_or(Reject::Canonical)?;
+    let replacement = renewal
+        .replacement
+        .as_ref()
+        .and_then(|d| d.body.as_ref())
+        .ok_or(Reject::Canonical)?;
+    validate_job_state_response(
+        &GetImportJobStateRequest {
+            destination: request.destination.clone(),
+            logical_job_id: replacement.logical_job_id.clone(),
+        },
+        read,
+    )?;
+    let state = read.state.as_ref().ok_or(Reject::Canonical)?;
+    let retained = read.retained_proof.as_ref().ok_or(Reject::Canonical)?;
+    let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
+    validate_bundle_bounds(proof)?;
+    if renewal.predecessor_delegation_digest
+        != signed_delegation_digest(state.active_predecessor.as_ref().ok_or(Reject::Canonical)?)?
+        || renewal.expected_authority_epoch != state.authority_epoch
+    {
+        return Err(Reject::StaleContext);
+    }
+    if renewal.committed_manifest_digest
+        != manifest_digest(state.committed_manifest.as_ref().ok_or(Reject::Canonical)?)?
+    {
+        return Err(Reject::StaleManifest);
+    }
+    // Normalize only the four permitted additions/current selectors. Every
+    // other retained byte (including original parents and accepted history)
+    // must stay exact. A pending candidate can never enter accepted arrays.
+    let parent = resolve_bundle_permission(proof, &replacement.parent_permission_digest)?;
+    let mut normalized = proof.clone();
+    let mut permissions = retained.member_permissions.clone();
+    if let Some(parent) = parent
+        && !permissions.contains(parent)
+    {
+        permissions.push(parent.clone());
+    }
+    let mut addressed = permissions
+        .into_iter()
+        .map(|p| Ok((signed_permission_digest(&p)?, p)))
+        .collect::<Result<Vec<_>, Reject>>()?;
+    addressed.sort_by(|a, b| a.0.cmp(&b.0));
+    let permissions = addressed.into_iter().map(|(_, p)| p).collect::<Vec<_>>();
+    if proof.member_permissions != permissions {
+        return Err(Reject::ImportPermission);
+    }
+    if proof
+        .member_permission
+        .as_ref()
+        .is_some_and(|p| Some(p) != parent)
+    {
+        return Err(Reject::ImportPermission);
+    }
+    if !retained
+        .owner_histories
+        .iter()
+        .all(|h| proof.owner_histories.contains(h))
+        || !proof
+            .ownership_transfers
+            .starts_with(&retained.ownership_transfers)
+        || !retained.policies.iter().all(|p| proof.policies.contains(p))
+    {
+        return Err(Reject::Root);
+    }
+    let chain = proof.owner_chain.as_ref().ok_or(Reject::Root)?;
+    let id = replacement.identity.as_ref().ok_or(Reject::Canonical)?;
+    bundle_owner_reference(proof, id)?;
+    if owner_chain_digest(chain)? != replacement.owner_chain_digest
+        || chain.spool_genesis_digest != id.spool_genesis_digest
+    {
+        return Err(Reject::Root);
+    }
+    normalized.member_permissions = retained.member_permissions.clone();
+    normalized.member_permission = retained.member_permission.clone();
+    normalized.owner_histories = retained.owner_histories.clone();
+    normalized.ownership_transfers = retained.ownership_transfers.clone();
+    normalized.policies = retained.policies.clone();
+    normalized.owner_chain = retained.owner_chain.clone();
+    if &normalized != retained {
+        return Err(Reject::Scope);
+    }
+    let initial = retained
+        .delegations
+        .first()
+        .and_then(|d| d.body.as_ref())
+        .ok_or(Reject::Canonical)?;
+    for branch in &replacement.branch_manifest {
+        if !initial.branch_manifest.iter().any(|b| {
+            b.genesis_authority_digest == branch.genesis_authority_digest
+                && b.limit
+                    .as_ref()
+                    .zip(branch.limit.as_ref())
+                    .is_some_and(|(a, b)| {
+                        a.genesis_digest == b.genesis_digest
+                            && a.ref_name == b.ref_name
+                            && a.slot_id == b.slot_id
+                    })
+        }) {
+            return Err(Reject::GenesisBinding);
+        }
+    }
+    Ok(())
+}
+
+/// Full typed renewal checks with separate independently authenticated historical
+/// predecessor and current replacement contexts. Host transaction gates remain.
+pub fn verify_renew_submission(
+    request: &RenewImportJobRequest,
+    read: &GetImportJobStateResponse,
+    predecessor_owner: &ImportOwnerExpectation<'_>,
+    current_owner: &ImportOwnerExpectation<'_>,
+) -> Result<VerifiedImportDelegation, Reject> {
+    validate_renew_request(request, read)?;
+    let state = read.state.as_ref().ok_or(Reject::Canonical)?;
+    let retained = read.retained_proof.as_ref().ok_or(Reject::Canonical)?;
+    let active = state
+        .active_predecessor
+        .as_ref()
+        .and_then(|d| d.body.as_ref())
+        .ok_or(Reject::Canonical)?;
+    let old = verify_renewal_predecessor(
+        state,
+        resolve_bundle_permission(retained, &active.parent_permission_digest)?,
+        predecessor_owner,
+    )?;
+    let renewal = request.renewal.as_ref().ok_or(Reject::Canonical)?;
+    let replacement = renewal
+        .body
+        .as_ref()
+        .and_then(|r| r.replacement.as_ref())
+        .and_then(|d| d.body.as_ref())
+        .ok_or(Reject::Canonical)?;
+    verify_renewal_from_state(
+        renewal,
+        &old,
+        state,
+        resolve_bundle_permission(
+            request.proof.as_ref().ok_or(Reject::Canonical)?,
+            &replacement.parent_permission_digest,
+        )?,
+        current_owner,
+    )
+}
+
+/// Frozen protobuf request replay is distinct from HYBRID signed-body encoding.
+/// Hosts compare retained raw bytes before CAS/expiry checks, in caller scope.
+pub fn check_renew_replay(request_bytes: &[u8], stored_bytes: &[u8]) -> Result<(), Reject> {
+    if request_bytes.len() > 2 * MAX_BUNDLE_BYTES {
+        return Err(Reject::Bounds);
+    }
+    if request_bytes != stored_bytes {
+        return Err(Reject::OperationIdReused);
+    }
+    Ok(())
 }

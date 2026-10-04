@@ -1076,7 +1076,8 @@ Read this state and the remaining delegation proposal in **one transaction**.
 The response grants no authority. Verify proposal/state identities, predecessor
 and snapshot; sign the exact snapshot epoch and manifest digest; activation
 still performs transactional CAS. A stale state or publication race requires
-another Prepare and another user signature. There is no separate state service.
+another job-state read, recomputation/review and exact Prepare before signing.
+The dedicated `GetImportJobState` read below supplies discovery and recovery.
 
 Initial Commit installs epoch **1**. Successful renewal increments it exactly
 once; successful Cancel increments it exactly once and makes the job terminal.
@@ -1105,7 +1106,7 @@ selector rule does not weaken those checks. `check_import_revocations` /
 `checkImportRevocations` check both against the independently selected revocation
 set. No renewal after explicit cancellation may reactivate the job. The signed
 predecessor digest, epoch, committed manifest and current policy/authority fences
-are all required. A response lost after activation is reread through Prepare;
+are all required. A response lost after activation is reread through `GetImportJobState`;
 it never causes another activation of the original CAS candidate.
 
 `DescribeEndpointResponse.protocol` supplies native negotiated semantic support
@@ -1150,3 +1151,130 @@ signed payloads. Root-ID is the only unrestricted Unicode string in the new
 witness set. Import refs/providers/converter versions, HTTPS origins and native
 format/method/signing selectors are ASCII; manifest refs now enforce that same
 ASCII restriction. All permitted Unicode bounds measure encoded UTF-8 bytes.
+
+## Renewal discovery and submission (alpha.24, G1/D1 and G2/D2)
+
+`IntegrationService.GetImportJobState` is a finite unary read, chosen instead of
+an Observe section because a renewal needs one complete transactional snapshot
+and retained proof, with no stream cursor or inventory dependency. It leaves
+Prepare's accept-exactly-or-refuse contract intact. Tier-1 request PoP and an
+**authenticated destination writer** are mandatory; a read grant, digest holder,
+job key or expired delegation alone cannot authorize this read. Resolve the
+specified destination and job under that permission in the same read transaction.
+Use uniform NOT_FOUND for unknown and unauthorized jobs. No listing, pagination,
+private seed, encrypted custody, bearer credential or source-access secret is
+returned. This is distinct from the public witness-history proof lookup.
+
+The request has one canonical destination UUID and one non-nil 16-byte logical
+job ID, at most 4096 encoded bytes. A successful response has `state` containing
+the existing `ImportJobCasStateV1` and `retained_proof` containing exact accepted
+public evidence. The whole response is at most 2 MiB, the proof at most 1 MiB,
+and all existing bundle counts apply (64 permissions/owner histories/transfers/
+delegations, 63 accepted renewals, 320 manifests, 256 operations/branches/native
+originals/policies, 1024 statements/history proofs). Exceeding bounds refuses;
+never truncate an accepted chain. The snapshot always includes a format-1
+manifest with job and lineage IDs, **including an explicit empty slots array**
+before the first publication. The retained proof's terminal selector equals
+that snapshot and its digest resolves in the sorted manifest history. Its final
+accepted delegation equals the snapshot's exact active signed predecessor.
+
+Retain original signed permission parents, genesis bindings, native originals,
+creator envelopes, owner genesis, accepted owner histories/handoffs, and the
+active predecessor's exact original owner-chain commitment with the job. Return
+these even after ordinary expiry or client loss. Histories preserve exact earlier
+states as separate entries when a later state is also returned. Independently
+verify them from the selected immutable Spool lineage; a carried hash or host
+response cannot enroll an owner. Recover the predecessor's exact historical
+context from this evidence without lowering today's owner pin. The read supplies
+provenance for the time-free predecessor verifier, never execution or evidence
+of an admission that did not occur. Already published history requires the
+complete public export closure, original admission/publication receipts and their
+policy/retirement dependencies. Before any publication, preserve every actual
+admission already stored; absent admissions are allowed and confer no historical
+admission claim. Operations and publication statements must be absent with an
+empty committed snapshot. No fabricated timestamps or synthetic receipts.
+
+The browser flow is:
+
+1. Read and independently verify retained evidence and the authenticated snapshot.
+2. Compute and review the remaining scope from the committed slots and consumed
+   budgets. Request an ordinary exact renewal Prepare with this caller-selected
+   scope. Only an empty destination token may be filled.
+3. Validate the exact scope response and require its **complete** `renewal_state`
+   to equal the read snapshot: predecessor bytes, epoch, job/lineage and manifest.
+   If publication or another renewal raced, read again, recompute/review and
+   re-prepare. Do not sign the stale snapshot or silently reduce the proposal.
+4. Obtain the current owner's remaining-scope permission, sign the replacement
+   delegation, then sign the renewal. Activation still CASes predecessor, epoch
+   and manifest and rechecks current owner, policy, cancellation, reservation,
+   expiry, job-key uniqueness, lease and destination frontier atomically.
+
+`validate_job_state_request` / `validateImportJobStateRequest` enforce read
+request bounds; response validators enforce snapshot and retained-proof closure.
+`validate_renewal_preparation_from_read` / `validateRenewalPreparationFromRead`
+enforce the publication race before signing. Authentication, writer permission,
+transaction serialization and native owner/witness verification belong to the
+consumer implementation; composition helpers do not claim to implement a host.
+
+Lost Prepare responses are recovered by replaying the exact Prepare under its
+original caller-scoped operation ID. The state read covers **accepted** jobs;
+a prepared-only reservation has no accepted predecessor and returns NOT_FOUND.
+After a lost Commit or Renew response, replay the original frozen request to get
+its stored receipt and use the state read to discover accepted authority and
+committed slots. Compare the candidate digest with accepted history, including
+when another accepted renewal has since advanced it. Never interpret response
+loss as a new activation opportunity. A lost browser can recover public authority
+through this read when it knows the destination/job selector; normal authorized
+job inventory supplies selectors, and this RPC adds no enumeration surface.
+
+The exact `RenewImportJobRequest.proof` profile is based on that retained proof:
+
+- `delegations` and `renewals` contain **only the exact prior accepted activation
+  history**. The pending candidate occurs only in top-level `renewal`, whose body
+  embeds its signed replacement. Append it to accepted history only in the
+  successful activation transaction. Duplication, omission, changed historical
+  bytes, pending operations or candidate publication evidence refuse.
+- `member_permissions` retains every original parent and adds only the exact
+  replacement parent if it is new, sorted uniquely by signed-permission digest.
+  The optional `member_permission` alias selects that replacement parent exactly;
+  for direct owner authority both the alias and a new parent are absent. A still
+  valid byte-identical parent may be reused under the settled alpha.23 rules.
+- Original genesis bindings, parent references, native geneses and creator
+  envelopes stay exact. Each replacement branch references an original initial
+  branch binding by digest and preserves ref, slot and genesis. The renewed parent
+  covers remaining scope; it never replaces the original genesis parent.
+- `owner_genesis` stays exact. `owner_histories` retains every exact earlier
+  endpoint and may add the complete independently verified current endpoint;
+  `ownership_transfers` preserves the old prefix and may extend it. `policies`
+  retains old records and may add current evidence. `owner_chain` selects the
+  current replacement chain, while the authenticated read retains the predecessor
+  chain. Resolve old and new permission signatures with their **separate** verified
+  historical/current owner contexts. Missing either endpoint refuses even if all
+  other signatures are valid. No historical clock is invented before publication.
+- `terminal_manifest`, digest-sorted `manifests`, operations, witness set,
+  statements, history proofs and witness payloads retain the exact read evidence.
+  The top-level renewal references that authenticated committed manifest digest,
+  active predecessor digest and epoch exactly. Zero-publication requests still
+  select and carry the explicit empty manifest; operations and publication
+  receipts are absent. Preserve real genesis admissions if present.
+
+`validate_renew_request` / `validateImportRenewRequest` check this request-level
+composition against the authenticated read. `verify_renew_submission` /
+`verifyImportRenewSubmission` additionally run the existing time-free predecessor
+verification with its resolved old parent/context, then current replacement and
+renewal verification with the exact new parent/context. Accepted owner histories,
+native genesis authority, policy signatures and witness trust must be independently
+verified by the consumer before supplying expectations; these API helpers verify
+references and import signatures, not native owner-chain enrollment.
+
+Freeze the complete protobuf request body bytes, nested proof records, order and
+signatures with the caller-scoped `client_operation_id` before first transmission.
+The request is at most 2 MiB, proof at most 1 MiB, ID 1..128 UTF-8 bytes. It is a
+transport container, **not** a new HYBRID canonical signing domain. Retrying uses
+identical frozen body bytes; fresh transport PoP nonce/timestamp is outside that
+body. `check_renew_replay` / `checkImportRenewReplay` compare retained raw octets:
+changed bytes under the same ID refuse OPERATION_ID_REUSED. Resolve exact replay
+before current expiry/CAS/terminal checks and return the stored receipt without
+another epoch increment. A race requiring a different snapshot, proof or signature
+requires a new operation ID and preparation. Never mutate a pending frozen request
+in place. No v2 encoding or compatibility path is introduced.

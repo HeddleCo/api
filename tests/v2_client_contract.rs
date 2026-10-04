@@ -302,6 +302,7 @@ fn old_peer_advertising_import_methods_never_reaches_transport() {
         "RenewImportJob",
         "CancelImportJob",
         "GetHostedWitnessHistoryProof",
+        "GetImportJobState",
     ];
     for protocol in [
         None,
@@ -336,6 +337,10 @@ fn old_peer_advertising_import_methods_never_reaches_transport() {
                     Err(ClientError::Protocol(path)) if path == <$rpc as heddle_api::v2::client::Rpc>::METHOD.path));
             };
         }
+        rejects!(
+            rpc::IntegrationServiceGetImportJobState,
+            GetImportJobStateRequest
+        );
         rejects!(rpc::IntegrationServiceImportSource, ImportSourceRequest);
         rejects!(
             rpc::IntegrationServiceRetryImportSource,

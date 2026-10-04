@@ -204,3 +204,37 @@ fn prepare_then_winning_veto_cannot_assemble_portable_recover() {
         );
     }
 }
+
+#[test]
+fn published_verifier_authenticates_alpha24_rotated_renew_owner_evidence() {
+    let f: Value = serde_json::from_str(contract::IMPORT_AUTHORITY_HOST_WITNESS_V1_FIXTURE_JSON)
+        .expect("HYBRID fixture");
+    let wire = |name: &str| {
+        hex::decode(f["wire_vectors"][name]["wire_hex"].as_str().expect("wire")).expect("fixed hex")
+    };
+    let history = native::OwnerHistory::decode(wire("renew_rotated_owner_history").as_slice())
+        .expect("published history codec");
+    let initial = verify_owner_root(history.root.as_ref().expect("original root"))
+        .expect("independently selected root");
+    let signed = &history.accepted_transitions[0];
+    let next =
+        apply_transition(&initial, signed, 1350, limits()).expect("accepted rotation history");
+    assert_eq!(next.state_hash().as_slice(), history.state_hash);
+    assert_ne!(next.authority_key(), initial.authority_key());
+    assert_eq!(
+        next.authority_key().public_key,
+        hex::decode(
+            f["keys"]["rotated_owner"]["public_key_hex"]
+                .as_str()
+                .expect("key")
+        )
+        .expect("hex")
+    );
+    let mut changed = signed.clone();
+    changed.transition.as_mut().expect("transition").nonce[0] ^= 1;
+    assert_eq!(
+        apply_transition(&initial, &changed, 1350, limits()).err(),
+        Some(Error::InvalidSignature)
+    );
+    apply_transition(&initial, signed, 1350, limits()).expect("unchanged passing control");
+}

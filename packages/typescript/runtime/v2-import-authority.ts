@@ -1,7 +1,8 @@
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
-import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse } from "./integration_pb.js";
-import type { HybridImportJobSelector, MutationResponse, OperationRecord } from "./common_pb.js";
+import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse, type RetryImportSourceRequest } from "./integration_pb.js";
+import { RecordRefSchema, SpoolRefSchema } from "./common_pb.js";
+import type { HybridImportJobSelector, MutationResponse, OperationRecord, SpoolRef } from "./common_pb.js";
 import { SignedSpoolOwnerGenesisSchema, OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { SignedHostedWitnessSetV1Schema, HostedWitnessStatementV1Schema, SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessSetV1, type HostedWitnessStatementV1, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
@@ -11,6 +12,7 @@ export { canonicalHybridV1, signingDigest, strictDecode, HybridContractError } f
 
 export const PERMISSION_DOMAIN="heddle-import-member-permission-v1",GENESIS_DOMAIN="heddle-import-genesis-authority-v1",DELEGATION_DOMAIN="heddle-import-job-delegation-v1",RENEWAL_DOMAIN="heddle-import-job-renewal-v1",OPERATION_DOMAIN="heddle-delegated-import-operation-v1",MANIFEST_DOMAIN="heddle-import-result-manifest-v1";
 export const MAX_BRANCHES=256,MAX_RECORD_BYTES=65536,MAX_BUNDLE_BYTES=1048576,MAX_RESULT_BYTES=1n<<30n;
+export const MAX_COMMIT_REQUEST_BYTES=2*MAX_BUNDLE_BYTES;
 export const CANCELLATION_NAMESPACE="heddle-import-cancel-v1";
 export const signedPermissionDigest=(v:api.SignedImportMemberPermissionV1)=>signingDigest("heddle-signed-import-member-permission-v1",api.SignedImportMemberPermissionV1Schema,v);
 export const signedGenesisDigest=(v:api.SignedImportGenesisAuthorityV1)=>signingDigest("heddle-signed-import-genesis-authority-v1",api.SignedImportGenesisAuthorityV1Schema,v);
@@ -190,6 +192,7 @@ export function validateImportPreparationResponse(request:api.PrepareImportJobRe
 /** Provider identity comes from an authenticated resolver, never projection hints.
  * Native base decoding/identity, source grants and atomic activation remain host gates. */
 export async function validateImportCommitRequest(request:CommitImportJobRequest, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse):Promise<void> {
+  validateImportCommitRequestBounds(request);
   request=clone(CommitImportJobRequestSchema,request);
   const source=request.source??reject("SourceSelection"),proof=request.proof??reject("Canonical");
   if (!request.clientOperationId || utf8.encode(request.clientOperationId).length>128 || !request.destination?.id) reject("Canonical");
@@ -655,3 +658,79 @@ export async function verifyImportBundleWitnesses(
   return {acceptedHistory:create(api.ImportJobCasStateV1Schema,{formatVersion:1,logicalJobId:terminal.logicalJobId,retryLineageId:terminal.retryLineageId,activePredecessor:bundle.delegations.at(-1),authorityEpoch:BigInt(bundle.delegations.length),committedManifest:terminal}),snapshot:cloneImportWitnessSnapshot({root:pin,witnessSet:carried,clockFloorUnixMillis:now,jobAssociations:associations,acceptedHistory:history})};
 }
 function cloneImportWitnessSnapshot(s:ImportWitnessSnapshot):ImportWitnessSnapshot{return {root:{...s.root,publicKey:s.root.publicKey.slice()},witnessSet:clone(SignedHostedWitnessSetV1Schema,s.witnessSet),clockFloorUnixMillis:s.clockFloorUnixMillis,jobAssociations:s.jobAssociations.map(a=>({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()})),acceptedHistory:s.acceptedHistory.map(b=>clone(api.ImportPublicProofBundleV1Schema,b))};}
+
+/** Enforce decoded protobuf sizes; transports also bound the uncompressed payload. */
+export function validateImportCommitRequestBounds(request:CommitImportJobRequest):void {
+  if(toBinary(CommitImportJobRequestSchema,request).length>MAX_COMMIT_REQUEST_BYTES||toBinary(api.ImportPublicProofBundleV1Schema,request.proof??reject("Canonical")).length>MAX_BUNDLE_BYTES)reject("Bounds");
+}
+/** Independently authenticated CURRENT host facts, never caller-supplied claims. */
+export interface ImportControlCaller {
+  authenticatedPop:boolean; destinationWriter:boolean; callerAccount:string;
+  connectionOwnerAccount?:string; authorizedSource?:api.ImportSourceSelectionV1;
+  exactGrantsCurrent:boolean; selectedCommitsAvailable:boolean;
+}
+export type ImportControlAction="Cancel"|"Retry"|"Renew";
+/** Cancel requires destination control only; Retry/Renew fetch via this exact custody. */
+export function checkImportControlCaller(action:ImportControlAction,retained:api.ImportSourceSelectionV1,scope:api.ImportPermissionScopeV1,caller:ImportControlCaller):void {
+  if(!caller.authenticatedPop||!caller.destinationWriter||!caller.callerAccount)reject("Scope");
+  if(action==="Cancel")return;
+  validateRetainedImportSource(retained,scope);
+  if(retained.connection&&(caller.connectionOwnerAccount!==caller.callerAccount||!caller.authorizedSource||!sameSourceSelection(caller.authorizedSource,retained)||!caller.exactGrantsCurrent))reject("SourceSelection");
+  if(!caller.selectedCommitsAvailable)reject("SourceSelection");
+}
+function sameSpool(a:SpoolRef|undefined,b:SpoolRef|undefined):boolean {return !!a&&!!b&&equal(toBinary(SpoolRefSchema,a),toBinary(SpoolRefSchema,b));}
+function canonicalOperationId(id:string):void {
+  const compact=id.replaceAll("-","");
+  if(!/^[0-9a-f]{32}$/.test(compact)||initialImportOperationId(new Uint8Array(compact.match(/../g)!.map(h=>parseInt(h,16))),false)!==id)reject("Canonical");
+}
+function validateRetryAvailability(response:api.GetImportJobStateResponse,destination:SpoolRef):void {
+  const availability=response.retryAvailability;
+  if(availability.case==="eligibleRetryTarget"){
+    const target=availability.value,op=target.operationRef??reject("Canonical");canonicalOperationId(op.id);
+    if(!sameSpool(op.spool,destination))reject("Scope");
+    if(!target.operationVersion.length||target.operationVersion.length>256)reject("Bounds");
+  }else if(availability.case!=="retryUnavailable"||availability.value<1||availability.value>6)reject("Canonical");
+}
+/** New writer disclosure validation; historical frozen recovery carriers lack this addition. */
+export function validateImportRetryStateResponse(request:api.GetImportJobStateRequest,response:api.GetImportJobStateResponse):void {
+  validateImportJobStateResponse(request,response);validateRetryAvailability(response,request.destination??reject("Scope"));
+}
+/** Receiver-owned facts read under the same job/operation/source admission fence. */
+export interface ImportRetryAdmission {
+  read:api.GetImportJobStateResponse; original:OperationRecord; retryLineageId:Uint8Array;
+  logicalJobTerminal:boolean; nowUnixSeconds:bigint;
+}
+/** Replay lookup precedes this check; owner/policy/revocation/lease checks remain host gates. */
+export function checkImportRetryAdmission(request:RetryImportSourceRequest,context:ImportRetryAdmission,active:VerifiedImportDelegation,caller:ImportControlCaller):void {
+  const readRequest=create(api.GetImportJobStateRequestSchema,{destination:request.originalOperation?.spool,logicalJobId:request.logicalJobId});
+  validateImportRetryStateResponse(readRequest,context.read);
+  if(!request.clientOperationId||utf8.encode(request.clientOperationId).length>128)reject("Canonical");
+  if(context.logicalJobTerminal)reject("Revoked");
+  const availability=context.read.retryAvailability;
+  if(availability.case!=="eligibleRetryTarget")reject("StaleContext");
+  const target=availability.value,targetRef=target.operationRef??reject("Canonical"),originalRef=context.original.ref??reject("Scope"),d=read(active);
+  const operationRead=importJobStateRequestFromOperation(context.original);
+  if(!request.originalOperation||!equal(toBinary(RecordRefSchema,request.originalOperation),toBinary(RecordRefSchema,originalRef))||!sameSpool(originalRef.spool,targetRef.spool)||originalRef.id!==targetRef.id||!equal(context.retryLineageId,d.body.retryLineageId)||!operationRead||!equal(toBinary(api.GetImportJobStateRequestSchema,operationRead),toBinary(api.GetImportJobStateRequestSchema,readRequest)))reject("Scope");
+  if(!equal(request.expectedOperationVersion,target.operationVersion)||!equal(context.original.version,target.operationVersion)||context.original.supersededBy||![4,5].includes(context.original.state))reject("StaleContext");
+  const state=context.read.state??reject("Canonical");
+  if(!equal(signedDelegationDigest(state.activePredecessor??reject("Canonical")),d.digest))reject("StaleContext");
+  checkImportJobFence(request.logicalJobId,request.activeDelegationDigest,request.expectedAuthorityEpoch,active,state.authorityEpoch);
+  interval(d.body.notBeforeUnixSeconds,d.body.expiresAtUnixSeconds,context.nowUnixSeconds);
+  const manifest=state.committedManifest??reject("Canonical"),scope=d.body.scope??reject("Canonical");
+  if(!scope.branches.some(b=>!manifest.slots.some(s=>s.refName===b.refName&&s.slotId===b.slotId)))reject("StaleContext");
+  checkImportControlCaller("Retry",context.read.retainedSource??reject("SourceSelection"),scope,caller);
+}
+/** Complete prior attempt set is host-owned; UUID allocation/links/receipt persist together. */
+export function validateImportRetryResponse(request:RetryImportSourceRequest,response:MutationResponse,priorAttemptIds:readonly string[]):void {
+  const receipt=response.receipt??reject("PendingOperation");
+  if(receipt.outcome.case!=="pendingOperation")reject("PendingOperation");
+  const operation=receipt.outcome.value,original=request.originalOperation??reject("PendingOperation");
+  try{canonicalOperationId(operation.id);}catch{reject("PendingOperation");}
+  if(!request.clientOperationId||receipt.clientOperationId!==request.clientOperationId||!sameSpool(operation.spool,original.spool)||operation.id===original.id||operation.id===request.clientOperationId||priorAttemptIds.includes(operation.id))reject("PendingOperation");
+}
+/** Applied may carry an empty version list; Renew creates no physical attempt. */
+export function validateImportRenewResponse(request:api.RenewImportJobRequest,response:MutationResponse):void {
+  const receipt=response.receipt??reject("Semantic");
+  if(!request.clientOperationId||receipt.clientOperationId!==request.clientOperationId||receipt.outcome.case!=="applied")reject("Semantic");
+}
+export function checkImportRetryReplay(requestBytes:Uint8Array,storedBytes:Uint8Array):void {checkImportRenewReplay(requestBytes,storedBytes);}

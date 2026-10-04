@@ -1394,7 +1394,7 @@ through this read using the destination/job selector projected on a visible
 `ImportOperationSubject.hybrid_job = 4` is a typed `HybridImportJobSelector` whose
 `logical_job_id = 1` is exactly 16 bytes and not all zero. Hosts populate it from
 the durable destination/logical-job association for **every physical HYBRID
-attempt**, including the initial attempt, retries, renewals and historical or
+attempt**, including the initial attempt, retries after authority-only renewal, and historical or
 terminal attempts. The pair stays stable across attempts of one logical job;
 different destinations are distinct scopes even if job ID bytes match. Physical
 operation IDs, `retry_of`, `client_operation_id` and retry lineage never substitute
@@ -1515,3 +1515,97 @@ remaining scope and budget, selects a new job key/delegation ID, and obtains new
 parent, delegation and renewal signatures. Its candidate remains outside the
 retained accepted history until successful activation. No wire or refusal
 semantics change is introduced by this vector set.
+
+## Import job control (alpha.31 owner decisions, 2026-10-04)
+
+Renew is **authority activation only**. A successful `RenewImportJob` MUST return
+`receipt.applied` under its own `client_operation_id` and MUST create no physical
+attempt, enqueue no fetch and create no retry links. Empty `resulting_versions`
+is valid; recover the new epoch and active certificate through the authenticated
+job-state read. Persist activation and its exact receipt together. Exact frozen
+replay returns that stored receipt before current CAS/expiry/terminal checks,
+without reactivation; changed body bytes under the same caller-scoped ID MUST
+refuse `OPERATION_ID_REUSED`. Explicitly cancelled or revoked logical jobs can
+never be revived by Prepare, Renew or Retry.
+
+Retry is eligible only for an **incomplete terminal physical attempt**: FAILED
+or CANCELED, with remaining authorized slots and no direct replacement. Physical
+attempt cancellation does not mean logical-job cancellation. Queued, running,
+waiting, paused, completed, already superseded and complete-job attempts are
+ineligible. The job must remain executable under all current authority, policy,
+revocation, budget, frontier and lease checks. In-window eligible retries need
+no new signature. On expired authority, the required flow is authenticated state
+read -> compute/review remaining scope -> exact Prepare -> sign replacement
+permission/delegation and renewal -> Renew -> state read -> Retry with a **NEW
+request ID**, the active replacement digest/epoch and eligible operation CAS.
+Renew's request ID MUST NOT be reused for Retry.
+
+Every admitted Retry MUST allocate a fresh **host-generated physical UUID**,
+distinct from every prior attempt (including the first lineage UUID) and
+independent of the request idempotency key. Return `receipt.pending_operation`
+for that UUID under Retry's request ID. In one admission transaction, persist
+the allocation, immediate `retry_of`/`superseded_by` links, predecessor version
+advance and the exact receipt. At most one direct replacement can win. Exact
+frozen replay returns the same receipt/UUID without allocation or relinking,
+even after authority/target changes; changed bytes refuse `OPERATION_ID_REUSED`.
+The host MUST retain the complete attempt set; portable helpers do not allocate
+UUIDs or prove transactional persistence.
+
+Every successful writer-only `GetImportJobStateResponse` MUST contain exactly
+one `retry_availability`: `eligible_retry_target {operation_ref,
+operation_version}` or a known nonzero `retry_unavailable` reason. The target
+contains one canonical non-nil physical UUID, the exact destination and a
+1..256-byte opaque operation CAS token. It is the eligible unsuperseded terminal
+attempt selected from the durable job/lineage association, read transactionally
+with state, retained proof and retained source. The existing 2 MiB response
+bound includes it. Reasons distinguish no terminal attempt, attempt in progress,
+complete job, logical-job cancellation, logical-job revocation and an already
+superseded target. Authority expiry or lack of source custody alone does not
+hide an otherwise eligible physical target: Renew/custody checks still gate
+admission. If the durable association cannot be read, refuse UNAVAILABLE after
+writer authorization; never guess from IDs or return partial state.
+
+This is an explicitly authorized **narrow disclosure to current destination
+writers**, even if the physical operation is otherwise hidden from that writer.
+Retry does not require initiating-account equality or ordinary operation
+visibility. Ordinary OperationService visibility and unreadable-link redaction
+remain unchanged. In ONE admission transaction, Retry MUST bind this current
+target to the exact destination, logical job, transitive retry lineage, operation
+CAS, active certificate digest/epoch and current authorization. A stale target
+or concurrent replacement refuses; a target alone grants no execution authority.
+
+Any current destination writer may Cancel with authenticated PoP, exact
+job/destination, the active cancellation ID and expected epoch. Cancel requires
+no provider connection, source grant, selected-commit fetch or initiating-account
+match. It must remain available when the original importer's source access is
+lost. For CONNECTED imports, Retry admission and Renew activation MUST instead
+require the caller to **own the exact retained connection**, with current exact
+repository/installation grants and selected-commit availability, rechecked at
+those mutation boundaries. Another connection to the same repository cannot
+substitute. Subsequent fetches MUST bind to that authorized attempt and source
+association; credentials MUST NEVER be selected from the old initiator's
+account. Public-git permits Retry/Renew by any current destination writer with
+proper signed authority and all current checks, including commit availability.
+Prepare retains its existing current custody checks.
+
+`CommitImportJobRequest` has a maximum decoded protobuf message size of **2 MiB
+(2097152 bytes), inclusive**, and `proof` has a maximum of **1 MiB (1048576
+bytes), inclusive**. Measure the whole uncompressed protobuf payload before
+decoding and the decoded message's protobuf encoded size before semantic
+admission; reject one byte over either bound. All existing per-field and
+record-count bounds still apply. The compact boundary vectors synthesize exact
+size carriers for size validation; passing that check does not make an otherwise
+invalid carrier an admissible Commit.
+
+Rust/TS `check_import_control_caller` / `checkImportControlCaller` consume only
+independently authenticated current host facts. `validate_retry_state_response`
+/ `validateImportRetryStateResponse` require the additive disclosure;
+`check_retry_admission` / `checkImportRetryAdmission` compose its target,
+operation CAS, lineage, authority and custody checks. Historical recovery
+validators still accept the frozen alpha.30 carriers without the new fields;
+hosts MUST populate the new disclosure on current successful reads.
+`validate_renew_response` / `validateImportRenewResponse`,
+`validate_retry_response` / `validateImportRetryResponse`, frozen replay helpers
+and Commit size helpers validate the portable receipt/size requirements. Hosts
+own the authorization lookup, transaction, allocation, credential binding and
+worker fences; API helpers are not a storage or execution implementation.

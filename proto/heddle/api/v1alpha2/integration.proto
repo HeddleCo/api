@@ -198,6 +198,9 @@ message SetRemoteLinkRequest {
 // Prepare -> sign -> Commit is sufficient for a new HYBRID import. Defined here
 // to reuse ProviderRepository without an import cycle. Proof originals and the
 // signed ordered branch manifest are the ONLY branch carrier.
+// Maximum decoded protobuf request size: 2 MiB (2097152 bytes), inclusive;
+// proof <=1 MiB (1048576 bytes), inclusive. Enforce the whole uncompressed
+// payload bound before decoding, and the decoded message bound before admission.
 message CommitImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
@@ -229,16 +232,29 @@ message ImportSourceRequest {
   reserved 8, 9;
   reserved "branches", "import_authority";
 }
-// Retry a failed native source fetch/adoption into its original Thread. The
+// Retry an incomplete terminal FAILED/CANCELED physical attempt into its original Thread. The
 // original operation remains immutable; this command creates a new operation
 // and never creates a second Spool or Thread genesis.
+// Allocate a fresh host-generated physical UUID, distinct from ALL prior
+// attempts and independent of client_operation_id. Return receipt.pending_operation
+// for it under this request's ID. Persist allocation, retry_of/superseded_by
+// links and the exact receipt together; exact frozen replay returns that receipt.
+// Changed bytes under the same ID -> OPERATION_ID_REUSED, before current CAS checks.
+// Bind the writer-only job-state eligible target, destination/job/lineage,
+// operation CAS and active authority in one admission transaction. CONNECTED
+// requires caller ownership of the exact retained connection, current exact
+// grants and selected-commit availability. Bind subsequent fetches to that
+// authorized attempt; never select credentials from the old initiator.
+// Public-git permits any current writer subject to signed authority/all checks.
 message RetryImportSourceRequest {
   string client_operation_id = 1;
   RecordRef original_operation = 2;
   bytes expected_operation_version = 3;
   // Resolves retry_original_operation to this ORIGINAL logical job, not the
   // new physical operation UUID. Current same-key retry needs no new signature;
-  // expired/cancelled authority needs explicit RenewImportJob first.
+  // expired authority needs state read -> remaining-scope Prepare -> sign ->
+  // authority-only Renew -> state read -> Retry with a NEW request ID and active
+  // replacement digest/epoch. Explicitly cancelled/revoked jobs NEVER revive.
   bytes logical_job_id = 4;
   bytes active_delegation_digest = 5;
   uint64 expected_authority_epoch = 6;

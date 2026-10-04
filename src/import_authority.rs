@@ -16,6 +16,7 @@ pub const PUBLICATION_DOMAIN: &str = "heddle-import-publication-payload-v1";
 pub const MAX_BRANCHES: usize = 256;
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub const MAX_BUNDLE_BYTES: usize = 1024 * 1024;
+pub const MAX_COMMIT_REQUEST_BYTES: usize = 2 * MAX_BUNDLE_BYTES;
 pub const MAX_RESULT_BYTES: u64 = 1 << 30;
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
 
@@ -698,6 +699,23 @@ pub fn validate_preparation_response(
     Ok(())
 }
 
+/// Enforce inclusive decoded protobuf sizes before semantic admission.
+/// Transport must also bound the whole uncompressed payload before decoding.
+pub fn validate_commit_request_bounds(request: &CommitImportJobRequest) -> Result<(), Reject> {
+    use prost::Message;
+    if request.encoded_len() > MAX_COMMIT_REQUEST_BYTES
+        || request
+            .proof
+            .as_ref()
+            .ok_or(Reject::Canonical)?
+            .encoded_len()
+            > MAX_BUNDLE_BYTES
+    {
+        return Err(Reject::Bounds);
+    }
+    Ok(())
+}
+
 /// Source association/provider comes from the host's authenticated resolver,
 /// never a projection hint. Native base decoding/identity and current grants
 /// remain host gates; this validates carrier, bounds and exact originals.
@@ -708,6 +726,7 @@ pub fn validate_commit_request(
     configuration: &GetImportConfigurationResponse,
 ) -> Result<(), Reject> {
     use prost::Message;
+    validate_commit_request_bounds(request)?;
     let source = request.source.as_ref().ok_or(Reject::SourceSelection)?;
     let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
     if request.client_operation_id.is_empty()
@@ -3490,4 +3509,240 @@ pub fn verify_import_bundle_witnesses(
             accepted_history: history,
         },
     })
+}
+
+/// These facts MUST come from current authenticated host state, never request
+/// claims. Retry/Renew fetches use this exact authorized source association.
+pub struct ImportControlCaller<'a> {
+    pub authenticated_pop: bool,
+    pub destination_writer: bool,
+    pub caller_account: &'a str,
+    pub connection_owner_account: Option<&'a str>,
+    pub authorized_source: Option<&'a ImportSourceSelectionV1>,
+    pub exact_grants_current: bool,
+    pub selected_commits_available: bool,
+}
+#[derive(Clone, Copy)]
+pub enum ImportControlAction {
+    Cancel,
+    Retry,
+    Renew,
+}
+
+/// Destination control is independent of source custody. Cancel never fetches.
+/// Run at Retry admission / Renew activation after checking signed authority.
+pub fn check_import_control_caller(
+    action: ImportControlAction,
+    retained: &ImportSourceSelectionV1,
+    scope: &ImportPermissionScopeV1,
+    caller: &ImportControlCaller<'_>,
+) -> Result<(), Reject> {
+    if !caller.authenticated_pop || !caller.destination_writer || caller.caller_account.is_empty() {
+        return Err(Reject::Scope);
+    }
+    if matches!(action, ImportControlAction::Cancel) {
+        return Ok(());
+    }
+    validate_retained_import_source(retained, scope)?;
+    if retained.connection.is_some()
+        && (caller.connection_owner_account != Some(caller.caller_account)
+            || caller.authorized_source != Some(retained)
+            || !caller.exact_grants_current)
+    {
+        return Err(Reject::SourceSelection);
+    }
+    if !caller.selected_commits_available {
+        return Err(Reject::SourceSelection);
+    }
+    Ok(())
+}
+
+fn validate_retry_availability(
+    response: &GetImportJobStateResponse,
+    destination: &SpoolRef,
+) -> Result<(), Reject> {
+    use get_import_job_state_response::RetryAvailability;
+    match response
+        .retry_availability
+        .as_ref()
+        .ok_or(Reject::Canonical)?
+    {
+        RetryAvailability::EligibleRetryTarget(target) => {
+            let operation = target.operation_ref.as_ref().ok_or(Reject::Canonical)?;
+            let raw = hex::decode(operation.id.replace('-', "")).map_err(|_| Reject::Canonical)?;
+            if initial_operation_id(&raw, false)? != operation.id {
+                return Err(Reject::Canonical);
+            }
+            if operation.spool.as_ref() != Some(destination) {
+                return Err(Reject::Scope);
+            }
+            if target.operation_version.is_empty() || target.operation_version.len() > 256 {
+                return Err(Reject::Bounds);
+            }
+        }
+        RetryAvailability::RetryUnavailable(reason) => {
+            if !(1..=6).contains(reason) {
+                return Err(Reject::Canonical);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validate the additive writer disclosure separately from historical recovery
+/// carriers, whose frozen alpha.30 bytes have no retry_availability field.
+pub fn validate_retry_state_response(
+    request: &GetImportJobStateRequest,
+    response: &GetImportJobStateResponse,
+) -> Result<(), Reject> {
+    validate_job_state_response(request, response)?;
+    validate_retry_availability(response, request.destination.as_ref().ok_or(Reject::Scope)?)
+}
+
+/// Receiver-owned facts locked together with job/authority/source state. The
+/// operation-lineage association is durable host state, not an ID inference.
+pub struct ImportRetryAdmission<'a> {
+    pub read: &'a GetImportJobStateResponse,
+    pub original: &'a OperationRecord,
+    pub retry_lineage_id: &'a [u8],
+    pub logical_job_terminal: bool,
+    pub now_unix_seconds: i64,
+}
+
+/// Run after caller-scoped frozen replay lookup, under ONE admission transaction.
+/// Full owner/policy/revocation/lease checks and allocation remain host gates.
+pub fn check_retry_admission(
+    request: &RetryImportSourceRequest,
+    context: &ImportRetryAdmission<'_>,
+    active: &VerifiedImportDelegation,
+    caller: &ImportControlCaller<'_>,
+) -> Result<(), Reject> {
+    use get_import_job_state_response::RetryAvailability;
+    let destination = request
+        .original_operation
+        .as_ref()
+        .and_then(|r| r.spool.clone());
+    let read_request = GetImportJobStateRequest {
+        destination,
+        logical_job_id: request.logical_job_id.clone(),
+    };
+    validate_retry_state_response(&read_request, context.read)?;
+    if request.client_operation_id.is_empty() || request.client_operation_id.len() > 128 {
+        return Err(Reject::Canonical);
+    }
+    if context.logical_job_terminal {
+        return Err(Reject::Revoked);
+    }
+    let Some(RetryAvailability::EligibleRetryTarget(target)) = &context.read.retry_availability
+    else {
+        return Err(Reject::StaleContext);
+    };
+    let target_ref = target.operation_ref.as_ref().ok_or(Reject::Canonical)?;
+    let original_ref = context.original.r#ref.as_ref().ok_or(Reject::Scope)?;
+    if request.original_operation.as_ref() != Some(original_ref)
+        || original_ref.spool != target_ref.spool
+        || original_ref.id != target_ref.id
+        || context.retry_lineage_id != active.body.retry_lineage_id
+        || import_job_state_request_from_operation(context.original)?.as_ref()
+            != Some(&read_request)
+    {
+        return Err(Reject::Scope);
+    }
+    if request.expected_operation_version != target.operation_version
+        || context.original.version != target.operation_version
+        || context.original.superseded_by.is_some()
+        || !matches!(context.original.state, 4 | 5)
+    {
+        return Err(Reject::StaleContext);
+    }
+    let state = context.read.state.as_ref().ok_or(Reject::Canonical)?;
+    if signed_delegation_digest(state.active_predecessor.as_ref().ok_or(Reject::Canonical)?)?
+        != active.digest
+    {
+        return Err(Reject::StaleContext);
+    }
+    check_job_fence(
+        &request.logical_job_id,
+        &request.active_delegation_digest,
+        request.expected_authority_epoch,
+        active,
+        state.authority_epoch,
+    )?;
+    interval(
+        active.body.not_before_unix_seconds,
+        active.body.expires_at_unix_seconds,
+        context.now_unix_seconds,
+    )?;
+    let manifest = state.committed_manifest.as_ref().ok_or(Reject::Canonical)?;
+    let scope = active.body.scope.as_ref().ok_or(Reject::Canonical)?;
+    if !scope.branches.iter().any(|b| {
+        !manifest
+            .slots
+            .iter()
+            .any(|s| s.ref_name == b.ref_name && s.slot_id == b.slot_id)
+    }) {
+        return Err(Reject::StaleContext);
+    }
+    check_import_control_caller(
+        ImportControlAction::Retry,
+        context
+            .read
+            .retained_source
+            .as_ref()
+            .ok_or(Reject::SourceSelection)?,
+        scope,
+        caller,
+    )
+}
+
+/// Check a host-generated UUID against the COMPLETE durable attempt set, including
+/// the first lineage UUID. Persist the allocation, both direct links and receipt
+/// atomically; do not generate a UUID from the request idempotency key.
+pub fn validate_retry_response(
+    request: &RetryImportSourceRequest,
+    response: &MutationResponse,
+    prior_attempt_ids: &[String],
+) -> Result<(), Reject> {
+    let receipt = response.receipt.as_ref().ok_or(Reject::PendingOperation)?;
+    let Some(mutation_receipt::Outcome::PendingOperation(operation)) = &receipt.outcome else {
+        return Err(Reject::PendingOperation);
+    };
+    let original = request
+        .original_operation
+        .as_ref()
+        .ok_or(Reject::PendingOperation)?;
+    let raw = hex::decode(operation.id.replace('-', "")).map_err(|_| Reject::PendingOperation)?;
+    if initial_operation_id(&raw, false).map_or(true, |id| id != operation.id)
+        || request.client_operation_id.is_empty()
+        || receipt.client_operation_id != request.client_operation_id
+        || original.spool.is_none()
+        || operation.spool != original.spool
+        || operation.id == original.id
+        || operation.id == request.client_operation_id
+        || prior_attempt_ids.contains(&operation.id)
+    {
+        return Err(Reject::PendingOperation);
+    }
+    Ok(())
+}
+
+/// Authority-only acknowledgement. Empty Applied.resulting_versions is valid;
+/// scheduling is forbidden and the activated epoch/certificate comes from state.
+pub fn validate_renew_response(
+    request: &RenewImportJobRequest,
+    response: &MutationResponse,
+) -> Result<(), Reject> {
+    let receipt = response.receipt.as_ref().ok_or(Reject::Semantic)?;
+    if request.client_operation_id.is_empty()
+        || receipt.client_operation_id != request.client_operation_id
+        || !matches!(receipt.outcome, Some(mutation_receipt::Outcome::Applied(_)))
+    {
+        return Err(Reject::Semantic);
+    }
+    Ok(())
+}
+
+/// Exact frozen Retry replay returns the stored receipt without allocating.
+pub fn check_retry_replay(request_bytes: &[u8], stored_bytes: &[u8]) -> Result<(), Reject> {
+    check_renew_replay(request_bytes, stored_bytes)
 }

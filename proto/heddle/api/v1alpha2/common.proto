@@ -390,7 +390,8 @@ message ImportOperationSubject {
   string provider = 2;
   string provider_repository_id = 3;
   // Populate from the durable destination/job association on EVERY physical
-  // HYBRID attempt: initial, retry and renewal. Stable within that logical job,
+  // HYBRID attempt: initial and retry (including retries after authority-only
+  // renewal). Stable within that logical job,
   // including historical/terminal attempts; never infer it from attempt IDs.
   // Absent for non-HYBRID imports or before association is durably available.
   // Absent/unknown subject also means unavailable, never a guessed selector.

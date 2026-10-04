@@ -53,6 +53,7 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
         }],
         boundary_acceptances: vec![evidence()],
         import_authority: None,
+        native_authority: None,
     };
     let bytes = batch.encode_to_vec();
     let dynamic = DynamicMessage::decode(
@@ -75,6 +76,7 @@ fn boundary_evidence_fields_are_additive_and_preserve_populated_signed_records()
         boundary_acceptances: vec![evidence()],
         ownership_resolutions: vec![evidence()],
         ownership_resolution_admissions: vec![evidence()],
+        native_genesis_authority: None,
     };
     let bytes = wrapper.encode_to_vec();
     let dynamic = DynamicMessage::decode(

@@ -6,6 +6,7 @@ import "heddle/api/common/contract.proto";
 import "heddle/api/common/errors.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/import_authority.proto";
+import "heddle/api/v1alpha2/native_witness.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
 import "heddle/api/v1alpha2/owner_views.proto";
 import "heddle/api/v1alpha2/stream.proto";
@@ -161,6 +162,8 @@ message TransferReady {
   repeated SemanticIndexPublication semantic_indexes = 18;
   heddle.api.common.ProtocolCompatibility protocol = 19;
   ImportPublicProofBundleV1 import_authority = 20;
+  // Explicit native arm; reject simultaneous import/native carriers.
+  NativePublicProofBundleV1 native_authority = 21;
 }
 message ProviderExtent {
   EndpointRef provider = 1;
@@ -299,6 +302,8 @@ message PublicationReceipt {
   bytes sharing_policy_version = 5;
   ObjectAddress accepted_inventory = 6;
   ImportPublicProofBundleV1 import_authority = 9;
+  // Explicit native arm; reject simultaneous import/native carriers.
+  NativePublicProofBundleV1 native_authority = 10;
   oneof outcome {
     Applied accepted = 7;
     heddle.api.common.CallFailure rejected = 8;
@@ -363,6 +368,8 @@ message PublishContentOpen {
   repeated SemanticIndexPublication semantic_indexes = 8;
   heddle.api.common.ProtocolCompatibility protocol = 9;
   ImportPublicProofBundleV1 import_authority = 10;
+  // Explicit native arm; reject simultaneous import/native carriers.
+  NativePublicProofBundleV1 native_authority = 11;
 }
 message PublishContentFinish {
   // Names the server's current committed transfer plan, not a caller assertion
@@ -464,6 +471,8 @@ message ThreadGenesisRecord {
   // identities. Current authorization governs a new admission; retained exact
   // history is not invalidated merely by the accepting credential's expiry.
   repeated SignedRecord ownership_resolution_admissions = 8;
+  // Original public creator binding; retain byte-identically on relay.
+  SignedNativeGenesisAuthorityV1 native_genesis_authority = 9;
 }
 
 message ReplicationOpen {
@@ -479,6 +488,8 @@ message ReplicationOpen {
   repeated string record_formats = 6;
   heddle.api.common.ProtocolCompatibility protocol = 10;
   ImportPublicProofBundleV1 import_authority = 11;
+  // Explicit native arm; reject simultaneous import/native carriers.
+  NativePublicProofBundleV1 native_authority = 12;
   // Fresh session binding; the request PoP covers this exact opening.
   bytes session_nonce = 7;
   // The opening PoP binds both Iroh identities; replay on another peer or
@@ -496,6 +507,8 @@ message ReplicationReady {
   repeated string record_formats = 6;
   heddle.api.common.ProtocolCompatibility protocol = 7;
   ImportPublicProofBundleV1 import_authority = 8;
+  // Explicit native arm; reject simultaneous import/native carriers.
+  NativePublicProofBundleV1 native_authority = 9;
 }
 message ReplicationHave {
   repeated CausalFrontier frontiers = 1;
@@ -528,6 +541,8 @@ message ReplicationOperations {
   // contributes to the existing batch byte budget; operations remains nonempty.
   repeated SignedRecord boundary_acceptances = 3;
   ImportPublicProofBundleV1 import_authority = 4;
+  // Explicit native arm; reject simultaneous import/native carriers.
+  NativePublicProofBundleV1 native_authority = 5;
 }
 message ReplicationRejection {
   bytes operation_id = 1;

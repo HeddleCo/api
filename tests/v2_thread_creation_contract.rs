@@ -43,6 +43,16 @@ fn thread_creation_and_replication_preserve_the_same_signed_genesis() {
     );
     assert_eq!(
         start
+            .get_field_by_name("native_genesis_authority")
+            .expect("creator native binding")
+            .kind(),
+        carrier
+            .get_field_by_name("native_genesis_authority")
+            .expect("binding survives replication")
+            .kind()
+    );
+    assert_eq!(
+        start
             .fields()
             .map(|field| field.name().to_owned())
             .collect::<Vec<_>>(),
@@ -50,7 +60,8 @@ fn thread_creation_and_replication_preserve_the_same_signed_genesis() {
             "client_operation_id",
             "spool",
             "thread_genesis",
-            "creator_authority"
+            "creator_authority",
+            "native_genesis_authority"
         ],
         "signed creation data has one representation; a new immutable identity has no mutable CAS target"
     );

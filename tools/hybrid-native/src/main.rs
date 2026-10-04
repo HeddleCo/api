@@ -15,13 +15,13 @@ use objects::object::{
     thread_genesis_admission::ThreadGenesisAdmission,
     thread_replication::{
         Capture, ThreadGenesis, ThreadOperation, integration::HostedIntegration,
-        metadata::ThreadControl, ownership_claim::ThreadOwnershipClaim,
-        ownership_resolution::ThreadOwnershipResolution,
+        local_integration::LocalIntegration, metadata::ThreadControl,
+        ownership_claim::ThreadOwnershipClaim, ownership_resolution::ThreadOwnershipResolution,
     },
 };
 use prost::Message;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 
 fn hex_field(value: &Value) -> Result<Vec<u8>> {
@@ -67,6 +67,84 @@ fn genesis(record: &wire::SignedRecord) -> Result<ThreadGenesis> {
 }
 fn operation(record: &wire::SignedRecord) -> Result<ThreadOperation> {
     Ok(thread_api::replication::decode_record(native_wire(record)?)?.verify()?)
+}
+
+// Fixed-corpus counterpart of ThreadReplica::verify_local_source_owner and its
+// indexed ownership cutoff. Inputs have verified signatures, native parents,
+// claim/resolution signatures and independently admitted account authority.
+// This does not replace heddle's durable conflict/admission authorization.
+fn verify_local_work(
+    geneses: &BTreeMap<ContentHash, ThreadGenesis>,
+    operations: &BTreeMap<ContentHash, ThreadOperation>,
+    claims: &BTreeMap<ContentHash, ThreadOwnershipClaim>,
+    resolutions: &BTreeMap<ContentHash, ThreadOwnershipResolution>,
+) -> Result<()> {
+    use objects::object::thread_replication::{GenesisOwner, SourceAuthor};
+    let mut histories = BTreeMap::new();
+    for (thread, genesis) in geneses {
+        if !matches!(genesis.owner, GenesisOwner::LocalKey(_)) {
+            continue;
+        }
+        let candidates: Vec<_> = claims.values().filter(|c| c.thread == *thread).collect();
+        let choices: Vec<_> = resolutions
+            .values()
+            .filter(|r| r.thread == *thread)
+            .collect();
+        let frontier = match (candidates.as_slice(), choices.as_slice()) {
+            ([claim], []) => &claim.source_frontier,
+            (_, [resolution]) => {
+                let ids: BTreeSet<_> = candidates
+                    .iter()
+                    .map(|c| c.id())
+                    .collect::<std::result::Result<_, _>>()?;
+                ensure!(
+                    ids == resolution.conflicting_claims,
+                    "resolution differs from exact witnessed claim set"
+                );
+                ensure!(
+                    ids.contains(&resolution.winning_claim),
+                    "winning claim absent"
+                );
+                &resolution.frontier
+            }
+            _ => bail!("local work requires a sole witnessed claim or explicit resolution"),
+        };
+        let mut history = BTreeSet::new();
+        let mut pending = frontier.clone();
+        while let Some(id) = pending.pop_first() {
+            if !history.insert(id) {
+                continue;
+            }
+            // Each verified operation is visited once; missing/foreign edges
+            // fail closed. The bundle's byte/dependency bounds cap this walk.
+            ensure!(
+                history.len() <= operations.len(),
+                "ownership ancestry bound"
+            );
+            let ancestor = operations.get(&id).context("ownership cutoff ancestry")?;
+            ensure!(
+                ancestor.thread == *thread,
+                "ownership cutoff crosses Thread"
+            );
+            pending.extend(&ancestor.parents);
+        }
+        histories.insert(*thread, history);
+    }
+    for (id, op) in operations {
+        if !matches!(op.source_author()?, Some(SourceAuthor::LocalKey)) {
+            continue;
+        }
+        let genesis = geneses.get(&op.thread).context("local owner genesis")?;
+        ensure!(
+            genesis.owner == GenesisOwner::LocalKey(op.publisher),
+            "local signer differs from genesis owner"
+        );
+        ensure!(
+            histories.get(&op.thread).is_some_and(|h| h.contains(id)),
+            "local work outside selected ownership cutoff"
+        );
+    }
+    Ok(())
 }
 fn verify_old_capture(value: &Value) -> Result<()> {
     let g = SignedGenesis {
@@ -506,6 +584,9 @@ fn encode(format: &str, bytes: &[u8]) -> Result<Vec<u8>> {
         "heddle-thread-control-v1" => rmp_serde::from_slice::<ThreadControl>(bytes)?.encode()?,
         "heddle-hosted-integration-v1" => {
             rmp_serde::from_slice::<HostedIntegration>(bytes)?.encode()?
+        }
+        "heddle-local-integration-v1" => {
+            rmp_serde::from_slice::<LocalIntegration>(bytes)?.encode()?
         }
         "heddle-original-boundary-acceptance-v1" => {
             rmp_serde::from_slice::<OriginalBoundaryAcceptance>(bytes)?.encode()?
@@ -1259,14 +1340,18 @@ fn request_binding(
 
 // alpha.28 contract verification uses the unchanged published native codecs.
 fn verify_native_witness_fixture() -> Result<()> {
+    let f: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/native-host-witness-v1.json"
+    ))?;
+    verify_native_witness_vectors(&f)
+}
+
+fn verify_native_witness_vectors(f: &Value) -> Result<()> {
     use objects::object::{
         CollaborationActor,
         thread_replication::{GenesisOwner, SourceAuthor, ThreadOperationBody},
     };
-    let f: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/native-host-witness-v1.json"
-    ))?;
-    let reference: wire::NativePublicProofBundleV1 = record(&f, "local_adopt_push")?;
+    let reference: wire::NativePublicProofBundleV1 = record(f, "local_adopt_push")?;
     let claim = ThreadOwnershipClaim::decode(
         &reference.authority_witnesses[0]
             .original
@@ -1303,7 +1388,7 @@ fn verify_native_witness_fixture() -> Result<()> {
     capability_verifier::verify_spool_owner_genesis(&spool)?;
     for name in f["positive"].as_array().context("positive cases")? {
         let name = name.as_str().context("case")?;
-        let b: wire::NativePublicProofBundleV1 = record(&f, name)?;
+        let b: wire::NativePublicProofBundleV1 = record(f, name)?;
         let now = b
             .witness_set
             .as_ref()
@@ -1330,14 +1415,82 @@ fn verify_native_witness_fixture() -> Result<()> {
         for p in &b.genesis_witnesses {
             let g = genesis(p.original_genesis.as_ref().context("original")?)?;
             let id = g.id()?;
+            let binding = p
+                .binding
+                .as_ref()
+                .and_then(|p| p.body.as_ref())
+                .context("binding")?;
+            let identity = binding.identity.as_ref().context("binding owner")?;
+            let payload = codec::canonical(p)?;
+            let admission = b
+                .statements
+                .iter()
+                .filter_map(|s| s.body.as_ref())
+                .find(|s| s.canonical_payload == payload)
+                .context("genesis admission")?;
+            let admitted_at = admission.observed_at_unix_millis / 1000;
+            let chain = b
+                .owner_chains
+                .iter()
+                .find(|c| {
+                    import::owner_chain_digest(c).is_ok_and(|d| d == binding.owner_chain_digest)
+                })
+                .context("binding chain")?;
+            let mut selected_owner = None;
+            let mut newest_sequence = 0;
+            for endpoint in &chain.owner_state_hashes {
+                let history = b
+                    .owner_histories
+                    .iter()
+                    .find(|h| &h.state_hash == endpoint)
+                    .context("retained endpoint")?;
+                let verified = verify_owner_history(history, admitted_at)?;
+                newest_sequence = newest_sequence.max(verified.sequence());
+                if history.state_hash == identity.owner_state_hash {
+                    selected_owner = Some(verified);
+                }
+            }
+            let selected_owner = selected_owner.context("selected owner at admission")?;
+            ensure!(
+                selected_owner.signed_root() == owner.signed_root(),
+                "selected history extends independently pinned root"
+            );
+            let mut expected_endpoints = vec![
+                owner.state_hash().to_vec(),
+                selected_owner.state_hash().to_vec(),
+            ];
+            expected_endpoints.sort();
+            expected_endpoints.dedup();
+            ensure!(
+                chain.owner_state_hashes == expected_endpoints,
+                "recomputed original-keyring and accepted-owner endpoints"
+            );
+            ensure!(
+                selected_owner.sequence() == newest_sequence,
+                "binding owner is chain state at admission"
+            );
+            ensure!(
+                selected_owner.owner_id().as_slice() == identity.owner_id,
+                "binding owner identity"
+            );
+            ensure!(
+                identity.ownership_transfer_sequence == 0 && chain.transfer_audit_hashes.is_empty(),
+                "fixture transfer timeline"
+            );
+            if admission.basis == 1 {
+                ensure!(
+                    identity.owner_state_hash == admission.owner_state_hash,
+                    "witnessed binding owner"
+                );
+            }
             if matches!(g.owner, GenesisOwner::Account(_)) && p.boundary_acceptance.is_none() {
                 verify_authority(
                     &p.creator_authority_envelope,
-                    &owner,
+                    &selected_owner,
                     &g.creator,
                     &actor,
                     "/heddle.api.v1alpha2.ThreadService/StartThread",
-                    1100,
+                    admitted_at,
                 )?;
             }
             if let Some(e) = &p.boundary_acceptance {
@@ -1354,6 +1507,7 @@ fn verify_native_witness_fixture() -> Result<()> {
         }
         let mut claims = BTreeMap::new();
         let mut operations = BTreeMap::new();
+        let mut resolutions = BTreeMap::new();
         for p in &b.authority_witnesses {
             for r in p.original.iter().chain(p.dependencies.iter()) {
                 match r.format.as_str() {
@@ -1400,6 +1554,14 @@ fn verify_native_witness_fixture() -> Result<()> {
                 geneses.get(&op.thread).context("operation genesis")?,
                 &parents,
             )?;
+            if let ThreadOperationBody::LocalIntegration(bytes) = &op.body {
+                let integration = LocalIntegration::decode(bytes)?;
+                integration.validate_source(
+                    operations
+                        .get(&integration.source_operation)
+                        .context("local integration source closure")?,
+                )?;
+            }
         }
         for p in &b.authority_witnesses {
             let r = p.original.as_ref().context("authority original")?;
@@ -1478,6 +1640,10 @@ fn verify_native_witness_fixture() -> Result<()> {
                         acceptance_signature: signature(r, &v.accepting_publisher)?,
                     }
                     .verify(claims.get(&v.winning_claim).context("winner")?)?;
+                    ensure!(
+                        resolutions.insert(v.id()?, v.clone()).is_none(),
+                        "duplicate witnessed resolution"
+                    );
                     let SourceAuthor::Account {
                         actor, authority, ..
                     } = v.acceptance
@@ -1505,11 +1671,31 @@ fn verify_native_witness_fixture() -> Result<()> {
                 1100,
             )?;
         }
+        verify_local_work(&geneses, &operations, &claims, &resolutions)?;
         println!(
             "NATIVE MODEL PASS {name}: original signatures, StartThread/ownership/source authority, causal and acceptance closure"
         );
     }
     Ok(())
+}
+
+fn verify_owner_history(
+    history: &wire::OwnerHistory,
+    now: i64,
+) -> Result<capability_verifier::VerifiedOwnerState> {
+    let history =
+        capability_verifier::wire::OwnerHistory::decode(history.encode_to_vec().as_slice())?;
+    let mut owner =
+        capability_verifier::verify_owner_root(history.root.as_ref().context("owner root")?)?;
+    let limits = capability_verifier::VerificationLimits::new(30 * 24 * 60 * 60)?;
+    for transition in &history.accepted_transitions {
+        owner = capability_verifier::apply_accepted_transition(&owner, transition, now, limits)?;
+    }
+    ensure!(
+        history.state_hash == owner.state_hash(),
+        "owner history endpoint"
+    );
+    Ok(owner)
 }
 fn verify_native_genesis_boundary(
     g: &ThreadGenesis,
@@ -1597,6 +1783,24 @@ fn verify_native_genesis_boundary(
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
+        Some("merge-state") => {
+            let states: Vec<Vec<u8>> = rmp_serde::from_slice(&input()?)?;
+            ensure!(states.len() == 2, "source and target States required");
+            let source = State::decode_current_msgpack(&states[0])?;
+            let mut target = State::decode_current_msgpack(&states[1])?;
+            let mut parents = vec![source.id(), target.id()];
+            parents.sort();
+            parents.dedup();
+            target.parents = parents;
+            println!(
+                "{}",
+                serde_json::json!({
+                    "source_id_hex": hex::encode(source.id().as_bytes()),
+                    "id_hex": hex::encode(target.id().as_bytes()),
+                    "state_hex": hex::encode(target.encode_current_msgpack()?),
+                })
+            );
+        }
         Some("child-state" | "descendant-state") => {
             let mut state = State::decode_current_msgpack(&input()?)?;
             ensure!(
@@ -1618,6 +1822,12 @@ fn main() -> Result<()> {
         Some("encode") => {
             let format = args.get(2).context("native format required")?;
             println!("{}", hex::encode(encode(format, &input()?)?));
+        }
+        Some("verify-owner-history") => {
+            let now: i64 = args.get(2).context("admission seconds required")?.parse()?;
+            let history = wire::OwnerHistory::decode(input()?.as_slice())?;
+            let owner = verify_owner_history(&history, now)?;
+            println!("{}", hex::encode(owner.state_hash()));
         }
         Some("verify") => {
             let f = read_json(args.get(2).context("fixture path")?)?;
@@ -1677,6 +1887,58 @@ mod tests {
     #[test]
     fn native_witness_originals_and_start_thread_authority() {
         verify_native_witness_fixture().expect("native model and owner authority");
+    }
+    fn native_local_work_negative(name: &str) {
+        let mut f: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/native-host-witness-v1.json"
+        ))
+        .expect("signed native vectors");
+        let expected = f["native_negative"]
+            .as_array()
+            .expect("native negatives")
+            .iter()
+            .find(|v| v["id"] == name)
+            .expect("negative")
+            .clone();
+        f["positive"] = serde_json::json!([expected["control"]]);
+        verify_native_witness_vectors(&f).expect("passing signed control");
+        f["positive"] = serde_json::json!([name]);
+        let error = verify_native_witness_vectors(&f).expect_err("native owner/cutoff must reject");
+        assert!(
+            format!("{error:#}").contains(expected["expected"].as_str().expect("reason")),
+            "{name}: {error:#}"
+        );
+        println!("NATIVE REJECT {name}: {error:#}");
+    }
+    #[test]
+    fn local_integration_wrong_key() {
+        native_local_work_negative("local_integration_wrong_key");
+    }
+    #[test]
+    fn local_integration_beyond_claim_cutoff() {
+        native_local_work_negative("local_integration_beyond_claim_cutoff");
+    }
+    #[test]
+    fn local_integration_wrong_key_unchanged_claim() {
+        native_local_work_negative("local_integration_wrong_key_unchanged_claim");
+    }
+    #[test]
+    fn owner_history_must_be_active_and_exact_at_admission() {
+        let f = fixture();
+        let mut history: wire::OwnerHistory =
+            record(&f, "renew_rotated_owner_history").expect("signed rotation control");
+        assert!(
+            verify_owner_history(&history, 1100).is_err(),
+            "future rotation must fail"
+        );
+        verify_owner_history(&history, 1300).expect("rotation active at admission");
+        history.state_hash = record::<wire::OwnerHistory>(&f, "owner_history")
+            .expect("original owner")
+            .state_hash;
+        assert!(
+            verify_owner_history(&history, 1300).is_err(),
+            "stale endpoint must fail"
+        );
     }
     #[test]
     fn prepared_commit_matches_native_original_branches() {

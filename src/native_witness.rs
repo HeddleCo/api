@@ -323,6 +323,11 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     for p in &b.landing_witnesses {
         require_statement(b, 4, &canonical(p)?)?;
         let execution = p.execution.as_ref().ok_or(Reject::Canonical)?;
+        let op: OperationSelectors =
+            rmp_serde::from_slice(&execution.canonical_record).map_err(|_| Reject::Canonical)?;
+        if execution.format != "heddle-thread-operation-v1" || op.body.kind != "integration" {
+            return Err(Reject::Scope);
+        }
         if !b.genesis_witnesses.iter().any(|g| {
             g.original_genesis
                 .as_ref()
@@ -413,6 +418,14 @@ struct CaptureBodySelectors {
 struct CaptureSelectors {
     author: OperationBodySelectors,
 }
+#[derive(serde::Deserialize)]
+struct LocalIntegrationOperationSelectors {
+    body: LocalIntegrationBodySelectors,
+}
+#[derive(serde::Deserialize)]
+struct LocalIntegrationBodySelectors {
+    canonical: Vec<u8>,
+}
 fn requires_authority(record: &api::SignedRecord) -> Result<bool, Reject> {
     if record.format != "heddle-thread-operation-v1" {
         return Ok(true);
@@ -422,12 +435,21 @@ fn requires_authority(record: &api::SignedRecord) -> Result<bool, Reject> {
     if op.body.kind == "integration" {
         return Ok(false);
     }
-    if op.body.kind != "capture" {
-        return Ok(true);
+    match op.body.kind.as_str() {
+        "capture" => {
+            let op: CaptureOperationSelectors =
+                rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Canonical)?;
+            Ok(op.body.canonical.author.kind != "local_key")
+        }
+        "local_integration" => {
+            let op: LocalIntegrationOperationSelectors =
+                rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Canonical)?;
+            let integration: CaptureSelectors =
+                rmp_serde::from_slice(&op.body.canonical).map_err(|_| Reject::Canonical)?;
+            Ok(integration.author.kind != "local_key")
+        }
+        _ => Ok(true),
     }
-    let op: CaptureOperationSelectors =
-        rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Canonical)?;
-    Ok(op.body.canonical.author.kind != "local_key")
 }
 fn require_native_dependency(
     b: &api::NativePublicProofBundleV1,
@@ -451,7 +473,10 @@ fn require_native_dependency(
             .ok_or(Reject::Scope)?;
         return require_statement(b, 4, &canonical(p)?);
     }
-    // Local captures retain their native proof and exact hosted ownership claim.
+    // Local captures and LocalKey integrations retain native proof and the
+    // thread's exact hosted ownership claim, never an authority/landing receipt.
+    // This establishes reference closure only. Native authorization must bind
+    // publisher to genesis.owner.local_key and enforce the selected signed cutoff.
     import::verify_native(original, "heddle-thread-operation-v1")?;
     let t = thread(original)?;
     let claim = b

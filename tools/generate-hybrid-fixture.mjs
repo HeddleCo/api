@@ -24,6 +24,7 @@ import * as owner from '../packages/typescript/dist/v1alpha2/owner_records_pb.js
 import { canonicalHybridV1, signingDigest, signedPermissionDigest, ownerChainDigest, signedGenesisDigest, signedDelegationDigest, signedOperationDigest, manifestDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import { setSigningBytes, witnessId, statementSigningDigest, leafDigest, merkleRoot, purposeDomain } from '../packages/typescript/dist/v1alpha2/witness-trust.js';
 import { hash, keyId, join, u32, integer, sized, utf8, compare } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
+import { assertFixtureOwnerContext } from './assert-fixture-owner-context.mjs';
 const hex=v=>Buffer.from(v).toString('hex'),raw=(n,s=32)=>new Uint8Array(s).fill(n),str=s=>utf8.encode(s);
 const keys=Object.fromEntries(['owner','device','job','renew_job','witness','next_witness','root','wrong_root','guardian_a','guardian_b','direct_job','competing_job','rotated_owner'].map((name,i)=>{const seed=raw(i+1),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'}),publicKey=new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32));return [name,{seed,privateKey,publicKey}];}));
 const sig=(name,input)=>new Uint8Array(sign(null,input,keys[name].privateKey));
@@ -835,5 +836,39 @@ const noncanonical=clone(ProviderRepositorySchema,pub);noncanonical.cloneUrl='ht
 resolveCase('noncanonical_input',noncanonical,pub,undefined,'Canonical');
 const observations=clone(ProviderRepositorySchema,repo);observations.name='new display name';observations.defaultBranch='other';observations.hashAlgorithm=0;observations.refs=[];
 resolveCase('observations_change',repo,observations,'github','OK');
+// Audit every generated admission, including all positive boundary controls and
+// both publications in the renewed export. Negative fixtures may break other
+// checks, but their owner/time context also stays coherent. Resolve the original
+// signed binding's chain rather than the export's later current-chain selector.
+const histories=[create(owner.OwnerHistorySchema,{root:signedRoot,stateHash}),rotatedHistory];
+const chains=[chain,rotatedChain];
+const witnessedGeneses=new Map(Object.values(artifact.wire_vectors).filter(v=>v.schema===api.ImportGenesisWitnessV1Schema.typeName).map(v=>{
+ const p=fromBinary(api.ImportGenesisWitnessV1Schema,Buffer.from(v.wire_hex,'hex'));
+ return [hex(canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p)),p];
+}));
+for(const [name,v] of Object.entries(artifact.signed_vectors)){
+ if(v.schema!==common.SignedHostedWitnessStatementV1Schema.typeName)continue;
+ const {body}=fromBinary(common.SignedHostedWitnessStatementV1Schema,Buffer.from(v.wire_hex,'hex'));
+ let selectedIdentity={...identity,ownerId:body.ownerId,ownerStateHash:body.ownerStateHash,ownershipTransferSequence:body.ownershipTransferSequence},selectedChain=chain;
+ if(body.purpose===1&&body.basis===1){
+  const p=witnessedGeneses.get(hex(body.canonicalPayload));
+  if(!p)throw new Error(`${name}: exact genesis payload missing`);
+  selectedIdentity=p.binding.body.identity;
+  selectedChain=chains.find(c=>hex(ownerChainDigest(c))===hex(p.binding.body.ownerChainDigest));
+  if(hex(selectedIdentity.ownerStateHash)!==hex(body.ownerStateHash)||selectedIdentity.ownershipTransferSequence!==body.ownershipTransferSequence)throw new Error(`${name}: binding differs from witnessed owner`);
+ }
+ if(!selectedChain)throw new Error(`${name}: original selected chain missing`);
+ assertFixtureOwnerContext(nativeCodec,name,histories,selectedChain,selectedIdentity,body.observedAtUnixMillis);
+}
+// Renew has a current submission time, rather than a new hosted admission. Its
+// retained originals were audited at their own witnessed times above. Rotated
+// replacements select the owner active at the documented 1350 s submission.
+for(const v of artifact.renew_submission_vectors.passing){
+ const request=fromBinary(api.RenewImportJobRequestSchema,Buffer.from(artifact.wire_vectors[v.request].wire_hex,'hex'));
+ const replacement=request.renewal.body.replacement.body;
+ const selectedChain=chains.find(c=>hex(ownerChainDigest(c))===hex(replacement.ownerChainDigest));
+ if(!selectedChain)throw new Error(`${v.id}: replacement selected chain missing`);
+ assertFixtureOwnerContext(nativeCodec,v.id,request.proof.ownerHistories,selectedChain,replacement.identity,1350000n,request.proof.ownershipTransfers);
+}
 writeFileSync(new URL('../tests/fixtures/import-authority-host-witness-v1.json',import.meta.url),JSON.stringify(artifact,null,2)+'\n');
 console.log(`Frozen ${artifact.messages.length} messages, ${Object.keys(artifact.signed_vectors).length} signed byte vectors, ${artifact.negative_vectors.length} witness/operation negatives, ${artifact.commit_vectors.negative.length} Commit negatives, ${artifact.trees.length} trees, ${artifact.retry_scenarios.length} retry scenarios.`);

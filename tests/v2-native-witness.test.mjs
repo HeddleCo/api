@@ -16,6 +16,16 @@ const bytes=h=>new Uint8Array(Buffer.from(h,'hex'));
 const wire=(name,schema=api.NativePublicProofBundleV1Schema)=>fromBinary(schema,bytes(f.wire_vectors[name].wire_hex));
 async function verify(b){const selected=wire(b.witnessSet?.body?.generation===51n?'retired_set':'current_set',SignedHostedWitnessSetV1Schema);const now=selected.body.issuedAtUnixMillis+1n;const set=await verifyWitnessSet(selected,{authority:'https://weft.example.test',rootId:'descriptor-root-1',rootPublicKey:bytes(f.keys.root.public_key_hex),rootEpoch:1n,nowUnixMillis:now,clockFloorUnixMillis:1000000n,knownJobKeys:[]});await verifyNativeBundleWitnesses(b,set,now);}
 for(const name of f.positive)test(`native positive ${name}`,async()=>{await verify(wire(name));});
+for(const v of f.native_negative)test(`portable closure passes; native authority must reject ${v.id}`,async()=>{
+  await verify(wire(v.control));await verify(wire(v.id));
+});
+test('local integration push retains native work and claim',async()=>{
+  const b=wire('local_integration_push');await verify(b);
+  const claim=b.authorityWitnesses.find(p=>p.kind===2);
+  assert.equal(claim.dependencies.length,5,'both geneses, captures and integration');
+  assert.equal(b.authorityWitnesses.length,2,'account source and ownership claim only');
+  assert.equal(b.landingWitnesses.length,0);
+});
 test('bindings select distinct retained owner chains',()=>{
   const b=wire('distinct_owner_chains'),selected=b.genesisWitnesses.map(p=>Buffer.from(p.binding.body.ownerChainDigest).toString('hex'));
   assert.equal(b.ownerChains.length,2);assert.equal(selected.length,2);assert.notEqual(selected[0],selected[1]);

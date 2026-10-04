@@ -63,6 +63,18 @@ fn native_positive_bundles() {
     }
 }
 #[test]
+fn signed_native_authority_negatives_require_the_native_gate() {
+    let f = fixture();
+    for v in f["native_negative"].as_array().expect("native negatives") {
+        let name = v["id"].as_str().expect("name");
+        verify(&f, &wire(&f, v["control"].as_str().expect("control")))
+            .expect("passing signed control");
+        verify(&f, &wire(&f, name))
+            .expect("portable closure is valid; native authority must reject");
+        println!("PORTABLE PASS {name}; native authorization required");
+    }
+}
+#[test]
 fn bindings_select_distinct_retained_owner_chains() {
     let f = fixture();
     let b: api::NativePublicProofBundleV1 = wire(&f, "distinct_owner_chains");
@@ -205,6 +217,36 @@ negatives!(
     import_without_delegation,
     dual_carriers
 );
+negatives!(
+    local_integration_forged_signature,
+    local_integration_missing_claim,
+    local_integration_purpose2,
+    local_integration_empty_purpose2,
+    local_integration_purpose4,
+    account_integration_as_local
+);
+#[test]
+fn local_integration_push_retains_native_work_and_claim() {
+    let f = fixture();
+    let b: api::NativePublicProofBundleV1 = wire(&f, "local_integration_push");
+    verify(&f, &b).expect("local capture, integration and push");
+    let claim = b
+        .authority_witnesses
+        .iter()
+        .find(|p| p.kind == 2)
+        .expect("claim");
+    assert_eq!(
+        claim.dependencies.len(),
+        5,
+        "both geneses, captures and integration"
+    );
+    assert_eq!(
+        b.authority_witnesses.len(),
+        2,
+        "account source and ownership claim only"
+    );
+    assert!(b.landing_witnesses.is_empty());
+}
 #[test]
 fn producers_carry_exact_binding() {
     let f = fixture();

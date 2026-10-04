@@ -125,7 +125,7 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
 test('frozen descriptor fields and public proof-only lookup',()=>{
   for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length);for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
   for(const descriptor of fixture.enums){const schema=(descriptor.name.includes(".common.")?common:api)[`${descriptor.name.split(".").at(-1)}Schema`];assert.deepEqual(schema.values.map(v=>({name:v.name,number:v.number})),descriptor.values);}
-  const expected = ['CancelImportJob', 'CommitImportJob', 'GetHostedWitnessHistoryProof', 'ImportSource',
+  const expected = ['CancelImportJob', 'CommitImportJob', 'GetHostedWitnessHistoryProof', 'GetImportJobState', 'ImportSource',
     'PrepareImportJob', 'RenewImportJob', 'RetryImportSource', 'SynchronizeRemote']
     .map(name => `/heddle.api.v1alpha2.IntegrationService/${name}`);
   const actual = Object.values(api).filter(value => value?.kind === "service").flatMap(service => service.methods)
@@ -421,4 +421,60 @@ for(const v of fixture.amendment_vectors.lineage)test(`initial lineage allocatio
 test('Commit receipt must name the reserved first physical operation',()=>{
  authority.validateImportCommitResponse(vector('commit_request'),vector('commit_response'));
  assert.throws(()=>authority.validateImportCommitResponse(vector('commit_request'),vector('commit_wrong_lineage_response')),expected('PendingOperation'));
+});
+
+for(const v of fixture.renew_submission_vectors.negative)test(`alpha24 Renew REJECT then PASS: ${v.id}`,()=>{
+  const read=vector(v.read),request=vector(v.request);
+  if(v.envelope_bytes)request.proof.creatorAuthorityEnvelopes=[new Uint8Array(v.envelope_bytes).fill(1)];
+  assert.throws(()=>authority.validateImportRenewRequest(request,read),expected(v.expected));
+  authority.validateImportRenewRequest(vector(v.control),read);
+});
+for(const v of fixture.renew_submission_vectors.read_request_negative)test(`alpha24 Read request REJECT then PASS: ${v.id}`,()=>{
+ assert.throws(()=>authority.validateImportJobStateRequest(vector(v.request)),expected(v.expected));
+ authority.validateImportJobStateRequest(vector(v.control));
+});
+for(const v of fixture.renew_submission_vectors.read_negative)test(`alpha24 Read REJECT then PASS: ${v.id}`,()=>{
+  const request=vector('job_state_request'),response=vector(v.response);
+  if(v.envelope_bytes)response.retainedProof.creatorAuthorityEnvelopes=[new Uint8Array(v.envelope_bytes).fill(1)];
+  assert.throws(()=>authority.validateImportJobStateResponse(request,response),expected(v.expected));
+  authority.validateImportJobStateResponse(request,vector(v.control));
+});
+for(const v of fixture.renew_submission_vectors.prepare_negative)test(`alpha24 Prepare race REJECT then PASS: ${v.id}`,()=>{
+  const request=vector(v.request),response=vector(v.response);
+  assert.throws(()=>authority.validateRenewalPreparationFromRead(request,response,vector(v.read)),expected(v.expected));
+  authority.validateRenewalPreparationFromRead(request,response,vector(v.control));
+});
+for(const v of fixture.renew_submission_vectors.passing)test(`alpha24 frozen actual Renew: ${v.id}`,async()=>{
+  const request=vector(v.request),read=vector(v.read),original=exportOwnerContext(vector('complete_renewed_export'))(1350n);
+  let current=original;
+  if(v.rotated){
+    const transition=vector('renew_owner_rotation'),digest=hash(utf8.encode('heddle-owner-key-transition-v1'),bytes(fixture.renew_submission_vectors.rotation.canonical_hex));
+    assert.deepEqual(digest,bytes(fixture.renew_submission_vectors.rotation.digest_hex));
+    assert.deepEqual(transition.transition.previousStateHash,original.identity.ownerStateHash);
+    assertCrypto(original.ownerPublicKey,digest,transition.authorizations[0].signature);
+    const key=bytes(fixture.keys.rotated_owner.public_key_hex);assertCrypto(key,digest,transition.nextAuthorityKeyProof.signature);
+    assert.deepEqual(transition.transition.nextAuthorityKey.publicKey,key);
+    assert.deepEqual(vector('renew_rotated_owner_history').acceptedTransitions,[transition]);
+    current={...original,identity:vector('renew_rotated_identity'),ownerPublicKey:key,ownerChainDigest:authority.ownerChainDigest(vector('renew_rotated_chain'))};
+    await assert.rejects(authority.verifyImportRenewSubmission(request,read,current,current),expected('Root'));
+  }
+  const token=await authority.verifyImportRenewSubmission(request,read,original,current);
+  assert.deepEqual(token.digest,authority.signedDelegationDigest(request.renewal.body.replacement));
+  assert.deepEqual(toBinary(api.RenewImportJobRequestSchema,request),bytes(fixture.wire_vectors[v.request].wire_hex));
+  const frozen=toBinary(api.RenewImportJobRequestSchema,request);authority.checkImportRenewReplay(frozen,frozen);
+  assert.throws(()=>authority.checkImportRenewReplay(join(frozen,Uint8Array.of(0)),frozen),expected('OperationIdReused'));
+  await assert.rejects(authority.verifyImportRenewSubmission(request,read,original,{...current,nowUnixSeconds:1800n}),expected('Expired'));
+  assert.deepEqual(request.proof.delegations,read.retainedProof.delegations);
+  assert.deepEqual(request.proof.renewals,read.retainedProof.renewals);
+});
+test('alpha24 job-state read is authenticated destination-writer only, bounded and gated',()=>{
+ const contract=getOption(api.IntegrationService.method.getImportJobState,common.rpc_contract);
+ assert.equal(contract.effect,common.RpcEffect.READ_ONLY);assert.equal(contract.retryBehavior,common.RetryBehavior.SAFE);
+ assert.equal(contract.authorizationAccess,common.AuthorizationAccess.AUTHENTICATED_PRINCIPAL);
+ assert.equal(contract.authorizationRole,common.AuthorizationRole.RESOURCE_WRITER);
+ assert.equal(contract.signingTier,common.SigningTier.PROOF_OF_POSSESSION);
+ assert.equal(contract.authorizationExistence,common.AuthorizationExistence.HIDE);
+ assert.deepEqual(contract.authorizationRequestTargets,[create(common.AuthorizationRequestTargetSchema,{path:'destination',role:common.AuthorizationRole.RESOURCE_WRITER})]);
+ assert.deepEqual(contract.mandatoryFeatures,[1]);
+ const empty=vector('job_state_empty');authority.validateImportJobStateResponse(vector('job_state_request'),empty);assert.deepEqual(empty.state.committedManifest.slots,[]);
 });

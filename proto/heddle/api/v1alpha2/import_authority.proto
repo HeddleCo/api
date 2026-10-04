@@ -323,10 +323,37 @@ message GetImportConfigurationResponse {
   repeated ImportConverterConfigurationV1 converters = 1;
   ImportBudgetLimitsV1 limits = 2;
 }
+// Destination-writer-only, authenticated finite read. No listing, pagination or
+// seed/custody/bearer secrets. Unknown and unauthorized jobs use uniform NOT_FOUND.
+message GetImportJobStateRequest {
+  SpoolRef destination = 1;
+  bytes logical_job_id = 2; // Exactly 16 nonzero bytes; <=4096 encoded request bytes.
+}
+message GetImportJobStateResponse {
+  // One transactional snapshot, including an explicit empty manifest before
+  // publication. Read -> compute/review remaining scope -> EXACT Prepare. Its
+  // renewal_state MUST equal this snapshot; otherwise recompute and re-prepare.
+  ImportJobCasStateV1 state = 1;
+  // Bounded retained accepted evidence, including original genesis parents,
+  // owner histories/handoffs and their original chain commitment. No candidate.
+  // terminal_manifest selects state.committed_manifest even when empty. Same
+  // record-count limits as the public bundle; <=2 MiB entire response, no truncation.
+  ImportPublicProofBundleV1 retained_proof = 2;
+}
 message RenewImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
   SignedImportJobRenewalV1 renewal = 3;
+  // Renew submission profile: exact retained accepted evidence from the state
+  // read, plus the digest-sorted replacement permission and current owner/policy
+  // evidence. owner_chain selects the current chain; the read retains the old
+  // chain. Original genesis parents MUST NOT be rebound. Candidate occurs ONLY
+  // in field 3, never proof.delegations/renewals. terminal_manifest and manifests
+  // resolve the exact authenticated snapshot, including an explicit empty one.
+  // Before publication: no operations/publication receipts; retain any actual
+  // genesis admissions, but never invent them. Freeze complete protobuf request
+  // bytes for client_operation_id replay; extend history only after activation.
+  // <=2 MiB request; proof <=1 MiB and existing record-count limits apply.
   ImportPublicProofBundleV1 proof = 4;
 }
 message CancelImportJobRequest {
@@ -416,7 +443,7 @@ message HostedLandingWitnessV1 {
   repeated SignedRecord review_evidence = 5; // Sorted signed-native-record digests.
   bytes authority_envelope = 6;
 }
-// Authenticated Prepare snapshot. Signature/scope-only predecessor recovery
+// Authenticated job-state read / Prepare snapshot. Signature/scope-only predecessor recovery
 // does not establish current execution or historical admission. Current
 // replacement authority and transactional activation CAS remain mandatory.
 message ImportJobCasStateV1 {

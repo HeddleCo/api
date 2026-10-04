@@ -56,6 +56,7 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
         "CancelImportJob",
         "CommitImportJob",
         "GetHostedWitnessHistoryProof",
+        "GetImportJobState",
         "ImportSource",
         "PrepareImportJob",
         "RenewImportJob",
@@ -2323,5 +2324,233 @@ fn initial_lineage_uuid_reservation_and_receipt_vectors() {
     assert_eq!(
         import::validate_commit_response(&request, &record(&f, "commit_wrong_lineage_response")),
         Err(codec::Reject::PendingOperation)
+    );
+}
+
+#[test]
+fn alpha24_renew_and_read_negatives_reject_then_pass() {
+    let f = fixture();
+    let vectors = &f["renew_submission_vectors"];
+    let mut failures = Vec::new();
+    for v in vectors["negative"].as_array().expect("renew negatives") {
+        let mut request: api::RenewImportJobRequest =
+            record(&f, v["request"].as_str().expect("request"));
+        if let Some(size) = v["envelope_bytes"].as_u64() {
+            request
+                .proof
+                .as_mut()
+                .expect("proof")
+                .creator_authority_envelopes = vec![vec![1; size as usize]];
+        }
+        let read = record(&f, v["read"].as_str().expect("read"));
+        let result = import::validate_renew_request(&request, &read);
+        let actual = result
+            .err()
+            .map(|r| format!("{r:?}"))
+            .unwrap_or_else(|| "OK".into());
+        println!("Renew {}: {} -> control PASS", v["id"], actual);
+        if actual != v["expected"].as_str().expect("expected") {
+            failures.push(format!("Renew {}: {actual}", v["id"]));
+        }
+        import::validate_renew_request(&record(&f, v["control"].as_str().expect("control")), &read)
+            .expect("passing control");
+    }
+    for v in vectors["read_request_negative"]
+        .as_array()
+        .expect("request negatives")
+    {
+        let result = import::validate_job_state_request(&record(
+            &f,
+            v["request"].as_str().expect("request"),
+        ));
+        let actual = result
+            .err()
+            .map(|r| format!("{r:?}"))
+            .unwrap_or_else(|| "OK".into());
+        println!("Read request {}: {} -> control PASS", v["id"], actual);
+        if actual != v["expected"].as_str().expect("expected") {
+            failures.push(format!("Read request {}: {actual}", v["id"]));
+        }
+        import::validate_job_state_request(&record(&f, "job_state_request"))
+            .expect("passing control");
+    }
+    for v in vectors["read_negative"].as_array().expect("read negatives") {
+        let request = record(&f, "job_state_request");
+        let mut response: api::GetImportJobStateResponse =
+            record(&f, v["response"].as_str().expect("response"));
+        if let Some(size) = v["envelope_bytes"].as_u64() {
+            response
+                .retained_proof
+                .as_mut()
+                .expect("proof")
+                .creator_authority_envelopes = vec![vec![1; size as usize]];
+        }
+        let result = import::validate_job_state_response(&request, &response);
+        let actual = result
+            .err()
+            .map(|r| format!("{r:?}"))
+            .unwrap_or_else(|| "OK".into());
+        println!("Read {}: {} -> control PASS", v["id"], actual);
+        if actual != v["expected"].as_str().expect("expected") {
+            failures.push(format!("Read {}: {actual}", v["id"]));
+        }
+        import::validate_job_state_response(
+            &request,
+            &record(&f, v["control"].as_str().expect("control")),
+        )
+        .expect("passing control");
+    }
+    for v in vectors["prepare_negative"]
+        .as_array()
+        .expect("race negatives")
+    {
+        let request = record(&f, v["request"].as_str().expect("request"));
+        let response = record(&f, v["response"].as_str().expect("response"));
+        let result = import::validate_renewal_preparation_from_read(
+            &request,
+            &response,
+            &record(&f, v["read"].as_str().expect("read")),
+        );
+        let actual = result
+            .err()
+            .map(|r| format!("{r:?}"))
+            .unwrap_or_else(|| "OK".into());
+        println!("Prepare {}: {} -> control PASS", v["id"], actual);
+        if actual != v["expected"].as_str().expect("expected") {
+            failures.push(format!("Prepare {}: {actual}", v["id"]));
+        }
+        import::validate_renewal_preparation_from_read(
+            &request,
+            &response,
+            &record(&f, v["control"].as_str().expect("control")),
+        )
+        .expect("passing control");
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
+    let f = fixture();
+    let original = Context::from_export(&f, &record(&f, "complete_renewed_export"));
+    let rotation: api::SignedOwnerKeyTransition = record(&f, "renew_owner_rotation");
+    let canonical = bytes(&f["renew_submission_vectors"]["rotation"]["canonical_hex"]);
+    let digest = codec::hash(&[b"heddle-owner-key-transition-v1", &canonical]);
+    assert_eq!(
+        digest,
+        bytes(&f["renew_submission_vectors"]["rotation"]["digest_hex"])
+    );
+    let next_key = bytes(&f["keys"]["rotated_owner"]["public_key_hex"]);
+    for (key, signature) in [
+        (&original.owner, &rotation.authorizations[0]),
+        (
+            &next_key,
+            rotation
+                .next_authority_key_proof
+                .as_ref()
+                .expect("next PoP"),
+        ),
+    ] {
+        assert_eq!(signature.signer_key_id, codec::key_id(key));
+        codec::verify(key, &digest, &signature.signature).expect("co-signed rotation");
+    }
+    for v in f["renew_submission_vectors"]["passing"]
+        .as_array()
+        .expect("passing")
+    {
+        let request: api::RenewImportJobRequest =
+            record(&f, v["request"].as_str().expect("request"));
+        let read = record(&f, v["read"].as_str().expect("read"));
+        let mut current = Context::new(&f);
+        if v["rotated"].as_bool().expect("rotated") {
+            current.identity = record(&f, "renew_rotated_identity");
+            current.owner = next_key.clone();
+            current.chain = import::owner_chain_digest(&record(&f, "renew_rotated_chain"))
+                .expect("current chain");
+            assert!(matches!(
+                import::verify_renew_submission(
+                    &request,
+                    &read,
+                    &current.owner(1350),
+                    &current.owner(1350)
+                ),
+                Err(codec::Reject::Root)
+            ));
+        }
+        let verified = import::verify_renew_submission(
+            &request,
+            &read,
+            &original.owner(1350),
+            &current.owner(1350),
+        )
+        .expect("historical predecessor and current replacement");
+        assert_eq!(
+            verified.digest(),
+            import::signed_delegation_digest(
+                request
+                    .renewal
+                    .as_ref()
+                    .expect("renewal")
+                    .body
+                    .as_ref()
+                    .expect("body")
+                    .replacement
+                    .as_ref()
+                    .expect("replacement")
+            )
+            .expect("digest")
+        );
+        let wire = request.encode_to_vec();
+        assert_eq!(
+            wire,
+            bytes(&f["wire_vectors"][v["request"].as_str().expect("request")]["wire_hex"])
+        );
+        import::check_renew_replay(&wire, &wire).expect("frozen replay");
+        let mut changed = wire.clone();
+        changed.push(0);
+        assert_eq!(
+            import::check_renew_replay(&changed, &wire),
+            Err(codec::Reject::OperationIdReused)
+        );
+        assert!(matches!(
+            import::verify_renew_submission(
+                &request,
+                &read,
+                &original.owner(1350),
+                &current.owner(1800)
+            ),
+            Err(codec::Reject::Expired)
+        ));
+    }
+}
+
+#[test]
+fn alpha24_job_state_read_is_authenticated_writer_only_and_gated() {
+    use heddle_api::v2::*;
+    let m = method_descriptor("/heddle.api.v1alpha2.IntegrationService/GetImportJobState")
+        .expect("read method");
+    assert_eq!(m.effect, host::RpcEffect::ReadOnly);
+    assert_eq!(m.retry_behavior, host::RetryBehavior::Safe);
+    assert_eq!(
+        m.authorization_access,
+        host::AuthorizationAccess::AuthenticatedPrincipal
+    );
+    assert_eq!(
+        m.authorization.role,
+        host::AuthorizationRole::ResourceWriter
+    );
+    assert_eq!(m.signing_tier, host::SigningTier::ProofOfPossession);
+    assert_eq!(
+        m.authorization.existence,
+        host::AuthorizationExistence::Hide
+    );
+    assert_eq!(m.authorization.targets[0].path, "destination");
+    assert_eq!(
+        m.authorization.targets[0].role,
+        host::AuthorizationRole::ResourceWriter
+    );
+    assert_eq!(
+        m.verify_protocol(&Default::default()),
+        Err(codec::Reject::Protocol)
     );
 }

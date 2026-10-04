@@ -21,11 +21,11 @@ import { canonicalThreadGenesis, threadGenesisId } from '../packages/typescript/
 import { IntegrationService, SyncService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
 import { ProtocolCompatibilitySchema, MandatoryProtocolFeatureSchema, rpc_contract } from '../packages/typescript/dist/common/contract_pb.js';
 import * as owner from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
-import { canonicalHybridV1, signingDigest, signedPermissionDigest, signedGenesisDigest, signedDelegationDigest, signedOperationDigest, manifestDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
+import { canonicalHybridV1, signingDigest, signedPermissionDigest, ownerChainDigest, signedGenesisDigest, signedDelegationDigest, signedOperationDigest, manifestDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import { setSigningBytes, witnessId, statementSigningDigest, leafDigest, merkleRoot, purposeDomain } from '../packages/typescript/dist/v1alpha2/witness-trust.js';
 import { hash, keyId, join, u32, integer, sized, utf8, compare } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
 const hex=v=>Buffer.from(v).toString('hex'),raw=(n,s=32)=>new Uint8Array(s).fill(n),str=s=>utf8.encode(s);
-const keys=Object.fromEntries(['owner','device','job','renew_job','witness','next_witness','root','wrong_root','guardian_a','guardian_b','direct_job','competing_job'].map((name,i)=>{const seed=raw(i+1),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'}),publicKey=new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32));return [name,{seed,privateKey,publicKey}];}));
+const keys=Object.fromEntries(['owner','device','job','renew_job','witness','next_witness','root','wrong_root','guardian_a','guardian_b','direct_job','competing_job','rotated_owner'].map((name,i)=>{const seed=raw(i+1),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'}),publicKey=new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32));return [name,{seed,privateKey,publicKey}];}));
 const sig=(name,input)=>new Uint8Array(sign(null,input,keys[name].privateKey));
 const auth=(name,input)=>({signerKeyId:keyId(keys[name].publicKey),signature:sig(name,input)});
 const artifact={format_version:1,messages:[...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message').map(v=>v.typeName).sort(),descriptors:[],enums:[],protocol:{version:2,feature:1,gated_methods:[...IntegrationService.methods,...SyncService.methods].filter(m=>getOption(m,rpc_contract).mandatoryFeatures.includes(1)).map(m=>`/${m.parent.typeName}/${m.name}`).sort()},keys:Object.fromEntries(Object.entries(keys).map(([n,k])=>[n,{seed_hex:hex(k.seed),public_key_hex:hex(k.publicKey)}])),signed_vectors:{},wire_vectors:{},commitment_vectors:{},raw_commitment_vectors:{},negative_vectors:[],trees:[],retry_scenarios:[]};
@@ -520,6 +520,108 @@ for(const [id,now,preflight,host] of [['behind_at_skew',900,'OK','Expired'],['be
 const wrongReceipt=create(MutationResponseSchema,{receipt:{clientOperationId:commitRequest.clientOperationId,outcome:{case:'pendingOperation',value:{spool:destination,id:'27272727-2727-2727-2727-272727272727'}}}});
 wire('commit_wrong_lineage_response',MutationResponseSchema,wrongReceipt);
 artifact.amendment_vectors.lineage.push({id:'reserved_first_id',lineage_hex:hex(retryLineageId),operation_id:'25252525-2525-2525-2525-252525252525',occupied:false,expected:'OK'},{id:'collision',lineage_hex:hex(retryLineageId),occupied:true,expected:'OperationIdReused'},{id:'nil',lineage_hex:hex(raw(0,16)),occupied:false,expected:'Canonical'});
+// alpha.24: actual Renew submissions and authenticated bounded recovery reads.
+artifact.renew_submission_vectors={passing:[],negative:[],read_negative:[],prepare_negative:[],read_request_negative:[]};
+const retainedPartial=clone(api.ImportPublicProofBundleV1Schema,exportBundle);
+retainedPartial.delegations=[delegation];retainedPartial.renewals=[];
+retainedPartial.memberPermissions=[permission];retainedPartial.operations=[operations.main];
+retainedPartial.terminalManifest=partialManifest;retainedPartial.manifests=[partialManifest];
+retainedPartial.statements=[statements[0],devGenesisAdmission,publicationStatement];
+const retainedEmpty=clone(api.ImportPublicProofBundleV1Schema,initialProof);
+retainedEmpty.terminalManifest=beforePublication;retainedEmpty.manifests=[beforePublication];
+wire('job_state_request',api.GetImportJobStateRequestSchema,create(api.GetImportJobStateRequestSchema,{destination,logicalJobId}));
+const readPartial=wire('job_state_partial',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{state:{...emptyState,committedManifest:partialManifest},retainedProof:retainedPartial}));
+const readEmpty=wire('job_state_empty',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{state:emptyState,retainedProof:retainedEmpty}));
+function renewRequest(name,read,certificate,parent,ownerHistory,ownerChain){
+ const b=clone(api.ImportPublicProofBundleV1Schema,read.retainedProof);
+ b.memberPermission=parent;
+ if(!b.memberPermissions.some(p=>hex(signedPermissionDigest(p))===hex(signedPermissionDigest(parent))))b.memberPermissions.push(parent);
+ b.memberPermissions.sort((a,b)=>compare(signedPermissionDigest(a),signedPermissionDigest(b)));
+ if(ownerHistory)b.ownerHistories.push(ownerHistory);
+ if(ownerChain)b.ownerChain=ownerChain;
+ const r=wire(name,api.RenewImportJobRequestSchema,create(api.RenewImportJobRequestSchema,{clientOperationId:name,destination,renewal:certificate,proof:b}));
+ artifact.renew_submission_vectors.passing.push({id:name,request:name,read:read===readEmpty?'job_state_empty':'job_state_partial',rotated:!!ownerHistory});
+ return r;
+}
+const partialRequest=renewRequest('renew_request_partial',readPartial,renewal,renewedPermission);
+const zeroRequest=renewRequest('renew_request_zero',readEmpty,fromBinary(api.SignedImportJobRenewalV1Schema,Buffer.from(artifact.signed_vectors.recovery_empty_renewal.wire_hex,'hex')),renewedPermission);
+// Retain the old exact state and add a complete, co-signed same-owner rotation.
+const rotation=create(owner.OwnerKeyTransitionSchema,{formatVersion:1,ownerId,previousStateHash:stateHash,sequence:1n,kind:1,nextAuthorityKey:{algorithm:1,publicKey:keys.rotated_owner.publicKey},nextRecoveryPolicy:root.recoveryPolicy,validFromUnixSeconds:1300n,previousKeyValidUntilUnixSeconds:1300n,nonce:raw(0xe1)});
+const rotationCanonical=join(u32(1),sized(ownerId),sized(stateHash),integer(1n),u32(1),encodedKey('rotated_owner'),recovery,integer(1300n,true),integer(1300n,true),sized(rotation.nonce));
+const rotationDigest=hash(str('heddle-owner-key-transition-v1'),rotationCanonical);
+const signedRotation=wire('renew_owner_rotation',owner.SignedOwnerKeyTransitionSchema,create(owner.SignedOwnerKeyTransitionSchema,{transition:rotation,authorizations:[auth('owner',rotationDigest)],nextAuthorityKeyProof:auth('rotated_owner',rotationDigest)}));
+const rotatedHistory=wire('renew_rotated_owner_history',owner.OwnerHistorySchema,create(owner.OwnerHistorySchema,{root:signedRoot,acceptedTransitions:[signedRotation],stateHash:rotationDigest}));
+const rotatedIdentity=wire('renew_rotated_identity',api.ImportIdentityV1Schema,create(api.ImportIdentityV1Schema,{...identity,ownerStateHash:rotationDigest}));
+const rotatedChain=wire('renew_rotated_chain',api.ImportOwnerChainV1Schema,create(api.ImportOwnerChainV1Schema,{...chain,ownerStateHashes:[stateHash,rotationDigest].sort(compare)}));
+const rp=clone(api.ImportMemberPermissionV1Schema,renewedPermissionBody);rp.identity=rotatedIdentity;rp.ownerChainDigest=ownerChainDigest(rotatedChain);rp.notBeforeUnixSeconds=1300n;rp.nonce=raw(0xe2);
+const rotatedParent=signed('renew_rotated_permission',api.ImportMemberPermissionV1Schema,rp,api.SignedImportMemberPermissionV1Schema,'ownerSignature','rotated_owner','heddle-import-member-permission-v1');
+const rd=clone(api.ImportJobDelegationV1Schema,nextBody);rd.identity=rotatedIdentity;rd.ownerChainDigest=rp.ownerChainDigest;rd.parentPermissionDigest=signedPermissionDigest(rotatedParent);rd.notBeforeUnixSeconds=1300n;
+const rotatedChild=signed('renew_rotated_delegation',api.ImportJobDelegationV1Schema,rd,api.SignedImportJobDelegationV1Schema,'delegatingSignature','device','heddle-import-job-delegation-v1');
+const rr=clone(api.ImportJobRenewalV1Schema,renewalBody);rr.replacement=rotatedChild;
+const rotatedRenewal=signed('renew_rotated_renewal',api.ImportJobRenewalV1Schema,rr,api.SignedImportJobRenewalV1Schema,'delegatingSignature','device','heddle-import-job-renewal-v1');
+const rotatedRequest=renewRequest('renew_request_rotated',readPartial,rotatedRenewal,rotatedParent,rotatedHistory,rotatedChain);
+const rrz=clone(api.ImportJobRenewalV1Schema,rr);rrz.committedManifestDigest=manifestDigest(beforePublication);
+const rotatedZeroRenewal=signed('renew_rotated_zero_renewal',api.ImportJobRenewalV1Schema,rrz,api.SignedImportJobRenewalV1Schema,'delegatingSignature','device','heddle-import-job-renewal-v1');
+renewRequest('renew_request_rotated_zero',readEmpty,rotatedZeroRenewal,rotatedParent,rotatedHistory,rotatedChain);
+artifact.renew_submission_vectors.rotation={canonical_hex:hex(rotationCanonical),digest_hex:hex(rotationDigest)};
+for(const [id,control,read,mutate,expected] of [
+ ['candidate_delegation',partialRequest,'job_state_partial',r=>r.proof.delegations.push(next),'Scope'],
+ ['candidate_renewal',partialRequest,'job_state_partial',r=>r.proof.renewals.push(renewal),'Scope'],
+ ['missing_old_parent',partialRequest,'job_state_partial',r=>r.proof.memberPermissions=r.proof.memberPermissions.filter(p=>hex(signedPermissionDigest(p))!==hex(signedPermissionDigest(permission))),'ImportPermission'],
+ ['missing_new_parent',partialRequest,'job_state_partial',r=>r.proof.memberPermissions=[permission],'ImportPermission'],
+ ['extra_parent',partialRequest,'job_state_partial',r=>{r.proof.memberPermissions.push(renewalWideParent);r.proof.memberPermissions.sort((a,b)=>compare(signedPermissionDigest(a),signedPermissionDigest(b)));},'ImportPermission'],
+ ['unsorted_parents',partialRequest,'job_state_partial',r=>r.proof.memberPermissions.reverse(),'ImportPermission'],
+ ['old_alias',partialRequest,'job_state_partial',r=>r.proof.memberPermission=permission,'ImportPermission'],
+ ['missing_original_genesis',partialRequest,'job_state_partial',r=>r.proof.originalGeneses.pop(),'Scope'],
+ ['rebound_genesis_parent',partialRequest,'job_state_partial',r=>r.proof.genesisAuthorities[0].body.parentPermissionDigest=signedPermissionDigest(renewedPermission),'Scope'],
+ ['changed_envelope',partialRequest,'job_state_partial',r=>r.proof.creatorAuthorityEnvelopes[0][0]^=1,'Scope'],
+ ['changed_publication',partialRequest,'job_state_partial',r=>r.proof.operations[0].jobSignature.signature[0]^=1,'Scope'],
+ ['missing_publication_receipt',partialRequest,'job_state_partial',r=>r.proof.statements.pop(),'Scope'],
+ ['snapshot_selector',partialRequest,'job_state_partial',r=>r.proof.terminalManifest=beforePublication,'Scope'],
+ ['missing_snapshot',partialRequest,'job_state_partial',r=>r.proof.manifests=[],'Scope'],
+ ['stale_predecessor',partialRequest,'job_state_partial',r=>r.renewal.body.predecessorDelegationDigest=raw(0xee),'StaleContext'],
+ ['stale_epoch',partialRequest,'job_state_partial',r=>r.renewal.body.expectedAuthorityEpoch++,'StaleContext'],
+ ['stale_manifest',partialRequest,'job_state_partial',r=>r.renewal.body.committedManifestDigest=manifestDigest(beforePublication),'StaleManifest'],
+ ['zero_missing_manifest',zeroRequest,'job_state_empty',r=>r.proof.terminalManifest=undefined,'Scope'],
+ ['zero_invented_publication',zeroRequest,'job_state_empty',r=>r.proof.operations.push(operations.main),'Scope'],
+ ['missing_old_owner',rotatedRequest,'job_state_partial',r=>r.proof.ownerHistories.shift(),'Root'],
+ ['missing_current_owner',rotatedRequest,'job_state_partial',r=>r.proof.ownerHistories.pop(),'Root'],
+ ['wrong_current_chain',rotatedRequest,'job_state_partial',r=>r.proof.ownerChain=chain,'Root'],
+ ['wrong_destination',partialRequest,'job_state_partial',r=>r.destination.id='24242424-2424-2424-2424-242424242424','Scope'],
+ ['operation_id_byte_bound',partialRequest,'job_state_partial',r=>r.clientOperationId='é'.repeat(65),'Canonical'],
+ ['request_byte_bound',partialRequest,'job_state_partial',r=>r.proof.creatorAuthorityEnvelopes=[raw(1,2097153)],'Bounds'],
+ ['missing_operation_id',partialRequest,'job_state_partial',r=>r.clientOperationId='','Canonical'],
+ ['permission_bound',partialRequest,'job_state_partial',r=>r.proof.memberPermissions=Array(65).fill(permission),'Bounds'],
+ ['proof_byte_bound',partialRequest,'job_state_partial',r=>r.proof.creatorAuthorityEnvelopes=[raw(1,1048577)],'Bounds'],
+ ['original_binding_ref',partialRequest,'job_state_partial',r=>r.renewal.body.replacement.body.branchManifest[0].genesisAuthorityDigest=raw(0xee),'GenesisBinding'],
+]){
+ const name=`renew_request_bad_${id}`,r=clone(api.RenewImportJobRequestSchema,control);mutate(r);
+ const oversized=id==='proof_byte_bound'?1048577:id==='request_byte_bound'?2097153:0;
+ if(!oversized)wire(name,api.RenewImportJobRequestSchema,r);
+ artifact.renew_submission_vectors.negative.push({id,request:oversized?control.clientOperationId:name,read,expected,control:control.clientOperationId,...(oversized?{envelope_bytes:oversized}:{})});
+}
+for(const [id,read,mutate,expected] of [
+ ['response_byte_bound',readEmpty,r=>r.retainedProof.creatorAuthorityEnvelopes=[raw(1,2097153)],'Bounds'],
+ ['absent_empty_manifest',readEmpty,r=>r.state.committedManifest=undefined,'Canonical'],
+ ['missing_retained_proof',readEmpty,r=>r.retainedProof=undefined,'Canonical'],
+ ['snapshot_mismatch',readPartial,r=>r.retainedProof.terminalManifest=beforePublication,'StaleContext'],
+ ['active_history_mismatch',readPartial,r=>r.retainedProof.delegations=[next],'StaleContext'],
+ ['missing_genesis_parent',readEmpty,r=>r.retainedProof.memberPermissions=[],'ImportPermission'],
+ ['missing_old_owner_evidence',readEmpty,r=>r.retainedProof.ownerHistories=[],'Root'],
+ ['nil_job_id',readEmpty,r=>r.state.logicalJobId=raw(0,16),'StaleContext'],
+ ['retained_byte_bound',readEmpty,r=>r.retainedProof.creatorAuthorityEnvelopes=[raw(1,1048577)],'Bounds'],
+]){const name=`job_state_bad_${id}`,r=clone(api.GetImportJobStateResponseSchema,read);mutate(r);const oversized=id==='retained_byte_bound'?1048577:id==='response_byte_bound'?2097153:0;
+ if(!oversized)wire(name,api.GetImportJobStateResponseSchema,r);
+ artifact.renew_submission_vectors.read_negative.push({id,response:oversized?'job_state_empty':name,expected,control:read===readEmpty?'job_state_empty':'job_state_partial',...(oversized?{envelope_bytes:oversized}:{})});}
+for(const [id,mutate,expected] of [
+ ['nil_job',r=>r.logicalJobId=raw(0,16),'Canonical'],
+ ['job_width',r=>r.logicalJobId=raw(1,15),'Canonical'],
+ ['missing_destination',r=>r.destination=undefined,'Scope'],
+ ['noncanonical_destination',r=>r.destination.id='x'.repeat(36),'Scope'],
+ ['request_bound',r=>r.destination.id='x'.repeat(4096),'Bounds'],
+]){const r=create(api.GetImportJobStateRequestSchema,{destination,logicalJobId});mutate(r);const name=`job_state_request_bad_${id}`;wire(name,api.GetImportJobStateRequestSchema,r);artifact.renew_submission_vectors.read_request_negative.push({id,request:name,expected,control:'job_state_request'});}
+const renewalPrepareRequest=wire('renew_prepare_request',api.PrepareImportJobRequestSchema,create(api.PrepareImportJobRequestSchema,{...prepareRequest,proposedScope:nextBody.scope,renewLogicalJobId:logicalJobId}));
+artifact.renew_submission_vectors.prepare_negative.push({id:'publication_race',request:'renew_prepare_request',response:'renewal_preparation',read:'job_state_empty',expected:'StaleContext',control:'job_state_partial'});
 for(const [name,v] of Object.entries(artifact.signed_vectors)){const domains={SignedImportMemberPermissionV1:'heddle-signed-import-member-permission-v1',SignedImportGenesisAuthorityV1:'heddle-signed-import-genesis-authority-v1',SignedImportJobDelegationV1:'heddle-signed-import-job-delegation-v1',SignedDelegatedImportOperationV1:'heddle-signed-delegated-import-operation-v1'};const domain=domains[v.schema.split('.').at(-1)];if(domain){const schema=api[v.schema.split('.').at(-1)+'Schema'],value=(await import('@bufbuild/protobuf')).fromBinary(schema,new Uint8Array(Buffer.from(v.wire_hex,'hex')));commitment(`signed_${name}`,schema,value,domain);}}
 const checks={forged_wrong_root:'root_signature',root_signed_invalid_current_set:'current_entry_has_no_archive_seal',job_key_as_witness:'known_job_key_role',encoded_job_role_as_witness:'witness_role_enum',set_rollback_below_persisted_high_water:'persisted_generation_high_water',retired_seed_backdating_new_leaf:'exact_retirement_leaf_inclusion',retired_key_cannot_admit_new_work:'current_issuance_window',revoked_key_rejects_exact_history:'revoked_tombstone',delegation_target_scope_violation:'exact_operation_target_scope',expired_delegation:'new_operation_validity_window',renewal_forks_logical_job:'logical_job_lineage',renewal_resets_result_budget:'remaining_operation_budget'};
 for(const v of artifact.negative_vectors)v.first_failing_check=checks[v.id];

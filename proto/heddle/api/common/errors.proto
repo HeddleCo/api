@@ -57,6 +57,7 @@ enum ErrorReason {
   ERROR_REASON_OPERATION_ID_REUSED = 501;
   ERROR_REASON_VERSION_CONFLICT = 502;
   ERROR_REASON_ALREADY_EXISTS = 503;
+  ERROR_REASON_IMPORT_SOURCE_REQUIRES_COMMIT = 504;
 
   // Flow control (6xx). RATE_LIMITED / QUOTA_EXCEEDED are retryable;
   // CURSOR_INVALID is a client-fix (restart from a valid cursor), not retryable.

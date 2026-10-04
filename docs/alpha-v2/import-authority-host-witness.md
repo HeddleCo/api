@@ -118,6 +118,19 @@ histories/handoffs and checks the selected current or witnessed accepted owner;
 an incoming commitment alone proves nothing. Permission and genesis/delegation
 bindings include this digest. Public proofs retain the full signed histories.
 
+The endpoint algorithm matches heddle#1964: form the sorted unique union of
+(1) the verified keyring's owner-state hash, (2) the independently selected
+accepted owner's state hash, and (3) the endpoint state hash of each carried,
+verified transfer-owner history. Take transfer audit hashes from the verified
+keyring's transfers in their accepted order. Do not include every intermediate
+rotation hash. Transfer sequence is the accepted transfer count; rotations do
+not increment it. A rotated but never-transferred Spool, with keyring and selected
+history both ending at the same current state and no extra transfer histories,
+uses **only that current state hash** and an empty audit list. If the keyring ends
+at an older accepted state and the selected history extends it, include both
+endpoints. The complete root/rotation/transfer signatures must still be retained
+and verified; endpoint commitments do not permit truncating history.
+
 **The missing member permission is a new, direct, typed owner → device grant:**
 `ImportMemberPermissionV1`, owner-signed under its own new domain. It grants
 both exact genesis binding and IMPORT_CONVERSION_V1 delegation for **one logical
@@ -148,6 +161,29 @@ The host accounts by `(permission digest, logical job)` and by
 delegation or retry row. Reissuing permission for the same logical job cannot
 reset its durable original limits. Only the direct active owner can issue the
 member permission; a member cannot turn its own delegation into another parent.
+
+A renewed parent MUST cover only remaining scope: a subset of the predecessor's
+scope, excluding every committed `(ref, slot)` and subtracting consumed operation
+and result-byte budgets. It may contain a narrower replacement child, but MUST
+NOT regrant the original full scope. Durable original job limits continue to
+apply across all parents. Retain the original signed parent/envelope for genesis
+verification; never rewrite those originals to match a renewal.
+
+At first issuance, generate `cancellation_id` using a CSPRNG as 32 random bytes
+in `heddle-import-cancel-v1`; persist it for the same logical-job/retry-lineage/
+grantee public-key lineage. Every reissued permission in that lineage MUST reuse
+that cancellation ID. A different lineage receives an independently generated
+ID. Each **new grant** MUST use a fresh CSPRNG-generated 32-byte `nonce`, including
+renewals with otherwise identical fields; never use a counter, timestamp or
+permission digest as a nonce. Issuers must prevent nonce reuse across grants.
+Retransmission/idempotent replay of an existing grant preserves its entire signed
+bytes, including nonce and signature; it is not a new issuance. A renewal may
+reuse that exact still-valid parent only when it already covers remaining scope;
+a changed signed grant must have a fresh nonce. Portable helpers
+check widths and same-lineage cancellation-ID stability/nonce inequality at
+renewal; they cannot prove entropy. Revoking the stable permission cancellation
+ID invalidates every reissue/descendant in that lineage. The delegation's separate
+host-issued cancellation ID is checked independently.
 Known user authority, descriptor-root and all CURRENT/RETIRED/REVOKED witness
 keys are forbidden as job signers. Known job keys cannot join a witness set.
 Persist job-key → logical-job associations in issuer custody and receiver trust
@@ -162,13 +198,51 @@ binding and the manifest. During renewal, retained genesis bindings are checked
 against their ORIGINAL delegation/accepted owner context, never rewritten to
 match the renewed key or owner state.
 
+Genesis envelope dispatch is explicit. For member/device import authority, use
+`UTF8("heddle-signed-import-member-permission-v1\0") || canonicalHybridV1(SignedImportMemberPermissionV1)`:
+the complete original signed permission, including its owner signature, and bind
+SHA-256 of those exact envelope bytes. A device's unrelated ThreadControlAuthority
+cannot replace it. For direct-owner authority (no member permission), retain the
+original native account genesis authority envelope and verify it through the
+native `thread_control_authority::verify_genesis_with_retained_mint_roots` path;
+an empty or arbitrary envelope is refused. Preserve that envelope's original
+`/heddle.api.v1alpha2.IntegrationService/ImportSource` signed method context.
+Commit carries these retained originals without rewriting their context; closing
+the ImportSource RPC does not reopen it or invalidate retained provenance.
+Both paths still verify the native creator signature, exact genesis binding and
+manifest independently.
+
 `DelegatedImportOperationV1` is a NEW typed converted result. The job key signs
 its exact logical job, original retry lineage, physical operation ID, signed
 certificate digest, ref/slot, observed Git OID AND hash algorithm, original genesis,
 target and expected/result frontiers, content digest/byte count, options/converter.
 PINNED_COMMIT authorizes the exact raw 20-byte SHA1 or 32-byte SHA256 commit;
-OBSERVE_AT_EXECUTION has an empty pinned OID and is explicitly disclosed before
-signing. No implicit mutable-ref authorization exists. A URL/ref signature does
+**Whenever the exact selected commit OID is known, the caller MUST pin it.**
+Failed pinning, stale observations and empty OIDs never authorize a silent
+downgrade. OBSERVE_AT_EXECUTION is only an explicit fallback when the caller
+cannot obtain the OID. Before signing, disclose this fixed promise:
+
+> The exact commit is unavailable. This branch may move before execution. The
+> import will convert the commit observed when the job executes, which may differ
+> from the commit you saw when selecting the branch.
+
+The caller must explicitly select and sign that fallback. Each observe branch
+has an empty `pinned_commit_oid`, an explicit hash algorithm and
+`ref_disclosure = IMPORT_REF_DISCLOSURE_OBSERVE_AT_EXECUTION (1)`.
+Pinned branches require `ref_disclosure = UNSPECIFIED (0)`. Field 10 of
+`ImportBranchLimitV1` appends **u32be(ref_disclosure)** to its canonical layout;
+the parent scope, prepared scope and signed manifest all bind it. A genuine
+delegation signature without the marker still rejects with `RefDisclosure`.
+The result retains its exact observed OID and algorithm.
+
+`validate_ref_selection` / `validateImportRefSelection` additionally take an
+independently known OID available when choosing the scope. They reject observe
+mode or a different pin with `RefPinning`; None/undefined supplies no consent
+and never changes the mode. A receiver cannot prove UI consent or discover an
+undisclosed locally known OID from signed bytes alone. It verifies the explicit
+marker, signatures and mode; authoring clients and hosts with that independent
+knowledge must enforce exact pinning. No implicit mutable-ref authorization
+exists. A URL/ref signature does
 not prove deterministic Git conversion or original Git authorship; those require
 retained objects and a mapping verifier, or the disclosed trust in the converter.
 
@@ -191,6 +265,124 @@ reservation expires exclusively at prepare time + **3600 seconds**. No prepared
 job executes until Commit verifies the complete user-signed proposal/chain,
 original branches, current permission and budgets. The browser closes only after
 this authorization. A proposal change requires fresh preparation and signature.
+
+### Configuration and caller-selected scope (api#327 G2)
+
+Call authenticated `GetImportConfiguration(destination)` before choosing the
+scope. It requires destination write permission and request PoP, hides unavailable
+destinations, and returns one complete bounded snapshot. A dedicated unary RPC
+keeps this small configuration independent of provider inventory paging and
+observation replacement/resume. It is an ordinary read; the eight existing
+mandatory-feature import gates remain unchanged. Discovery grants no execution
+authority, and Prepare rechecks current support and policy.
+
+The response carries 1–32 converters ordered uniquely by exact ASCII version,
+each with a versioned converter-owned `options_encoding`, 1–64 sorted unique
+`canonical_options` byte sequences (at most 4096 bytes each), and `default_options`
+equal to one of those sequences. These are the complete supported choices; a
+default is explicit even when empty. The encoding identifies the converter's
+public versioned byte specification. For `heddle-import-options-empty-v1`, the
+only canonical value is the zero-length sequence. This fixture converter is an
+example, never a universal server version/default. Other encodings require their
+own specification; select returned octets verbatim instead of reserializing JSON
+or protobuf. Compute `options_digest` using `conversion_options_digest` /
+`conversionOptionsDigest` and the preimage below. Responses are at most 1 MiB;
+do not truncate supported choices.
+
+Positive host limits cover branches, logical-job operations, total result bytes
+and per-branch result bytes. They cannot exceed 256 branches/operations or 1 GiB
+total, and per-branch bytes cannot exceed the host total. The caller chooses
+**every** scope field: provider/URL, exact ordered branches and ref disclosure,
+converter/options, stable slot IDs, per-branch and total budgets, targets and
+explicit Thread-specific frontier commitments. There are no omitted-field
+defaults or host-allocated slots. Prepare accepts these choices byte-for-byte
+or refuses; even budget reductions or equivalent normalization are forbidden.
+
+The one exception is `proposed_scope.destination_version`: empty asks the host
+to issue the opaque current **32-byte destination CAS token** in its preparation
+transaction; exactly 32 bytes asks it to compare with the current token and echo
+it unchanged. Other lengths are INVALID_SCOPE. A mismatched token returns
+DESTINATION_CONFLICT. This is neither an overview version, a hash, zero32 sentinel
+nor a caller-generated token. No other scope field can be filled. Commit binds
+the returned token in its signed delegation and compares it with current
+destination state atomically; a changed destination requires new preparation
+and signatures. Renewal requests can supply the existing exact signed token;
+no token may be substituted around remaining-scope/non-amplification checks.
+
+Success carries a proposal and no refusal. Refusal carries only
+`ImportPreparationRefusalV1` with a nonzero typed reason and bounded field path:
+INVALID_SCOPE, UNSUPPORTED_CONVERTER, UNSUPPORTED_OPTIONS, BUDGET_EXCEEDED,
+DESTINATION_CONFLICT or POLICY_DENIED. It reserves no key/job, returns no proposal,
+bounds or renewal state, and activates nothing. Authentication and hidden-resource
+failures retain ordinary CallFailure handling without leaking policy details.
+`prepare_scope` / `prepareImportScope` enforce support, bounds and CAS;
+`validate_preparation_response` / `validateImportPreparationResponse` compare
+the request and response before signing and reject changed choices with
+`PreparedFields`. Configuration changes require a fresh Prepare/client operation
+ID, never a changed response to an idempotent prepared reservation.
+
+The caller generates and persists a fresh non-nil UUID with a CSPRNG (for example
+`crypto.randomUUID()`), encodes its 16 raw bytes as `retry_lineage_id`, and uses
+it as the **reserved first physical operation ID**. Prepare reserves that exact
+UUID for the caller/job/destination. An existing reservation or physical operation
+owned by another request/job is a collision: refuse `OPERATION_ID_REUSED` without
+allocating another UUID or activating work. An exact caller-scoped Prepare replay
+returns its original reservation. Commit MUST create that same physical operation
+and return its canonical lowercase hyphenated UUID as `pending_operation.id`.
+Prepare/Commit `client_operation_id` values remain separate request idempotency
+keys. Renewal and physical retries retain the original lineage UUID, even when
+later physical attempts have other IDs. `initial_operation_id` /
+`initialImportOperationId` check UUID shape and transactional occupancy inputs;
+the response helpers enforce receipt equality.
+
+### Complete initial submission (api#327 G1)
+
+**Prepare → sign → CommitImportJob is sufficient.** Commit carries required
+`ProviderRepository source` and optional `initial_base_state` along with its
+proof. The host revalidates public-source URL rules or the current authenticated
+connection, repository and exact user-granted installation before selecting
+provider custody. It binds the resolved provider and exact credential-free
+clone URL to the signed scope. Projection hints do not authorize provider access.
+Public sources have no connection/installation and cannot claim to be private;
+their repository ID is empty or the exact clone URL. Connected sources carry an
+account-scoped connection and exact repository/installation IDs.
+
+The proof's `original_geneses`, `creator_authority_envelopes` and
+`genesis_authorities` are ordered one-to-one with the signed branch manifest,
+with exactly one initial delegation and its exact parent permission (or direct
+owner). This is the single branch carrier. Preserve each original creator
+signature and verify native IDs, envelope commitments and manifest bindings.
+Do not regenerate geneses or submit another branches payload. The optional base
+is a canonical synthetic empty native State, at most 4096 bytes, whose native ID
+equals the base in **every** original genesis. If absent, the exact base closure
+must already be hosted. Nonempty closures use SyncService publication.
+
+Under one authorization/destination/reservation transaction, Commit persists
+source/base and verified authority, installs epoch 1, creates the initial
+physical operation whose ID equals `retry_lineage_id` and makes it runnable. Its successful
+`MutationResponse.receipt` MUST contain `pending_operation` for that created
+operation in the destination Spool, never an `applied` acknowledgement. Failure
+leaves no activated job, operation or partial branch publication.
+
+Commit's caller-scoped `client_operation_id` is its own idempotency key, distinct
+from Prepare's. Persist the exact request and receipt with activation. Exact
+replay returns that same operation/receipt without creating work or advancing an
+epoch, including after expiry, cancellation or response loss. Look up the durable
+idempotency row **before** current-authority revalidation; this replay is an
+acknowledgement of committed submission, not fresh execution authority. Any
+changed request under that ID fails OPERATION_ID_REUSED. `check_commit_replay` /
+`checkImportCommitReplay` and response helpers check these invariants; the host
+owns durable serialization, current authorization and atomicity.
+
+`ImportSource` is closed: after authentication/authorization it always fails
+FAILED_PRECONDITION with `ERROR_REASON_IMPORT_SOURCE_REQUIRES_COMMIT`. It cannot
+create or attach to a reservation, alias Commit or activate work. Its duplicate
+branch message and fields 8/9 are removed/reserved. Use RetryImportSource for a
+failed existing physical operation and explicit RenewImportJob when required.
+`verify_commit_submission` / `verifyImportCommitSubmission` compose source/
+original validation with the stored-preparation/signature checks. Native canonical
+State/genesis validation, independently selected owner history, live source
+grants and transaction fences remain the hosted consumer's gates.
 
 ### Exact Prepare/Commit delegation boundary (api#321)
 
@@ -246,6 +438,21 @@ Commit time and contain the entire child window, and the child's expiry cannot
 exceed the independently verified owner authority expiry. Use checked/widened
 integer arithmetic, including extreme uint64 duration/skew advertisements.
 
+Browser signing uses the separate `preflight_prepared_delegation` /
+`preflightPreparedImportDelegation`, with browser clock `B`. It checks exact
+proposal/manifest, signatures, scope attenuation and prospective signed windows:
+`0 <= B`, `A <= B + S`, `B < R`, `A - S <= N <= B + S`, `N < E`, `B < E`,
+`E - N <= D`, `R = A + 3600`. Parent not-before may be up to `B + S` (so a
+parent beginning at A is usable when `A-S <= B < A`); parent expiry MUST still be
+strictly greater than B and contain the entire child window. Owner expiry still
+bounds child and parent. This is prospective signing validation, returns **no
+executable/admitted authority**, and asserts no historical acceptance. It does
+not invent a host admission time. Native originals and retained renewal genesis
+contexts remain independently required. The host verifier continues to require
+`T >= A`, parent validity at actual host T, strict exclusive expiry and all
+activation gates. Neither browser preflight nor host skew permits execution
+before the child's exact signed not-before.
+
 `verify_prepared_delegation` (Rust) / `verifyPreparedImportDelegation` (TS) take
 the **host-stored** response, signed child, exact parent permission (if any),
 signed genesis bindings and independently verified current owner expectation.
@@ -289,7 +496,7 @@ permission to reset branch identities, first receipts, budgets or result slots.
 The request's logical-job, active certificate digest and expected authority epoch
 must match the receiver-owned association; row IDs alone establish no authority.
 
-After expiry/cancellation, new uncommitted work requires user-signed
+After expiry, new uncommitted work requires user-signed
 `ImportJobRenewalV1` AND its signed replacement delegation. Renewal binds the
 exact predecessor certificate, expected authority epoch and digest of the complete
 durable committed-slot manifest. It preserves logical job, retry lineage, Spool
@@ -298,6 +505,26 @@ proofs; uses a **fresh** subordinate key/delegation ID; excludes committed slots
 and reduces remaining operation/byte budgets by already consumed work. A current
 owner/permission chain is independently required for the replacement. Permission
 renewal does not resurrect a revoked device or reset accounting.
+Explicit job cancellation is terminal and cannot be renewed.
+
+Recovery from an expired predecessor requires no publication receipt.
+`verify_renewal_predecessor` / `verifyImportRenewalPredecessor` consume the exact
+authenticated Prepare `ImportJobCasStateV1` snapshot and independently verified
+predecessor owner context. They check original delegation/parent signatures,
+identity, key roles, scope attenuation and window structure, without checking
+old execution eligibility at a fabricated timestamp. Their distinct opaque
+`VerifiedImportRenewalPredecessor` is **non-executable** and proves neither
+current authority nor historical admission. It commits to exact predecessor
+signed digest, logical job, lineage, positive epoch and complete committed
+manifest (including an empty manifest before any publication).
+`verify_renewal_from_state` / `verifyImportRenewalFromState` require that same
+snapshot, verify the renewal's predecessor/epoch/manifest CAS and all remaining
+scope/parent rules, and require currently valid replacement authority. Initial
+original genesis bindings/envelopes retain their independently verified original
+context. The host MUST still reject terminal/revoked jobs and recheck current
+replacement authority, active predecessor, epoch, manifest, original limits and
+activation CAS in one transaction. A locally coherent snapshot alone is not
+an authenticated host state or an admission receipt.
 
 Activation, cancellation, publication, slot uniqueness, frontier CAS and worker
 lease/generation checks run under the SAME database transaction fence. Activation
@@ -752,7 +979,7 @@ the pinned codec's representation and exact parse/re-encode equality.
 The locked `tools/hybrid-native` tool uses published `heddle-api
 0.31.0-alpha.19`, `heddle-thread-api 0.28.7`, `heddle-object-model 0.28.7`,
 `heddle-crypto 0.28.7`, `heddleco-capability-verifier 0.28.7`, and
-`heddle-biscuit-verifier 0.28.7`. On 2026-10-03 the complete 0.28.7 crate set
+`heddle-biscuit-verifier 0.28.7`. Rechecked on 2026-10-04: the complete 0.28.7 crate set
 and alpha.19 are published; 0.28.7 requires exactly alpha.19,
 so 0.28.7/alpha.19 is the newest compatible published pair. Maintenance
 generation uses these codecs. `tools/verify.sh` runs its
@@ -857,7 +1084,26 @@ Failed CAS, Prepare, physical retries and exact replays never increment it.
 Publication changes the cumulative manifest atomically while preserving the
 current authority epoch; its slot/manifest CAS is separate from that epoch.
 Expiry closes issuance without silently incrementing epoch. Overflow rejects.
-No renewal after explicit cancellation may reactivate the job. The signed
+Cancel's `cancellation_id` MUST equal the ACTIVE delegation's host-issued ID;
+parent permission IDs and retained predecessor IDs are not selectors for this RPC.
+Under the cancellation transaction, compare the logical job/destination and
+expected epoch before the selector: a stale epoch refuses `StaleContext`, with
+no mutation; a correct epoch with mismatched selector refuses `Scope`, with no
+mutation. A new request for an already terminal cancelled job refuses `Revoked`
+after its context/selector checks (FAILED_PRECONDITION/LIFECYCLE_STATE).
+Success cancels the whole logical job, advances
+the epoch once, fences every worker and preserves committed originals/receipts.
+Persist the exact caller-scoped request and receipt atomically. Exact replay is
+resolved **before** epoch/terminal/selector revalidation and returns that receipt
+without advancing the epoch, including when the original expected epoch is now
+stale. Changed inputs under the same client operation ID refuse
+`OPERATION_ID_REUSED`. `check_cancel_request` / `checkImportCancelRequest` and
+replay helpers supply the portable checks; the host owns the transaction.
+Independent revocation of either the parent permission's cancellation ID or the
+active delegation's ID still invalidates execution/renewal authority; Cancel's
+selector rule does not weaken those checks. `check_import_revocations` /
+`checkImportRevocations` check both against the independently selected revocation
+set. No renewal after explicit cancellation may reactivate the job. The signed
 predecessor digest, epoch, committed manifest and current policy/authority fences
 are all required. A response lost after activation is reread through Prepare;
 it never causes another activation of the original CAS candidate.

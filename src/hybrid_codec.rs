@@ -32,6 +32,20 @@ pub enum Reject {
     Scope,
     #[error("prepared frozen fields changed")]
     PreparedFields,
+    #[error("preparation refused: {0:?}")]
+    PreparationRefused(crate::heddle::api::v1alpha2::ImportPreparationRefusalReason),
+    #[error("observe mode lacks its signed disclosure")]
+    RefDisclosure,
+    #[error("known commit must be pinned exactly")]
+    RefPinning,
+    #[error("missing or mismatched provider source selection")]
+    SourceSelection,
+    #[error("ImportSource requires CommitImportJob")]
+    ImportSourceRequiresCommit,
+    #[error("client operation ID was reused with changed inputs")]
+    OperationIdReused,
+    #[error("Commit must return its created pending operation")]
+    PendingOperation,
     #[error("delegation window exceeds prepared host bounds")]
     ValidityBounds,
     #[error("genesis binding does not match prepared branch")]

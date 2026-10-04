@@ -25,7 +25,7 @@ export interface ThreadGenesisSigner {
 
 /** Exact rmp-serde named ThreadGenesis bytes. The owner/account choice is
  * immutable and must agree with the independently verified authority envelope
- * supplied to StartThread or ImportSource. */
+ * supplied to StartThread or CommitImportJob. */
 export function canonicalThreadGenesis(input: ThreadGenesisInput, creatorKey: Uint8Array): Uint8Array {
   const spool = uuid(input.spoolId);
   const creator = fixed(creatorKey, 32);

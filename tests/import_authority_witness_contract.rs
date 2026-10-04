@@ -136,6 +136,256 @@ fn record<T: Message + Default>(f: &Value, name: &str) -> T {
     };
     codec::strict_decode(&bytes(&v["wire_hex"]), import::MAX_BUNDLE_BYTES).expect("fixed wire")
 }
+
+#[test]
+fn submission_observe_requires_signed_disclosure() {
+    let f = fixture();
+    let mut scope: api::ImportPermissionScopeV1 = record(&f, "scope");
+    import::validate_scope(&scope).expect("pinned control");
+    scope.branches[0].ref_mode = 2;
+    scope.branches[0].pinned_commit_oid.clear();
+    assert!(
+        import::validate_scope(&scope).is_err(),
+        "observe mode must carry the signed disclosure"
+    );
+}
+
+#[test]
+fn submission_changed_prepare_scope_is_rejected() {
+    let f = fixture();
+    let request = record(&f, "prepare_request");
+    assert_eq!(
+        import::validate_preparation_response(
+            &request,
+            &record(&f, "prepare_changed_converterVersion")
+        ),
+        Err(codec::Reject::PreparedFields)
+    );
+    import::validate_preparation_response(&request, &record(&f, "commit_preparation"))
+        .expect("unchanged control");
+}
+
+#[test]
+fn submission_commit_requires_source() {
+    let f = fixture();
+    assert_eq!(
+        import::validate_commit_request(&record(&f, "submission_missing_source"), "github"),
+        Err(codec::Reject::SourceSelection)
+    );
+    import::validate_commit_request(&record(&f, "commit_request"), "github")
+        .expect("complete control");
+}
+
+#[test]
+fn submission_import_source_is_closed() {
+    let f = fixture();
+    assert_eq!(
+        import::validate_import_source(&record(&f, "import_source_misuse")),
+        Err(codec::Reject::ImportSourceRequiresCommit)
+    );
+    import::validate_commit_request(&record(&f, "commit_request"), "github")
+        .expect("Commit control");
+}
+
+#[test]
+fn submission_contract_vectors() {
+    let f = fixture();
+    let request: api::PrepareImportJobRequest = record(&f, "prepare_request");
+    let response: api::PrepareImportJobResponse = record(&f, "commit_preparation");
+    for v in f["submission_vectors"]["changed_preparations"]
+        .as_array()
+        .expect("scope changes")
+    {
+        let changed = record(&f, v["response"].as_str().expect("response"));
+        assert_eq!(
+            import::validate_preparation_response(&request, &changed),
+            Err(codec::Reject::PreparedFields)
+        );
+        println!(
+            "SUBMISSION REJECT prepare.{}: PreparedFields",
+            v["id"].as_str().expect("field")
+        );
+        import::validate_preparation_response(&request, &response).expect("exact scope control");
+        println!(
+            "SUBMISSION PASS prepare.{}: unchanged control",
+            v["id"].as_str().expect("field")
+        );
+    }
+    let issue_token: api::PrepareImportJobRequest = record(&f, "prepare_issue_token");
+    import::validate_preparation_response(&issue_token, &response).expect("host-issued token");
+    let scope: api::ImportPermissionScopeV1 = record(&f, "scope");
+    let mut unknown_refusal: api::PrepareImportJobResponse =
+        record(&f, "prepare_refusal_converter");
+    unknown_refusal.refusal.as_mut().expect("refusal").reason = 99;
+    assert_eq!(
+        import::validate_preparation_response(&request, &unknown_refusal),
+        Err(codec::Reject::Version)
+    );
+    let config = record(&f, "import_configuration");
+    let selected = import::prepare_scope(
+        issue_token.proposed_scope.as_ref().expect("scope"),
+        &config,
+        &scope.destination_version,
+    )
+    .expect("issued CAS");
+    assert_eq!(selected, scope);
+    assert!(
+        issue_token
+            .proposed_scope
+            .as_ref()
+            .expect("scope")
+            .destination_version
+            .is_empty()
+    );
+    for v in f["submission_vectors"]["scope_refusals"]
+        .as_array()
+        .expect("refusals")
+    {
+        let bad = record(&f, v["scope"].as_str().expect("scope"));
+        let config = record(&f, v["configuration"].as_str().expect("config"));
+        let reason = api::ImportPreparationRefusalReason::try_from(
+            v["reason"].as_i64().expect("reason") as i32,
+        )
+        .expect("typed reason");
+        assert_eq!(
+            import::prepare_scope(&bad, &config, &scope.destination_version),
+            Err(codec::Reject::PreparationRefused(reason))
+        );
+        let refused = record(
+            &f,
+            &format!("prepare_refusal_{}", v["id"].as_str().expect("id")),
+        );
+        assert_eq!(
+            import::validate_preparation_response(&request, &refused),
+            Err(codec::Reject::PreparationRefused(reason))
+        );
+        import::prepare_scope(&scope, &config, &scope.destination_version).expect("scope control");
+        println!(
+            "SUBMISSION REJECT then PASS scope.{}: {reason:?}",
+            v["id"].as_str().expect("id")
+        );
+    }
+    for v in f["submission_vectors"]["commit_negatives"]
+        .as_array()
+        .expect("commit negatives")
+    {
+        let bad = record(&f, v["request"].as_str().expect("request"));
+        let actual = import::validate_commit_request(&bad, "github");
+        assert_eq!(
+            format!("{:?}", actual.expect_err("negative")),
+            v["expected"].as_str().expect("reason")
+        );
+        println!(
+            "SUBMISSION REJECT commit.{}: {:?}",
+            v["id"].as_str().expect("id"),
+            actual.expect_err("negative")
+        );
+        import::validate_commit_request(&record(&f, "commit_request"), "github")
+            .expect("complete Commit control");
+        println!(
+            "SUBMISSION PASS commit.{}: complete control",
+            v["id"].as_str().expect("id")
+        );
+    }
+    for name in ["commit_hosted_base", "commit_public_source"] {
+        import::validate_commit_request(&record(&f, name), "github")
+            .expect("optional base / public source");
+    }
+    let commit: api::CommitImportJobRequest = record(&f, "commit_request");
+    let c = Context::new(&f);
+    import::verify_commit_submission(&commit, &response, "github", &c.owner(1100))
+        .expect("complete signed initial submission");
+    assert_eq!(
+        import::validate_commit_request(&commit, "gitlab"),
+        Err(codec::Reject::SourceSelection)
+    );
+    let pending = record(&f, "commit_response");
+    import::check_commit_replay(&commit, &commit, &pending).expect("exact replay");
+    let mut changed = commit.clone();
+    changed.initial_base_state.clear();
+    assert_eq!(
+        import::check_commit_replay(&changed, &commit, &pending),
+        Err(codec::Reject::OperationIdReused)
+    );
+    let applied = api::MutationResponse {
+        receipt: Some(api::MutationReceipt {
+            client_operation_id: commit.client_operation_id.clone(),
+            outcome: Some(api::mutation_receipt::Outcome::Applied(
+                api::Applied::default(),
+            )),
+            ..Default::default()
+        }),
+    };
+    assert_eq!(
+        import::validate_commit_response(&commit, &applied),
+        Err(codec::Reject::PendingOperation)
+    );
+    assert_eq!(
+        import::validate_import_source(&record(&f, "import_source_misuse")),
+        Err(codec::Reject::ImportSourceRequiresCommit)
+    );
+    println!("SUBMISSION REJECT ImportSource misuse: ImportSourceRequiresCommit");
+    import::validate_commit_request(&commit, "github").expect("use Commit instead");
+    println!("SUBMISSION PASS ImportSource misuse: Commit control");
+    let observe: api::ImportPermissionScopeV1 = record(&f, "scope_observe_disclosed");
+    let undisclosed = record(&f, "scope_observe_undisclosed");
+    assert_eq!(
+        import::validate_scope(&undisclosed),
+        Err(codec::Reject::RefDisclosure)
+    );
+    import::validate_scope(&observe).expect("explicit fallback");
+    println!("SUBMISSION REJECT then PASS observe_without_disclosure: RefDisclosure");
+    import::validate_ref_selection(
+        &scope.branches[0],
+        Some(&scope.branches[0].pinned_commit_oid),
+    )
+    .expect("known exact OID");
+    assert_eq!(
+        import::validate_ref_selection(
+            &observe.branches[0],
+            Some(&scope.branches[0].pinned_commit_oid)
+        ),
+        Err(codec::Reject::RefPinning)
+    );
+    import::validate_ref_selection(&observe.branches[0], None)
+        .expect("unknown OID disclosed fallback");
+    let c = Context::new(&f);
+    let geneses = [
+        record(&f, "direct_genesis_0"),
+        record(&f, "direct_genesis_1"),
+    ];
+    let bad = import::verify_prepared_delegation(
+        &record(&f, "submission_observe_undisclosed_preparation"),
+        &record(&f, "submission_observe_undisclosed_delegation"),
+        None,
+        &geneses,
+        &c.owner(1100),
+    );
+    assert_eq!(bad.err(), Some(codec::Reject::RefDisclosure));
+    import::verify_prepared_delegation(
+        &record(&f, "submission_observe_preparation"),
+        &record(&f, "submission_observe_delegation"),
+        None,
+        &geneses,
+        &c.owner(1100),
+    )
+    .expect("signed disclosed fallback");
+    let advertised = &config.converters[0];
+    assert_eq!(
+        import::conversion_options_digest(
+            &advertised.converter_version,
+            &advertised.default_options
+        )
+        .expect("default encoding digest"),
+        scope.options_digest
+    );
+    let mut malformed = config.clone();
+    malformed.converters[0].default_options = vec![1];
+    assert_eq!(
+        import::validate_import_configuration(&malformed),
+        Err(codec::Reject::Canonical)
+    );
+}
 struct Context {
     identity: api::ImportIdentityV1,
     owner: Vec<u8>,
@@ -479,7 +729,8 @@ fn negative_vectors_isolate_their_named_gate() {
                 v["now_seconds"].as_i64().expect("now"),
             ),
             "renewal" => {
-                let member: api::SignedImportMemberPermissionV1 = record(&f, "renewed_permission");
+                let member: api::SignedImportMemberPermissionV1 =
+                    record(&f, v["parent"].as_str().unwrap_or("renewed_permission"));
                 import::verify_renewal(
                     &codec::strict_decode(&wire, import::MAX_RECORD_BYTES).expect("renewal"),
                     &d,
@@ -1742,4 +1993,335 @@ fn commit_future_operation_obeys_signed_start() {
     import::verify_new_operation(&operation, &d, 1200)
         .expect("matching job-signed operation at signed start");
     println!("COMMIT FUTURE OPERATION: 1199 Expired; 1200 PASS");
+}
+
+#[test]
+fn p2_isolated_private_source() {
+    let f = fixture();
+    let good: api::CommitImportJobRequest = record(&f, "commit_public_source");
+    let mut bad: api::CommitImportJobRequest = record(&f, "submission_private_without_connection");
+    bad.source.as_mut().expect("source").private = false;
+    assert_eq!(bad, good);
+    bad.source.as_mut().expect("source").private = true;
+    import::validate_commit_request(&good, "github").expect("public control");
+    println!("P2 PRIVATE CONTROL PASS");
+    assert_eq!(
+        import::validate_commit_request(&bad, "github"),
+        Err(codec::Reject::SourceSelection)
+    );
+    println!("P2 PRIVATE NEGATIVE SourceSelection");
+}
+#[test]
+fn p2_isolated_signed_direct_owner_disclosure() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let good: api::CommitImportJobRequest = record(&f, "submission_observe_request");
+    let mut bad: api::CommitImportJobRequest = record(&f, "submission_observe_undisclosed_request");
+    let gd = good.proof.as_ref().expect("proof");
+    let bd = bad.proof.as_mut().expect("proof");
+    let body = bd.delegations[0].body.as_mut().expect("body");
+    body.scope.as_mut().expect("scope").branches[0].ref_disclosure = 1;
+    body.branch_manifest[0]
+        .limit
+        .as_mut()
+        .expect("limit")
+        .ref_disclosure = 1;
+    assert_eq!(body, gd.delegations[0].body.as_ref().expect("control"));
+    assert_eq!(bd.original_geneses, gd.original_geneses);
+    assert_eq!(bd.genesis_authorities, gd.genesis_authorities);
+    import::verify_commit_submission(
+        &good,
+        &record(&f, "submission_observe_preparation"),
+        "github",
+        &c.owner(1100),
+    )
+    .expect("signed direct owner control");
+    println!("P2 DISCLOSURE CONTROL PASS");
+    assert_eq!(
+        import::verify_commit_submission(
+            &record(&f, "submission_observe_undisclosed_request"),
+            &record(&f, "submission_observe_undisclosed_preparation"),
+            "github",
+            &c.owner(1100)
+        )
+        .err(),
+        Some(codec::Reject::RefDisclosure)
+    );
+    println!("P2 DISCLOSURE NEGATIVE RefDisclosure");
+}
+#[test]
+fn remaining_parent_permission_nonce_and_revocation_vectors() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let old = delegation(&f, &c);
+    for v in f["amendment_vectors"]["permission_negatives"]
+        .as_array()
+        .expect("cases")
+    {
+        let result = import::verify_renewal(
+            &record(&f, v["renewal"].as_str().expect("renewal")),
+            &old,
+            &record(&f, "partial_manifest"),
+            1,
+            Some(&record(&f, v["parent"].as_str().expect("parent"))),
+            &c.owner(1200),
+        );
+        assert_eq!(
+            format!("{:?}", result.expect_err("invalid renewal parent")),
+            v["expected"].as_str().expect("reason")
+        );
+    }
+    let p0: api::SignedImportMemberPermissionV1 = record(&f, "permission");
+    let p1: api::SignedImportMemberPermissionV1 = record(&f, "renewed_permission");
+    let d: api::SignedImportJobDelegationV1 = record(&f, "renewed_delegation");
+    let a = p0.body.as_ref().expect("old");
+    let b = p1.body.as_ref().expect("new");
+    assert_eq!(a.cancellation_id, b.cancellation_id);
+    assert_ne!(a.nonce, b.nonce);
+    assert_eq!(b.scope, d.body.as_ref().expect("child").scope);
+    import::verify_member_permission(&p1, &c.owner(1350)).expect("reissue");
+    import::verify_member_permission(&record(&f, "renewed_permission"), &c.owner(1350))
+        .expect("byte-identical replay");
+    assert_eq!(
+        p1.encode_to_vec(),
+        bytes(&f["signed_vectors"]["renewed_permission"]["wire_hex"])
+    );
+    import::verify_renewal(
+        &record(&f, "renewal"),
+        &old,
+        &record(&f, "partial_manifest"),
+        1,
+        Some(&p1),
+        &c.owner(1200),
+    )
+    .expect("remaining parent control");
+    let same_parent = import::verify_delegation(&d, Some(&p1), &c.owner(1350))
+        .expect("still valid remaining-only parent");
+    import::verify_renewal(
+        &record(&f, "reused_parent_renewal"),
+        &same_parent,
+        &record(&f, "partial_manifest"),
+        2,
+        Some(&p1),
+        &c.owner(1350),
+    )
+    .expect("byte-identical parent reuse retains nonce");
+    import::check_import_revocations(&d, Some(&p1), &[]).expect("unrevoked control");
+    for id in [
+        &a.cancellation_id,
+        &d.body.as_ref().expect("child").cancellation_id,
+    ] {
+        assert_eq!(
+            import::check_import_revocations(&d, Some(&p1), std::slice::from_ref(id)),
+            Err(codec::Reject::Revoked)
+        );
+    }
+}
+#[test]
+fn active_cancel_selector_and_replay_vectors() {
+    let f = fixture();
+    for v in f["amendment_vectors"]["cancel_negatives"]
+        .as_array()
+        .expect("cases")
+    {
+        let result = import::check_cancel_request(
+            &record(&f, v["request"].as_str().expect("request")),
+            &record(&f, v["active"].as_str().expect("active")),
+            v["epoch"].as_u64().expect("epoch"),
+            v["cancelled"].as_bool().expect("terminal"),
+        );
+        assert_eq!(
+            format!("{:?}", result.expect_err("negative")),
+            v["expected"].as_str().expect("reason")
+        );
+        import::check_cancel_request(
+            &record(&f, "cancel_active"),
+            &record(&f, "delegation"),
+            1,
+            false,
+        )
+        .expect("active selector control");
+    }
+    let request = record(&f, "cancel_active");
+    import::check_cancel_replay(&request, &request).expect("terminal replay before epoch check");
+    assert_eq!(
+        import::check_cancel_replay(&record(&f, "cancel_changed_replay"), &request),
+        Err(codec::Reject::OperationIdReused)
+    );
+}
+#[test]
+fn expired_predecessor_recovery_without_publication_receipt() {
+    let f = fixture();
+    let c = Context::new(&f);
+    for v in f["amendment_vectors"]["recovery"]
+        .as_array()
+        .expect("cases")
+    {
+        let state: api::ImportJobCasStateV1 = record(&f, v["state"].as_str().expect("state"));
+        let renewal = record(&f, v["renewal"].as_str().expect("renewal"));
+        let now = v["now"].as_i64().expect("clock");
+        let parent = record(&f, "permission");
+        let current = record(&f, "renewed_permission");
+        assert_eq!(
+            import::verify_delegation(
+                state.active_predecessor.as_ref().expect("predecessor"),
+                Some(&parent),
+                &c.owner(now)
+            )
+            .err(),
+            Some(codec::Reject::Expired)
+        );
+        let token = import::verify_renewal_predecessor(&state, Some(&parent), &c.owner(now))
+            .expect("structural recovery only");
+        let next = import::verify_renewal_from_state(
+            &renewal,
+            &token,
+            &state,
+            Some(&current),
+            &c.owner(now),
+        )
+        .expect("current replacement");
+        assert_eq!(
+            next.digest(),
+            import::signed_delegation_digest(&record(&f, "renewed_delegation")).expect("digest")
+        );
+        for field in 0..4 {
+            let mut changed = state.clone();
+            match field {
+                0 => changed.authority_epoch += 1,
+                1 => changed.logical_job_id[0] ^= 1,
+                2 => {
+                    let m = changed.committed_manifest.as_mut().expect("manifest");
+                    if m.slots.is_empty() {
+                        let partial: api::ImportResultManifestV1 = record(&f, "partial_manifest");
+                        m.slots.push(partial.slots[0].clone());
+                    } else {
+                        m.slots[0].signed_operation_digest[0] ^= 1;
+                    }
+                }
+                _ => {
+                    changed
+                        .active_predecessor
+                        .as_mut()
+                        .expect("active")
+                        .delegating_signature
+                        .as_mut()
+                        .expect("signature")
+                        .signature[0] ^= 1
+                }
+            }
+            assert_eq!(
+                import::verify_renewal_from_state(
+                    &renewal,
+                    &token,
+                    &changed,
+                    Some(&current),
+                    &c.owner(now)
+                )
+                .err(),
+                Some(codec::Reject::StaleContext)
+            );
+        }
+        let mut bad = state.clone();
+        bad.active_predecessor
+            .as_mut()
+            .expect("active")
+            .delegating_signature
+            .as_mut()
+            .expect("sig")
+            .signature[0] ^= 1;
+        assert_eq!(
+            import::verify_renewal_predecessor(&bad, Some(&parent), &c.owner(now)).err(),
+            Some(codec::Reject::Signature)
+        );
+        assert_eq!(
+            import::verify_renewal_from_state(
+                &renewal,
+                &token,
+                &state,
+                Some(&current),
+                &c.owner(1800)
+            )
+            .err(),
+            Some(codec::Reject::Expired)
+        );
+    }
+}
+#[test]
+fn browser_preflight_keeps_strict_host_commit_clock() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let p = record(&f, "commit_preparation");
+    let d = record(&f, "delegation");
+    let parent = record(&f, "permission");
+    let g = [record(&f, "genesis_dev"), record(&f, "genesis_main")];
+    for v in f["amendment_vectors"]["preflight"]
+        .as_array()
+        .expect("cases")
+    {
+        let e = c.owner(v["now"].as_i64().expect("clock"));
+        let preflight = import::preflight_prepared_delegation(&p, &d, Some(&parent), &g, &e);
+        let host = import::verify_prepared_delegation(&p, &d, Some(&parent), &g, &e).map(|_| ());
+        for (r, name) in [(preflight, "preflight"), (host, "host")] {
+            let actual = r.map_or_else(|error| format!("{error:?}"), |()| "OK".into());
+            assert_eq!(
+                actual,
+                v[name].as_str().expect("result"),
+                "{} {name}",
+                v["id"]
+            );
+        }
+    }
+    assert_eq!(
+        import::preflight_prepared_delegation(
+            &p,
+            &record(&f, "commit_bad_signature"),
+            Some(&parent),
+            &g,
+            &c.owner(999)
+        ),
+        Err(codec::Reject::Signature)
+    );
+    assert_eq!(
+        import::preflight_prepared_delegation(
+            &record(&f, "prepare_changed_converterVersion"),
+            &d,
+            Some(&parent),
+            &g,
+            &c.owner(999)
+        ),
+        Err(codec::Reject::PreparedFields)
+    );
+    assert_eq!(
+        import::preflight_prepared_delegation(&p, &d, None, &g, &c.owner(999)),
+        Err(codec::Reject::ImportPermission)
+    );
+}
+#[test]
+fn initial_lineage_uuid_reservation_and_receipt_vectors() {
+    let f = fixture();
+    for v in f["amendment_vectors"]["lineage"].as_array().expect("cases") {
+        let result = import::initial_operation_id(
+            &bytes(&v["lineage_hex"]),
+            v["occupied"].as_bool().expect("occupied"),
+        );
+        if v["expected"] == "OK" {
+            assert_eq!(
+                result.expect("reserved first ID"),
+                v["operation_id"].as_str().expect("UUID")
+            );
+        } else {
+            assert_eq!(
+                format!("{:?}", result.expect_err("invalid allocation")),
+                v["expected"].as_str().expect("reason")
+            );
+        }
+    }
+    let request = record(&f, "commit_request");
+    import::validate_commit_response(&request, &record(&f, "commit_response"))
+        .expect("lineage control");
+    assert_eq!(
+        import::validate_commit_response(&request, &record(&f, "commit_wrong_lineage_response")),
+        Err(codec::Reject::PendingOperation)
+    );
 }

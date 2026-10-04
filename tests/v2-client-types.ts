@@ -30,3 +30,14 @@ void platformChecks;
 // @ts-expect-error Authorization checks are unary decisions, not observations.
 const platformStream: AsyncIterable<PlatformAuthorizationResponse> = platform.authorizeAnalytics({});
 void platformStream;
+
+import { verifyNewImportOperation, preflightPreparedImportDelegation, type VerifiedImportRenewalPredecessor, type VerifiedImportDelegation } from "../packages/typescript/dist/v1alpha2/import-authority.js";
+import type { SignedDelegatedImportOperationV1 } from "../packages/typescript/dist/v1alpha2/import_authority_pb.js";
+declare const recoveredPredecessor: VerifiedImportRenewalPredecessor;
+declare const importOperation: SignedDelegatedImportOperationV1;
+// @ts-expect-error Recovery evidence cannot authorize execution.
+verifyNewImportOperation(importOperation, recoveredPredecessor, 1350n);
+declare const preflightResult: Awaited<ReturnType<typeof preflightPreparedImportDelegation>>;
+// @ts-expect-error Signing preflight returns void, never execution authority.
+const executablePreflight: VerifiedImportDelegation = preflightResult;
+void executablePreflight;

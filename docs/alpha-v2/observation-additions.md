@@ -6,8 +6,8 @@ Additive v2 contract for [api#287](https://github.com/HeddleCo/api/issues/287),
 [weft#2478](https://github.com/HeddleCo/weft/issues/2478), requested by
 [tapestry#587](https://github.com/HeddleCo/tapestry/issues/587). This bundle defines
 transport and presentation semantics; persistence, population, and enforcement
-belong to the corresponding weft work. The package version and signed formats
-are unchanged.
+belong to the corresponding weft work. The original bundle left package versions
+and signed formats unchanged; the alpha.26 selector below bumps the package only.
 
 ## Operation attempts
 
@@ -19,12 +19,27 @@ The provider identifier follows `ProviderConnection.provider`; the repository
 identifier follows `ProviderRepository.provider_repository_id`. It identifies
 the source actually admitted for this attempt, not the destination spool's
 current name or a subsequently edited remote. An import supplies a nonempty
-source URL, the provider pair, or both. Never expose URL userinfo, credential
-query parameters, OAuth tokens, connection secrets, or source identities hidden
-from this caller. Omit unavailable details, or the whole subject if neither URL
-nor provider identity is visible; absence or an unknown oneof
+source URL, the provider pair, or the HYBRID selector below. Never expose URL
+userinfo, credential query parameters, OAuth tokens, connection secrets, or source
+identities hidden from this caller. Omit unavailable details, or the whole subject
+if neither source detail nor the HYBRID selector is available; absence or an unknown oneof
 case means unknown. Future operation kinds can add cases without changing the
 import case.
+
+Alpha.26 adds `ImportOperationSubject.hybrid_job = 4`, a typed
+`HybridImportJobSelector { logical_job_id = 1 }`. Its ID is exactly 16 bytes and
+not all zero, scoped to destination `OperationRecord.ref.spool`. Populate it from
+the durable association for every physical HYBRID attempt (initial, retry and
+renewal), preserving the same destination/job pair even on historical or terminal
+attempts. Non-HYBRID imports and attempts before association omit it; absent or
+unknown subjects likewise mean unavailable. Never infer a job selector from
+physical operation IDs, retry links, client operation IDs or lineage.
+
+It follows operation visibility and may remain visible when source details are
+hidden. It grants no control authority: the existing `GetImportJobState` remains
+destination-writer-only, and Cancel/Retry/Renew retain their authorization and
+signed-request requirements. See the [HYBRID discovery profile](import-authority-host-witness.md)
+for request projection helpers and unavailable semantics. This adds no inventory RPC.
 
 `created_at = 16`, `started_at = 17`, and `finished_at = 18` are
 `google.protobuf.Timestamp`, as elsewhere in v2. Creation is admission of the

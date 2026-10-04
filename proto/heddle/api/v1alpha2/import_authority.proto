@@ -354,6 +354,8 @@ message GetImportConfigurationResponse {
 }
 // Destination-writer-only, authenticated finite read. No listing, pagination or
 // seed/custody/bearer secrets. Unknown and unauthorized jobs use uniform NOT_FOUND.
+// Discover destination + logical_job_id from OperationRecord.ref.spool and
+// subject.import.hybrid_job; selector visibility grants no read/control authority.
 message GetImportJobStateRequest {
   SpoolRef destination = 1;
   bytes logical_job_id = 2; // Exactly 16 nonzero bytes; <=4096 encoded request bytes.

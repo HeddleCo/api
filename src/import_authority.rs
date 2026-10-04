@@ -2704,6 +2704,46 @@ pub fn verify_renewal_from_state(
     )
 }
 
+/// Validate discovery metadata only; a well-shaped selector grants no authority.
+pub fn validate_hybrid_import_job_selector(
+    selector: &HybridImportJobSelector,
+) -> Result<(), Reject> {
+    width(&selector.logical_job_id, 16)?;
+    if selector.logical_job_id.iter().all(|byte| *byte == 0) {
+        return Err(Reject::Canonical);
+    }
+    Ok(())
+}
+
+/// Project a visible operation's durable HYBRID association into the existing
+/// writer-only state read. Missing/unknown subject or selector is unavailable.
+/// Malformed present metadata is rejected; never substitute an attempt ID.
+/// This validates shape, not operation visibility, writer access or signatures.
+pub fn import_job_state_request_from_operation(
+    operation: &OperationRecord,
+) -> Result<Option<GetImportJobStateRequest>, Reject> {
+    let Some(operation_subject::Subject::Import(subject)) = operation
+        .subject
+        .as_ref()
+        .and_then(|subject| subject.subject.as_ref())
+    else {
+        return Ok(None);
+    };
+    let Some(selector) = subject.hybrid_job.as_ref() else {
+        return Ok(None);
+    };
+    validate_hybrid_import_job_selector(selector)?;
+    let request = GetImportJobStateRequest {
+        destination: operation
+            .r#ref
+            .as_ref()
+            .and_then(|record| record.spool.clone()),
+        logical_job_id: selector.logical_job_id.clone(),
+    };
+    validate_job_state_request(&request)?;
+    Ok(Some(request))
+}
+
 /// Finite destination-writer read; transport authentication/authorization belongs
 /// to the generated RPC contract. Validate before any storage lookup.
 pub fn validate_job_state_request(request: &GetImportJobStateRequest) -> Result<(), Reject> {

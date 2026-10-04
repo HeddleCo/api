@@ -184,12 +184,14 @@ function integrationOriginal(value,signer='owner'){
  return native('heddle-thread-operation-v1',{version:1,thread:value.target_thread,parents:value.expected_target_frontier,publisher:value.device,body:{kind:'local_integration',canonical:Array.from(canonical)}},[signer]);
 }
 const localIntegration=integrationOriginal(localIntegrationValue);
-function localIntegrationBundle(original){
+function localIntegrationBundle(original,unchangedClaim=false,descendant){
  const claimValue=decode(localAuthority.original.canonicalRecord);
- claimValue.source_frontier=[Array.from(nativeId(original.format,original.canonicalRecord))];
+ const head=descendant??original;
+ claimValue.source_frontier=[Array.from(nativeId(head.format,head.canonicalRecord))];
  const p=clone(imp.ImportAuthorityWitnessV1Schema,localAuthority);
- p.original=native('heddle-thread-ownership-claim-v1',claimValue,['owner','device']);
+ if(!unchangedClaim)p.original=native('heddle-thread-ownership-claim-v1',claimValue,['owner','device']);
  p.dependencies.push(accountSource.originalGenesis,sourceTemplate,original);
+ if(descendant)p.dependencies.push(descendant);
  p.dependencies.sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));
  const b=bundle([local,accountSource],[p,sourcePayload],[localStatement,sourceGenesisStatement,authorityStatement(sourcePayload,204),authorityStatement(p,219)]);
  b.witnessSet=currentSet;
@@ -198,6 +200,27 @@ function localIntegrationBundle(original){
 cases.local_integration_push=localIntegrationBundle(localIntegration);
 assertPositive('local_integration_push',cases.local_integration_push);
 wire('local_integration_push',api.NativePublicProofBundleV1Schema,cases.local_integration_push);fixture.positive.push('local_integration_push');
+// A signed later capture covers the integration as an ancestor, not a literal head.
+const laterValue=decode(localCapture.canonicalRecord);
+const laterState=JSON.parse(execFileSync(codec,['descendant-state'],{input:hex(raw(merged.state_hex)),encoding:'utf8'}));
+laterValue.parents=[Array.from(nativeId(localIntegration.format,localIntegration.canonicalRecord))];
+laterValue.body.canonical.result.state=Array.from(raw(laterState.state_hex));
+const laterCapture=native('heddle-thread-operation-v1',laterValue,['owner']);
+const ancestorBundle=localIntegrationBundle(localIntegration,false,laterCapture);
+assertPositive('local_integration_ancestor_push',ancestorBundle);
+wire('local_integration_ancestor_push',api.NativePublicProofBundleV1Schema,ancestorBundle);fixture.positive.push('local_integration_ancestor_push');
+// These signed vectors pass portable reference/signature checks. Only the native
+// owner/cutoff gate may reject them; no production authorization is inferred here.
+const wrongKeyIntegration=integrationOriginal({...localIntegrationValue,device:Array.from(key('device'))},'device');
+fixture.native_negative=[];
+for(const [id,original,unchangedClaim,expected] of [
+ ['local_integration_wrong_key',wrongKeyIntegration,false,'local signer differs from genesis owner'],
+ ['local_integration_beyond_claim_cutoff',localIntegration,true,'local work outside selected ownership cutoff'],
+ ['local_integration_wrong_key_unchanged_claim',wrongKeyIntegration,true,'local signer differs from genesis owner'],
+]){
+ wire(id,api.NativePublicProofBundleV1Schema,localIntegrationBundle(original,unchangedClaim));
+ fixture.native_negative.push({id,control:'local_integration_push',expected});
+}
 negative('local_integration_forged_signature','local_integration_push',b=>{
  const p=b.authorityWitnesses.find(p=>p.kind===2),r=p.dependencies.find(r=>hex(signedNativeDigest(r))===hex(signedNativeDigest(localIntegration)));
  r.signatures[0].signature[0]^=1;p.dependencies.sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));

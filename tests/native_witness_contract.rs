@@ -63,6 +63,17 @@ fn native_positive_bundles() {
     }
 }
 #[test]
+fn signed_native_authority_negatives_require_the_native_gate() {
+    let f = fixture();
+    for v in f["native_negative"].as_array().expect("native negatives") {
+        let name = v["id"].as_str().expect("name");
+        verify(&f, &wire(&f, v["control"].as_str().expect("control")))
+            .expect("passing signed control");
+        verify(&f, &wire(&f, name)).expect("portable closure is valid; native authority must reject");
+        println!("PORTABLE PASS {name}; native authorization required");
+    }
+}
+#[test]
 fn bindings_select_distinct_retained_owner_chains() {
     let f = fixture();
     let b: api::NativePublicProofBundleV1 = wire(&f, "distinct_owner_chains");

@@ -1262,13 +1262,17 @@ fn request_binding(
 
 // alpha.28 contract verification uses the unchanged published native codecs.
 fn verify_native_witness_fixture() -> Result<()> {
+    let f: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/native-host-witness-v1.json"
+    ))?;
+    verify_native_witness_vectors(&f)
+}
+
+fn verify_native_witness_vectors(f: &Value) -> Result<()> {
     use objects::object::{
         CollaborationActor,
         thread_replication::{GenesisOwner, SourceAuthor, ThreadOperationBody},
     };
-    let f: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/native-host-witness-v1.json"
-    ))?;
     let reference: wire::NativePublicProofBundleV1 = record(&f, "local_adopt_push")?;
     let claim = ThreadOwnershipClaim::decode(
         &reference.authority_witnesses[0]
@@ -1799,6 +1803,40 @@ mod tests {
     #[test]
     fn native_witness_originals_and_start_thread_authority() {
         verify_native_witness_fixture().expect("native model and owner authority");
+    }
+    fn native_local_work_negative(name: &str) {
+        let mut f: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/native-host-witness-v1.json"
+        ))
+        .expect("signed native vectors");
+        let expected = f["native_negative"]
+            .as_array()
+            .expect("native negatives")
+            .iter()
+            .find(|v| v["id"] == name)
+            .expect("negative")
+            .clone();
+        f["positive"] = serde_json::json!([expected["control"]]);
+        verify_native_witness_vectors(&f).expect("passing signed control");
+        f["positive"] = serde_json::json!([name]);
+        let error = verify_native_witness_vectors(&f).expect_err("native owner/cutoff must reject");
+        assert!(
+            format!("{error:#}").contains(expected["expected"].as_str().expect("reason")),
+            "{name}: {error:#}"
+        );
+        println!("NATIVE REJECT {name}: {error:#}");
+    }
+    #[test]
+    fn local_integration_wrong_key() {
+        native_local_work_negative("local_integration_wrong_key");
+    }
+    #[test]
+    fn local_integration_beyond_claim_cutoff() {
+        native_local_work_negative("local_integration_beyond_claim_cutoff");
+    }
+    #[test]
+    fn local_integration_wrong_key_unchanged_claim() {
+        native_local_work_negative("local_integration_wrong_key_unchanged_claim");
     }
     #[test]
     fn owner_history_must_be_active_and_exact_at_admission() {

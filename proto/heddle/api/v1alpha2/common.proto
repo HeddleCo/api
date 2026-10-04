@@ -375,14 +375,29 @@ message OperationSubject {
   }
 }
 
+// HYBRID logical-job discovery only; destination is OperationRecord.ref.spool.
+// Not a physical operation ID, retry lineage, client operation ID or authority.
+message HybridImportJobSelector {
+  bytes logical_job_id = 1; // Exactly 16 bytes; the all-zero ID is invalid.
+}
+
 message ImportOperationSubject {
   // Source admitted for this attempt. Credential-free URL: never project
   // userinfo, secret query parameters, or a source hidden from this caller.
   string source_url = 1;
   // ProviderConnection.provider + ProviderRepository.provider_repository_id.
-  // Both populated or both empty; source_url or this pair must be nonempty.
+  // Both populated or both empty; source_url, this pair or hybrid_job is present.
   string provider = 2;
   string provider_repository_id = 3;
+  // Populate from the durable destination/job association on EVERY physical
+  // HYBRID attempt: initial, retry and renewal. Stable within that logical job,
+  // including historical/terminal attempts; never infer it from attempt IDs.
+  // Absent for non-HYBRID imports or before association is durably available.
+  // Absent/unknown subject also means unavailable, never a guessed selector.
+  // Visible only with the operation, independently of source-detail visibility.
+  // Grants NO control authority: GetImportJobState remains destination-writer
+  // only; control requests still require their existing authorization/signatures.
+  HybridImportJobSelector hybrid_job = 4;
 }
 
 message OperationRecord {

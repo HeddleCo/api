@@ -15,6 +15,23 @@ fn hybrid_operation_job_selector_wire_and_projection_match_shared_vectors() {
             .expect("valid operation bytes");
         let operation = OperationRecord::decode(wire.as_slice()).expect("operation decodes");
         assert_eq!(operation.encode_to_vec(), wire, "wire round trip: {name}");
+        if let Some(operation_subject::Subject::Import(subject)) = operation
+            .subject
+            .as_ref()
+            .and_then(|subject| subject.subject.as_ref())
+            && let Some(selector) = subject.hybrid_job.as_ref()
+        {
+            let expected = if vector["expected"] == "Canonical" {
+                Err(Reject::Canonical)
+            } else {
+                Ok(())
+            };
+            assert_eq!(
+                validate_hybrid_import_job_selector(selector),
+                expected,
+                "shape: {name}"
+            );
+        }
         let result = import_job_state_request_from_operation(&operation);
         match vector["expected"].as_str().expect("expected result") {
             "OK" => {
@@ -26,13 +43,6 @@ fn hybrid_operation_job_selector_wire_and_projection_match_shared_vectors() {
                     vector["request_wire_hex"].as_str().expect("request bytes"),
                     "destination/job projection: {name}"
                 );
-                let Some(operation_subject::Subject::Import(subject)) =
-                    operation.subject.as_ref().and_then(|s| s.subject.as_ref())
-                else {
-                    panic!("fixture must have an import subject");
-                };
-                validate_hybrid_import_job_selector(subject.hybrid_job.as_ref().expect("selector"))
-                    .expect("valid selector shape");
             }
             "unavailable" => assert_eq!(result, Ok(None), "{name}"),
             "Canonical" => assert_eq!(result, Err(Reject::Canonical), "{name}"),

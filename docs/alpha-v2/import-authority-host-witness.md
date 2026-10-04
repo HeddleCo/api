@@ -1308,8 +1308,36 @@ its stored receipt and use the state read to discover accepted authority and
 committed slots. Compare the candidate digest with accepted history, including
 when another accepted renewal has since advanced it. Never interpret response
 loss as a new activation opportunity. A lost browser can recover public authority
-through this read when it knows the destination/job selector; normal authorized
-job inventory supplies selectors, and this RPC adds no enumeration surface.
+through this read using the destination/job selector projected on a visible
+`OperationRecord`: destination is `ref.spool`, and logical-job ID is
+`subject.import.hybrid_job.logical_job_id`. This RPC adds no enumeration surface.
+
+`ImportOperationSubject.hybrid_job = 4` is a typed `HybridImportJobSelector` whose
+`logical_job_id = 1` is exactly 16 bytes and not all zero. Hosts populate it from
+the durable destination/logical-job association for **every physical HYBRID
+attempt**, including the initial attempt, retries, renewals and historical or
+terminal attempts. The pair stays stable across attempts of one logical job;
+different destinations are distinct scopes even if job ID bytes match. Physical
+operation IDs, `retry_of`, `client_operation_id` and retry lineage never substitute
+for this association. A prepared-only reservation is not an accepted job.
+
+The selector is absent for non-HYBRID imports and before the durable association
+is available. Missing/unknown subject or absent selector means unavailable: wait
+for a later authorized operation observation, never fabricate an ID. An empty,
+wrong-width or all-zero **present** selector is malformed, not unavailable.
+Selector visibility follows operation visibility; it exposes no hidden operation
+or additional job inventory. Source fields retain their independent disclosure
+rules, so a visible selector may be the only projected import-subject detail.
+
+The selector grants **no control authority**, including to a reader who can see
+the operation. `GetImportJobState` still requires current destination write access
+and uses uniform NOT_FOUND for unknown/unauthorized jobs. Cancel, Retry and Renew
+retain their existing writer, current-state and signed-request/authority checks.
+The Rust `validate_hybrid_import_job_selector` and TS
+`validateHybridImportJobSelector` validate selector shape;
+`import_job_state_request_from_operation` / `importJobStateRequestFromOperation`
+project destination plus ID into the existing state read, rejecting malformed
+present metadata. These helpers do not authenticate observations or grant access.
 
 The exact `RenewImportJobRequest.proof` profile is based on that retained proof:
 

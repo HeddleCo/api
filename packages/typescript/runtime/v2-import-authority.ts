@@ -1,7 +1,7 @@
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
 import { CommitImportJobRequestSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository } from "./integration_pb.js";
-import type { MutationResponse } from "./common_pb.js";
+import type { HybridImportJobSelector, MutationResponse, OperationRecord } from "./common_pb.js";
 import { OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
@@ -449,6 +449,27 @@ export async function verifyImportRenewalFromState(signed:api.SignedImportJobRen
   state=clone(api.ImportJobCasStateV1Schema,state);const old=predecessors.get(previous)??reject("Canonical");validateCasState(state);
   if(!equal(signingDigest("heddle-import-job-cas-state-v1",api.ImportJobCasStateV1Schema,state),old.stateDigest))reject("StaleContext");
   return verifyImportRenewal(signed,old.previous,state.committedManifest!,state.authorityEpoch,member,e);
+}
+
+/** Validate discovery metadata only; a well-shaped selector grants no authority. */
+export function validateHybridImportJobSelector(selector:HybridImportJobSelector):void {
+  width(selector.logicalJobId,16);
+  if(!selector.logicalJobId.some(Boolean))reject("Canonical");
+}
+
+/** Project the durable HYBRID association into the writer-only read. Missing/unknown
+ * subject or selector is unavailable. Shape validation supplies no authorization. */
+export function importJobStateRequestFromOperation(operation:OperationRecord):api.GetImportJobStateRequest|undefined {
+  const subject=operation.subject?.subject;
+  if(subject?.case!=="import"||!subject.value.hybridJob)return undefined;
+  const selector=subject.value.hybridJob;
+  validateHybridImportJobSelector(selector);
+  const request=create(api.GetImportJobStateRequestSchema,{
+    destination:operation.ref?.spool?{id:operation.ref.spool.id}:undefined,
+    logicalJobId:selector.logicalJobId.slice(),
+  });
+  validateImportJobStateRequest(request);
+  return request;
 }
 
 /** Finite writer read. The generated RPC contract supplies authentication and authorization. */

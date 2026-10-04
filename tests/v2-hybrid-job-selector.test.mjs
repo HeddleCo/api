@@ -12,11 +12,19 @@ test('HYBRID operation job selector wire and projection match shared vectors', (
   for (const vector of fixture.operations) {
     const operation = fromBinary(api.OperationRecordSchema, bytes(vector.wire_hex));
     assert.deepEqual(toBinary(api.OperationRecordSchema, operation), bytes(vector.wire_hex), vector.name);
+    const selector = operation.subject?.subject.case === 'import' ? operation.subject.subject.value.hybridJob : undefined;
+    if (selector) {
+      if (vector.expected === 'Canonical') {
+        assert.throws(() => authority.validateHybridImportJobSelector(selector),
+          error => error instanceof authority.HybridContractError && error.reason === 'Canonical', `shape: ${vector.name}`);
+      } else {
+        authority.validateHybridImportJobSelector(selector);
+      }
+    }
     if (vector.expected === 'OK') {
       const request = authority.importJobStateRequestFromOperation(operation);
       assert.ok(request, vector.name);
       assert.deepEqual(toBinary(api.GetImportJobStateRequestSchema, request), bytes(vector.request_wire_hex), vector.name);
-      authority.validateHybridImportJobSelector(operation.subject.subject.value.hybridJob);
       // Mutating the request must not mutate the observed operation.
       request.logicalJobId.fill(0);
       request.destination.id = '';

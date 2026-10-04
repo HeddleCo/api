@@ -1365,10 +1365,23 @@ mod tests {
             &expectation,
         )
         .expect("completed signed commit");
+        let submission: wire::CommitImportJobRequest =
+            record(&f, "commit_request").expect("initial submission");
+        import::verify_commit_submission(&submission, &prepared, "github", &expectation)
+            .expect("source and signed complete submission");
         for name in ["genesis_dev_payload", "genesis_payload"] {
             let payload: wire::ImportGenesisWitnessV1 = record(&f, name).expect("original payload");
             let original = payload.original_genesis.as_ref().expect("native original");
             let g = genesis(original).expect("published native parse and creator signature");
+            let base = objects::object::thread_replication::hosted_import::initial_base_state(
+                &g,
+                &submission.initial_base_state,
+            )
+            .expect("same exact canonical empty base for both branches");
+            assert!(
+                base.parents.is_empty(),
+                "initial base cannot carry a nonempty closure"
+            );
             let binding = payload.binding.as_ref().expect("binding");
             let signature = signature(original, &g.creator).expect("original creator signature");
             import::verify_genesis_authority(

@@ -149,6 +149,244 @@ fn submission_observe_requires_signed_disclosure() {
         "observe mode must carry the signed disclosure"
     );
 }
+
+#[test]
+fn submission_changed_prepare_scope_is_rejected() {
+    let f = fixture();
+    let request = record(&f, "prepare_request");
+    assert_eq!(
+        import::validate_preparation_response(
+            &request,
+            &record(&f, "prepare_changed_converterVersion")
+        ),
+        Err(codec::Reject::PreparedFields)
+    );
+    import::validate_preparation_response(&request, &record(&f, "commit_preparation"))
+        .expect("unchanged control");
+}
+
+#[test]
+fn submission_commit_requires_source() {
+    let f = fixture();
+    assert_eq!(
+        import::validate_commit_request(&record(&f, "submission_missing_source"), "github"),
+        Err(codec::Reject::SourceSelection)
+    );
+    import::validate_commit_request(&record(&f, "commit_request"), "github")
+        .expect("complete control");
+}
+
+#[test]
+fn submission_import_source_is_closed() {
+    let f = fixture();
+    assert_eq!(
+        import::validate_import_source(&record(&f, "import_source_misuse")),
+        Err(codec::Reject::ImportSourceRequiresCommit)
+    );
+    import::validate_commit_request(&record(&f, "commit_request"), "github")
+        .expect("Commit control");
+}
+
+#[test]
+fn submission_contract_vectors() {
+    let f = fixture();
+    let request: api::PrepareImportJobRequest = record(&f, "prepare_request");
+    let response: api::PrepareImportJobResponse = record(&f, "commit_preparation");
+    for v in f["submission_vectors"]["changed_preparations"]
+        .as_array()
+        .expect("scope changes")
+    {
+        let changed = record(&f, v["response"].as_str().expect("response"));
+        assert_eq!(
+            import::validate_preparation_response(&request, &changed),
+            Err(codec::Reject::PreparedFields)
+        );
+        println!(
+            "SUBMISSION REJECT prepare.{}: PreparedFields",
+            v["id"].as_str().expect("field")
+        );
+        import::validate_preparation_response(&request, &response).expect("exact scope control");
+        println!(
+            "SUBMISSION PASS prepare.{}: unchanged control",
+            v["id"].as_str().expect("field")
+        );
+    }
+    let issue_token: api::PrepareImportJobRequest = record(&f, "prepare_issue_token");
+    import::validate_preparation_response(&issue_token, &response).expect("host-issued token");
+    let scope: api::ImportPermissionScopeV1 = record(&f, "scope");
+    let mut unknown_refusal: api::PrepareImportJobResponse =
+        record(&f, "prepare_refusal_converter");
+    unknown_refusal.refusal.as_mut().expect("refusal").reason = 99;
+    assert_eq!(
+        import::validate_preparation_response(&request, &unknown_refusal),
+        Err(codec::Reject::Version)
+    );
+    let config = record(&f, "import_configuration");
+    let selected = import::prepare_scope(
+        issue_token.proposed_scope.as_ref().expect("scope"),
+        &config,
+        &scope.destination_version,
+    )
+    .expect("issued CAS");
+    assert_eq!(selected, scope);
+    assert!(
+        issue_token
+            .proposed_scope
+            .as_ref()
+            .expect("scope")
+            .destination_version
+            .is_empty()
+    );
+    for v in f["submission_vectors"]["scope_refusals"]
+        .as_array()
+        .expect("refusals")
+    {
+        let bad = record(&f, v["scope"].as_str().expect("scope"));
+        let config = record(&f, v["configuration"].as_str().expect("config"));
+        let reason = api::ImportPreparationRefusalReason::try_from(
+            v["reason"].as_i64().expect("reason") as i32,
+        )
+        .expect("typed reason");
+        assert_eq!(
+            import::prepare_scope(&bad, &config, &scope.destination_version),
+            Err(codec::Reject::PreparationRefused(reason))
+        );
+        let refused = record(
+            &f,
+            &format!("prepare_refusal_{}", v["id"].as_str().expect("id")),
+        );
+        assert_eq!(
+            import::validate_preparation_response(&request, &refused),
+            Err(codec::Reject::PreparationRefused(reason))
+        );
+        import::prepare_scope(&scope, &config, &scope.destination_version).expect("scope control");
+        println!(
+            "SUBMISSION REJECT then PASS scope.{}: {reason:?}",
+            v["id"].as_str().expect("id")
+        );
+    }
+    for v in f["submission_vectors"]["commit_negatives"]
+        .as_array()
+        .expect("commit negatives")
+    {
+        let bad = record(&f, v["request"].as_str().expect("request"));
+        let actual = import::validate_commit_request(&bad, "github");
+        assert_eq!(
+            format!("{:?}", actual.expect_err("negative")),
+            v["expected"].as_str().expect("reason")
+        );
+        println!(
+            "SUBMISSION REJECT commit.{}: {:?}",
+            v["id"].as_str().expect("id"),
+            actual.expect_err("negative")
+        );
+        import::validate_commit_request(&record(&f, "commit_request"), "github")
+            .expect("complete Commit control");
+        println!(
+            "SUBMISSION PASS commit.{}: complete control",
+            v["id"].as_str().expect("id")
+        );
+    }
+    for name in ["commit_hosted_base", "commit_public_source"] {
+        import::validate_commit_request(&record(&f, name), "github")
+            .expect("optional base / public source");
+    }
+    let commit: api::CommitImportJobRequest = record(&f, "commit_request");
+    let c = Context::new(&f);
+    import::verify_commit_submission(&commit, &response, "github", &c.owner(1100))
+        .expect("complete signed initial submission");
+    assert_eq!(
+        import::validate_commit_request(&commit, "gitlab"),
+        Err(codec::Reject::SourceSelection)
+    );
+    let pending = record(&f, "commit_response");
+    import::check_commit_replay(&commit, &commit, &pending).expect("exact replay");
+    let mut changed = commit.clone();
+    changed.initial_base_state.clear();
+    assert_eq!(
+        import::check_commit_replay(&changed, &commit, &pending),
+        Err(codec::Reject::OperationIdReused)
+    );
+    let applied = api::MutationResponse {
+        receipt: Some(api::MutationReceipt {
+            client_operation_id: commit.client_operation_id.clone(),
+            outcome: Some(api::mutation_receipt::Outcome::Applied(
+                api::Applied::default(),
+            )),
+            ..Default::default()
+        }),
+    };
+    assert_eq!(
+        import::validate_commit_response(&commit, &applied),
+        Err(codec::Reject::PendingOperation)
+    );
+    assert_eq!(
+        import::validate_import_source(&record(&f, "import_source_misuse")),
+        Err(codec::Reject::ImportSourceRequiresCommit)
+    );
+    println!("SUBMISSION REJECT ImportSource misuse: ImportSourceRequiresCommit");
+    import::validate_commit_request(&commit, "github").expect("use Commit instead");
+    println!("SUBMISSION PASS ImportSource misuse: Commit control");
+    let observe: api::ImportPermissionScopeV1 = record(&f, "scope_observe_disclosed");
+    let undisclosed = record(&f, "scope_observe_undisclosed");
+    assert_eq!(
+        import::validate_scope(&undisclosed),
+        Err(codec::Reject::RefDisclosure)
+    );
+    import::validate_scope(&observe).expect("explicit fallback");
+    println!("SUBMISSION REJECT then PASS observe_without_disclosure: RefDisclosure");
+    import::validate_ref_selection(
+        &scope.branches[0],
+        Some(&scope.branches[0].pinned_commit_oid),
+    )
+    .expect("known exact OID");
+    assert_eq!(
+        import::validate_ref_selection(
+            &observe.branches[0],
+            Some(&scope.branches[0].pinned_commit_oid)
+        ),
+        Err(codec::Reject::RefPinning)
+    );
+    import::validate_ref_selection(&observe.branches[0], None)
+        .expect("unknown OID disclosed fallback");
+    let c = Context::new(&f);
+    let parent = record(&f, "commit_observe_parent");
+    let geneses = [
+        record(&f, "commit_observe_genesis_dev"),
+        record(&f, "commit_observe_genesis_main"),
+    ];
+    let bad = import::verify_prepared_delegation(
+        &record(&f, "submission_observe_undisclosed_preparation"),
+        &record(&f, "submission_observe_undisclosed_delegation"),
+        Some(&parent),
+        &geneses,
+        &c.owner(1100),
+    );
+    assert_eq!(bad.err(), Some(codec::Reject::RefDisclosure));
+    import::verify_prepared_delegation(
+        &record(&f, "submission_observe_preparation"),
+        &record(&f, "submission_observe_delegation"),
+        Some(&parent),
+        &geneses,
+        &c.owner(1100),
+    )
+    .expect("signed disclosed fallback");
+    let advertised = &config.converters[0];
+    assert_eq!(
+        import::conversion_options_digest(
+            &advertised.converter_version,
+            &advertised.default_options
+        )
+        .expect("default encoding digest"),
+        scope.options_digest
+    );
+    let mut malformed = config.clone();
+    malformed.converters[0].default_options = vec![1];
+    assert_eq!(
+        import::validate_import_configuration(&malformed),
+        Err(codec::Reject::Canonical)
+    );
+}
 struct Context {
     identity: api::ImportIdentityV1,
     owner: Vec<u8>,

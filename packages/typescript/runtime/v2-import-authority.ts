@@ -1,10 +1,12 @@
-import { clone, create } from "@bufbuild/protobuf";
+import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
+import { CommitImportJobRequestSchema, type CommitImportJobRequest, type ImportSourceRequest } from "./integration_pb.js";
+import type { MutationResponse } from "./common_pb.js";
 import type { AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
 import { resolveWitnessStatement, type VerifiedWitnessSet } from "./witness-trust.js";
-import { canonicalHybridV1, signingDigest, equal, width, keyId, verifySignature, reject, canonicalHttps, hash } from "./_hybrid-codec.js";
+import { canonicalHybridV1, signingDigest, equal, width, keyId, verifySignature, reject, canonicalHttps, hash, compare, sized, utf8, HybridContractError } from "./_hybrid-codec.js";
 export { canonicalHybridV1, signingDigest, strictDecode, HybridContractError } from "./_hybrid-codec.js";
 
 export const PERMISSION_DOMAIN="heddle-import-member-permission-v1",GENESIS_DOMAIN="heddle-import-genesis-authority-v1",DELEGATION_DOMAIN="heddle-import-job-delegation-v1",RENEWAL_DOMAIN="heddle-import-job-renewal-v1",OPERATION_DOMAIN="heddle-delegated-import-operation-v1",MANIFEST_DOMAIN="heddle-import-result-manifest-v1";
@@ -20,9 +22,125 @@ export function ownerChainDigest(v:api.ImportOwnerChainV1):Uint8Array{width(v.sp
 function identity(v:api.ImportIdentityV1|undefined):asserts v is api.ImportIdentityV1{if(!v)reject("Canonical");for(const b of [v.spoolUuid,v.ownerAccountUuid]){width(b,16);if(!b.some(Boolean))reject("Canonical");}for(const b of [v.spoolGenesisDigest,v.ownerId,v.ownerStateHash])width(b,32);}
 function sameIdentity(a:api.ImportIdentityV1,b:api.ImportIdentityV1):boolean{return equal(canonicalHybridV1(api.ImportIdentityV1Schema,a),canonicalHybridV1(api.ImportIdentityV1Schema,b));}
 function interval(start:bigint,end:bigint,now:bigint){if(start<0n||end<=start)reject("Semantic");if(now<start||now>=end)reject("Expired");}
-function branch(v:api.ImportBranchLimitV1){if(!v.refName.startsWith("refs/heads/")||v.refName.length>1024||v.refName.endsWith("/")||v.refName.endsWith(".")||v.refName.includes("..")||v.refName.includes("//")||v.refName.includes("@{")||v.refName.split("/").some(p=>p.startsWith(".")||p.endsWith(".lock"))||!/^[A-Za-z0-9/_\-.]+$/.test(v.refName))reject("Canonical");const size=v.hashAlgorithm===1?20:v.hashAlgorithm===2?32:reject("Version");if(v.refMode===1)width(v.pinnedCommitOid,size);else if(v.refMode!==2||v.pinnedCommitOid.length)reject("Semantic");for(const b of [v.genesisDigest,v.targetThreadId,v.expectedFrontierDigest])width(b,32);if(v.maxResultBytes<=0n||v.maxResultBytes>MAX_RESULT_BYTES)reject("Bounds");}
+function branch(v:api.ImportBranchLimitV1){if(!v.refName.startsWith("refs/heads/")||v.refName.length>1024||v.refName.endsWith("/")||v.refName.endsWith(".")||v.refName.includes("..")||v.refName.includes("//")||v.refName.includes("@{")||v.refName.split("/").some(p=>p.startsWith(".")||p.endsWith(".lock"))||!/^[A-Za-z0-9/_\-.]+$/.test(v.refName))reject("Canonical");const size=v.hashAlgorithm===1?20:v.hashAlgorithm===2?32:reject("Version");if(v.refMode===1){width(v.pinnedCommitOid,size);if(v.refDisclosure!==0)reject("RefDisclosure");}else if(v.refMode===2&&!v.pinnedCommitOid.length){if(v.refDisclosure!==1)reject("RefDisclosure");}else reject("Semantic");for(const b of [v.genesisDigest,v.targetThreadId,v.expectedFrontierDigest])width(b,32);if(v.maxResultBytes<=0n||v.maxResultBytes>MAX_RESULT_BYTES)reject("Bounds");}
 export function validateImportScope(v:api.ImportPermissionScopeV1){canonicalHttps(v.sourceUrl);if(!/^[a-z0-9-]{1,64}$/.test(v.provider)||!v.converterVersion||v.converterVersion.length>128||!/^[\x00-\x7f]+$/.test(v.converterVersion))reject("Canonical");width(v.destinationVersion,32);width(v.optionsDigest,32);if(!v.branches.length||v.branches.length>MAX_BRANCHES||v.maxOperations<=0||v.maxOperations>MAX_BRANCHES||v.maxResultBytes<=0n||v.maxResultBytes>MAX_RESULT_BYTES)reject("Bounds");if(v.maxOperations<v.branches.length)reject("Scope");let total=0n;v.branches.forEach((b,i)=>{branch(b);if(i&&v.branches[i-1]!.refName>=b.refName)reject("Canonical");total+=b.maxResultBytes;});if(total>v.maxResultBytes)reject("Scope");}
 function branchSubset(c:api.ImportBranchLimitV1,p:api.ImportBranchLimitV1):boolean{const copy=clone(api.ImportBranchLimitV1Schema,c);copy.maxResultBytes=p.maxResultBytes;return c.maxResultBytes<=p.maxResultBytes&&equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,copy),canonicalHybridV1(api.ImportBranchLimitV1Schema,p));}
+
+/** Compare independently observed OID knowledge before preparing/signing. */
+export function validateImportRefSelection(value:api.ImportBranchLimitV1, knownCommitOid?:Uint8Array):void {
+  branch(value);
+  if (knownCommitOid !== undefined) {
+    width(knownCommitOid, value.hashAlgorithm === 1 ? 20 : 32);
+    if (value.refMode !== 1 || !equal(value.pinnedCommitOid, knownCommitOid)) reject("RefPinning");
+  }
+}
+
+export function conversionOptionsDigest(version:string, options:Uint8Array):Uint8Array {
+  if (!version || version.length > 128 || !/^[\x00-\x7f]+$/.test(version)) reject("Canonical");
+  if (options.length > 4096) reject("Bounds");
+  return hash(utf8.encode("heddle-import-conversion-options-v1"), sized(utf8.encode(version)), sized(options));
+}
+
+export function validateImportConfiguration(v:api.GetImportConfigurationResponse):void {
+  if (toBinary(api.GetImportConfigurationResponseSchema,v).length > MAX_BUNDLE_BYTES || !v.converters.length || v.converters.length > 32) reject("Bounds");
+  v.converters.forEach((c,i) => {
+    for (const text of [c.converterVersion,c.optionsEncoding]) {
+      if (!text || text.length > 128 || !/^[\x00-\x7f]+$/.test(text)) reject("Canonical");
+    }
+    if (i && v.converters[i-1]!.converterVersion >= c.converterVersion) reject("Canonical");
+    if (!c.canonicalOptions.length || c.canonicalOptions.length > 64 || c.canonicalOptions.some(o=>o.length > 4096)) reject("Bounds");
+    if (c.canonicalOptions.some((o,j)=>j>0 && compare(c.canonicalOptions[j-1]!,o)>=0) || !c.canonicalOptions.some(o=>equal(o,c.defaultOptions))) reject("Canonical");
+  });
+  const l=v.limits??reject("Canonical");
+  if (l.maxBranches<=0 || l.maxBranches>MAX_BRANCHES || l.maxOperations<=0 || l.maxOperations>MAX_BRANCHES || l.maxResultBytes<=0n || l.maxResultBytes>MAX_RESULT_BYTES || l.maxBranchResultBytes<=0n || l.maxBranchResultBytes>l.maxResultBytes) reject("Bounds");
+}
+
+/** Host negotiation against CURRENT configuration and the current destination CAS. */
+export function prepareImportScope(proposed:api.ImportPermissionScopeV1, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array):api.ImportPermissionScopeV1 {
+  const reason=api.ImportPreparationRefusalReason;
+  const refuse=(r:api.ImportPreparationRefusalReason):never=>{throw new HybridContractError("PreparationRefused",r);};
+  validateImportConfiguration(configuration);width(currentDestinationVersion,32);
+  if (proposed.destinationVersion.length && proposed.destinationVersion.length!==32) refuse(reason.INVALID_SCOPE);
+  if (proposed.destinationVersion.length && !equal(proposed.destinationVersion,currentDestinationVersion)) refuse(reason.DESTINATION_CONFLICT);
+  const selected=clone(api.ImportPermissionScopeV1Schema,proposed);selected.destinationVersion=currentDestinationVersion.slice();
+  try { validateImportScope(selected); } catch (error) { if (error instanceof HybridContractError) refuse(reason.INVALID_SCOPE); throw error; }
+  const c=configuration.converters.find(c=>c.converterVersion===selected.converterVersion)??refuse(reason.UNSUPPORTED_CONVERTER);
+  if (!c.canonicalOptions.some(o=>equal(conversionOptionsDigest(c.converterVersion,o),selected.optionsDigest))) refuse(reason.UNSUPPORTED_OPTIONS);
+  const l=configuration.limits!;
+  if (selected.branches.length>l.maxBranches || selected.maxOperations>l.maxOperations || selected.maxResultBytes>l.maxResultBytes || selected.branches.some(b=>b.maxResultBytes>l.maxBranchResultBytes)) refuse(reason.BUDGET_EXCEEDED);
+  return selected;
+}
+
+/** Caller comparison before signing; no silent negotiation, including reductions. */
+export function validateImportPreparationResponse(request:api.PrepareImportJobRequest, response:api.PrepareImportJobResponse):void {
+  const r=response.refusal;
+  if (r) {
+    if (r.reason<0 || r.reason>6) reject("Version");
+    if (r.reason===0 || r.field.length>256 || !/^[\x00-\x7f]*$/.test(r.field) || response.proposal || response.renewalState || response.reservationExpiresAtUnixSeconds!==0n || response.preparedAtUnixSeconds!==0n || response.maxValidityDurationSeconds!==0n || response.clockSkewAllowanceSeconds!==0n) reject("Canonical");
+    throw new HybridContractError("PreparationRefused",r.reason);
+  }
+  const p=response.proposal??reject("Canonical"),returned=p.scope??reject("Canonical");
+  if (!request.proposedScope) reject("Canonical");
+  const requested=clone(api.ImportPermissionScopeV1Schema,request.proposedScope);
+  if (!requested.destinationVersion.length) requested.destinationVersion=returned.destinationVersion.slice();
+  if (!equal(canonicalHybridV1(api.ImportPermissionScopeV1Schema,requested),canonicalHybridV1(api.ImportPermissionScopeV1Schema,returned)) || !request.identity || !p.identity || !sameIdentity(p.identity,request.identity) || !equal(p.retryLineageId,request.retryLineageId)) reject("PreparedFields");
+  validateImportScope(returned);
+  if (!request.renewLogicalJobId.length) {
+    if (response.renewalState || p.predecessorDelegationDigest.some(Boolean)) reject("PreparedFields");
+  } else {
+    if (!equal(p.logicalJobId,request.renewLogicalJobId)) reject("PreparedFields");
+    validateRenewalPreparation(response);
+  }
+}
+
+/** Provider identity comes from an authenticated resolver, never projection hints.
+ * Native base decoding/identity, source grants and atomic activation remain host gates. */
+export async function validateImportCommitRequest(request:CommitImportJobRequest, resolvedProvider:string):Promise<void> {
+  request=clone(CommitImportJobRequestSchema,request);
+  const source=request.source??reject("SourceSelection"),proof=request.proof??reject("Canonical");
+  if (!request.clientOperationId || utf8.encode(request.clientOperationId).length>128 || !request.destination?.id) reject("Canonical");
+  if (request.initialBaseState.length>4096 || toBinary(api.ImportPublicProofBundleV1Schema,proof).length>MAX_BUNDLE_BYTES) reject("Bounds");
+  if (proof.formatVersion!==1 || proof.delegations.length!==1 || proof.renewals.length || proof.operations.length || proof.terminalManifest || proof.manifests.length) reject("Canonical");
+  const d=proof.delegations[0]!.body??reject("Canonical"),scope=d.scope??reject("Canonical");validateImportScope(scope);
+  identity(d.identity);
+  const uuid=Array.from(d.identity.spoolUuid,b=>b.toString(16).padStart(2,"0")).join("");
+  const destinationId=`${uuid.slice(0,8)}-${uuid.slice(8,12)}-${uuid.slice(12,16)}-${uuid.slice(16,20)}-${uuid.slice(20)}`;
+  if (request.destination.id!==destinationId) reject("Scope");
+  if (d.predecessorDelegationDigest.length!==32 || d.predecessorDelegationDigest.some(Boolean)) reject("Canonical");
+  if (source.cloneUrl!==scope.sourceUrl || resolvedProvider!==scope.provider || utf8.encode(source.providerRepositoryId).length>4096 || utf8.encode(source.name).length>4096) reject("SourceSelection");
+  if (source.connection) {
+    if (source.connection.spool || !source.connection.id || !source.providerRepositoryId || !source.installationId) reject("SourceSelection");
+  } else if (source.private || source.installationId || (source.providerRepositoryId && source.providerRepositoryId!==source.cloneUrl)) reject("SourceSelection");
+  if (proof.originalGeneses.length!==scope.branches.length || proof.creatorAuthorityEnvelopes.length!==scope.branches.length || proof.genesisAuthorities.length!==scope.branches.length || d.branchManifest.length!==scope.branches.length) reject("GenesisBinding");
+  for (const [i,b] of scope.branches.entries()) {
+    const original=proof.originalGeneses[i]!,binding=proof.genesisAuthorities[i]!,g=binding.body??reject("GenesisBinding"),m=d.branchManifest[i]!,envelope=proof.creatorAuthorityEnvelopes[i]!;
+    if (!equal(nativeOctetsId(original.format,original.canonicalRecord),b.genesisDigest) || !equal(g.genesisDigest,b.genesisDigest) || !m.limit || !equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,m.limit),canonicalHybridV1(api.ImportBranchLimitV1Schema,b)) || !equal(m.genesisAuthorityDigest,signedGenesisDigest(binding)) || !equal(g.creatorAuthorityEnvelopeDigest,hash(envelope)) || !envelope.length || envelope.length>MAX_RECORD_BYTES || original.signatures.length!==1 || !equal(original.signatures[0]!.publicKey,g.creatorPublicKey) || !equal(original.signatures[0]!.signature,g.originalCreatorSignature)) reject("GenesisBinding");
+    await native(original,"heddle-thread-genesis-v1");
+  }
+}
+
+export function validateImportSource(_request:ImportSourceRequest):never { return reject("ImportSourceRequiresCommit"); }
+
+/** Complete initial validation; native model/owner history and live transaction
+ * checks remain the hosted implementation's responsibility. */
+export async function verifyImportCommitSubmission(request:CommitImportJobRequest, prepared:api.PrepareImportJobResponse, resolvedProvider:string, e:ImportOwnerExpectation):Promise<VerifiedImportDelegation> {
+  request=clone(CommitImportJobRequestSchema,request);prepared=clone(api.PrepareImportJobResponseSchema,prepared);e=snapshotExpectation(e);
+  await validateImportCommitRequest(request,resolvedProvider);
+  const proof=request.proof!,member=proof.memberPermission??proof.memberPermissions[0];
+  if (proof.memberPermissions.length>1 || (proof.memberPermissions[0] && (!member || !equal(canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,proof.memberPermissions[0]),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,member))))) reject("ImportPermission");
+  return verifyPreparedImportDelegation(prepared,proof.delegations[0]!,member,proof.genesisAuthorities,e);
+}
+
+export function validateImportCommitResponse(request:CommitImportJobRequest, response:MutationResponse):void {
+  const r=response.receipt;
+  if (!r || r.outcome.case!=="pendingOperation" || !request.clientOperationId || r.clientOperationId!==request.clientOperationId || !request.destination || r.outcome.value.spool?.id!==request.destination.id || !r.outcome.value.id) reject("PendingOperation");
+}
+
+/** Host looks up its durable caller-scoped row before revalidating expired authority. */
+export function checkImportCommitReplay(request:CommitImportJobRequest, stored:CommitImportJobRequest, response:MutationResponse):void {
+  if (!equal(toBinary(CommitImportJobRequestSchema,request),toBinary(CommitImportJobRequestSchema,stored))) reject("OperationIdReused");
+  validateImportCommitResponse(request,response);
+}
 function subset(c:api.ImportPermissionScopeV1,p:api.ImportPermissionScopeV1):boolean{return c.provider===p.provider&&c.sourceUrl===p.sourceUrl&&equal(c.destinationVersion,p.destinationVersion)&&equal(c.optionsDigest,p.optionsDigest)&&c.converterVersion===p.converterVersion&&c.maxOperations<=p.maxOperations&&c.maxResultBytes<=p.maxResultBytes&&c.branches.every(b=>p.branches.some(a=>branchSubset(b,a)));}
 export interface ImportOwnerExpectation{identity:api.ImportIdentityV1;ownerPublicKey:Uint8Array;ownerChainDigest:Uint8Array;authorityExpiresAtSeconds:bigint;nowUnixSeconds:bigint;forbiddenJobKeys:readonly Uint8Array[];knownJobAssociations:readonly {key:Uint8Array;logicalJobId:Uint8Array}[];}
 function snapshotExpectation(e:ImportOwnerExpectation):ImportOwnerExpectation{return {...e,identity:clone(api.ImportIdentityV1Schema,e.identity),ownerPublicKey:e.ownerPublicKey.slice(),ownerChainDigest:e.ownerChainDigest.slice(),forbiddenJobKeys:e.forbiddenJobKeys.map(k=>k.slice()),knownJobAssociations:e.knownJobAssociations.map(a=>({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()}))};}
@@ -100,9 +218,8 @@ export async function signImportDelegation(body:api.ImportJobDelegationV1,signer
 export async function signImportRenewal(body:api.ImportJobRenewalV1,signer:ImportSigner){const b=clone(api.ImportJobRenewalV1Schema,body);if(!b.replacement?.body||!equal(b.replacement.body.delegatingPublicKey,signer.publicKey))reject("Signature");return create(api.SignedImportJobRenewalV1Schema,{body:b,delegatingSignature:await signature(RENEWAL_DOMAIN,api.ImportJobRenewalV1Schema,b,signer)});}
 export async function signDelegatedImportOperation(body:api.DelegatedImportOperationV1,signer:ImportSigner){const b=clone(api.DelegatedImportOperationV1Schema,body);return create(api.SignedDelegatedImportOperationV1Schema,{body:b,jobSignature:await signature(OPERATION_DOMAIN,api.DelegatedImportOperationV1Schema,b,signer)});}
 
-import { toBinary } from "@bufbuild/protobuf";
 import { SignedRecordSchema, type SignedRecord, type RecordSignature } from "./common_pb.js";
-import { compare, sized, utf8, u32, join } from "./_hybrid-codec.js";
+import { u32, join } from "./_hybrid-codec.js";
 import { unarySigningBytes } from "../signing.js";
 import { threadGenesisId } from "./thread-genesis.js";
 

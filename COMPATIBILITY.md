@@ -96,5 +96,13 @@ old peer may decode protobuf but must never ignore the new authority requirement
 See the [wire/verification contract](docs/alpha-v2/import-authority-host-witness.md).
 The release/cutover cascade is api → heddle → weft → tapestry, coordinated with
 new-format import and native reinitialization; no legacy proof conversion or
-immutable receipt re-signing is permitted. This additive schema PR bumps no
-package version and creates no tag. The eventual release is a separate step.
+immutable receipt re-signing is permitted. The alpha.23 revision below advances both API package versions; tag creation
+and publication remain separate release steps.
+
+## HYBRID v1 alpha.23
+
+The undeployed import contract is revised in place for api#327. Commit is the
+complete initial submission, Prepare preserves caller choices with typed refusal,
+and mutable-ref fallback requires a signed disclosure. No compatibility branch
+or v2 import format exists. See [the breaking note](breaking/0.31.0-alpha.23.md)
+and [normative contract](docs/alpha-v2/import-authority-host-witness.md).

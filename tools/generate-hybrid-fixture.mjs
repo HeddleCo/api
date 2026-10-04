@@ -14,6 +14,8 @@ import { unarySigningBytes } from '../packages/typescript/dist/signing.js';
 import { blake3 } from '@noble/hashes/blake3.js';
 import { delegationPreparation, frontierDigest, contentDigest, boundaryOctetsDigest, publicationPayload, signedNativeDigest, authorityEnvelopeDigest, originalSignaturesDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import * as api from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
+import { CommitImportJobRequestSchema, ImportSourceRequestSchema } from '../packages/typescript/dist/v1alpha2/integration_pb.js';
+import { MutationResponseSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import * as common from '../packages/typescript/dist/common/hosted_witness_pb.js';
 import { canonicalThreadGenesis, threadGenesisId } from '../packages/typescript/dist/v1alpha2/thread-genesis.js';
 import { IntegrationService, SyncService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
@@ -26,8 +28,8 @@ const hex=v=>Buffer.from(v).toString('hex'),raw=(n,s=32)=>new Uint8Array(s).fill
 const keys=Object.fromEntries(['owner','device','job','renew_job','witness','next_witness','root','wrong_root','guardian_a','guardian_b','direct_job','competing_job'].map((name,i)=>{const seed=raw(i+1),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'}),publicKey=new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32));return [name,{seed,privateKey,publicKey}];}));
 const sig=(name,input)=>new Uint8Array(sign(null,input,keys[name].privateKey));
 const auth=(name,input)=>({signerKeyId:keyId(keys[name].publicKey),signature:sig(name,input)});
-const artifact={format_version:1,messages:[...Object.values(common),...Object.values(api),ProtocolCompatibilitySchema].filter(v=>v?.kind==='message').map(v=>v.typeName).sort(),descriptors:[],enums:[],protocol:{version:2,feature:1,gated_methods:[...IntegrationService.methods,...SyncService.methods].filter(m=>getOption(m,rpc_contract).mandatoryFeatures.includes(1)).map(m=>`/${m.parent.typeName}/${m.name}`).sort()},keys:Object.fromEntries(Object.entries(keys).map(([n,k])=>[n,{seed_hex:hex(k.seed),public_key_hex:hex(k.publicKey)}])),signed_vectors:{},wire_vectors:{},commitment_vectors:{},raw_commitment_vectors:{},negative_vectors:[],trees:[],retry_scenarios:[]};
-for(const schema of [...Object.values(common),...Object.values(api),ProtocolCompatibilitySchema].filter(v=>v?.kind==='message'))artifact.descriptors.push({name:schema.typeName,fields:schema.fields.map(f=>({name:f.name,number:f.number,type:f.message?.typeName??f.enum?.typeName??String(f.scalar),list:f.fieldKind==='list'}))});
+const artifact={format_version:1,messages:[...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message').map(v=>v.typeName).sort(),descriptors:[],enums:[],protocol:{version:2,feature:1,gated_methods:[...IntegrationService.methods,...SyncService.methods].filter(m=>getOption(m,rpc_contract).mandatoryFeatures.includes(1)).map(m=>`/${m.parent.typeName}/${m.name}`).sort()},keys:Object.fromEntries(Object.entries(keys).map(([n,k])=>[n,{seed_hex:hex(k.seed),public_key_hex:hex(k.publicKey)}])),signed_vectors:{},wire_vectors:{},commitment_vectors:{},raw_commitment_vectors:{},negative_vectors:[],trees:[],retry_scenarios:[]};
+for(const schema of [...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message'))artifact.descriptors.push({name:schema.typeName,fields:schema.fields.map(f=>({name:f.name,number:f.number,type:f.message?.typeName??f.enum?.typeName??String(f.scalar),list:f.fieldKind==='list'}))});
 for(const schema of [...Object.values(common),...Object.values(api),MandatoryProtocolFeatureSchema].filter(v=>v?.kind==='enum'))artifact.enums.push({name:schema.typeName,values:schema.values.map(v=>({name:v.name,number:v.number}))});
 function wire(name,schema,value){artifact.wire_vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,value))};return value;}
 function signed(name,bodySchema,body,signedSchema,signatureField,key,domain){const input=signingDigest(domain,bodySchema,body),signature=auth(key,input),value=create(signedSchema,{body,[signatureField]:signature});artifact.signed_vectors[name]={schema:signedSchema.typeName,body_schema:bodySchema.typeName,wire_hex:hex(toBinary(signedSchema,value)),canonical_hex:hex(canonicalHybridV1(bodySchema,body)),signing_input_hex:hex(input),domain,public_key_hex:hex(keys[key].publicKey),signature_hex:hex(signature.signature)};return value;}
@@ -196,6 +198,55 @@ const publication=wire('publication',api.ImportPublicationWitnessV1Schema,create
 const statements=[];
 function statement(name,purpose,payload,transaction=0x60,authority=signedDelegationDigest(delegation),originalSignatures=hash(operations.main.jobSignature.signature),observed=1100000n,boundaryAcceptance){const body=create(common.HostedWitnessStatementV1Schema,{formatVersion:1,executorId:witnessId(keys.witness.publicKey),purpose,spoolUuid,spoolGenesisDigest:spoolDigest,ownerId,ownerStateHash:stateHash,policyStateHash,policySequence:1n,basis:boundaryAcceptance?2:1,boundaryAcceptance,publisherKeyId:keyId(keys.device.publicKey),authorityDigest:authority,originalSignaturesDigest:originalSignatures,hostTransactionId:raw(transaction,16),admissionOrder:BigInt(transaction),observedAtUnixMillis:observed,canonicalPayload:payload});const input=statementSigningDigest(body),signature=sig('witness',input),value=create(common.SignedHostedWitnessStatementV1Schema,{body,signature});artifact.signed_vectors[name]={schema:common.SignedHostedWitnessStatementV1Schema.typeName,body_schema:common.HostedWitnessStatementV1Schema.typeName,wire_hex:hex(toBinary(common.SignedHostedWitnessStatementV1Schema,value)),canonical_hex:hex(canonicalHybridV1(common.HostedWitnessStatementV1Schema,body)),signing_input_hex:hex(input),domain:purposeDomain(purpose),public_key_hex:hex(keys.witness.publicKey),signature_hex:hex(signature)};return value;}
 const originalGeneses=Object.fromEntries(Object.entries(genesisRecords).map(([name,g])=>[name,create(SignedRecordSchema,{format:'heddle-thread-genesis-v1',canonicalRecord:g.canonical,signatures:[{publicKey:keys.device.publicKey,signature:g.signature}]})]));
+// api#327: caller choices, complete initial submission and signed ref fallback.
+artifact.submission_vectors={changed_preparations:[],commit_negatives:[],ref_negatives:[],scope_refusals:[]};
+const destination={id:'23232323-2323-2323-2323-232323232323'};
+const config=wire('import_configuration',api.GetImportConfigurationResponseSchema,create(api.GetImportConfigurationResponseSchema,{
+ converters:[{converterVersion:scope.converterVersion,optionsEncoding:'heddle-import-options-empty-v1',canonicalOptions:[new Uint8Array()],defaultOptions:new Uint8Array()}],
+ limits:{maxBranches:256,maxOperations:256,maxResultBytes:1n<<30n,maxBranchResultBytes:1n<<30n},
+}));
+const prepareRequest=wire('prepare_request',api.PrepareImportJobRequestSchema,create(api.PrepareImportJobRequestSchema,{clientOperationId:'prepare-327',destination,identity,proposedScope:scope,retryLineageId}));
+const emptyTokenRequest=clone(api.PrepareImportJobRequestSchema,prepareRequest);emptyTokenRequest.proposedScope.destinationVersion=new Uint8Array();wire('prepare_issue_token',api.PrepareImportJobRequestSchema,emptyTokenRequest);
+for(const {path,field} of frozenLeaves(api.ImportPermissionScopeV1Schema,scope)){
+ const changed=clone(api.PrepareImportJobResponseSchema,preparation);let target=changed.proposal.scope;
+ for(const part of path.slice(0,-1))target=target[part];mutateLeaf(target,field);
+ const name=`prepare_changed_${path.join('_')}`;wire(name,api.PrepareImportJobResponseSchema,changed);
+ artifact.submission_vectors.changed_preparations.push({id:path.join('.'),response:name,expected:'PreparedFields',control:'commit_preparation'});
+}
+const initialProof=create(api.ImportPublicProofBundleV1Schema,{formatVersion:1,ownerGenesis:spoolGenesis,ownerHistories:[create(owner.OwnerHistorySchema,{root:signedRoot,stateHash})],memberPermission:permission,memberPermissions:[permission],genesisAuthorities:Object.values(genesisProofs),delegations:[delegation],originalGeneses:Object.values(originalGeneses),creatorAuthorityEnvelopes:Object.values(envelopes),ownerChain:chain});
+const commitRequest=wire('commit_request',CommitImportJobRequestSchema,create(CommitImportJobRequestSchema,{clientOperationId:'commit-327',destination,proof:initialProof,source:{connection:{id:'26262626-2626-2626-2626-262626262626'},providerRepositoryId:'327',cloneUrl:scope.sourceUrl,name:'heddleco/example',private:true,installationId:'123'},initialBaseState:new Uint8Array(Buffer.from(seedText.split('canonical=')[1].split('\n')[0],'hex'))}));
+const withoutBase=clone(CommitImportJobRequestSchema,commitRequest);withoutBase.initialBaseState=new Uint8Array();wire('commit_hosted_base',CommitImportJobRequestSchema,withoutBase);
+const publicSource=clone(CommitImportJobRequestSchema,commitRequest);publicSource.source={...publicSource.source,connection:undefined,providerRepositoryId:scope.sourceUrl,private:false,installationId:''};wire('commit_public_source',CommitImportJobRequestSchema,publicSource);
+for(const [id,mutate,expected] of [
+ ['missing_source',r=>r.source=undefined,'SourceSelection'],
+ ['source_url',r=>r.source.cloneUrl='https://other.example.test/repo.git','SourceSelection'],
+ ['private_without_connection',r=>r.source.connection=undefined,'SourceSelection'],
+ ['missing_installation',r=>r.source.installationId='','SourceSelection'],
+ ['base_too_large',r=>r.initialBaseState=raw(0,4097),'Bounds'],
+ ['missing_original',r=>r.proof.originalGeneses.pop(),'GenesisBinding'],
+ ['reordered_originals',r=>r.proof.originalGeneses.reverse(),'GenesisBinding'],
+ ['envelope_substitution',r=>r.proof.creatorAuthorityEnvelopes[0]=str('different exact envelope'),'GenesisBinding'],
+ ['renewal_as_commit',r=>r.proof.delegations[0].body.predecessorDelegationDigest=raw(1),'Canonical'],
+]){const r=clone(CommitImportJobRequestSchema,commitRequest);mutate(r);const name=`submission_${id}`;wire(name,CommitImportJobRequestSchema,r);artifact.submission_vectors.commit_negatives.push({id,request:name,expected,control:'commit_request'});}
+wire('commit_response',MutationResponseSchema,create(MutationResponseSchema,{receipt:{clientOperationId:commitRequest.clientOperationId,outcome:{case:'pendingOperation',value:{spool:destination,id:'27272727-2727-2727-2727-272727272727'}}}}));
+wire('import_source_misuse',ImportSourceRequestSchema,create(ImportSourceRequestSchema,{clientOperationId:'commit-327',destination,source:commitRequest.source,initialBaseState:commitRequest.initialBaseState}));
+for(const [id,mutate,reason] of [
+ ['converter',s=>s.converterVersion='unsupported/1',2],
+ ['options',s=>s.optionsDigest=raw(0x91),3],
+ ['budget',s=>s.maxOperations=3,4],
+ ['destination',s=>s.destinationVersion=raw(0x92),5],
+ ['invalid_scope',s=>s.optionsDigest=new Uint8Array(),1],
+]){const s=clone(api.ImportPermissionScopeV1Schema,scope);mutate(s);const name=`scope_refusal_${id}`;wire(name,api.ImportPermissionScopeV1Schema,s);const limits=clone(api.GetImportConfigurationResponseSchema,config);limits.limits.maxOperations=2;wire('import_configuration_tight',api.GetImportConfigurationResponseSchema,limits);artifact.submission_vectors.scope_refusals.push({id,scope:name,reason,configuration:id==='budget'?'import_configuration_tight':'import_configuration',control:'scope'});wire(`prepare_refusal_${id}`,api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{refusal:{reason,field:'proposed_scope'}}));}
+const observeScope=clone(api.ImportPermissionScopeV1Schema,scope);for(const b of observeScope.branches){b.refMode=2;b.pinnedCommitOid=new Uint8Array();b.refDisclosure=1;}
+wire('scope_observe_disclosed',api.ImportPermissionScopeV1Schema,observeScope);
+const observeParent=clone(api.ImportMemberPermissionV1Schema,permissionBody);observeParent.scope=observeScope;
+const observeChild=clone(api.ImportJobDelegationV1Schema,delegationBody);observeChild.scope=observeScope;observeChild.branchManifest.forEach((m,i)=>m.limit=observeScope.branches[i]);
+const observe=commitParentInputs('observe',observeParent,observeChild);commitSigned('submission_observe_delegation',observe.body);
+wire('submission_observe_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{...preparation,proposal:delegationPreparation(observe.body)}));
+const undisclosed=clone(api.ImportPermissionScopeV1Schema,observeScope);undisclosed.branches[0].refDisclosure=0;wire('scope_observe_undisclosed',api.ImportPermissionScopeV1Schema,undisclosed);
+const missingDisclosure=clone(api.ImportJobDelegationV1Schema,observe.body);missingDisclosure.scope=undisclosed;missingDisclosure.branchManifest[0].limit=undisclosed.branches[0];commitSigned('submission_observe_undisclosed_delegation',missingDisclosure);
+wire('submission_observe_undisclosed_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{...preparation,proposal:delegationPreparation(missingDisclosure)}));
+artifact.submission_vectors.ref_negatives.push({id:'observe_without_disclosure',scope:'scope_observe_undisclosed',expected:'RefDisclosure',control:'scope_observe_disclosed'});
 const genesisPayload=wire('genesis_payload',api.ImportGenesisWitnessV1Schema,create(api.ImportGenesisWitnessV1Schema,{formatVersion:1,binding:genesisProofs.main,originalGenesis:originalGeneses.main,creatorAuthorityEnvelope:envelopes.main}));
 commitment('genesis_payload',api.ImportGenesisWitnessV1Schema,genesisPayload,'heddle-import-genesis-witness-payload-v1');
 statements.push(statement('genesis_admission',1,canonicalHybridV1(api.ImportGenesisWitnessV1Schema,genesisPayload),0x60,signedGenesisDigest(genesisProofs.main),originalSignaturesDigest([originalGeneses.main])));

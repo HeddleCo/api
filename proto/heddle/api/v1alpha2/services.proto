@@ -2654,6 +2654,25 @@ service IntegrationService {
     deployment_targets: [DEPLOYMENT_TARGET_WEFT]
     maturity: SERVICE_MATURITY_PLANNED
   };
+  // Authenticated complete configuration snapshot before caller scope selection.
+  // A bounded unary read avoids coupling converter discovery to inventory pages.
+  rpc GetImportConfiguration(GetImportConfigurationRequest) returns (GetImportConfigurationResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "destination"
+        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // Freeze the exact job/identity/lineage/scope and persist encrypted key custody.
   // Advertise host time, maximum validity duration and clock-skew allowance.
   // The returned preparation has no execution authority.
@@ -2680,6 +2699,11 @@ service IntegrationService {
   // genesis bindings and bounded window. Compare frozen canonical bytes, verify
   // non-amplification, exact branch bindings and signature before activation;
   // recheck current authority and reservation expiry in the mutation transaction.
+  // Atomically persist source/base, activate authority epoch 1 and create the
+  // initial physical operation. Success is receipt.pending_operation, never
+  // applied; no later ImportSource call. An exact client_operation_id replay
+  // returns the same receipt/operation without reactivation, even after expiry.
+  // Changed inputs under that ID fail ERROR_REASON_OPERATION_ID_REUSED.
   rpc CommitImportJob(CommitImportJobRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -2854,6 +2878,7 @@ service IntegrationService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  // Closed initial-import route; typed IMPORT_SOURCE_REQUIRES_COMMIT refusal.
   rpc ImportSource(ImportSourceRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

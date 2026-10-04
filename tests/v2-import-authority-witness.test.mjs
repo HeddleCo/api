@@ -33,6 +33,67 @@ test('submission observe requires signed disclosure',()=>{
  scope.branches[0].refMode=2;scope.branches[0].pinnedCommitOid=new Uint8Array();
  assert.throws(()=>authority.validateImportScope(scope), 'observe mode must carry the signed disclosure');
 });
+for(const v of fixture.submission_vectors.changed_preparations)test(`submission Prepare REJECT then PASS: ${v.id}`,()=>{
+ const request=vector('prepare_request');
+ assert.throws(()=>authority.validateImportPreparationResponse(request,vector(v.response)),expected(v.expected));
+ authority.validateImportPreparationResponse(request,vector(v.control));
+});
+for(const v of fixture.submission_vectors.commit_negatives)test(`submission Commit REJECT then PASS: ${v.id}`,async()=>{
+ await assert.rejects(authority.validateImportCommitRequest(vector(v.request),'github'),expected(v.expected));
+ await authority.validateImportCommitRequest(vector(v.control),'github');
+});
+for(const v of fixture.submission_vectors.scope_refusals)test(`submission typed refusal REJECT then PASS: ${v.id}`,()=>{
+ const scope=vector('scope'),configuration=vector(v.configuration);
+ const refusal=e=>expected('PreparationRefused')(e)&&e.preparationRefusalReason===v.reason;
+ assert.throws(()=>authority.prepareImportScope(vector(v.scope),configuration,scope.destinationVersion),refusal);
+ assert.throws(()=>authority.validateImportPreparationResponse(vector('prepare_request'),vector(`prepare_refusal_${v.id}`)),refusal);
+ assert.deepEqual(authority.prepareImportScope(scope,configuration,scope.destinationVersion),scope);
+});
+test('submission CAS issuance preserves all choices and leaves the request untouched',()=>{
+ const request=vector('prepare_issue_token'),scope=vector('scope');
+ authority.validateImportPreparationResponse(request,vector('commit_preparation'));
+ assert.deepEqual(authority.prepareImportScope(request.proposedScope,vector('import_configuration'),scope.destinationVersion),scope);
+ assert.equal(request.proposedScope.destinationVersion.length,0);
+ const refused=vector('prepare_refusal_converter');refused.refusal.reason=99;
+ assert.throws(()=>authority.validateImportPreparationResponse(vector('prepare_request'),refused),expected('Version'));
+});
+test('submission ImportSource misuse REJECT then PASS with Commit',async()=>{
+ assert.throws(()=>authority.validateImportSource(vector('import_source_misuse')),expected('ImportSourceRequiresCommit'));
+ await authority.validateImportCommitRequest(vector('commit_request'),'github');
+});
+test('submission Commit pending operation and immutable replay',async()=>{
+ const request=vector('commit_request'),response=vector('commit_response');
+ await authority.verifyImportCommitSubmission(request,vector('commit_preparation'),'github',ownerContext());
+ authority.checkImportCommitReplay(request,vector('commit_request'),response);
+ const changed=vector('commit_request');changed.initialBaseState=new Uint8Array();
+ assert.throws(()=>authority.checkImportCommitReplay(changed,request,response),expected('OperationIdReused'));
+ response.receipt.outcome={case:'applied',value:create(api.AppliedSchema)};
+ assert.throws(()=>authority.validateImportCommitResponse(request,response),expected('PendingOperation'));
+ await assert.rejects(authority.validateImportCommitRequest(request,'gitlab'),expected('SourceSelection'));
+ for(const name of ['commit_hosted_base','commit_public_source'])await authority.validateImportCommitRequest(vector(name),'github');
+});
+test('submission signed observe disclosure REJECT then PASS; known OID always pinned',async()=>{
+ const pinned=vector('scope').branches[0],observe=vector('scope_observe_disclosed').branches[0];
+ assert.throws(()=>authority.validateImportScope(vector('scope_observe_undisclosed')),expected('RefDisclosure'));
+ authority.validateImportScope(vector('scope_observe_disclosed'));
+ authority.validateImportRefSelection(pinned,pinned.pinnedCommitOid);
+ assert.throws(()=>authority.validateImportRefSelection(observe,pinned.pinnedCommitOid),expected('RefPinning'));
+ authority.validateImportRefSelection(observe);
+ const parent=vector('commit_observe_parent'),geneses=['dev','main'].map(n=>vector(`commit_observe_genesis_${n}`));
+ await assert.rejects(authority.verifyPreparedImportDelegation(vector('submission_observe_undisclosed_preparation'),vector('submission_observe_undisclosed_delegation'),parent,geneses,ownerContext()),expected('RefDisclosure'));
+ await authority.verifyPreparedImportDelegation(vector('submission_observe_preparation'),vector('submission_observe_delegation'),parent,geneses,ownerContext());
+});
+test('submission configuration defaults carry their exact encoding and authenticated RPC',()=>{
+ const config=vector('import_configuration'),c=config.converters[0];
+ authority.validateImportConfiguration(config);
+ assert.equal(c.optionsEncoding,'heddle-import-options-empty-v1');
+ assert.deepEqual(authority.conversionOptionsDigest(c.converterVersion,c.defaultOptions),vector('scope').optionsDigest);
+ c.defaultOptions=Uint8Array.of(1);assert.throws(()=>authority.validateImportConfiguration(config),expected('Canonical'));
+ const contract=getOption(api.IntegrationService.method.getImportConfiguration,common.rpc_contract);
+ assert.equal(contract.effect,common.RpcEffect.READ_ONLY);
+ assert.equal(contract.authorizationAccess,common.AuthorizationAccess.AUTHENTICATED_PRINCIPAL);
+ assert.equal(contract.signingTier,common.SigningTier.PROOF_OF_POSSESSION);
+});
 // Only the owner/root keys are pinned. Derive this root-only history's context
 // from the exported originals, rather than a second fixture identity/chain.
 function exportOwnerContext(b){

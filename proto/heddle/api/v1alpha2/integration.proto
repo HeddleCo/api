@@ -24,7 +24,7 @@ message ProviderRepository {
   string clone_url = 3;
   string name = 4;
   bool private = 5;
-  // Exact installation whose user grant listed this repository. ImportSource
+  // Exact installation whose user grant listed this repository. CommitImportJob
   // verifies this association again before selecting provider custody.
   string installation_id = 6;
   // Spools that already hold a remote link for this repository (same provider
@@ -160,15 +160,28 @@ message SetRemoteLinkRequest {
   RemoteLinkRecord remote = 2;
   bytes expected_version = 3;
 }
-// One Git branch selected for native Thread publication. The caller supplies
-// the original creator-signed genesis and its authority for this branch.
-message ImportBranchGenesis {
-  string ref_name = 1;
-  SignedRecord thread_genesis = 2;
-  bytes creator_authority = 3;
-  SignedImportGenesisAuthorityV1 genesis_authority = 4;
+// Prepare -> sign -> Commit is sufficient for a new HYBRID import. Defined here
+// to reuse ProviderRepository without an import cycle. Proof originals and the
+// signed ordered branch manifest are the ONLY branch carrier.
+message CommitImportJobRequest {
+  string client_operation_id = 1;
+  SpoolRef destination = 2;
+  // Exactly one initial delegation; select the HOST-STORED reservation by its
+  // delegation ID. Original geneses/envelopes/bindings match the signed manifest.
+  ImportPublicProofBundleV1 proof = 3;
+  // Required, same public URL / connected-provider validation as source import.
+  // Resolve current authorized connection/repository/installation, and bind
+  // its provider + clone_url to the signed scope before custody selection.
+  ProviderRepository source = 4;
+  // Optional canonical synthetic empty State, <=4096 bytes; its native identity
+  // MUST equal the base in EVERY proof original genesis. Otherwise the exact
+  // base closure must already be hosted. Nonempty closures use SyncService.
+  bytes initial_base_state = 5;
 }
-
+// Closed route: always FAILED_PRECONDITION with typed
+// ERROR_REASON_IMPORT_SOURCE_REQUIRES_COMMIT after authentication/authorization.
+// Never creates, attaches, aliases Commit or activates a HYBRID job. Use Commit
+// for initial submission and RetryImportSource for an existing physical job.
 message ImportSourceRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
@@ -176,17 +189,10 @@ message ImportSourceRequest {
   bytes expected_destination_version = 4;
   reserved 5, 6;
   reserved "thread_genesis", "creator_authority";
-  // Optional canonical synthetic empty State, at most 4096 bytes, whose identity
-  // matches the base in each supplied branch genesis. Enables a fresh Spool
-  // import in one call without requiring a pre-existing hosted base. Nonempty
-  // source closures use SyncService publication instead. Each creator signature
-  // binds this base.
+  // Unusable on this closed route. Initial base submission belongs to Commit.
   bytes initial_base_state = 7;
-  // Import preserves creator signatures. A scoped job key signs converted
-  // content; a separate host witness signs admission/publication receipts.
-  // Git attribution remains in the Capture.
-  repeated ImportBranchGenesis branches = 8;
-  ImportPublicProofBundleV1 import_authority = 9;
+  reserved 8, 9;
+  reserved "branches", "import_authority";
 }
 // Retry a failed native source fetch/adoption into its original Thread. The
 // original operation remains immutable; this command creates a new operation

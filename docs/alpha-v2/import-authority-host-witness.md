@@ -167,8 +167,32 @@ its exact logical job, original retry lineage, physical operation ID, signed
 certificate digest, ref/slot, observed Git OID AND hash algorithm, original genesis,
 target and expected/result frontiers, content digest/byte count, options/converter.
 PINNED_COMMIT authorizes the exact raw 20-byte SHA1 or 32-byte SHA256 commit;
-OBSERVE_AT_EXECUTION has an empty pinned OID and is explicitly disclosed before
-signing. No implicit mutable-ref authorization exists. A URL/ref signature does
+**Whenever the exact selected commit OID is known, the caller MUST pin it.**
+Failed pinning, stale observations and empty OIDs never authorize a silent
+downgrade. OBSERVE_AT_EXECUTION is only an explicit fallback when the caller
+cannot obtain the OID. Before signing, disclose this fixed promise:
+
+> The exact commit is unavailable. This branch may move before execution. The
+> import will convert the commit observed when the job executes, which may differ
+> from the commit you saw when selecting the branch.
+
+The caller must explicitly select and sign that fallback. Each observe branch
+has an empty `pinned_commit_oid`, an explicit hash algorithm and
+`ref_disclosure = IMPORT_REF_DISCLOSURE_OBSERVE_AT_EXECUTION (1)`.
+Pinned branches require `ref_disclosure = UNSPECIFIED (0)`. Field 10 of
+`ImportBranchLimitV1` appends **u32be(ref_disclosure)** to its canonical layout;
+the parent scope, prepared scope and signed manifest all bind it. A genuine
+delegation signature without the marker still rejects with `RefDisclosure`.
+The result retains its exact observed OID and algorithm.
+
+`validate_ref_selection` / `validateImportRefSelection` additionally take an
+independently known OID available when choosing the scope. They reject observe
+mode or a different pin with `RefPinning`; None/undefined supplies no consent
+and never changes the mode. A receiver cannot prove UI consent or discover an
+undisclosed locally known OID from signed bytes alone. It verifies the explicit
+marker, signatures and mode; authoring clients and hosts with that independent
+knowledge must enforce exact pinning. No implicit mutable-ref authorization
+exists. A URL/ref signature does
 not prove deterministic Git conversion or original Git authorship; those require
 retained objects and a mapping verifier, or the disclosed trust in the converter.
 
@@ -191,6 +215,110 @@ reservation expires exclusively at prepare time + **3600 seconds**. No prepared
 job executes until Commit verifies the complete user-signed proposal/chain,
 original branches, current permission and budgets. The browser closes only after
 this authorization. A proposal change requires fresh preparation and signature.
+
+### Configuration and caller-selected scope (api#327 G2)
+
+Call authenticated `GetImportConfiguration(destination)` before choosing the
+scope. It requires destination write permission and request PoP, hides unavailable
+destinations, and returns one complete bounded snapshot. A dedicated unary RPC
+keeps this small configuration independent of provider inventory paging and
+observation replacement/resume. It is an ordinary read; the eight existing
+mandatory-feature import gates remain unchanged. Discovery grants no execution
+authority, and Prepare rechecks current support and policy.
+
+The response carries 1–32 converters ordered uniquely by exact ASCII version,
+each with a versioned converter-owned `options_encoding`, 1–64 sorted unique
+`canonical_options` byte sequences (at most 4096 bytes each), and `default_options`
+equal to one of those sequences. These are the complete supported choices; a
+default is explicit even when empty. The encoding identifies the converter's
+public versioned byte specification. For `heddle-import-options-empty-v1`, the
+only canonical value is the zero-length sequence. This fixture converter is an
+example, never a universal server version/default. Other encodings require their
+own specification; select returned octets verbatim instead of reserializing JSON
+or protobuf. Compute `options_digest` using `conversion_options_digest` /
+`conversionOptionsDigest` and the preimage below. Responses are at most 1 MiB;
+do not truncate supported choices.
+
+Positive host limits cover branches, logical-job operations, total result bytes
+and per-branch result bytes. They cannot exceed 256 branches/operations or 1 GiB
+total, and per-branch bytes cannot exceed the host total. The caller chooses
+**every** scope field: provider/URL, exact ordered branches and ref disclosure,
+converter/options, stable slot IDs, per-branch and total budgets, targets and
+explicit Thread-specific frontier commitments. There are no omitted-field
+defaults or host-allocated slots. Prepare accepts these choices byte-for-byte
+or refuses; even budget reductions or equivalent normalization are forbidden.
+
+The one exception is `proposed_scope.destination_version`: empty asks the host
+to issue the opaque current **32-byte destination CAS token** in its preparation
+transaction; exactly 32 bytes asks it to compare with the current token and echo
+it unchanged. Other lengths are INVALID_SCOPE. A mismatched token returns
+DESTINATION_CONFLICT. This is neither an overview version, a hash, zero32 sentinel
+nor a caller-generated token. No other scope field can be filled. Commit binds
+the returned token in its signed delegation and compares it with current
+destination state atomically; a changed destination requires new preparation
+and signatures. Renewal requests can supply the existing exact signed token;
+no token may be substituted around remaining-scope/non-amplification checks.
+
+Success carries a proposal and no refusal. Refusal carries only
+`ImportPreparationRefusalV1` with a nonzero typed reason and bounded field path:
+INVALID_SCOPE, UNSUPPORTED_CONVERTER, UNSUPPORTED_OPTIONS, BUDGET_EXCEEDED,
+DESTINATION_CONFLICT or POLICY_DENIED. It reserves no key/job, returns no proposal,
+bounds or renewal state, and activates nothing. Authentication and hidden-resource
+failures retain ordinary CallFailure handling without leaking policy details.
+`prepare_scope` / `prepareImportScope` enforce support, bounds and CAS;
+`validate_preparation_response` / `validateImportPreparationResponse` compare
+the request and response before signing and reject changed choices with
+`PreparedFields`. Configuration changes require a fresh Prepare/client operation
+ID, never a changed response to an idempotent prepared reservation.
+
+### Complete initial submission (api#327 G1)
+
+**Prepare → sign → CommitImportJob is sufficient.** Commit carries required
+`ProviderRepository source` and optional `initial_base_state` along with its
+proof. The host revalidates public-source URL rules or the current authenticated
+connection, repository and exact user-granted installation before selecting
+provider custody. It binds the resolved provider and exact credential-free
+clone URL to the signed scope. Projection hints do not authorize provider access.
+Public sources have no connection/installation and cannot claim to be private;
+their repository ID is empty or the exact clone URL. Connected sources carry an
+account-scoped connection and exact repository/installation IDs.
+
+The proof's `original_geneses`, `creator_authority_envelopes` and
+`genesis_authorities` are ordered one-to-one with the signed branch manifest,
+with exactly one initial delegation and its exact parent permission (or direct
+owner). This is the single branch carrier. Preserve each original creator
+signature and verify native IDs, envelope commitments and manifest bindings.
+Do not regenerate geneses or submit another branches payload. The optional base
+is a canonical synthetic empty native State, at most 4096 bytes, whose native ID
+equals the base in **every** original genesis. If absent, the exact base closure
+must already be hosted. Nonempty closures use SyncService publication.
+
+Under one authorization/destination/reservation transaction, Commit persists
+source/base and verified authority, installs epoch 1, creates the initial
+physical operation and makes that operation runnable. Its successful
+`MutationResponse.receipt` MUST contain `pending_operation` for that created
+operation in the destination Spool, never an `applied` acknowledgement. Failure
+leaves no activated job, operation or partial branch publication.
+
+Commit's caller-scoped `client_operation_id` is its own idempotency key, distinct
+from Prepare's. Persist the exact request and receipt with activation. Exact
+replay returns that same operation/receipt without creating work or advancing an
+epoch, including after expiry, cancellation or response loss. Look up the durable
+idempotency row **before** current-authority revalidation; this replay is an
+acknowledgement of committed submission, not fresh execution authority. Any
+changed request under that ID fails OPERATION_ID_REUSED. `check_commit_replay` /
+`checkImportCommitReplay` and response helpers check these invariants; the host
+owns durable serialization, current authorization and atomicity.
+
+`ImportSource` is closed: after authentication/authorization it always fails
+FAILED_PRECONDITION with `ERROR_REASON_IMPORT_SOURCE_REQUIRES_COMMIT`. It cannot
+create or attach to a reservation, alias Commit or activate work. Its duplicate
+branch message and fields 8/9 are removed/reserved. Use RetryImportSource for a
+failed existing physical operation and explicit RenewImportJob when required.
+`verify_commit_submission` / `verifyImportCommitSubmission` compose source/
+original validation with the stored-preparation/signature checks. Native canonical
+State/genesis validation, independently selected owner history, live source
+grants and transaction fences remain the hosted consumer's gates.
 
 ### Exact Prepare/Commit delegation boundary (api#321)
 
@@ -752,7 +880,7 @@ the pinned codec's representation and exact parse/re-encode equality.
 The locked `tools/hybrid-native` tool uses published `heddle-api
 0.31.0-alpha.19`, `heddle-thread-api 0.28.7`, `heddle-object-model 0.28.7`,
 `heddle-crypto 0.28.7`, `heddleco-capability-verifier 0.28.7`, and
-`heddle-biscuit-verifier 0.28.7`. On 2026-10-03 the complete 0.28.7 crate set
+`heddle-biscuit-verifier 0.28.7`. Rechecked on 2026-10-04: the complete 0.28.7 crate set
 and alpha.19 are published; 0.28.7 requires exactly alpha.19,
 so 0.28.7/alpha.19 is the newest compatible published pair. Maintenance
 generation uses these codecs. `tools/verify.sh` runs its

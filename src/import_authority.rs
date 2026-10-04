@@ -34,7 +34,7 @@ record!(ImportIdentityV1, spool_uuid:b, spool_genesis_digest:b, owner_id:b,
     owner_account_uuid:b, owner_state_hash:b, ownership_transfer_sequence:u);
 record!(ImportOwnerChainV1, spool_genesis_digest:b, owner_state_hashes:q, transfer_audit_hashes:q);
 record!(ImportBranchLimitV1, ref_name:s, hash_algorithm:e, ref_mode:e, pinned_commit_oid:b,
-    genesis_digest:b, target_thread_id:b, expected_frontier_digest:b, slot_id:u, max_result_bytes:u);
+    genesis_digest:b, target_thread_id:b, expected_frontier_digest:b, slot_id:u, max_result_bytes:u, ref_disclosure:e);
 record!(ImportPermissionScopeV1, provider:s, source_url:s, branches:l, destination_version:b,
     options_digest:b, converter_version:s, max_operations:u, max_result_bytes:u);
 record!(ImportMemberPermissionV1, format_version:u, identity:m, logical_job_id:b,
@@ -207,8 +207,17 @@ fn branch(value: &ImportBranchLimitV1) -> Result<(), Reject> {
         _ => return Err(Reject::Version),
     };
     match value.ref_mode {
-        1 => width(&value.pinned_commit_oid, size)?,
-        2 if value.pinned_commit_oid.is_empty() => (),
+        1 => {
+            width(&value.pinned_commit_oid, size)?;
+            if value.ref_disclosure != 0 {
+                return Err(Reject::RefDisclosure);
+            }
+        }
+        2 if value.pinned_commit_oid.is_empty() => {
+            if value.ref_disclosure != 1 {
+                return Err(Reject::RefDisclosure);
+            }
+        }
         _ => return Err(Reject::Semantic),
     }
     for v in [
@@ -222,6 +231,357 @@ fn branch(value: &ImportBranchLimitV1) -> Result<(), Reject> {
         return Err(Reject::Bounds);
     }
     Ok(())
+}
+
+/// Check independently observed OID knowledge before signing/preparation.
+/// Empty/unknown is None, never an implicit observe-mode selection or consent.
+pub fn validate_ref_selection(
+    value: &ImportBranchLimitV1,
+    known_commit_oid: Option<&[u8]>,
+) -> Result<(), Reject> {
+    branch(value)?;
+    if let Some(oid) = known_commit_oid {
+        width(oid, if value.hash_algorithm == 1 { 20 } else { 32 })?;
+        if value.ref_mode != 1 || value.pinned_commit_oid != oid {
+            return Err(Reject::RefPinning);
+        }
+    }
+    Ok(())
+}
+
+/// Converter option octets are selected verbatim from authenticated discovery.
+pub fn conversion_options_digest(version: &str, options: &[u8]) -> Result<Vec<u8>, Reject> {
+    if version.is_empty() || version.len() > 128 || !version.is_ascii() {
+        return Err(Reject::Canonical);
+    }
+    if options.len() > 4096 {
+        return Err(Reject::Bounds);
+    }
+    let mut bytes = Vec::new();
+    crate::hybrid_codec::counted(&mut bytes, version.as_bytes())?;
+    crate::hybrid_codec::counted(&mut bytes, options)?;
+    Ok(hash(&[b"heddle-import-conversion-options-v1", &bytes]))
+}
+
+pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Result<(), Reject> {
+    use prost::Message;
+    if v.encoded_len() > MAX_BUNDLE_BYTES || v.converters.is_empty() || v.converters.len() > 32 {
+        return Err(Reject::Bounds);
+    }
+    for (i, c) in v.converters.iter().enumerate() {
+        for text in [&c.converter_version, &c.options_encoding] {
+            if text.is_empty() || text.len() > 128 || !text.is_ascii() {
+                return Err(Reject::Canonical);
+            }
+        }
+        if i > 0 && v.converters[i - 1].converter_version >= c.converter_version {
+            return Err(Reject::Canonical);
+        }
+        if c.canonical_options.is_empty()
+            || c.canonical_options.len() > 64
+            || c.canonical_options.iter().any(|o| o.len() > 4096)
+        {
+            return Err(Reject::Bounds);
+        }
+        if c.canonical_options.windows(2).any(|w| w[0] >= w[1])
+            || !c.canonical_options.contains(&c.default_options)
+        {
+            return Err(Reject::Canonical);
+        }
+    }
+    let l = v.limits.as_ref().ok_or(Reject::Canonical)?;
+    if l.max_branches == 0
+        || l.max_branches as usize > MAX_BRANCHES
+        || l.max_operations == 0
+        || l.max_operations as usize > MAX_BRANCHES
+        || l.max_result_bytes == 0
+        || l.max_result_bytes > MAX_RESULT_BYTES
+        || l.max_branch_result_bytes == 0
+        || l.max_branch_result_bytes > l.max_result_bytes
+    {
+        return Err(Reject::Bounds);
+    }
+    Ok(())
+}
+
+/// Host-side negotiation with a CURRENT authenticated configuration and CAS.
+/// Only an empty destination token is filled; all other choices survive exactly.
+pub fn prepare_scope(
+    proposed: &ImportPermissionScopeV1,
+    configuration: &GetImportConfigurationResponse,
+    current_destination_version: &[u8],
+) -> Result<ImportPermissionScopeV1, Reject> {
+    use ImportPreparationRefusalReason as Reason;
+    validate_import_configuration(configuration)?;
+    width(current_destination_version, 32)?;
+    if !proposed.destination_version.is_empty() && proposed.destination_version.len() != 32 {
+        return Err(Reject::PreparationRefused(Reason::InvalidScope));
+    }
+    if !proposed.destination_version.is_empty()
+        && proposed.destination_version != current_destination_version
+    {
+        return Err(Reject::PreparationRefused(Reason::DestinationConflict));
+    }
+    let mut selected = proposed.clone();
+    selected.destination_version = current_destination_version.to_vec();
+    validate_scope(&selected).map_err(|_| Reject::PreparationRefused(Reason::InvalidScope))?;
+    let converter = configuration
+        .converters
+        .iter()
+        .find(|c| c.converter_version == selected.converter_version)
+        .ok_or(Reject::PreparationRefused(Reason::UnsupportedConverter))?;
+    let supported = converter
+        .canonical_options
+        .iter()
+        .try_fold(false, |found, o| {
+            Ok::<_, Reject>(
+                found
+                    || conversion_options_digest(&converter.converter_version, o)?
+                        == selected.options_digest,
+            )
+        })?;
+    if !supported {
+        return Err(Reject::PreparationRefused(Reason::UnsupportedOptions));
+    }
+    let limits = configuration.limits.as_ref().ok_or(Reject::Canonical)?;
+    if selected.branches.len() > limits.max_branches as usize
+        || selected.max_operations > limits.max_operations
+        || selected.max_result_bytes > limits.max_result_bytes
+        || selected
+            .branches
+            .iter()
+            .any(|b| b.max_result_bytes > limits.max_branch_result_bytes)
+    {
+        return Err(Reject::PreparationRefused(Reason::BudgetExceeded));
+    }
+    Ok(selected)
+}
+
+/// Browser-side comparison before signing. A host cannot silently negotiate.
+pub fn validate_preparation_response(
+    request: &PrepareImportJobRequest,
+    response: &PrepareImportJobResponse,
+) -> Result<(), Reject> {
+    if let Some(refusal) = &response.refusal {
+        let reason = ImportPreparationRefusalReason::try_from(refusal.reason)
+            .map_err(|_| Reject::Version)?;
+        if reason == ImportPreparationRefusalReason::Unspecified
+            || refusal.field.len() > 256
+            || !refusal.field.is_ascii()
+            || response.proposal.is_some()
+            || response.renewal_state.is_some()
+            || response.reservation_expires_at_unix_seconds != 0
+            || response.prepared_at_unix_seconds != 0
+            || response.max_validity_duration_seconds != 0
+            || response.clock_skew_allowance_seconds != 0
+        {
+            return Err(Reject::Canonical);
+        }
+        return Err(Reject::PreparationRefused(reason));
+    }
+    let p = response.proposal.as_ref().ok_or(Reject::Canonical)?;
+    let returned = p.scope.as_ref().ok_or(Reject::Canonical)?;
+    let mut requested = request.proposed_scope.clone().ok_or(Reject::Canonical)?;
+    if requested.destination_version.is_empty() {
+        requested.destination_version = returned.destination_version.clone();
+    }
+    if canonical(&requested)? != canonical(returned)?
+        || p.identity != request.identity
+        || p.retry_lineage_id != request.retry_lineage_id
+    {
+        return Err(Reject::PreparedFields);
+    }
+    validate_scope(returned)?;
+    if request.renew_logical_job_id.is_empty() {
+        if response.renewal_state.is_some()
+            || p.predecessor_delegation_digest.iter().any(|b| *b != 0)
+        {
+            return Err(Reject::PreparedFields);
+        }
+    } else {
+        if p.logical_job_id != request.renew_logical_job_id {
+            return Err(Reject::PreparedFields);
+        }
+        validate_renewal_preparation(response)?;
+    }
+    Ok(())
+}
+
+/// Source association/provider comes from the host's authenticated resolver,
+/// never a projection hint. Native base decoding/identity and current grants
+/// remain host gates; this validates carrier, bounds and exact originals.
+pub fn validate_commit_request(
+    request: &CommitImportJobRequest,
+    resolved_provider: &str,
+) -> Result<(), Reject> {
+    use prost::Message;
+    let source = request.source.as_ref().ok_or(Reject::SourceSelection)?;
+    let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
+    if request.client_operation_id.is_empty()
+        || request.client_operation_id.len() > 128
+        || request.destination.as_ref().is_none_or(|d| d.id.is_empty())
+    {
+        return Err(Reject::Canonical);
+    }
+    if request.initial_base_state.len() > 4096 || proof.encoded_len() > MAX_BUNDLE_BYTES {
+        return Err(Reject::Bounds);
+    }
+    if proof.format_version != 1
+        || proof.delegations.len() != 1
+        || !proof.renewals.is_empty()
+        || !proof.operations.is_empty()
+        || proof.terminal_manifest.is_some()
+        || !proof.manifests.is_empty()
+    {
+        return Err(Reject::Canonical);
+    }
+    let d = proof.delegations[0]
+        .body
+        .as_ref()
+        .ok_or(Reject::Canonical)?;
+    let scope = d.scope.as_ref().ok_or(Reject::Canonical)?;
+    validate_scope(scope)?;
+    let id = d.identity.as_ref().ok_or(Reject::Canonical)?;
+    identity(id)?;
+    let uuid = hex::encode(&id.spool_uuid);
+    let destination_id = format!(
+        "{}-{}-{}-{}-{}",
+        &uuid[..8],
+        &uuid[8..12],
+        &uuid[12..16],
+        &uuid[16..20],
+        &uuid[20..]
+    );
+    if request
+        .destination
+        .as_ref()
+        .is_none_or(|s| s.id != destination_id)
+    {
+        return Err(Reject::Scope);
+    }
+    if d.predecessor_delegation_digest != [0; 32] {
+        return Err(Reject::Canonical);
+    }
+    if source.clone_url != scope.source_url
+        || resolved_provider != scope.provider
+        || source.provider_repository_id.len() > 4096
+        || source.name.len() > 4096
+    {
+        return Err(Reject::SourceSelection);
+    }
+    if let Some(connection) = &source.connection {
+        if connection.spool.is_some()
+            || connection.id.is_empty()
+            || source.provider_repository_id.is_empty()
+            || source.installation_id.is_empty()
+        {
+            return Err(Reject::SourceSelection);
+        }
+    } else if source.private
+        || !source.installation_id.is_empty()
+        || (!source.provider_repository_id.is_empty()
+            && source.provider_repository_id != source.clone_url)
+    {
+        return Err(Reject::SourceSelection);
+    }
+    if proof.original_geneses.len() != scope.branches.len()
+        || proof.creator_authority_envelopes.len() != scope.branches.len()
+        || proof.genesis_authorities.len() != scope.branches.len()
+        || d.branch_manifest.len() != scope.branches.len()
+    {
+        return Err(Reject::GenesisBinding);
+    }
+    // Arrays are ordered exactly like the signed branch manifest, no second
+    // association-by-name payload and no incoming regenerated branch originals.
+    for (i, b) in scope.branches.iter().enumerate() {
+        let original = &proof.original_geneses[i];
+        let binding = &proof.genesis_authorities[i];
+        let g = binding.body.as_ref().ok_or(Reject::GenesisBinding)?;
+        let m = &d.branch_manifest[i];
+        if native_id(original) != b.genesis_digest
+            || g.genesis_digest != b.genesis_digest
+            || m.limit.as_ref() != Some(b)
+            || m.genesis_authority_digest != signed_genesis_digest(binding)?
+            || g.creator_authority_envelope_digest != hash(&[&proof.creator_authority_envelopes[i]])
+            || proof.creator_authority_envelopes[i].is_empty()
+            || proof.creator_authority_envelopes[i].len() > MAX_RECORD_BYTES
+            || original.signatures.len() != 1
+            || original.signatures[0].public_key != g.creator_public_key
+            || original.signatures[0].signature != g.original_creator_signature
+        {
+            return Err(Reject::GenesisBinding);
+        }
+        verify_native(original, "heddle-thread-genesis-v1")?;
+    }
+    Ok(())
+}
+
+/// This closed route has no initial-submission or authority-attachment role.
+pub fn validate_import_source(_: &ImportSourceRequest) -> Result<(), Reject> {
+    Err(Reject::ImportSourceRequiresCommit)
+}
+
+/// Complete initial validation, excluding native model/owner history, live
+/// source access and transaction checks owned by the hosted implementation.
+pub fn verify_commit_submission(
+    request: &CommitImportJobRequest,
+    prepared: &PrepareImportJobResponse,
+    resolved_provider: &str,
+    expected: &ImportOwnerExpectation<'_>,
+) -> Result<VerifiedImportDelegation, Reject> {
+    validate_commit_request(request, resolved_provider)?;
+    let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
+    let member = proof
+        .member_permission
+        .as_ref()
+        .or(proof.member_permissions.first());
+    if proof.member_permissions.len() > 1
+        || proof
+            .member_permissions
+            .first()
+            .is_some_and(|p| Some(p) != member)
+    {
+        return Err(Reject::ImportPermission);
+    }
+    verify_prepared_delegation(
+        prepared,
+        &proof.delegations[0],
+        member,
+        &proof.genesis_authorities,
+        expected,
+    )
+}
+
+pub fn validate_commit_response(
+    request: &CommitImportJobRequest,
+    response: &MutationResponse,
+) -> Result<(), Reject> {
+    let receipt = response.receipt.as_ref().ok_or(Reject::PendingOperation)?;
+    let Some(mutation_receipt::Outcome::PendingOperation(operation)) = &receipt.outcome else {
+        return Err(Reject::PendingOperation);
+    };
+    if request.client_operation_id.is_empty()
+        || receipt.client_operation_id != request.client_operation_id
+        || request.destination.is_none()
+        || operation.spool != request.destination
+        || operation.id.is_empty()
+    {
+        return Err(Reject::PendingOperation);
+    }
+    Ok(())
+}
+
+/// Use a durable caller-scoped idempotency row BEFORE rechecking expired job
+/// authority. Host stores the original request/receipt atomically with activation.
+pub fn check_commit_replay(
+    request: &CommitImportJobRequest,
+    stored: &CommitImportJobRequest,
+    response: &MutationResponse,
+) -> Result<(), Reject> {
+    if request != stored {
+        return Err(Reject::OperationIdReused);
+    }
+    validate_commit_response(request, response)
 }
 pub fn validate_scope(value: &ImportPermissionScopeV1) -> Result<(), Reject> {
     canonical_https(&value.source_url, false)?;

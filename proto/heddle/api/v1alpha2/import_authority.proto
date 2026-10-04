@@ -17,6 +17,14 @@ enum ImportRefMode {
   IMPORT_REF_MODE_PINNED_COMMIT = 1;
   IMPORT_REF_MODE_OBSERVE_AT_EXECUTION = 2; // Explicitly disclosed weaker promise.
 }
+// Signed acknowledgement of the fixed disclosure in the normative contract:
+// the exact OID is unavailable; the branch may move before execution and the
+// job will convert its then-observed commit. Never infer consent from an empty
+// OID. A known OID MUST use PINNED_COMMIT, including after an attempted pin.
+enum ImportRefDisclosure {
+  IMPORT_REF_DISCLOSURE_UNSPECIFIED = 0;
+  IMPORT_REF_DISCLOSURE_OBSERVE_AT_EXECUTION = 1;
+}
 enum ImportGitHashAlgorithm {
   IMPORT_GIT_HASH_ALGORITHM_UNSPECIFIED = 0;
   IMPORT_GIT_HASH_ALGORITHM_SHA1 = 1;
@@ -50,11 +58,16 @@ message ImportBranchLimitV1 {
   bytes expected_frontier_digest = 7; // ImportFrontierV1 commitment.
   uint64 slot_id = 8;
   uint64 max_result_bytes = 9;
+  ImportRefDisclosure ref_disclosure = 10; // OBSERVE requires 1; PINNED requires 0.
 }
 message ImportPermissionScopeV1 {
   string provider = 1; // Canonical lowercase provider ID.
   string source_url = 2; // Credential-free canonical HTTPS URL.
   repeated ImportBranchLimitV1 branches = 3;
+  // Prepare request: empty asks the host to issue its current destination CAS;
+  // exactly 32 bytes requires that current CAS or typed DESTINATION_CONFLICT.
+  // Success: always 32 opaque host-issued bytes. Never an overview version or
+  // zero32 sentinel. All other proposed scope fields MUST remain unchanged.
   bytes destination_version = 4;
   bytes options_digest = 5;
   string converter_version = 6;
@@ -230,6 +243,9 @@ message PrepareImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
   ImportIdentityV1 identity = 3;
+  // Caller selects EVERY field, including slots, frontiers and exact budgets.
+  // Only empty destination_version is filled. No normalization, defaults,
+  // reductions or substituted converter/options; accept unchanged or refuse.
   ImportPermissionScopeV1 proposed_scope = 4;
   bytes retry_lineage_id = 5;
   bytes renew_logical_job_id = 6; // Empty initially; no execution authority.
@@ -261,15 +277,46 @@ message PrepareImportJobResponse {
   uint64 max_validity_duration_seconds = 4; // Positive; expires - not_before.
   uint64 clock_skew_allowance_seconds = 5; // No grace after exclusive expiry.
   int64 prepared_at_unix_seconds = 6; // Host clock; reservation expiry = this + 3600.
+  // Exactly one of proposal/refusal. A refusal has no reservation, key, bounds
+  // or renewal_state and MUST NOT activate work or return a changed proposal.
+  ImportPreparationRefusalV1 refusal = 7;
 }
-message CommitImportJobRequest {
-  string client_operation_id = 1;
-  SpoolRef destination = 2;
-  // Exactly one initial delegation and its branch bindings. The browser fills
-  // and signs the device key, parent permission digest (zero32 for direct owner),
-  // per-branch genesis authority digests and not-before/exclusive expiry. Host
-  // selects the stored reservation by delegation ID, never a caller proposal.
-  ImportPublicProofBundleV1 proof = 3;
+enum ImportPreparationRefusalReason {
+  IMPORT_PREPARATION_REFUSAL_REASON_UNSPECIFIED = 0;
+  IMPORT_PREPARATION_REFUSAL_REASON_INVALID_SCOPE = 1;
+  IMPORT_PREPARATION_REFUSAL_REASON_UNSUPPORTED_CONVERTER = 2;
+  IMPORT_PREPARATION_REFUSAL_REASON_UNSUPPORTED_OPTIONS = 3;
+  IMPORT_PREPARATION_REFUSAL_REASON_BUDGET_EXCEEDED = 4;
+  IMPORT_PREPARATION_REFUSAL_REASON_DESTINATION_CONFLICT = 5;
+  IMPORT_PREPARATION_REFUSAL_REASON_POLICY_DENIED = 6;
+}
+message ImportPreparationRefusalV1 {
+  ImportPreparationRefusalReason reason = 1;
+  string field = 2; // Bounded request field path; never hidden resource details.
+}
+// An authenticated finite read, separate from provider inventory observation.
+// Configuration is advice, never authority; Prepare rechecks current support.
+message GetImportConfigurationRequest {
+  SpoolRef destination = 1;
+}
+message ImportConverterConfigurationV1 {
+  string converter_version = 1; // Exact ASCII identifier, 1..128 bytes.
+  // Versioned converter-owned encoding specification. Clients select returned
+  // octets verbatim, never serialize JSON/protobuf or infer an empty default.
+  string options_encoding = 2; // ASCII identifier, 1..128 bytes.
+  repeated bytes canonical_options = 3; // 1..64 sorted unique choices, <=4096 each.
+  bytes default_options = 4; // MUST equal one exact canonical_options entry.
+}
+message ImportBudgetLimitsV1 {
+  uint32 max_branches = 1; // Positive, <=256.
+  uint32 max_operations = 2; // Positive, <=256; total per logical job.
+  uint64 max_result_bytes = 3; // Positive, <=1 GiB; total per logical job.
+  uint64 max_branch_result_bytes = 4; // Positive, <=max_result_bytes.
+}
+message GetImportConfigurationResponse {
+  // Complete sorted unique converter-version list, 1..32; <=1 MiB response.
+  repeated ImportConverterConfigurationV1 converters = 1;
+  ImportBudgetLimitsV1 limits = 2;
 }
 message RenewImportJobRequest {
   string client_operation_id = 1;

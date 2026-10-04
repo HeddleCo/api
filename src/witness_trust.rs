@@ -104,6 +104,16 @@ impl VerifiedWitnessSet {
     pub fn root_epoch(&self) -> u64 {
         self.root_epoch
     }
+
+    /// Explicit receiver-owned pin replacement. This carries history only;
+    /// old contexts remain stale and the old root cannot verify a response.
+    pub(crate) fn replace_epoch(mut self, epoch: u64) -> Result<Self, Reject> {
+        if self.root_epoch.checked_add(1) != Some(epoch) {
+            return Err(Reject::StaleContext);
+        }
+        self.root_epoch = epoch;
+        Ok(self)
+    }
 }
 
 pub fn verify_set(

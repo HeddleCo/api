@@ -984,10 +984,21 @@ pub struct ImportOwnerExpectation<'a> {
     pub identity: &'a ImportIdentityV1,
     pub owner_public_key: &'a [u8],
     pub owner_chain_digest: &'a [u8],
+    /// From the independently verified EFFECTIVE owner state at `now`, not
+    /// the immutable root. Accepted claim/deferral clearing is unbounded.
     pub authority_expires_at_seconds: i64,
     pub now_unix_seconds: i64,
     pub forbidden_job_keys: &'a [Vec<u8>], // Every user/root/witness key, including tombstones.
     pub known_job_associations: &'a [(Vec<u8>, Vec<u8>)], // key -> logical job.
+}
+/// Inputs MUST come from the selected, independently verified effective state.
+/// Historical verification selects the state at its authenticated observation.
+pub fn effective_owner_authority_expiry(deferred_human: bool, claimable_until: i64) -> i64 {
+    if deferred_human && claimable_until > 0 {
+        claimable_until
+    } else {
+        i64::MAX
+    }
 }
 pub fn verify_member_permission(
     signed: &SignedImportMemberPermissionV1,
@@ -3130,4 +3141,293 @@ pub fn check_renew_replay(request_bytes: &[u8], stored_bytes: &[u8]) -> Result<(
         return Err(Reject::OperationIdReused);
     }
     Ok(())
+}
+
+/// Independently installed descriptor pin; never learned from a response.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportWitnessRootPin {
+    pub authority: String,
+    pub root_id: String,
+    pub public_key: Vec<u8>,
+    pub epoch: u64,
+}
+/// Receiver-owned durable data, committed atomically with accepted history.
+/// Do not deserialize this from the incoming proof or lower its clock floor.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportWitnessSnapshot {
+    pub root: ImportWitnessRootPin,
+    pub witness_set: crate::heddle::api::common::SignedHostedWitnessSetV1,
+    pub clock_floor_unix_millis: i64,
+    pub job_associations: Vec<(Vec<u8>, Vec<u8>)>,
+    pub accepted_history: Vec<ImportPublicProofBundleV1>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerifiedImportBundleWitnesses {
+    pub accepted_history: ImportJobCasStateV1,
+    pub snapshot: ImportWitnessSnapshot,
+}
+/// Verify retained evidence after authenticating the state RPC. Owner contexts
+/// are independently verified at each historical activation, in delegation order.
+/// The mandatory hook verifies the selected policy chain and owner/native context
+/// at each authenticated statement time (heddle capability-verifier / WASM).
+/// No snapshot is returned on any failure. Persist the result under the trust lock.
+pub fn verify_import_bundle_witnesses(
+    bundle: &ImportPublicProofBundleV1,
+    pin: &ImportWitnessRootPin,
+    snapshot: Option<&ImportWitnessSnapshot>,
+    now_ms: i64,
+    owners: &[ImportOwnerExpectation<'_>],
+    mut verify_policy: impl FnMut(
+        &ImportPublicProofBundleV1,
+        &crate::heddle::api::common::HostedWitnessStatementV1,
+    ) -> Result<(), Reject>,
+) -> Result<VerifiedImportBundleWitnesses, Reject> {
+    use crate::witness_trust as trust;
+    width(&pin.public_key, 32)?;
+    if pin.epoch == 0 {
+        return Err(Reject::StaleContext);
+    }
+    validate_bundle_bounds(bundle)?;
+    let terminal = bundle.terminal_manifest.as_ref().ok_or(Reject::Canonical)?;
+    validate_bundle_history(bundle, !terminal.slots.is_empty())?;
+    if owners.len() != bundle.delegations.len() {
+        return Err(Reject::Root);
+    }
+    let mut associations = snapshot.map_or_else(Vec::new, |s| s.job_associations.clone());
+    for d in &bundle.delegations {
+        let b = d.body.as_ref().ok_or(Reject::Canonical)?;
+        if associations
+            .iter()
+            .any(|(key, job)| *key == b.job_public_key && *job != b.logical_job_id)
+        {
+            return Err(Reject::KeyRole);
+        }
+        if !associations.iter().any(|(key, _)| *key == b.job_public_key) {
+            associations.push((b.job_public_key.clone(), b.logical_job_id.clone()));
+        }
+    }
+    let job_keys = associations
+        .iter()
+        .map(|(key, _)| key.clone())
+        .collect::<Vec<_>>();
+    fn expectation<'a>(
+        root: &'a ImportWitnessRootPin,
+        floor: i64,
+        now: i64,
+        keys: &'a [Vec<u8>],
+    ) -> trust::SetExpectation<'a> {
+        trust::SetExpectation {
+            authority: &root.authority,
+            root_id: &root.root_id,
+            root_public_key: &root.public_key,
+            root_epoch: root.epoch,
+            now_unix_millis: now,
+            clock_floor_unix_millis: floor,
+            known_job_keys: keys,
+        }
+    }
+    let previous = if let Some(s) = snapshot {
+        if s.root.authority != pin.authority {
+            return Err(Reject::Root);
+        }
+        let restored = trust::restore_history_snapshot(
+            &s.witness_set,
+            &expectation(&s.root, 0, now_ms, &job_keys),
+        )?;
+        if s.root == *pin {
+            Some(restored)
+        } else {
+            // Only an explicit independently installed epoch+1 pin replaces trust.
+            Some(restored.replace_epoch(pin.epoch)?)
+        }
+    } else {
+        None
+    };
+    let carried = bundle.witness_set.as_ref().ok_or(Reject::Canonical)?;
+    let set = trust::verify_set(
+        carried,
+        &expectation(
+            pin,
+            snapshot.map_or(0, |s| s.clock_floor_unix_millis),
+            now_ms,
+            &job_keys,
+        ),
+        previous.as_ref(),
+    )?;
+    // Authenticate statements before using their observation times or policies.
+    let mut resolved = Vec::new();
+    for signed in &bundle.statements {
+        let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        let entry = set
+            .body()
+            .entries
+            .iter()
+            .find(|e| e.executor_id == s.executor_id)
+            .ok_or(Reject::Root)?;
+        let proof = if entry.state == 2 {
+            let leaf = trust::leaf_digest(s.purpose, &canonical(s)?, &signed.signature)?;
+            bundle.history_proofs.iter().find(|p| {
+                p.purpose == s.purpose && trust::verify_inclusion(&leaf, p, entry).is_ok()
+            })
+        } else {
+            None
+        };
+        let context = trust::resolve_statement(&set, signed, proof, false, now_ms)?;
+        verify_policy(bundle, s)?;
+        resolved.push((context, proof));
+    }
+    let mut verified = Vec::new();
+    for (i, d) in bundle.delegations.iter().enumerate() {
+        let body = d.body.as_ref().ok_or(Reject::Canonical)?;
+        let parent = resolve_bundle_permission(bundle, &body.parent_permission_digest)?;
+        let owner = ImportOwnerExpectation {
+            known_job_associations: &associations,
+            ..owners[i]
+        };
+        // The independently selected historical time is not an author timestamp.
+        let token = if i == 0 {
+            verify_delegation(d, parent, &owner)?
+        } else {
+            let renewal = &bundle.renewals[i - 1];
+            let r = renewal.body.as_ref().ok_or(Reject::Canonical)?;
+            verify_renewal(
+                renewal,
+                &verified[i - 1],
+                resolve_bundle_manifest(bundle, &r.committed_manifest_digest)?,
+                i as u64,
+                parent,
+                &owner,
+            )?
+        };
+        verified.push(token);
+    }
+    for ((context, proof), signed) in resolved.iter().zip(&bundle.statements) {
+        let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        match s.purpose {
+            1 => verify_witness_payload(
+                s,
+                WitnessPayload::Genesis(
+                    bundle
+                        .genesis_witnesses
+                        .iter()
+                        .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                        .ok_or(Reject::Scope)?,
+                ),
+            )?,
+            2 => verify_witness_payload(
+                s,
+                WitnessPayload::Authority(
+                    bundle
+                        .authority_witnesses
+                        .iter()
+                        .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                        .ok_or(Reject::Scope)?,
+                ),
+            )?,
+            4 => verify_witness_payload(
+                s,
+                WitnessPayload::Landing(
+                    bundle
+                        .landing_witnesses
+                        .iter()
+                        .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                        .ok_or(Reject::Scope)?,
+                ),
+            )?,
+            3 => {
+                let (operation, manifest) = bundle
+                    .operations
+                    .iter()
+                    .flat_map(|o| bundle.manifests.iter().map(move |m| (o, m)))
+                    .find(|(o, m)| {
+                        publication_payload(o, m)
+                            .and_then(|p| canonical(&p))
+                            .is_ok_and(|b| b == s.canonical_payload)
+                    })
+                    .ok_or(Reject::Scope)?;
+                let delegation = verified
+                    .iter()
+                    .find(|d| {
+                        operation
+                            .body
+                            .as_ref()
+                            .is_some_and(|o| o.delegation_digest == d.digest)
+                    })
+                    .ok_or(Reject::Scope)?;
+                verify_publication(
+                    operation, delegation, manifest, signed, &set, *proof, now_ms,
+                )?;
+            }
+            _ => return Err(Reject::Version),
+        }
+        trust::recheck_context(context, &set, signed, now_ms)?;
+    }
+    // Operations are accepted publication order, while manifest slots are sorted.
+    let mut progressive = ImportResultManifestV1 {
+        slots: vec![],
+        ..terminal.clone()
+    };
+    let mut order = 0;
+    let mut observed = 0;
+    for o in &bundle.operations {
+        let digest = signed_operation_digest(o)?;
+        let slot = terminal
+            .slots
+            .iter()
+            .find(|s| s.signed_operation_digest == digest)
+            .ok_or(Reject::Scope)?;
+        progressive.slots.push(slot.clone());
+        progressive
+            .slots
+            .sort_by(|a, b| (&a.ref_name, a.slot_id).cmp(&(&b.ref_name, b.slot_id)));
+        let payload = canonical(&publication_payload(o, &progressive)?)?;
+        let s = bundle
+            .statements
+            .iter()
+            .filter_map(|s| s.body.as_ref())
+            .find(|s| s.purpose == 3 && s.canonical_payload == payload)
+            .ok_or(Reject::Transition)?;
+        if s.admission_order <= order || s.observed_at_unix_millis < observed {
+            return Err(Reject::Transition);
+        }
+        order = s.admission_order;
+        observed = s.observed_at_unix_millis;
+    }
+    if progressive != *terminal {
+        return Err(Reject::Scope);
+    }
+    let mut history = snapshot.map_or_else(Vec::new, |s| s.accepted_history.clone());
+    if let Some(old) = history.iter_mut().find(|b| {
+        b.terminal_manifest
+            .as_ref()
+            .is_some_and(|m| m.logical_job_id == terminal.logical_job_id)
+    }) {
+        if !bundle.delegations.starts_with(&old.delegations)
+            || !bundle.renewals.starts_with(&old.renewals)
+            || !bundle.operations.starts_with(&old.operations)
+        {
+            return Err(Reject::HighWater);
+        }
+        *old = bundle.clone();
+    } else {
+        history.push(bundle.clone());
+    }
+    let active = bundle.delegations.last().ok_or(Reject::Canonical)?.clone();
+    Ok(VerifiedImportBundleWitnesses {
+        accepted_history: ImportJobCasStateV1 {
+            format_version: 1,
+            logical_job_id: terminal.logical_job_id.clone(),
+            retry_lineage_id: terminal.retry_lineage_id.clone(),
+            active_predecessor: Some(active),
+            authority_epoch: bundle.delegations.len() as u64,
+            committed_manifest: Some(terminal.clone()),
+        },
+        snapshot: ImportWitnessSnapshot {
+            root: pin.clone(),
+            witness_set: carried.clone(),
+            clock_floor_unix_millis: now_ms,
+            job_associations: associations,
+            accepted_history: history,
+        },
+    })
 }

@@ -646,3 +646,54 @@ test('alpha27 Resolve exact identity and redirect refusal vectors',()=>{
  }
  assert.deepEqual(failures,[]);
 });
+
+const alpha31Pin=(replacement=false,epoch=replacement?2n:1n)=>({authority:fixture.context.authority,rootId:replacement?'descriptor-root-2':fixture.context.root_id,publicKey:bytes(fixture.keys[replacement?'wrong_root':'root'].public_key_hex),epoch});
+const alpha31Owners=()=>[ownerContext(1100n),ownerContext(1200n)];
+// This corpus's policy is cryptographically checked above. Pin its exact wire
+// bytes here as the already-verified policy-chain hook; do not infer trust from
+// carried policy hashes. Production uses heddle WASM at the supplied time.
+function alpha31Policy(b,s){assert.equal(b.policies.length,1);assert.deepEqual(toBinary(api.SignedSpoolPolicyRecordSchema,b.policies[0]),toBinary(api.SignedSpoolPolicyRecordSchema,vector('signed_policy')));authority.requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);}
+async function alpha31Verify(name,pin=alpha31Pin(),snapshot){return authority.verifyImportBundleWitnesses(vector(name),pin,snapshot,1350000n,alpha31Owners(),alpha31Policy);}
+for(const name of fixture.import_bundle_vectors.positive)test(`alpha31 bundle authenticated PASS: ${name}`,async()=>{
+ const r=await alpha31Verify(name);assert.equal(r.acceptedHistory.authorityEpoch,2n);assert.equal(r.acceptedHistory.committedManifest.slots.length,2);assert.equal(r.snapshot.witnessSet.body.generation,12n);assert.equal(r.snapshot.clockFloorUnixMillis,1350000n);assert.equal(r.snapshot.jobAssociations.length,2);
+});
+for(const v of fixture.import_bundle_vectors.negative)test(`alpha31 bundle REJECT then PASS: ${v.id}`,async()=>{
+ let snapshot=v.snapshot_bundle?(await alpha31Verify(v.snapshot_bundle)).snapshot:undefined;
+ if(v.snapshot_clock)snapshot.clockFloorUnixMillis=BigInt(v.snapshot_clock);
+ const original=snapshot?structuredClone(snapshot):undefined;
+ const pin=alpha31Pin(v.replacement,v.pin_epoch===undefined?(v.replacement?2n:1n):BigInt(v.pin_epoch));
+ await assert.rejects(alpha31Verify(v.bundle,pin,snapshot),expected(v.expected));assert.deepEqual(snapshot,original,'failure preserves durable snapshot');
+ if(v.snapshot_clock)snapshot.clockFloorUnixMillis=1350000n;
+ const result=await alpha31Verify(v.control,alpha31Pin(v.replacement),snapshot);
+ if(v.replacement){assert.equal(result.snapshot.witnessSet.body.generation,14n);assert.equal(result.snapshot.root.epoch,2n);assert.deepEqual(result.snapshot.jobAssociations,original.jobAssociations);assert.equal(result.snapshot.acceptedHistory.length,original.acceptedHistory.length);}
+});
+test('alpha31 hook refusal fails closed, then verified hook passes',async()=>{
+ await assert.rejects(authority.verifyImportBundleWitnesses(vector('alpha31_bundle'),alpha31Pin(),undefined,1350000n,alpha31Owners(),()=>{throw new authority.HybridContractError('Signature');}),expected('Signature'));
+ await alpha31Verify('alpha31_bundle');
+});
+test('alpha31 old witness context is stale after explicit replacement',async()=>{
+ const old=await witness.verifyWitnessSet(vector('retired_set'),setContext(1350000n));
+ const signed=vector('publication_statement'),context=await witness.resolveWitnessStatement(old,signed,vector('publication_proof'),false,1350000n);
+ const pin=alpha31Pin(true);
+ const next=await witness.verifyWitnessSetAfterRootReplacement(vector('alpha31_replacement_set'),{...setContext(1350000n),rootId:pin.rootId,rootPublicKey:pin.publicKey,rootEpoch:pin.epoch},old);
+ assert.throws(()=>witness.recheckWitnessContext(context,next,signed,1350000n),expected('StaleContext'));
+ const fresh=await witness.resolveWitnessStatement(next,signed,vector('publication_proof'),false,1350000n);witness.recheckWitnessContext(fresh,next,signed,1350000n);
+});
+function alpha31ExpiryContext(v){const d=vector(v.delegation).body;return {...ownerContext(BigInt(v.now_seconds)),identity:d.identity,ownerPublicKey:bytes(fixture.keys[v.owner_key].public_key_hex),ownerChainDigest:authority.ownerChainDigest(vector(v.chain)),authorityExpiresAtSeconds:authority.effectiveOwnerAuthorityExpiry(v.deferred,BigInt(v.claimable_until))};}
+for(const v of fixture.effective_owner_expiry_vectors.vectors)test(`alpha31 effective owner expiry: ${v.id}`,async()=>{
+ const run=x=>authority.verifyImportDelegation(vector(x.delegation),undefined,alpha31ExpiryContext(x));
+ if(v.expected==='OK')await run(v);else{await assert.rejects(run(v),expected(v.expected));await run(fixture.effective_owner_expiry_vectors.vectors.find(x=>x.id===v.control));}
+});
+for(const v of fixture.stale_manifest_vectors.negative)test(`alpha31 StaleManifest REJECT then PASS: ${v.id}`,async()=>{
+ const s=fixture.stale_manifest_vectors,old=vector(s.frozen_request),read=vector(s.fresh_read),fresh=vector(s.fresh_request);
+ authority.validateImportRenewRequest(old,vector(s.signed_state));
+ await authority.verifyImportRenewSubmission(old,vector(s.signed_state),ownerContext(1200n),ownerContext(1200n));
+ assert.equal(s.refusal.definitive,true);assert.equal(s.refusal.classification,'StaleManifest');assert.equal(s.refusal.settled,false);
+ assert.deepEqual(toBinary(api.RenewImportJobRequestSchema,old),bytes(s.refusal.request_wire_hex));
+ const candidate=authority.signedDelegationDigest(old.renewal.body.replacement);
+ assert.equal(read.retainedProof.delegations.some(d=>Buffer.compare(authority.signedDelegationDigest(d),candidate)===0),false,'refused bytes do not settle');
+ assert.throws(()=>authority.validateImportRenewRequest(old,read),expected(v.expected));
+ authority.validateImportRenewRequest(fresh,read);await authority.verifyImportRenewSubmission(fresh,read,ownerContext(1200n),ownerContext(1200n));
+ assert.notDeepEqual(fresh.renewal.delegatingSignature.signature,old.renewal.delegatingSignature.signature);assert.notDeepEqual(authority.signedDelegationDigest(fresh.renewal.body.replacement),candidate);
+ assert.equal(fresh.renewal.body.replacement.body.scope.maxOperations,1);assert.equal(fresh.renewal.body.replacement.body.scope.maxResultBytes,1000n);
+});

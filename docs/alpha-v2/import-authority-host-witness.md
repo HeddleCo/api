@@ -526,7 +526,18 @@ Skew permits clock differences at not-before, never grace after expiry or an
 extension of parent/owner authority. Commit may accept `N > T` within skew;
 execution remains forbidden until `N`. The typed parent must be valid at actual
 Commit time and contain the entire child window, and the child's expiry cannot
-exceed the independently verified owner authority expiry. Use checked/widened
+exceed the independently verified owner authority expiry. Authority expiry MUST
+derive from the **effective selected owner state at the verification time**,
+never from the immutable sequence-zero root. A still-deferred, unclaimed owner
+with a positive deadline is bounded by `claimable_until_unix_seconds`. After an
+accepted `ClaimDeferredHuman`, or any accepted transition clearing deferral,
+authority is unbounded (`2^63 - 1` seconds), including after the original claim
+deadline. Historical verification MUST use the effective state at that historical
+time: a future claim cannot make earlier unclaimed authority unbounded.
+`effective_owner_authority_expiry` / `effectiveOwnerAuthorityExpiry` take only
+independently verified effective-state inputs. Signed parent and child validity
+windows still apply. This matches heddle's `authority_expires_at_seconds`.
+Use checked/widened
 integer arithmetic, including extreme uint64 duration/skew advertisements.
 
 Browser signing uses the separate `preflight_prepared_delegation` /
@@ -863,7 +874,13 @@ against that high-water and the saved clock floor. An uninformed fresh receiver 
 unexpired authentic older set; the five-minute bound is NOT owner/policy freshness.
 
 Explicit out-of-band descriptor-root replacement invalidates old contexts and
-preserves known seals/intervals/tombstones. Compromised-root recovery requires
+preserves authenticated history, generation high-water, known seals, intervals,
+tombstones, job-key associations and the clock floor. Replacement compares the
+expected old pin and advances its epoch by one; generation and high-water MUST
+NOT reset. There is no previous-root overlap. The old root MUST NOT authenticate
+new responses, and every context created under its epoch rejects as
+`StaleContext`. Clients install the new pin explicitly out of band.
+Compromised-root recovery requires
 independent pre-compromise provenance, not a newly signed archive/higher generation.
 Otherwise affected history is unavailable. The owner [accepted replica-held root
 custody](https://github.com/HeddleCo/weft/issues/2469#issuecomment-5943900946) for first
@@ -1337,6 +1354,8 @@ empty committed snapshot. No fabricated timestamps or synthetic receipts.
 The browser flow is:
 
 1. Read and independently verify retained evidence and the authenticated snapshot.
+   Derive each owner expiry from its effective selected state at that verification
+   time; a claimed human does not inherit the immutable root's claim deadline.
 2. Compute and review the remaining scope from the committed slots and consumed
    budgets. Request an ordinary exact renewal Prepare with this caller-selected
    scope and the exact `retained_source`; no inventory lookup is needed, including
@@ -1450,3 +1469,49 @@ before current expiry/CAS/terminal checks and return the stored receipt without
 another epoch increment. A race requiring a different snapshot, proof or signature
 requires a new operation ID and preparation. Never mutate a pending frozen request
 in place. No v2 encoding or compatibility path is introduced.
+
+### Import bundle witness composition (alpha.31)
+
+`verify_import_bundle_witnesses` / `verifyImportBundleWitnesses` accept the retained
+`ImportPublicProofBundleV1`, an independently installed descriptor pin (authority,
+root ID, public key, epoch), the receiver's durable snapshot, actual verification
+clock, independently verified historical owner contexts in delegation order, and
+a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
+its response/retained closure, independently verify owner histories and original
+native authority/causal/landing context with heddle, then call this composition
+before reviewing or computing remaining scope. The hook receives each exact
+statement only after witness signature and inclusion verification; use heddle's
+`verifySignedPolicyChain` WASM to verify the selected chain, owner context and
+historical observation time. A carried policy hash alone is never verification.
+API verifies policy reference completeness, not heddle's policy signatures.
+
+The composition verifies the root signature and complete witness history,
+monotonic generation and clock floor, every statement and retirement inclusion,
+exact admission/authority/publication/landing payloads and original signatures,
+signed delegation/renewal history and accepted publication order. Before any
+publication, absent admission statements confer no historical admission claim.
+It returns the authenticated committed manifest, active predecessor, authority
+epoch and an updated snapshot. Compare these with the authenticated read state.
+Persist the result atomically under the receiver's trust/mutation lock; failures
+return no snapshot and cannot advance trust. Never source a persisted snapshot,
+owner context or descriptor pin from the incoming bundle. Snapshot copies in TS
+prevent asynchronous hook mutation from changing verification inputs.
+
+A newer independently installed pin performs an explicit epoch+1 replacement.
+The previous pin in receiver-owned storage is used solely to restore previously
+accepted history, never to authenticate the response. New response signatures
+must verify under the installed pin, and all old context epochs remain stale.
+The signed wire set has no epoch field: epoch belongs to the independent pin and
+verified contexts. Same-generation equivocation, including at replacement,
+rejects. Lower generations, missing seals/tombstones and history rollback reject
+under the new root just as they do under the old root.
+
+The signed `StaleManifest` renewal-refusal vectors freeze a request at S, retain
+an accepted publication producing S′ at the same authority epoch, and classify
+the definitive refusal against the fresh read as `StaleManifest`. Replaying the
+refused bytes cannot settle the candidate: it is absent from accepted history.
+Revalidating it against S′ refuses again. The positive rereads S′, recomputes
+remaining scope and budget, selects a new job key/delegation ID, and obtains new
+parent, delegation and renewal signatures. Its candidate remains outside the
+retained accepted history until successful activation. No wire or refusal
+semantics change is introduced by this vector set.

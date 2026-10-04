@@ -3322,3 +3322,345 @@ fn alpha27_resolve_exact_identity_and_redirect_refusal_vectors() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+fn alpha31_pin(f: &Value, replacement: bool) -> import::ImportWitnessRootPin {
+    import::ImportWitnessRootPin {
+        authority: "https://weft.example.test".into(),
+        root_id: if replacement {
+            "descriptor-root-2"
+        } else {
+            "descriptor-root-1"
+        }
+        .into(),
+        public_key: bytes(
+            &f["keys"][if replacement { "wrong_root" } else { "root" }]["public_key_hex"],
+        ),
+        epoch: if replacement { 2 } else { 1 },
+    }
+}
+fn alpha31_verify(
+    f: &Value,
+    name: &str,
+    pin: &import::ImportWitnessRootPin,
+    snapshot: Option<&import::ImportWitnessSnapshot>,
+) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
+    let c = Context::new(f);
+    import::verify_import_bundle_witnesses(
+        &record(f, name),
+        pin,
+        snapshot,
+        1_350_000,
+        &[c.owner(1100), c.owner(1200)],
+        |b, s| {
+            // Exact previously signature-verified policy input, as the WASM hook.
+            if b.policies != vec![record(f, "signed_policy")] {
+                return Err(codec::Reject::Signature);
+            }
+            assert_eq!(s.policy_sequence, 1);
+            Ok(())
+        },
+    )
+}
+#[test]
+fn alpha31_bundle_positive_all_purposes() {
+    let f = fixture();
+    for name in f["import_bundle_vectors"]["positive"]
+        .as_array()
+        .expect("positives")
+    {
+        let r = alpha31_verify(
+            &f,
+            name.as_str().expect("name"),
+            &alpha31_pin(&f, false),
+            None,
+        )
+        .expect("authenticated bundle");
+        assert_eq!(r.accepted_history.authority_epoch, 2);
+        assert_eq!(
+            r.accepted_history
+                .committed_manifest
+                .expect("manifest")
+                .slots
+                .len(),
+            2
+        );
+        assert_eq!(r.snapshot.witness_set.body.expect("set").generation, 12);
+        assert_eq!(r.snapshot.clock_floor_unix_millis, 1_350_000);
+        assert_eq!(r.snapshot.job_associations.len(), 2);
+    }
+}
+fn alpha31_bundle_negative(id: &str) {
+    let f = fixture();
+    let v = f["import_bundle_vectors"]["negative"]
+        .as_array()
+        .expect("negatives")
+        .iter()
+        .find(|v| v["id"] == id)
+        .expect("vector");
+    let mut snapshot = v["snapshot_bundle"].as_str().map(|n| {
+        alpha31_verify(&f, n, &alpha31_pin(&f, false), None)
+            .expect("prior authenticated bundle")
+            .snapshot
+    });
+    if let Some(clock) = v["snapshot_clock"].as_i64() {
+        snapshot.as_mut().expect("snapshot").clock_floor_unix_millis = clock;
+    }
+    let original = snapshot.clone();
+    let replacement = v["replacement"].as_bool().unwrap_or(false);
+    let mut pin = alpha31_pin(&f, replacement);
+    if let Some(epoch) = v["pin_epoch"].as_u64() {
+        pin.epoch = epoch;
+    }
+    let result = alpha31_verify(
+        &f,
+        v["bundle"].as_str().expect("bundle"),
+        &pin,
+        snapshot.as_ref(),
+    );
+    let actual = format!("{:?}", result.expect_err("must reject"));
+    assert_eq!(actual, v["expected"].as_str().expect("reason"), "{id}");
+    assert_eq!(snapshot, original, "failure preserves snapshot");
+    if v["snapshot_clock"].is_number() {
+        snapshot.as_mut().expect("snapshot").clock_floor_unix_millis = 1_350_000;
+    }
+    let control = alpha31_verify(
+        &f,
+        v["control"].as_str().expect("control"),
+        &alpha31_pin(&f, replacement),
+        snapshot.as_ref(),
+    )
+    .expect("passing control");
+    if replacement {
+        assert_eq!(
+            control
+                .snapshot
+                .witness_set
+                .body
+                .as_ref()
+                .expect("set")
+                .generation,
+            14
+        );
+        assert_eq!(control.snapshot.root.epoch, 2);
+        assert_eq!(
+            control.snapshot.job_associations,
+            original.as_ref().expect("snapshot").job_associations
+        );
+        assert_eq!(
+            control.snapshot.accepted_history.len(),
+            original.expect("snapshot").accepted_history.len()
+        );
+    }
+    println!("alpha31 {id}: {actual} -> control PASS");
+}
+macro_rules! alpha31_negative_tests {
+    ($($name:ident),* $(,)?) => { $(#[test] fn $name() { alpha31_bundle_negative(stringify!($name).strip_prefix("alpha31_").expect("prefix")); })* };
+}
+alpha31_negative_tests!(
+    alpha31_corrupted_witness_signature,
+    alpha31_corrupted_statement,
+    alpha31_unknown_root,
+    alpha31_mismatched_root,
+    alpha31_wrong_root_key,
+    alpha31_high_water_rollback,
+    alpha31_missing_inclusion_proof,
+    alpha31_reordered_history,
+    alpha31_reordered_publications,
+    alpha31_stale_epoch,
+    alpha31_replacement_carries_high_water,
+    alpha31_replacement_preserves_seal,
+    alpha31_clock_rollback
+);
+#[test]
+fn alpha31_policy_hook_rejects_then_passes() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let pin = alpha31_pin(&f, false);
+    assert_eq!(
+        import::verify_import_bundle_witnesses(
+            &record(&f, "alpha31_bundle"),
+            &pin,
+            None,
+            1_350_000,
+            &[c.owner(1100), c.owner(1200)],
+            |_, _| Err(codec::Reject::Signature)
+        )
+        .err(),
+        Some(codec::Reject::Signature)
+    );
+    alpha31_verify(&f, "alpha31_bundle", &pin, None).expect("verified policy hook");
+}
+#[test]
+fn alpha31_old_context_stale_after_replacement() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let old =
+        witness::verify_set(&record(&f, "retired_set"), &c.set(1_350_000), None).expect("old set");
+    let signed = record(&f, "publication_statement");
+    let proof = record(&f, "publication_proof");
+    let context = witness::resolve_statement(&old, &signed, Some(&proof), false, 1_350_000)
+        .expect("old context");
+    let pin = alpha31_pin(&f, true);
+    let mut e = c.set(1_350_000);
+    e.root_id = &pin.root_id;
+    e.root_public_key = &pin.public_key;
+    e.root_epoch = 2;
+    let next = witness::verify_set(&record(&f, "alpha31_replacement_set"), &e, None)
+        .expect("replacement set");
+    assert_eq!(
+        witness::recheck_context(&context, &next, &signed, 1_350_000),
+        Err(codec::Reject::StaleContext)
+    );
+    let fresh = witness::resolve_statement(&next, &signed, Some(&proof), false, 1_350_000)
+        .expect("fresh context");
+    witness::recheck_context(&fresh, &next, &signed, 1_350_000).expect("fresh control");
+}
+#[test]
+fn alpha31_effective_owner_expiry_signed_history() {
+    let f = fixture();
+    let vectors = f["effective_owner_expiry_vectors"]["vectors"]
+        .as_array()
+        .expect("vectors");
+    for v in vectors {
+        let c = Context::new(&f);
+        let d: api::SignedImportJobDelegationV1 =
+            record(&f, v["delegation"].as_str().expect("delegation"));
+        let b = d.body.as_ref().expect("body");
+        let chain = import::owner_chain_digest(&record(&f, v["chain"].as_str().expect("chain")))
+            .expect("chain");
+        let key = bytes(&f["keys"][v["owner_key"].as_str().expect("key")]["public_key_hex"]);
+        let mut e = c.owner(v["now_seconds"].as_i64().expect("now"));
+        e.identity = b.identity.as_ref().expect("identity");
+        e.owner_public_key = &key;
+        e.owner_chain_digest = &chain;
+        e.authority_expires_at_seconds = import::effective_owner_authority_expiry(
+            v["deferred"].as_bool().expect("effective deferral"),
+            1150,
+        );
+        let result = import::verify_delegation(&d, None, &e);
+        let actual = result
+            .err()
+            .map(|r| format!("{r:?}"))
+            .unwrap_or_else(|| "OK".into());
+        assert_eq!(actual, v["expected"].as_str().expect("reason"));
+        let h: api::OwnerHistory = record(&f, v["history"].as_str().expect("history"));
+        let root = h.root.as_ref().expect("root");
+        let root_digest = bytes(&f["effective_owner_expiry_vectors"]["root_digest_hex"]);
+        codec::verify(
+            &c.owner,
+            &root_digest,
+            &root.authority_proof.as_ref().expect("root proof").signature,
+        )
+        .expect("signed deferred root");
+        if !h.accepted_transitions.is_empty() {
+            let claim = &h.accepted_transitions[0];
+            let digest = bytes(&f["effective_owner_expiry_vectors"]["claim_digest_hex"]);
+            codec::verify(&c.owner, &digest, &claim.authorizations[0].signature)
+                .expect("origin claim signature");
+            codec::verify(
+                &bytes(&f["keys"]["rotated_owner"]["public_key_hex"]),
+                &digest,
+                &claim
+                    .next_authority_key_proof
+                    .as_ref()
+                    .expect("new authority proof")
+                    .signature,
+            )
+            .expect("new human signature");
+        }
+        if actual != "OK" {
+            let control = vectors
+                .iter()
+                .find(|x| x["id"] == v["control"])
+                .expect("control");
+            let pass: api::SignedImportJobDelegationV1 =
+                record(&f, control["delegation"].as_str().expect("delegation"));
+            let pass_chain =
+                import::owner_chain_digest(&record(&f, control["chain"].as_str().expect("chain")))
+                    .expect("chain");
+            let pass_key = bytes(&f["keys"]["rotated_owner"]["public_key_hex"]);
+            e.identity = pass
+                .body
+                .as_ref()
+                .expect("body")
+                .identity
+                .as_ref()
+                .expect("id");
+            e.owner_public_key = &pass_key;
+            e.owner_chain_digest = &pass_chain;
+            e.authority_expires_at_seconds = import::effective_owner_authority_expiry(false, 1150);
+            import::verify_delegation(&pass, None, &e).expect("claimed control");
+        }
+        println!("alpha31 expiry {}: {actual} -> control PASS", v["id"]);
+    }
+}
+#[test]
+fn alpha31_stale_manifest_refusal_rejects_then_new_signature_passes() {
+    let f = fixture();
+    let v = &f["stale_manifest_vectors"];
+    let c = Context::new(&f);
+    let old: api::RenewImportJobRequest = record(&f, v["frozen_request"].as_str().expect("old"));
+    let before = record(&f, v["signed_state"].as_str().expect("S"));
+    let after: api::GetImportJobStateResponse =
+        record(&f, v["fresh_read"].as_str().expect("S prime"));
+    let fresh: api::RenewImportJobRequest = record(&f, v["fresh_request"].as_str().expect("fresh"));
+    import::verify_renew_submission(&old, &before, &c.owner(1200), &c.owner(1200))
+        .expect("signature against S");
+    assert_eq!(
+        old.encode_to_vec(),
+        bytes(&v["refusal"]["request_wire_hex"])
+    );
+    assert_eq!(v["refusal"]["classification"], "StaleManifest");
+    assert_eq!(v["refusal"]["settled"], false);
+    assert_eq!(v["refusal"]["definitive"], true);
+    let candidate = old
+        .renewal
+        .as_ref()
+        .expect("renewal")
+        .body
+        .as_ref()
+        .expect("body")
+        .replacement
+        .as_ref()
+        .expect("candidate");
+    let digest = import::signed_delegation_digest(candidate).expect("digest");
+    assert!(
+        !after
+            .retained_proof
+            .as_ref()
+            .expect("accepted history")
+            .delegations
+            .iter()
+            .any(|d| import::signed_delegation_digest(d).expect("digest") == digest),
+        "refused bytes do not settle"
+    );
+    for n in v["negative"].as_array().expect("negatives") {
+        assert_eq!(
+            import::validate_renew_request(&old, &after),
+            Err(codec::Reject::StaleManifest)
+        );
+        import::verify_renew_submission(&fresh, &after, &c.owner(1200), &c.owner(1200))
+            .expect("re-read remaining scope and new signature");
+        println!("alpha31 {}: StaleManifest -> control PASS", n["id"]);
+    }
+    assert_ne!(
+        old.renewal.as_ref().expect("old").delegating_signature,
+        fresh.renewal.as_ref().expect("fresh").delegating_signature
+    );
+    assert_ne!(
+        digest,
+        import::signed_delegation_digest(
+            fresh
+                .renewal
+                .as_ref()
+                .expect("fresh")
+                .body
+                .as_ref()
+                .expect("body")
+                .replacement
+                .as_ref()
+                .expect("new candidate")
+        )
+        .expect("digest")
+    );
+}

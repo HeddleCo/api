@@ -4,8 +4,8 @@ import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSo
 import type { HybridImportJobSelector, MutationResponse, OperationRecord } from "./common_pb.js";
 import { OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
-import { SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
-import { resolveWitnessStatement, type VerifiedWitnessSet } from "./witness-trust.js";
+import { SignedHostedWitnessSetV1Schema, HostedWitnessStatementV1Schema, SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessSetV1, type HostedWitnessStatementV1, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
+import { resolveWitnessStatement, restoreWitnessHistorySnapshot, verifyWitnessSetAfterRootReplacement, verifyWitnessSet, verifyWitnessInclusion, leafDigest, recheckWitnessContext, type WitnessSetExpectation, type ResolvedWitnessStatement, type VerifiedWitnessSet } from "./witness-trust.js";
 import { canonicalHybridV1, signingDigest, equal, width, keyId, verifySignature, reject, canonicalHttps, hash, compare, sized, utf8, HybridContractError } from "./_hybrid-codec.js";
 export { canonicalHybridV1, signingDigest, strictDecode, HybridContractError } from "./_hybrid-codec.js";
 
@@ -245,7 +245,7 @@ export function checkImportCommitReplay(request:CommitImportJobRequest, stored:C
   validateImportCommitResponse(request,response);
 }
 function subset(c:api.ImportPermissionScopeV1,p:api.ImportPermissionScopeV1):boolean{return c.provider===p.provider&&c.sourceUrl===p.sourceUrl&&equal(c.destinationVersion,p.destinationVersion)&&equal(c.optionsDigest,p.optionsDigest)&&c.converterVersion===p.converterVersion&&c.maxOperations<=p.maxOperations&&c.maxResultBytes<=p.maxResultBytes&&c.branches.every(b=>p.branches.some(a=>branchSubset(b,a)));}
-export interface ImportOwnerExpectation{identity:api.ImportIdentityV1;ownerPublicKey:Uint8Array;ownerChainDigest:Uint8Array;authorityExpiresAtSeconds:bigint;nowUnixSeconds:bigint;forbiddenJobKeys:readonly Uint8Array[];knownJobAssociations:readonly {key:Uint8Array;logicalJobId:Uint8Array}[];}
+export interface ImportOwnerExpectation{identity:api.ImportIdentityV1;ownerPublicKey:Uint8Array;ownerChainDigest:Uint8Array;/** Effective selected owner state at nowUnixSeconds; immutable-root deadlines do not survive claim. */authorityExpiresAtSeconds:bigint;nowUnixSeconds:bigint;forbiddenJobKeys:readonly Uint8Array[];knownJobAssociations:readonly {key:Uint8Array;logicalJobId:Uint8Array}[];}
 function snapshotExpectation(e:ImportOwnerExpectation):ImportOwnerExpectation{return {...e,identity:clone(api.ImportIdentityV1Schema,e.identity),ownerPublicKey:e.ownerPublicKey.slice(),ownerChainDigest:e.ownerChainDigest.slice(),forbiddenJobKeys:e.forbiddenJobKeys.map(k=>k.slice()),knownJobAssociations:e.knownJobAssociations.map(a=>({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()}))};}
 async function auth(key:Uint8Array,domain:string,schema:Parameters<typeof canonicalHybridV1>[0],body:Parameters<typeof canonicalHybridV1>[1],sig:AuthorizationSignature|undefined){if(!sig||!equal(sig.signerKeyId,keyId(key)))reject("Signature");if(canonicalHybridV1(schema,body).length>MAX_RECORD_BYTES)reject("Bounds");await verifySignature(key,signingDigest(domain,schema,body),sig.signature);}
 export async function verifyImportMemberPermission(signed:api.SignedImportMemberPermissionV1,e:ImportOwnerExpectation){return verifyMemberPermissionInner(signed,e,true);}
@@ -349,7 +349,7 @@ export const signedNativeDigest=(r:SignedRecord)=>signingDigest("heddle-signed-n
 export async function verifyNativeRecord(r:SignedRecord,format:string){if(r.format!==format)reject("Version");if(!r.canonicalRecord.length||r.canonicalRecord.length>65536||!r.signatures.length||r.signatures.length>16)reject("Bounds");for(let i=0;i<r.signatures.length;i++){const s=r.signatures[i]!;if(i&&compare(r.signatures[i-1]!.publicKey,s.publicKey)>=0)reject("Canonical");await verifySignature(s.publicKey,join(utf8.encode(format),Uint8Array.of(0),r.canonicalRecord),s.signature);}}
 import { decode } from "./_collaboration-msgpack.js";
 import { blake3 } from "@noble/hashes/blake3.js";
-import type { HostedWitnessBoundaryAcceptanceV1, HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
+import type { HostedWitnessBoundaryAcceptanceV1 } from "../common/hosted_witness_pb.js";
 export function boundaryOctetsDigest(domain:string,bytes:Uint8Array):Uint8Array{return hash(utf8.encode(domain),sized(bytes));}
 function nativeOctetsId(format:string,bytes:Uint8Array):Uint8Array{const n=new Uint8Array(8);new DataView(n.buffer).setBigUint64(0,BigInt(bytes.length),true);return blake3(join(utf8.encode(format),n,Uint8Array.of(0),bytes));}
 type NativeSelectors={originals_manifest:unknown;publication_intent:unknown;thread:unknown;subject?:Record<string,unknown>;basis?:{BoundaryAcceptance?:{acceptance:unknown}}};
@@ -581,3 +581,61 @@ export function checkImportRenewReplay(requestBytes:Uint8Array,storedBytes:Uint8
   if(requestBytes.length>2*MAX_BUNDLE_BYTES)reject("Bounds");
   if(!equal(requestBytes,storedBytes))reject("OperationIdReused");
 }
+
+/** Supply the independently verified EFFECTIVE state at the selected time. */
+export function effectiveOwnerAuthorityExpiry(deferredHuman:boolean,claimableUntil:bigint):bigint {
+  return deferredHuman&&claimableUntil>0n?claimableUntil:(1n<<63n)-1n;
+}
+export interface ImportWitnessRootPin {authority:string;rootId:string;publicKey:Uint8Array;epoch:bigint;}
+/** Receiver-owned durable data; never restore from the incoming proof. */
+export interface ImportWitnessSnapshot {
+  root:ImportWitnessRootPin;witnessSet:SignedHostedWitnessSetV1;clockFloorUnixMillis:bigint;
+  jobAssociations:{key:Uint8Array;logicalJobId:Uint8Array}[];acceptedHistory:api.ImportPublicProofBundleV1[];
+}
+export interface VerifiedImportBundleWitnesses {acceptedHistory:api.ImportJobCasStateV1;snapshot:ImportWitnessSnapshot;}
+/** After authenticating the state RPC, supply independently verified historical
+ * owner contexts in delegation order. The mandatory hook authenticates each
+ * selected policy chain and owner/native context at its verified statement time
+ * with heddle's verifySignedPolicyChain (WASM). Commit the snapshot atomically. */
+export async function verifyImportBundleWitnesses(
+  bundle:api.ImportPublicProofBundleV1,pin:ImportWitnessRootPin,snapshot:ImportWitnessSnapshot|undefined,
+  now:bigint,owners:readonly ImportOwnerExpectation[],
+  verifyPolicy:(bundle:api.ImportPublicProofBundleV1,statement:HostedWitnessStatementV1)=>void|Promise<void>,
+):Promise<VerifiedImportBundleWitnesses> {
+  bundle=clone(api.ImportPublicProofBundleV1Schema,bundle);pin={...pin,publicKey:pin.publicKey.slice()};
+  snapshot=snapshot?cloneImportWitnessSnapshot(snapshot):undefined;owners=owners.map(snapshotExpectation);
+  width(pin.publicKey,32);if(pin.epoch===0n)reject("StaleContext");
+  validateBundleBounds(bundle);const terminal=bundle.terminalManifest??reject("Canonical");
+  validateBundle(bundle,terminal.slots.length>0);if(owners.length!==bundle.delegations.length)reject("Root");
+  const associations=snapshot?.jobAssociations??[];
+  for(const {body:b} of bundle.delegations){if(!b)reject("Canonical");if(associations.some(a=>equal(a.key,b.jobPublicKey)&&!equal(a.logicalJobId,b.logicalJobId)))reject("KeyRole");if(!associations.some(a=>equal(a.key,b.jobPublicKey)))associations.push({key:b.jobPublicKey.slice(),logicalJobId:b.logicalJobId.slice()});}
+  const expectation=(root:ImportWitnessRootPin,floor:bigint):WitnessSetExpectation=>({authority:root.authority,rootId:root.rootId,rootPublicKey:root.publicKey,rootEpoch:root.epoch,nowUnixMillis:now,clockFloorUnixMillis:floor,knownJobKeys:associations.map(a=>a.key)});
+  let previous:VerifiedWitnessSet|undefined;let replacing=false;
+  if(snapshot){if(snapshot.root.authority!==pin.authority)reject("Root");previous=await restoreWitnessHistorySnapshot(snapshot.witnessSet,expectation(snapshot.root,0n));if(snapshot.root.rootId!==pin.rootId||!equal(snapshot.root.publicKey,pin.publicKey)||snapshot.root.epoch!==pin.epoch)replacing=true;}
+  const carried=bundle.witnessSet??reject("Canonical"),set=replacing?await verifyWitnessSetAfterRootReplacement(carried,expectation(pin,snapshot?.clockFloorUnixMillis??0n),previous!):await verifyWitnessSet(carried,expectation(pin,snapshot?.clockFloorUnixMillis??0n),previous);
+  const resolved:{context:ResolvedWitnessStatement;proof:HostedWitnessHistoryProofV1|undefined}[]=[];
+  for(const signed of bundle.statements){const s=signed.body??reject("Canonical"),entry=set.body.entries.find(e=>equal(e.executorId,s.executorId))??reject("Root");
+    const leaf=leafDigest(s.purpose,canonicalHybridV1(HostedWitnessStatementV1Schema,s),signed.signature);
+    const proof=entry.state===2?bundle.historyProofs.find(p=>{if(p.purpose!==s.purpose)return false;try{verifyWitnessInclusion(leaf,p,entry);return true;}catch(e){if(e instanceof HybridContractError)return false;throw e;}}):undefined;
+    const context=await resolveWitnessStatement(set,signed,proof,false,now);
+    // Give hooks separate copies so an async consumer cannot mutate verification.
+    await verifyPolicy(clone(api.ImportPublicProofBundleV1Schema,bundle),clone(HostedWitnessStatementV1Schema,s));resolved.push({context,proof});
+  }
+  const verified:VerifiedImportDelegation[]=[];
+  for(let i=0;i<bundle.delegations.length;i++){const d=bundle.delegations[i]!,b=d.body??reject("Canonical"),parent=resolveBundlePermission(bundle,b.parentPermissionDigest),owner={...owners[i]!,knownJobAssociations:associations};
+    verified.push(i===0?await verifyImportDelegation(d,parent,owner):await verifyImportRenewal(bundle.renewals[i-1]!,verified[i-1]!,resolveBundleManifest(bundle,bundle.renewals[i-1]!.body!.committedManifestDigest),BigInt(i),parent,owner));}
+  for(let i=0;i<bundle.statements.length;i++){const signed=bundle.statements[i]!,s=signed.body!,{context,proof}=resolved[i]!;
+    if(s.purpose===1)await verifyWitnessPayload(s,{kind:'genesis',payload:bundle.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope")});
+    else if(s.purpose===2)await verifyWitnessPayload(s,{kind:'authority',payload:bundle.authorityWitnesses.find(p=>equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))??reject("Scope")});
+    else if(s.purpose===4)await verifyWitnessPayload(s,{kind:'landing',payload:bundle.landingWitnesses.find(p=>equal(canonicalHybridV1(api.HostedLandingWitnessV1Schema,p),s.canonicalPayload))??reject("Scope")});
+    else if(s.purpose===3){const pair=bundle.operations.flatMap(o=>bundle.manifests.map(m=>({o,m}))).find(({o,m})=>equal(canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,m)),s.canonicalPayload))??reject("Scope");const delegation=verified.find(d=>equal(d.digest,pair.o.body!.delegationDigest))??reject("Scope");await verifyImportPublication(pair.o,delegation,pair.m,signed,set,proof,now);}
+    else reject("Version");recheckWitnessContext(context,set,signed,now);
+  }
+  const progressive=clone(api.ImportResultManifestV1Schema,terminal);progressive.slots=[];let order=0n,observed=0n;
+  for(const o of bundle.operations){const digest=signedOperationDigest(o),slot=terminal.slots.find(s=>equal(s.signedOperationDigest,digest))??reject("Scope");progressive.slots.push(slot);progressive.slots.sort((a,b)=>a.refName<b.refName?-1:a.refName>b.refName?1:a.slotId<b.slotId?-1:a.slotId>b.slotId?1:0);const payload=canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,progressive)),s=bundle.statements.find(s=>s.body?.purpose===3&&equal(s.body.canonicalPayload,payload))?.body??reject("Transition");if(s.admissionOrder<=order||s.observedAtUnixMillis<observed)reject("Transition");order=s.admissionOrder;observed=s.observedAtUnixMillis;}
+  if(!equal(toBinary(api.ImportResultManifestV1Schema,progressive),toBinary(api.ImportResultManifestV1Schema,terminal)))reject("Scope");
+  const history=snapshot?.acceptedHistory??[],index=history.findIndex(b=>equal(b.terminalManifest!.logicalJobId,terminal.logicalJobId));
+  if(index>=0){const old=history[index]!;if(!old.delegations.every((d,i)=>bundle.delegations[i]&&equal(toBinary(api.SignedImportJobDelegationV1Schema,d),toBinary(api.SignedImportJobDelegationV1Schema,bundle.delegations[i]!)))||!old.renewals.every((r,i)=>bundle.renewals[i]&&equal(toBinary(api.SignedImportJobRenewalV1Schema,r),toBinary(api.SignedImportJobRenewalV1Schema,bundle.renewals[i]!)))||!old.operations.every((o,i)=>bundle.operations[i]&&equal(toBinary(api.SignedDelegatedImportOperationV1Schema,o),toBinary(api.SignedDelegatedImportOperationV1Schema,bundle.operations[i]!))))reject("HighWater");history[index]=bundle;}else history.push(bundle);
+  return {acceptedHistory:create(api.ImportJobCasStateV1Schema,{formatVersion:1,logicalJobId:terminal.logicalJobId,retryLineageId:terminal.retryLineageId,activePredecessor:bundle.delegations.at(-1),authorityEpoch:BigInt(bundle.delegations.length),committedManifest:terminal}),snapshot:cloneImportWitnessSnapshot({root:pin,witnessSet:carried,clockFloorUnixMillis:now,jobAssociations:associations,acceptedHistory:history})};
+}
+function cloneImportWitnessSnapshot(s:ImportWitnessSnapshot):ImportWitnessSnapshot{return {root:{...s.root,publicKey:s.root.publicKey.slice()},witnessSet:clone(SignedHostedWitnessSetV1Schema,s.witnessSet),clockFloorUnixMillis:s.clockFloorUnixMillis,jobAssociations:s.jobAssociations.map(a=>({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()})),acceptedHistory:s.acceptedHistory.map(b=>clone(api.ImportPublicProofBundleV1Schema,b))};}

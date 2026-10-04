@@ -24,6 +24,7 @@ import * as owner from '../packages/typescript/dist/v1alpha2/owner_records_pb.js
 import { canonicalHybridV1, signingDigest, signedPermissionDigest, ownerChainDigest, signedGenesisDigest, signedDelegationDigest, signedOperationDigest, manifestDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import { setSigningBytes, witnessId, statementSigningDigest, leafDigest, merkleRoot, purposeDomain } from '../packages/typescript/dist/v1alpha2/witness-trust.js';
 import { hash, keyId, join, u32, integer, sized, utf8, compare } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
+import { addAlpha31Vectors } from './generate-alpha31-fixture.mjs';
 import { assertFixtureOwnerContext } from './assert-fixture-owner-context.mjs';
 const hex=v=>Buffer.from(v).toString('hex'),raw=(n,s=32)=>new Uint8Array(s).fill(n),str=s=>utf8.encode(s);
 const keys=Object.fromEntries(['owner','device','job','renew_job','witness','next_witness','root','wrong_root','guardian_a','guardian_b','direct_job','competing_job','rotated_owner'].map((name,i)=>{const seed=raw(i+1),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'}),publicKey=new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32));return [name,{seed,privateKey,publicKey}];}));
@@ -870,5 +871,6 @@ for(const v of artifact.renew_submission_vectors.passing){
  if(!selectedChain)throw new Error(`${v.id}: replacement selected chain missing`);
  assertFixtureOwnerContext(nativeCodec,v.id,request.proof.ownerHistories,selectedChain,replacement.identity,1350000n,request.proof.ownershipTransfers);
 }
+addAlpha31Vectors(artifact);
 writeFileSync(new URL('../tests/fixtures/import-authority-host-witness-v1.json',import.meta.url),JSON.stringify(artifact,null,2)+'\n');
 console.log(`Frozen ${artifact.messages.length} messages, ${Object.keys(artifact.signed_vectors).length} signed byte vectors, ${artifact.negative_vectors.length} witness/operation negatives, ${artifact.commit_vectors.negative.length} Commit negatives, ${artifact.trees.length} trees, ${artifact.retry_scenarios.length} retry scenarios.`);

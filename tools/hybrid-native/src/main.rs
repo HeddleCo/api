@@ -1367,8 +1367,15 @@ mod tests {
         .expect("completed signed commit");
         let submission: wire::CommitImportJobRequest =
             record(&f, "commit_request").expect("initial submission");
-        import::verify_commit_submission(&submission, &prepared, "github", &expectation)
-            .expect("source and signed complete submission");
+        import::verify_commit_submission(
+            &submission,
+            &prepared,
+            "github",
+            &record(&f, "source_connected").expect("current source"),
+            &record(&f, "import_configuration").expect("configuration"),
+            &expectation,
+        )
+        .expect("source and signed complete submission");
         for name in ["genesis_dev_payload", "genesis_payload"] {
             let payload: wire::ImportGenesisWitnessV1 = record(&f, name).expect("original payload");
             let original = payload.original_genesis.as_ref().expect("native original");

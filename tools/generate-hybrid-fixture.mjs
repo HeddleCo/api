@@ -14,7 +14,7 @@ import { unarySigningBytes } from '../packages/typescript/dist/signing.js';
 import { blake3 } from '@noble/hashes/blake3.js';
 import { delegationPreparation, frontierDigest, contentDigest, boundaryOctetsDigest, publicationPayload, signedNativeDigest, authorityEnvelopeDigest, originalSignaturesDigest } from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import * as api from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
-import { CommitImportJobRequestSchema, ImportSourceRequestSchema } from '../packages/typescript/dist/v1alpha2/integration_pb.js';
+import { CommitImportJobRequestSchema, ImportSourceRequestSchema, ProviderRepositorySchema, ProviderRefSchema, ResolveImportSourceRequestSchema, ResolveImportSourceResponseSchema } from '../packages/typescript/dist/v1alpha2/integration_pb.js';
 import { MutationResponseSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import * as common from '../packages/typescript/dist/common/hosted_witness_pb.js';
 import { canonicalThreadGenesis, threadGenesisId } from '../packages/typescript/dist/v1alpha2/thread-genesis.js';
@@ -28,10 +28,14 @@ const hex=v=>Buffer.from(v).toString('hex'),raw=(n,s=32)=>new Uint8Array(s).fill
 const keys=Object.fromEntries(['owner','device','job','renew_job','witness','next_witness','root','wrong_root','guardian_a','guardian_b','direct_job','competing_job','rotated_owner'].map((name,i)=>{const seed=raw(i+1),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'}),publicKey=new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32));return [name,{seed,privateKey,publicKey}];}));
 const sig=(name,input)=>new Uint8Array(sign(null,input,keys[name].privateKey));
 const auth=(name,input)=>({signerKeyId:keyId(keys[name].publicKey),signature:sig(name,input)});
-const artifact={format_version:1,messages:[...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message').map(v=>v.typeName).sort(),descriptors:[],enums:[],protocol:{version:2,feature:1,gated_methods:[...IntegrationService.methods,...SyncService.methods].filter(m=>getOption(m,rpc_contract).mandatoryFeatures.includes(1)).map(m=>`/${m.parent.typeName}/${m.name}`).sort()},keys:Object.fromEntries(Object.entries(keys).map(([n,k])=>[n,{seed_hex:hex(k.seed),public_key_hex:hex(k.publicKey)}])),signed_vectors:{},wire_vectors:{},commitment_vectors:{},raw_commitment_vectors:{},negative_vectors:[],trees:[],retry_scenarios:[]};
-for(const schema of [...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message'))artifact.descriptors.push({name:schema.typeName,fields:schema.fields.map(f=>({name:f.name,number:f.number,type:f.message?.typeName??f.enum?.typeName??String(f.scalar),list:f.fieldKind==='list'}))});
+const artifact={format_version:1,messages:[...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProviderRepositorySchema,ResolveImportSourceRequestSchema,ResolveImportSourceResponseSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message').map(v=>v.typeName).sort(),descriptors:[],enums:[],protocol:{version:2,feature:1,gated_methods:[...IntegrationService.methods,...SyncService.methods].filter(m=>getOption(m,rpc_contract).mandatoryFeatures.includes(1)).map(m=>`/${m.parent.typeName}/${m.name}`).sort()},keys:Object.fromEntries(Object.entries(keys).map(([n,k])=>[n,{seed_hex:hex(k.seed),public_key_hex:hex(k.publicKey)}])),signed_vectors:{},wire_vectors:{},commitment_vectors:{},raw_commitment_vectors:{},negative_vectors:[],trees:[],retry_scenarios:[]};
+for(const schema of [...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProviderRepositorySchema,ResolveImportSourceRequestSchema,ResolveImportSourceResponseSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message'))artifact.descriptors.push({name:schema.typeName,fields:schema.fields.map(f=>({name:f.name,number:f.number,type:f.message?.typeName??f.enum?.typeName??String(f.scalar),list:f.fieldKind==='list'}))});
 for(const schema of [...Object.values(common),...Object.values(api),MandatoryProtocolFeatureSchema].filter(v=>v?.kind==='enum'))artifact.enums.push({name:schema.typeName,values:schema.values.map(v=>({name:v.name,number:v.number}))});
-function wire(name,schema,value){artifact.wire_vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,value))};return value;}
+function wire(name,schema,value){
+ if(schema===api.GetImportConfigurationResponseSchema)value.providers=value.providers.map(p=>create(api.ImportProviderConfigurationV1Schema,p));
+ if(schema===ProviderRepositorySchema)value.refs=value.refs.map(r=>create(ProviderRefSchema,r));
+ if(schema===api.PrepareImportJobRequestSchema&&value.source)value.source=create(api.ImportSourceSelectionV1Schema,value.source);
+artifact.wire_vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,create(schema,value)))};return value;}
 function signed(name,bodySchema,body,signedSchema,signatureField,key,domain){const input=signingDigest(domain,bodySchema,body),signature=auth(key,input),value=create(signedSchema,{body,[signatureField]:signature});artifact.signed_vectors[name]={schema:signedSchema.typeName,body_schema:bodySchema.typeName,wire_hex:hex(toBinary(signedSchema,value)),canonical_hex:hex(canonicalHybridV1(bodySchema,body)),signing_input_hex:hex(input),domain,public_key_hex:hex(keys[key].publicKey),signature_hex:hex(signature.signature)};return value;}
 function commitment(name,schema,value,domain){const canonical=canonicalHybridV1(schema,value),digest=hash(str(domain),canonical);artifact.commitment_vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,value)),domain,canonical_hex:hex(canonical),preimage_hex:hex(join(str(domain),canonical)),digest_hex:hex(digest)};return value;}
 function nativeId(format,canonical){const size=new Uint8Array(8);new DataView(size.buffer).setBigUint64(0,BigInt(canonical.length),true);return blake3(join(str(format),size,raw(0,1),canonical));}
@@ -204,9 +208,10 @@ artifact.submission_vectors={changed_preparations:[],commit_negatives:[],ref_neg
 const destination={id:'23232323-2323-2323-2323-232323232323'};
 const config=wire('import_configuration',api.GetImportConfigurationResponseSchema,create(api.GetImportConfigurationResponseSchema,{
  converters:[{converterVersion:scope.converterVersion,optionsEncoding:'heddle-import-options-empty-v1',canonicalOptions:[new Uint8Array()],defaultOptions:new Uint8Array()}],
+ providers:[{provider:'github',sourceModes:[1]},{provider:'public-git',sourceModes:[2]}],defaultConverterVersion:scope.converterVersion,
  limits:{maxBranches:256,maxOperations:256,maxResultBytes:1n<<30n,maxBranchResultBytes:1n<<30n},
 }));
-const prepareRequest=wire('prepare_request',api.PrepareImportJobRequestSchema,create(api.PrepareImportJobRequestSchema,{clientOperationId:'prepare-327',destination,identity,proposedScope:scope,retryLineageId}));
+const prepareRequest=wire('prepare_request',api.PrepareImportJobRequestSchema,create(api.PrepareImportJobRequestSchema,{clientOperationId:'prepare-327',destination,identity,proposedScope:scope,retryLineageId,source:{connection:{id:'26262626-2626-2626-2626-262626262626'},providerRepositoryId:'327',installationId:'123',private:true}}));
 const emptyTokenRequest=clone(api.PrepareImportJobRequestSchema,prepareRequest);emptyTokenRequest.proposedScope.destinationVersion=new Uint8Array();wire('prepare_issue_token',api.PrepareImportJobRequestSchema,emptyTokenRequest);
 for(const {path,field} of frozenLeaves(api.ImportPermissionScopeV1Schema,scope)){
  const changed=clone(api.PrepareImportJobResponseSchema,preparation);let target=changed.proposal.scope;
@@ -215,9 +220,13 @@ for(const {path,field} of frozenLeaves(api.ImportPermissionScopeV1Schema,scope))
  artifact.submission_vectors.changed_preparations.push({id:path.join('.'),response:name,expected:'PreparedFields',control:'commit_preparation'});
 }
 const initialProof=create(api.ImportPublicProofBundleV1Schema,{formatVersion:1,ownerGenesis:spoolGenesis,ownerHistories:[create(owner.OwnerHistorySchema,{root:signedRoot,stateHash})],memberPermission:permission,memberPermissions:[permission],genesisAuthorities:Object.values(genesisProofs),delegations:[delegation],originalGeneses:Object.values(originalGeneses),creatorAuthorityEnvelopes:Object.values(envelopes),ownerChain:chain});
-const commitRequest=wire('commit_request',CommitImportJobRequestSchema,create(CommitImportJobRequestSchema,{clientOperationId:'commit-327',destination,proof:initialProof,source:{connection:{id:'26262626-2626-2626-2626-262626262626'},providerRepositoryId:'327',cloneUrl:scope.sourceUrl,name:'heddleco/example',private:true,installationId:'123'},initialBaseState:new Uint8Array(Buffer.from(seedText.split('canonical=')[1].split('\n')[0],'hex'))}));
+const commitRequest=wire('commit_request',CommitImportJobRequestSchema,create(CommitImportJobRequestSchema,{clientOperationId:'commit-327',destination,proof:initialProof,source:{connection:{id:'26262626-2626-2626-2626-262626262626'},providerRepositoryId:'327',cloneUrl:scope.sourceUrl,name:'heddleco/example',private:true,installationId:'123',hashAlgorithm:1},initialBaseState:new Uint8Array(Buffer.from(seedText.split('canonical=')[1].split('\n')[0],'hex'))}));
 const withoutBase=clone(CommitImportJobRequestSchema,commitRequest);withoutBase.initialBaseState=new Uint8Array();wire('commit_hosted_base',CommitImportJobRequestSchema,withoutBase);
-const publicSource=clone(CommitImportJobRequestSchema,commitRequest);publicSource.source={...publicSource.source,connection:undefined,providerRepositoryId:scope.sourceUrl,private:false,installationId:''};wire('commit_public_source',CommitImportJobRequestSchema,publicSource);
+const publicSource=clone(CommitImportJobRequestSchema,commitRequest);publicSource.source={...publicSource.source,connection:undefined,providerRepositoryId:scope.sourceUrl,private:false,installationId:''};
+const publicBody=clone(api.ImportJobDelegationV1Schema,directBody);publicBody.scope.provider='public-git';
+const publicDelegation=signed('public_delegation',api.ImportJobDelegationV1Schema,publicBody,api.SignedImportJobDelegationV1Schema,'delegatingSignature','owner','heddle-import-job-delegation-v1');
+publicSource.proof.memberPermission=undefined;publicSource.proof.memberPermissions=[];publicSource.proof.delegations=[publicDelegation];publicSource.proof.genesisAuthorities=directGenes;publicSource.proof.originalGeneses=Object.values(directOriginals);publicSource.proof.creatorAuthorityEnvelopes=Object.values(directEnvelopes);
+wire('commit_public_source',CommitImportJobRequestSchema,publicSource);wire('public_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{...preparation,proposal:delegationPreparation(publicBody)}));
 for(const [id,mutate,expected] of [
  ['missing_source',r=>r.source=undefined,'SourceSelection'],
  ['source_url',r=>r.source.cloneUrl='https://other.example.test/repo.git','SourceSelection'],
@@ -484,6 +493,8 @@ const missingJob=clone(api.SignedDelegatedImportOperationV1Schema,operations.mai
 artifact.amendment_vectors={permission_negatives:[],cancel_negatives:[],preflight:[],recovery:[],lineage:[]};
 for(const [name,mutate,expected] of [
  ['full_scope',p=>p.scope=scope,'CommittedSlot'],
+ ['operations_budget',p=>p.scope.maxOperations=scope.maxOperations,'RenewalFork'],
+ ['result_bytes_budget',p=>p.scope.maxResultBytes=scope.maxResultBytes,'RenewalFork'],
  ['reused_nonce',p=>p.nonce=permissionBody.nonce,'ImportPermission'],
  ['changed_cancel',p=>p.cancellationId=raw(0x99),'ImportPermission'],
 ]){
@@ -589,7 +600,7 @@ for(const [id,control,read,mutate,expected] of [
  ['wrong_current_chain',rotatedRequest,'job_state_partial',r=>r.proof.ownerChain=chain,'Root'],
  ['wrong_destination',partialRequest,'job_state_partial',r=>r.destination.id='24242424-2424-2424-2424-242424242424','Scope'],
  ['operation_id_byte_bound',partialRequest,'job_state_partial',r=>r.clientOperationId='é'.repeat(65),'Canonical'],
- ['request_byte_bound',partialRequest,'job_state_partial',r=>r.proof.creatorAuthorityEnvelopes=[raw(1,2097153)],'Bounds'],
+ ['request_byte_bound',partialRequest,'job_state_partial',r=>r.clientOperationId='x'.repeat(2097153),'Bounds'],
  ['missing_operation_id',partialRequest,'job_state_partial',r=>r.clientOperationId='','Canonical'],
  ['permission_bound',partialRequest,'job_state_partial',r=>r.proof.memberPermissions=Array(65).fill(permission),'Bounds'],
  ['proof_byte_bound',partialRequest,'job_state_partial',r=>r.proof.creatorAuthorityEnvelopes=[raw(1,1048577)],'Bounds'],
@@ -598,10 +609,10 @@ for(const [id,control,read,mutate,expected] of [
  const name=`renew_request_bad_${id}`,r=clone(api.RenewImportJobRequestSchema,control);mutate(r);
  const oversized=id==='proof_byte_bound'?1048577:id==='request_byte_bound'?2097153:0;
  if(!oversized)wire(name,api.RenewImportJobRequestSchema,r);
- artifact.renew_submission_vectors.negative.push({id,request:oversized?control.clientOperationId:name,read,expected,control:control.clientOperationId,...(oversized?{envelope_bytes:oversized}:{})});
+ artifact.renew_submission_vectors.negative.push({id,request:oversized?control.clientOperationId:name,read,expected,control:control.clientOperationId,...(oversized?{[id==='request_byte_bound'?'outer_field_bytes':'envelope_bytes']:oversized}:{})});
 }
 for(const [id,read,mutate,expected] of [
- ['response_byte_bound',readEmpty,r=>r.retainedProof.creatorAuthorityEnvelopes=[raw(1,2097153)],'Bounds'],
+ ['response_byte_bound',readEmpty,r=>r.state.logicalJobId=raw(1,2097153),'Bounds'],
  ['absent_empty_manifest',readEmpty,r=>r.state.committedManifest=undefined,'Canonical'],
  ['missing_retained_proof',readEmpty,r=>r.retainedProof=undefined,'Canonical'],
  ['snapshot_mismatch',readPartial,r=>r.retainedProof.terminalManifest=beforePublication,'StaleContext'],
@@ -612,7 +623,7 @@ for(const [id,read,mutate,expected] of [
  ['retained_byte_bound',readEmpty,r=>r.retainedProof.creatorAuthorityEnvelopes=[raw(1,1048577)],'Bounds'],
 ]){const name=`job_state_bad_${id}`,r=clone(api.GetImportJobStateResponseSchema,read);mutate(r);const oversized=id==='retained_byte_bound'?1048577:id==='response_byte_bound'?2097153:0;
  if(!oversized)wire(name,api.GetImportJobStateResponseSchema,r);
- artifact.renew_submission_vectors.read_negative.push({id,response:oversized?'job_state_empty':name,expected,control:read===readEmpty?'job_state_empty':'job_state_partial',...(oversized?{envelope_bytes:oversized}:{})});}
+ artifact.renew_submission_vectors.read_negative.push({id,response:oversized?'job_state_empty':name,expected,control:read===readEmpty?'job_state_empty':'job_state_partial',...(oversized?{[id==='response_byte_bound'?'outer_field_bytes':'envelope_bytes']:oversized}:{})});}
 for(const [id,mutate,expected] of [
  ['nil_job',r=>r.logicalJobId=raw(0,16),'Canonical'],
  ['job_width',r=>r.logicalJobId=raw(1,15),'Canonical'],
@@ -631,5 +642,82 @@ rawCommitment('device_key_id','heddle-key-v1',join(u32(1),keys.device.publicKey)
 rawCommitment('witness_selector','heddle-hosted-witness-key-v1\0',keys.witness.publicKey);
 rawCommitment('authority_envelope','heddle-hosted-authority-envelope-v1',sized(envelope));
 artifact.first_failing_checks={unrelated_permissions:'permission_format_selection',completed_slot_renewal:'committed_slot_exclusion',paused_worker:'authority_epoch_and_active_delegation_fence',publication_wins:'committed_manifest_digest_cas',legacy_hosted_import:'hybrid_import_dispatch',root_id_over_boundary:'root_id_utf8_byte_bound'};
+// alpha.25: shared source/custody, discovery, configuration and Prepare vectors.
+artifact.source_vectors={configuration_negative:[],resolution:[],hash_negative:[],scope_negative:[],prepare_negative:[]};
+const sv=artifact.source_vectors;
+const repo=wire('source_connected',ProviderRepositorySchema,clone(ProviderRepositorySchema,commitRequest.source));
+const pub=wire('source_public_github',ProviderRepositorySchema,clone(ProviderRepositorySchema,publicSource.source));
+const gitlab=clone(ProviderRepositorySchema,pub);gitlab.cloneUrl='https://gitlab.com/acme/example.git';gitlab.providerRepositoryId=gitlab.cloneUrl;wire('source_public_gitlab',ProviderRepositorySchema,gitlab);
+sv.resolution.push({id:'connected_github',source:'source_connected',connection_provider:'github',provider:'github'},{id:'public_github',source:'source_public_github',provider:'public-git'},{id:'public_gitlab',source:'source_public_gitlab',provider:'public-git'});
+for(const [id,base,mutate,connectionProvider,expected] of [
+ ['connected_gitlab',repo,r=>{},'gitlab','SourceSelection'],
+ ['connected_wrong_origin',repo,r=>r.cloneUrl=gitlab.cloneUrl,'github','SourceSelection'],
+ ['public_private',pub,r=>r.private=true,undefined,'SourceSelection'],
+ ['public_installation',pub,r=>r.installationId='123',undefined,'SourceSelection'],
+ ['public_wrong_id',pub,r=>r.providerRepositoryId='327',undefined,'SourceSelection'],
+ ['domain_selects_custody',pub,r=>{},'github','SourceSelection'],
+ ['underscore_alias',repo,r=>{},'public_git','SourceSelection'],
+]){const r=clone(ProviderRepositorySchema,base);mutate(r);const name='source_bad_'+id;wire(name,ProviderRepositorySchema,r);sv.resolution.push({id,source:name,connection_provider:connectionProvider,expected,control:base===repo?'source_connected':'source_public_github',control_connection_provider:base===repo?'github':undefined});}
+for(const [id,mutate,expected] of [
+ ['missing_providers',c=>c.providers=[],'Bounds'],
+ ['provider_bound',c=>c.providers.push(c.providers[0]),'Bounds'],
+ ['duplicate_provider',c=>c.providers=[c.providers[0],c.providers[0]],'Canonical'],
+ ['unsorted_providers',c=>c.providers.reverse(),'Canonical'],
+ ['unadvertised_gitlab',c=>c.providers=[{provider:'gitlab',sourceModes:[1]}],'SourceSelection'],
+ ['provider_alias',c=>c.providers=[{provider:'public_git',sourceModes:[2]}],'SourceSelection'],
+ ['wrong_mode',c=>c.providers[0].sourceModes=[2],'SourceSelection'],
+ ['unknown_mode',c=>c.providers[0].sourceModes=[0],'SourceSelection'],
+ ['duplicate_mode',c=>c.providers[0].sourceModes=[1,1],'SourceSelection'],
+ ['unadvertised_default',c=>c.defaultConverterVersion='missing/1','Canonical'],
+ ['empty_default',c=>c.defaultConverterVersion='','Canonical'],
+]){const c=clone(api.GetImportConfigurationResponseSchema,config);mutate(c);const name='configuration_bad_'+id;wire(name,api.GetImportConfigurationResponseSchema,c);sv.configuration_negative.push({id,configuration:name,expected,control:'import_configuration'});}
+const noDefault=clone(api.GetImportConfigurationResponseSchema,config);noDefault.defaultConverterVersion=undefined;wire('configuration_no_default',api.GetImportConfigurationResponseSchema,noDefault);
+const unsupportedProvider=clone(api.GetImportConfigurationResponseSchema,config);unsupportedProvider.providers=unsupportedProvider.providers.slice(1);wire('configuration_no_github',api.GetImportConfigurationResponseSchema,unsupportedProvider);
+const sha256=clone(ProviderRepositorySchema,pub);sha256.hashAlgorithm=2;wire('source_public_sha256',ProviderRepositorySchema,sha256);
+const observe256=clone(api.ImportPermissionScopeV1Schema,observeScope);observe256.provider='public-git';observe256.branches.forEach(b=>b.hashAlgorithm=2);wire('scope_public_sha256_observe',api.ImportPermissionScopeV1Schema,observe256);
+for(const [id,mutate,known,expected] of [
+ ['unknown_connected',r=>r.hashAlgorithm=0,true,'Version'],
+ ['unknown_public',r=>r.hashAlgorithm=0,true,'Version'],
+ ['unsupported_algorithm',r=>r.hashAlgorithm=3,true,'Version'],
+ ['sha256_oid_40',r=>r.refs=[{name:'refs/heads/dev',headOid:'ab'.repeat(20),kind:1,hashAlgorithm:2}],true,'SourceSelection'],
+ ['sha1_oid_64',r=>{r.hashAlgorithm=1;r.refs=[{name:'refs/heads/dev',headOid:'ab'.repeat(32),kind:1,hashAlgorithm:1}];},true,'SourceSelection'],
+ ['ref_algorithm_mismatch',r=>r.refs=[{name:'refs/heads/dev',headOid:'',kind:1,hashAlgorithm:1}],true,'SourceSelection'],
+ ['uppercase_oid',r=>r.refs=[{name:'refs/heads/dev',headOid:'AB'.repeat(32),kind:1,hashAlgorithm:2}],true,'Canonical'],
+ ['unknown_with_oid',r=>{r.hashAlgorithm=0;r.refs=[{name:'refs/heads/dev',headOid:'ab'.repeat(20),kind:1,hashAlgorithm:0}];},false,'Version'],
+ ['refs_bound',r=>r.refs=Array.from({length:513},(_,i)=>({name:'refs/heads/'+i,headOid:'',hashAlgorithm:2})),true,'Bounds'],
+ ['refs_order',r=>r.refs=[{name:'refs/heads/z',hashAlgorithm:2},{name:'refs/heads/a',hashAlgorithm:2}],true,'Canonical'],
+]){const r=clone(ProviderRepositorySchema,id==='unknown_connected'?repo:sha256);mutate(r);const name='hash_bad_'+id;wire(name,ProviderRepositorySchema,r);sv.hash_negative.push({id,source:name,known,expected,control:id==='unknown_connected'?'source_connected':'source_public_sha256'});}
+const unknown=clone(ProviderRepositorySchema,pub);unknown.hashAlgorithm=0;wire('source_unknown',ProviderRepositorySchema,unknown);
+const sha256Known=clone(ProviderRepositorySchema,sha256);sha256Known.refs=[{name:'refs/heads/dev',headOid:'ab'.repeat(32),kind:1,hashAlgorithm:2}];wire('source_sha256_known',ProviderRepositorySchema,sha256Known);
+for(const [id,source,scopeName,expected] of [['unknown_blocks_scope','source_unknown','scope_public_sha256_observe','Version'],['known_oid_requires_pin','source_sha256_known','scope_public_sha256_observe','RefPinning'],['branch_algorithm_mismatch','source_public_github','scope_public_sha256_observe','SourceSelection']])sv.scope_negative.push({id,source,scope:scopeName,expected});
+const publicPrepare=clone(api.PrepareImportJobRequestSchema,prepareRequest);publicPrepare.proposedScope=observe256;publicPrepare.source={providerRepositoryId:sha256.providerRepositoryId,private:false};wire('prepare_public_sha256',api.PrepareImportJobRequestSchema,publicPrepare);
+for(const [id,mutate,expected] of [['missing_selector',r=>r.source=undefined,'SourceSelection'],['selector_changed',r=>r.source.private=true,'SourceSelection'],['provider_changed',r=>r.proposedScope.provider='github','SourceSelection']]){const r=clone(api.PrepareImportJobRequestSchema,publicPrepare);mutate(r);const name='prepare_source_bad_'+id;wire(name,api.PrepareImportJobRequestSchema,r);sv.prepare_negative.push({id,request:name,expected});}
+// Signed SHA-256 observe controls use direct owner authority, preserving originals.
+sv.signed_observe=[];
+for(const [id,provider,source] of [['public','public-git',sha256],['connected','github',{...repo,hashAlgorithm:2}]]){
+ const body=clone(api.ImportJobDelegationV1Schema,publicBody);body.scope.provider=provider;
+ body.scope.branches.forEach(b=>{b.hashAlgorithm=2;b.refMode=2;b.pinnedCommitOid=new Uint8Array();b.refDisclosure=1;});body.branchManifest.forEach((m,i)=>m.limit=body.scope.branches[i]);
+ const d=signed('sha256_'+id+'_delegation',api.ImportJobDelegationV1Schema,body,api.SignedImportJobDelegationV1Schema,'delegatingSignature','owner','heddle-import-job-delegation-v1');
+ const r=clone(CommitImportJobRequestSchema,publicSource);r.source=source;r.proof.delegations=[d];wire('sha256_'+id+'_request',CommitImportJobRequestSchema,r);
+ wire('sha256_'+id+'_source',ProviderRepositorySchema,source);wire('sha256_'+id+'_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{...preparation,proposal:delegationPreparation(body)}));
+ sv.signed_observe.push({id,provider,source:'sha256_'+id+'_source',request:'sha256_'+id+'_request',preparation:'sha256_'+id+'_preparation'});
+}
+sv.commit_negative=[];
+const currentUnknown=clone(ProviderRepositorySchema,repo);currentUnknown.hashAlgorithm=0;wire('commit_source_unknown',ProviderRepositorySchema,currentUnknown);
+const currentChanged=clone(ProviderRepositorySchema,repo);currentChanged.providerRepositoryId='328';wire('commit_source_changed',ProviderRepositorySchema,currentChanged);
+const currentKnown=clone(ProviderRepositorySchema,repo);currentKnown.refs=[{name:'refs/heads/dev',headOid:'ab'.repeat(20),kind:1,hashAlgorithm:1}];wire('commit_source_different_oid',ProviderRepositorySchema,currentKnown);
+const currentGood=clone(ProviderRepositorySchema,repo);currentGood.refs=[{name:'refs/heads/dev',headOid:hex(scope.branches[0].pinnedCommitOid),kind:1,hashAlgorithm:1}];wire('commit_source_known_control',ProviderRepositorySchema,currentGood);
+const badFormat=clone(CommitImportJobRequestSchema,commitRequest);badFormat.source.hashAlgorithm=2;wire('commit_bad_source_format',CommitImportJobRequestSchema,badFormat);
+for(const [id,request,source,configuration,expected] of [
+ ['unknown_current_format','commit_request','commit_source_unknown','import_configuration','Version'],
+ ['changed_current_identity','commit_request','commit_source_changed','import_configuration','SourceSelection'],
+ ['incoming_format_mismatch','commit_bad_source_format','source_connected','import_configuration','SourceSelection'],
+ ['cleared_incoming_refs','commit_request','commit_source_different_oid','import_configuration','RefPinning'],
+ ['support_removed','commit_request','source_connected','configuration_no_github','SourceSelection'],
+])sv.commit_negative.push({id,request,source,configuration,expected,control:'commit_request',control_source:'commit_source_known_control'});
+const multiple=clone(api.GetImportConfigurationResponseSchema,config);multiple.converters.push(create(api.ImportConverterConfigurationV1Schema,{...multiple.converters[0],converterVersion:'zzz-converter/1'}));multiple.defaultConverterVersion='zzz-converter/1';wire('configuration_multiple',api.GetImportConfigurationResponseSchema,multiple);
+wire('resolve_public_request',ResolveImportSourceRequestSchema,create(ResolveImportSourceRequestSchema,{source:pub,includeRefs:true,page:{size:128}}));
+wire('resolve_public_response',ResolveImportSourceResponseSchema,create(ResolveImportSourceResponseSchema,{source:sha256}));
+wire('resolve_unknown_response',ResolveImportSourceResponseSchema,create(ResolveImportSourceResponseSchema,{source:unknown}));
 writeFileSync(new URL('../tests/fixtures/import-authority-host-witness-v1.json',import.meta.url),JSON.stringify(artifact,null,2)+'\n');
 console.log(`Frozen ${artifact.messages.length} messages, ${Object.keys(artifact.signed_vectors).length} signed byte vectors, ${artifact.negative_vectors.length} witness/operation negatives, ${artifact.commit_vectors.negative.length} Commit negatives, ${artifact.trees.length} trees, ${artifact.retry_scenarios.length} retry scenarios.`);

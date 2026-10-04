@@ -1,6 +1,6 @@
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
-import { CommitImportJobRequestSchema, type CommitImportJobRequest, type ImportSourceRequest } from "./integration_pb.js";
+import { CommitImportJobRequestSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository } from "./integration_pb.js";
 import type { MutationResponse } from "./common_pb.js";
 import { OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
@@ -43,6 +43,51 @@ export function conversionOptionsDigest(version:string, options:Uint8Array):Uint
   return hash(utf8.encode("heddle-import-conversion-options-v1"), sized(utf8.encode(version)), sized(options));
 }
 
+/** Current authenticated connection identity selects custody; domains never do. */
+export function resolveImportProvider(source:ProviderRepository, connectionProvider?:string):"github"|"public-git" {
+  canonicalHttps(source.cloneUrl);
+  if(utf8.encode(source.providerRepositoryId).length>4096||utf8.encode(source.name).length>4096)reject("Bounds");
+  if(source.connection){
+    const positive=(v:string)=>/^[0-9]+$/.test(v)&&BigInt(v)>0n&&BigInt(v)<=0xffffffffffffffffn;
+    if(connectionProvider!=="github"||source.connection.spool||!source.connection.id||!positive(source.providerRepositoryId)||!positive(source.installationId))reject("SourceSelection");
+    const path=source.cloneUrl.startsWith("https://github.com/")?source.cloneUrl.slice(19).split("/"):[];
+    if(path.length!==2||!path[0]||!path[1]?.endsWith(".git")||path[1].length<=4)reject("SourceSelection");
+    return "github";
+  }
+  if(connectionProvider!==undefined||source.private||source.installationId||(source.providerRepositoryId&&source.providerRepositoryId!==source.cloneUrl))reject("SourceSelection");
+  return "public-git";
+}
+export function validateRepositoryHashAlgorithm(source:ProviderRepository, known:boolean):void {
+  const size=source.hashAlgorithm===1?40:source.hashAlgorithm===2?64:source.hashAlgorithm===0&&!known?undefined:reject("Version");
+  if(source.refs.length>512)reject("Bounds");
+  source.refs.forEach((r,i)=>{
+    if(r.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
+    if(i&&compare(utf8.encode(source.refs[i-1]!.name),utf8.encode(r.name))>=0)reject("Canonical");
+    if(r.headOid){if(size===undefined)reject("Version");if(r.headOid.length!==size)reject("SourceSelection");if(!/^[0-9a-f]+$/.test(r.headOid))reject("Canonical");}
+  });
+}
+export function validateDiscoveredImportScope(scope:api.ImportPermissionScopeV1, source:ProviderRepository):void {
+  validateRepositoryHashAlgorithm(source,true);
+  if(scope.sourceUrl!==source.cloneUrl)reject("SourceSelection");
+  for(const b of scope.branches){
+    if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
+    const text=source.refs.find(r=>r.name===b.refName)?.headOid;
+    const oid=text?Uint8Array.from(text.match(/../g)!,v=>parseInt(v,16)):undefined;
+    validateImportRefSelection(b,oid);
+  }
+}
+export function prepareImportSourceScope(request:api.PrepareImportJobRequest, currentSource:ProviderRepository, connectionProvider:string|undefined, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array):api.ImportPermissionScopeV1 {
+  const s=request.source??reject("SourceSelection");
+  if(s.connection?.id!==currentSource.connection?.id||s.connection?.spool?.id!==currentSource.connection?.spool?.id||s.providerRepositoryId!==currentSource.providerRepositoryId||s.installationId!==currentSource.installationId||s.private!==currentSource.private)reject("SourceSelection");
+  const scope=request.proposedScope??reject("Canonical");
+  if(scope.provider!==resolveImportProvider(currentSource,connectionProvider))reject("SourceSelection");
+  validateDiscoveredImportScope(scope,currentSource);
+  return prepareImportScope(scope,configuration,currentDestinationVersion);
+}
+function validateProviderSupport(provider:string,configuration:api.GetImportConfigurationResponse):void {
+  if(!configuration.providers.some(p=>p.provider===provider))reject("SourceSelection");
+}
+
 export function validateImportConfiguration(v:api.GetImportConfigurationResponse):void {
   if (toBinary(api.GetImportConfigurationResponseSchema,v).length > MAX_BUNDLE_BYTES || !v.converters.length || v.converters.length > 32) reject("Bounds");
   v.converters.forEach((c,i) => {
@@ -53,6 +98,13 @@ export function validateImportConfiguration(v:api.GetImportConfigurationResponse
     if (!c.canonicalOptions.length || c.canonicalOptions.length > 64 || c.canonicalOptions.some(o=>o.length > 4096)) reject("Bounds");
     if (c.canonicalOptions.some((o,j)=>j>0 && compare(c.canonicalOptions[j-1]!,o)>=0) || !c.canonicalOptions.some(o=>equal(o,c.defaultOptions))) reject("Canonical");
   });
+  if(!v.providers.length||v.providers.length>2)reject("Bounds");
+  v.providers.forEach((p,i)=>{
+    if(i&&v.providers[i-1]!.provider>=p.provider)reject("Canonical");
+    const mode=p.provider==="github"?1:p.provider==="public-git"?2:reject("SourceSelection");
+    if(p.sourceModes.length!==1||p.sourceModes[0]!==mode)reject("SourceSelection");
+  });
+  if(v.defaultConverterVersion!==undefined&&!v.converters.some(c=>c.converterVersion===v.defaultConverterVersion))reject("Canonical");
   const l=v.limits??reject("Canonical");
   if (l.maxBranches<=0 || l.maxBranches>MAX_BRANCHES || l.maxOperations<=0 || l.maxOperations>MAX_BRANCHES || l.maxResultBytes<=0n || l.maxResultBytes>MAX_RESULT_BYTES || l.maxBranchResultBytes<=0n || l.maxBranchResultBytes>l.maxResultBytes) reject("Bounds");
 }
@@ -66,6 +118,7 @@ export function prepareImportScope(proposed:api.ImportPermissionScopeV1, configu
   if (proposed.destinationVersion.length && !equal(proposed.destinationVersion,currentDestinationVersion)) refuse(reason.DESTINATION_CONFLICT);
   const selected=clone(api.ImportPermissionScopeV1Schema,proposed);selected.destinationVersion=currentDestinationVersion.slice();
   try { validateImportScope(selected); } catch (error) { if (error instanceof HybridContractError) refuse(reason.INVALID_SCOPE); throw error; }
+  try { validateProviderSupport(selected.provider,configuration); } catch { refuse(reason.INVALID_SCOPE); }
   const c=configuration.converters.find(c=>c.converterVersion===selected.converterVersion)??refuse(reason.UNSUPPORTED_CONVERTER);
   if (!c.canonicalOptions.some(o=>equal(conversionOptionsDigest(c.converterVersion,o),selected.optionsDigest))) refuse(reason.UNSUPPORTED_OPTIONS);
   const l=configuration.limits!;
@@ -97,7 +150,7 @@ export function validateImportPreparationResponse(request:api.PrepareImportJobRe
 
 /** Provider identity comes from an authenticated resolver, never projection hints.
  * Native base decoding/identity, source grants and atomic activation remain host gates. */
-export async function validateImportCommitRequest(request:CommitImportJobRequest, resolvedProvider:string):Promise<void> {
+export async function validateImportCommitRequest(request:CommitImportJobRequest, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse):Promise<void> {
   request=clone(CommitImportJobRequestSchema,request);
   const source=request.source??reject("SourceSelection"),proof=request.proof??reject("Canonical");
   if (!request.clientOperationId || utf8.encode(request.clientOperationId).length>128 || !request.destination?.id) reject("Canonical");
@@ -110,9 +163,14 @@ export async function validateImportCommitRequest(request:CommitImportJobRequest
   if (request.destination.id!==destinationId) reject("Scope");
   if (d.predecessorDelegationDigest.length!==32 || d.predecessorDelegationDigest.some(Boolean)) reject("Canonical");
   if (source.cloneUrl!==scope.sourceUrl || resolvedProvider!==scope.provider || utf8.encode(source.providerRepositoryId).length>4096 || utf8.encode(source.name).length>4096) reject("SourceSelection");
-  if (source.connection) {
-    if (source.connection.spool || !source.connection.id || !source.providerRepositoryId || !source.installationId) reject("SourceSelection");
-  } else if (source.private || source.installationId || (source.providerRepositoryId && source.providerRepositoryId!==source.cloneUrl)) reject("SourceSelection");
+  if(source.connection?.id!==currentSource.connection?.id||source.connection?.spool?.id!==currentSource.connection?.spool?.id||source.providerRepositoryId!==currentSource.providerRepositoryId||source.cloneUrl!==currentSource.cloneUrl||source.installationId!==currentSource.installationId||source.private!==currentSource.private)reject("SourceSelection");
+  const provider=resolveImportProvider(currentSource,currentSource.connection?resolvedProvider:undefined);
+  if(provider!==resolvedProvider)reject("SourceSelection");
+  validateImportConfiguration(configuration);validateProviderSupport(provider,configuration);
+  validateRepositoryHashAlgorithm(currentSource,true);
+  if(source.hashAlgorithm!==currentSource.hashAlgorithm)reject("SourceSelection");
+  validateDiscoveredImportScope(scope,currentSource);
+  prepareImportScope(scope,configuration,scope.destinationVersion);
   if (proof.originalGeneses.length!==scope.branches.length || proof.creatorAuthorityEnvelopes.length!==scope.branches.length || proof.genesisAuthorities.length!==scope.branches.length || d.branchManifest.length!==scope.branches.length) reject("GenesisBinding");
   for (const [i,b] of scope.branches.entries()) {
     const original=proof.originalGeneses[i]!,binding=proof.genesisAuthorities[i]!,g=binding.body??reject("GenesisBinding"),m=d.branchManifest[i]!,envelope=proof.creatorAuthorityEnvelopes[i]!;
@@ -125,9 +183,9 @@ export function validateImportSource(_request:ImportSourceRequest):never { retur
 
 /** Complete initial validation; native model/owner history and live transaction
  * checks remain the hosted implementation's responsibility. */
-export async function verifyImportCommitSubmission(request:CommitImportJobRequest, prepared:api.PrepareImportJobResponse, resolvedProvider:string, e:ImportOwnerExpectation):Promise<VerifiedImportDelegation> {
+export async function verifyImportCommitSubmission(request:CommitImportJobRequest, prepared:api.PrepareImportJobResponse, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse, e:ImportOwnerExpectation):Promise<VerifiedImportDelegation> {
   request=clone(CommitImportJobRequestSchema,request);prepared=clone(api.PrepareImportJobResponseSchema,prepared);e=snapshotExpectation(e);
-  await validateImportCommitRequest(request,resolvedProvider);
+  await validateImportCommitRequest(request,resolvedProvider,currentSource,configuration);
   const proof=request.proof!,member=proof.memberPermission??proof.memberPermissions[0];
   if (proof.memberPermissions.length>1 || (proof.memberPermissions[0] && (!member || !equal(canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,proof.memberPermissions[0]),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,member))))) reject("ImportPermission");
   return verifyPreparedImportDelegation(prepared,proof.delegations[0]!,member,proof.genesisAuthorities,e);

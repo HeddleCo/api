@@ -377,6 +377,7 @@ message GetImportJobStateResponse {
   // elsewhere are hidden or the connection is revoked. No credentials/authority.
   // Missing durable association -> UNAVAILABLE after writer authorization; never
   // guess from inventory. Renewal must use this selector unchanged: no rebinding.
+  // The accepted association is immutable across retries and renewals.
   // Host re-authorizes current caller connection, exact repository/installation
   // grant and selected-commit availability at Prepare and renewal activation.
   ImportSourceSelectionV1 retained_source = 3;

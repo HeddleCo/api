@@ -552,7 +552,7 @@ test('alpha25 renewal source Prepare shared vectors',async()=>{
   if(v.id==='replacement_pin')assert.equal(Buffer.from(request.proposedScope.branches[0].pinnedCommitOid).toString('hex'),source.refs[0].headOid,'replacement matches current head but exceeds retained authority');
   let actual='OK';
   try{
-   const retained=v.retained?{predecessor,state:v.state?vector(v.state):state}:undefined;
+   const retained=v.retained?{predecessor,state:v.state?vector(v.state):state,source:read.retainedSource}:undefined;
    const destinationVersion=vector('scope').destinationVersion;
    const prepared=authority.prepareImportSourceScope(request,source,'github',configuration,destinationVersion,retained);
    assert.deepEqual(prepared,{...request.proposedScope,destinationVersion},'retained selection stays exact');
@@ -565,7 +565,7 @@ test('alpha25 renewal source Prepare shared vectors',async()=>{
 
 test('alpha25 renewal source Prepare rejects an unverified predecessor token',()=>{
  const request=vector('renew_prepare_request');
- assert.throws(()=>authority.prepareImportSourceScope(request,vector('renew_source_moved_head'),'github',vector('import_configuration'),request.proposedScope.destinationVersion,{predecessor:{},state:vector('job_state_partial').state}),expected('Canonical'));
+ assert.throws(()=>authority.prepareImportSourceScope(request,vector('renew_source_moved_head'),'github',vector('import_configuration'),request.proposedScope.destinationVersion,{predecessor:{},state:vector('job_state_partial').state,source:vector('job_state_partial').retainedSource}),expected('Canonical'));
 });
 
 test('alpha25 fresh source Prepare with null retained context still requires the known pin',()=>{

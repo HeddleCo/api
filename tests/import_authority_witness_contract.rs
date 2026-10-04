@@ -3018,7 +3018,11 @@ fn alpha25_renewal_source_prepare_vectors() {
         let retained = v["retained"]
             .as_bool()
             .expect("retained state selection")
-            .then_some((&predecessor, current_state));
+            .then_some((
+                &predecessor,
+                current_state,
+                read.retained_source.as_ref().expect("retained selector"),
+            ));
         let result = import::prepare_import_source_scope(
             &request,
             &current,
@@ -3106,7 +3110,11 @@ fn alpha27_retained_custody_recovery_and_grant_refusal_vectors() {
                 if revoked { None } else { Some("github") },
                 &record(&f, "import_configuration"),
                 &record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version,
-                Some((&predecessor, state)),
+                Some((
+                    &predecessor,
+                    state,
+                    read.retained_source.as_ref().expect("retained selector"),
+                )),
             )
             .map(|_| ()),
             want,

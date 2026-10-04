@@ -1296,6 +1296,7 @@ from the portable public proof and operation projection. Unknown/unauthorized
 jobs still use uniform NOT_FOUND. After writer authorization, inability to obtain
 the complete durable association refuses UNAVAILABLE; no partial success, legacy
 fallback, connection-list reverse lookup or first matching connection is allowed.
+The accepted association is immutable across physical retries and renewals.
 
 Renewal Prepare must use the retained selector exactly. Connection replacement,
 repository/installation changes or visibility changes refuse `SourceSelection`,

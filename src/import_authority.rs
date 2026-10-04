@@ -466,10 +466,10 @@ pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Resu
             return Err(Reject::SourceSelection);
         }
     }
-    if let Some(default) = &v.default_converter_version {
-        if !v.converters.iter().any(|c| &c.converter_version == default) {
-            return Err(Reject::Canonical);
-        }
+    if let Some(default) = &v.default_converter_version
+        && !v.converters.iter().any(|c| &c.converter_version == default)
+    {
+        return Err(Reject::Canonical);
     }
     let l = v.limits.as_ref().ok_or(Reject::Canonical)?;
     if l.max_branches == 0

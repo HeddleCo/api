@@ -719,5 +719,39 @@ const multiple=clone(api.GetImportConfigurationResponseSchema,config);multiple.c
 wire('resolve_public_request',ResolveImportSourceRequestSchema,create(ResolveImportSourceRequestSchema,{source:pub,includeRefs:true,page:{size:128}}));
 wire('resolve_public_response',ResolveImportSourceResponseSchema,create(ResolveImportSourceResponseSchema,{source:sha256}));
 wire('resolve_unknown_response',ResolveImportSourceResponseSchema,create(ResolveImportSourceResponseSchema,{source:unknown}));
+// Renewal source checks use independently authenticated retained CAS state.
+const retainedHead=clone(ProviderRepositorySchema,repo);
+retainedHead.refs=nextBody.scope.branches.map(b=>({name:b.refName,headOid:hex(b.pinnedCommitOid),kind:1,hashAlgorithm:b.hashAlgorithm}));
+wire('renew_source_retained_head',ProviderRepositorySchema,retainedHead);
+const movedHead=clone(ProviderRepositorySchema,retainedHead);movedHead.refs[0].headOid='ab'.repeat(20);
+wire('renew_source_moved_head',ProviderRepositorySchema,movedHead);
+const replacedPin=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest);replacedPin.proposedScope.branches[0].pinnedCommitOid=raw(0xab,20);
+wire('renew_prepare_replaced_pin',api.PrepareImportJobRequestSchema,replacedPin);
+const freshPin=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest);freshPin.renewLogicalJobId=new Uint8Array();
+wire('fresh_prepare_retained_pin',api.PrepareImportJobRequestSchema,freshPin);
+const changedCas=clone(api.ImportJobCasStateV1Schema,readPartial.state);changedCas.authorityEpoch++;
+wire('renew_source_changed_cas',api.ImportJobCasStateV1Schema,changedCas);
+sv.renewal_prepare=[
+ {id:'retained_before_movement',request:'renew_prepare_request',source:'renew_source_retained_head',retained:true,expected:'OK'},
+ {id:'retained_after_movement',request:'renew_prepare_request',source:'renew_source_moved_head',retained:true,expected:'OK'},
+ {id:'replacement_pin',request:'renew_prepare_replaced_pin',source:'renew_source_moved_head',retained:true,expected:'RenewalFork'},
+ {id:'fresh_moved_head',request:'fresh_prepare_retained_pin',source:'renew_source_moved_head',retained:false,expected:'RefPinning'},
+ {id:'forged_renewal_id',request:'renew_prepare_request',source:'renew_source_moved_head',retained:false,expected:'StaleContext'},
+ {id:'missing_retained_state',request:'renew_prepare_request',source:'renew_source_retained_head',retained:false,expected:'StaleContext'},
+ {id:'changed_cas',request:'renew_prepare_request',source:'renew_source_moved_head',retained:true,state:'renew_source_changed_cas',expected:'StaleContext'},
+ {id:'unknown_current_format',request:'renew_prepare_request',source:'commit_source_unknown',retained:true,expected:'Version'},
+ {id:'support_removed',request:'renew_prepare_request',source:'renew_source_moved_head',retained:true,configuration:'configuration_no_github',expected:'PreparationRefused(InvalidScope)'},
+];
+for(const [id,mutate,expected] of [
+ ['uppercase_current_oid',r=>r.refs[0].headOid='AB'.repeat(20),'Canonical'],
+ ['wrong_current_oid_width',r=>r.refs[0].headOid='ab'.repeat(32),'SourceSelection'],
+ ['changed_repository_format',r=>{r.hashAlgorithm=2;r.refs[0].hashAlgorithm=2;r.refs[0].headOid='ab'.repeat(32);},'SourceSelection'],
+ ['changed_source_grant',r=>r.connection.id='27272727-2727-2727-2727-272727272727','SourceSelection'],
+]){const r=clone(ProviderRepositorySchema,movedHead);mutate(r);const name='renew_source_bad_'+id;wire(name,ProviderRepositorySchema,r);sv.renewal_prepare.push({id,request:'renew_prepare_request',source:name,retained:true,expected});}
+for(const [id,mutate] of [
+ ['wrong_logical_job',r=>r.renewLogicalJobId=raw(0xfe,16)],
+ ['wrong_lineage',r=>r.retryLineageId=raw(0xfe,16)],
+ ['wrong_destination',r=>r.destination.id='fefefefe-fefe-fefe-fefe-fefefefefefe'],
+]){const r=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest);mutate(r);const name='renew_prepare_bad_'+id;wire(name,api.PrepareImportJobRequestSchema,r);sv.renewal_prepare.push({id,request:name,source:'renew_source_moved_head',retained:true,expected:'StaleContext'});}
 writeFileSync(new URL('../tests/fixtures/import-authority-host-witness-v1.json',import.meta.url),JSON.stringify(artifact,null,2)+'\n');
 console.log(`Frozen ${artifact.messages.length} messages, ${Object.keys(artifact.signed_vectors).length} signed byte vectors, ${artifact.negative_vectors.length} witness/operation negatives, ${artifact.commit_vectors.negative.length} Commit negatives, ${artifact.trees.length} trees, ${artifact.retry_scenarios.length} retry scenarios.`);

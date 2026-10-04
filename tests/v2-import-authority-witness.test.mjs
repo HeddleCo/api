@@ -541,3 +541,21 @@ test('alpha25 Commit preserves a frozen pinned commit after branch movement',asy
  assert.notDeepEqual(request.proof.delegations[0].body.scope.branches[0].pinnedCommitOid,new Uint8Array(Buffer.from(current.refs[0].headOid,'hex')));
  await authority.validateImportCommitRequest(request,'github',current,vector('import_configuration'));
 });
+
+test('alpha25 renewal source Prepare shared vectors',async()=>{
+ const read=vector('job_state_partial'),state=read.state;
+ const predecessor=await authority.verifyImportRenewalPredecessor(state,vector('permission'),ownerContext(1600n));
+ authority.validateRenewalPreparationFromRead(vector('renew_prepare_request'),vector('renewal_preparation'),read);
+ const failures=[];
+ for(const v of fixture.source_vectors.renewal_prepare){
+  const request=vector(v.request),source=vector(v.source),configuration=vector(v.configuration??'import_configuration');
+  let actual='OK';
+  try{
+   const prepared=authority.prepareImportSourceScope(request,source,'github',configuration,request.proposedScope.destinationVersion);
+   assert.deepEqual(prepared,request.proposedScope,'retained selection stays exact');
+  }catch(e){actual=e.reason==='PreparationRefused'?`${e.reason}(${api.ImportPreparationRefusalReason[e.preparationRefusalReason].split('_').map(s=>s[0]+s.slice(1).toLowerCase()).join('')})`:e.reason;}
+  console.log(`ALPHA25 renewal_source.${v.id}: ${actual}`);
+  if(actual!==v.expected)failures.push(`${v.id}: expected ${v.expected}, got ${actual}`);
+ }
+ assert.deepEqual(failures,[]);
+});

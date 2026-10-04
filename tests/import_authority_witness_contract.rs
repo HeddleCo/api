@@ -2965,3 +2965,55 @@ fn alpha25_commit_preserves_frozen_pin_after_branch_movement() {
     )
     .expect("frozen pin remains the selected commit");
 }
+
+#[test]
+fn alpha25_renewal_source_prepare_vectors() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let read: api::GetImportJobStateResponse = record(&f, "job_state_partial");
+    let state = read.state.as_ref().expect("authenticated retained state");
+    let parent = record(&f, "permission");
+    let _predecessor = import::verify_renewal_predecessor(state, Some(&parent), &c.owner(1600))
+        .expect("independently authenticated expired predecessor");
+    import::validate_renewal_preparation_from_read(
+        &record(&f, "renew_prepare_request"),
+        &record(&f, "renewal_preparation"),
+        &read,
+    )
+    .expect("exact retained Prepare/read control");
+    let mut failures = Vec::new();
+    for v in f["source_vectors"]["renewal_prepare"]
+        .as_array()
+        .expect("shared cases")
+    {
+        let request: api::PrepareImportJobRequest =
+            record(&f, v["request"].as_str().expect("request"));
+        let current = record(&f, v["source"].as_str().expect("source"));
+        let configuration = record(
+            &f,
+            v["configuration"]
+                .as_str()
+                .unwrap_or("import_configuration"),
+        );
+        let scope = request.proposed_scope.as_ref().expect("scope");
+        let result = import::prepare_import_source_scope(
+            &request,
+            &current,
+            Some("github"),
+            &configuration,
+            &scope.destination_version,
+        );
+        if let Ok(prepared) = &result {
+            assert_eq!(prepared, scope, "retained selection stays exact");
+        }
+        let actual = result.map_or_else(|error| format!("{error:?}"), |_| "OK".into());
+        println!("ALPHA25 renewal_source.{}: {actual}", v["id"]);
+        if actual != v["expected"].as_str().expect("expected") {
+            failures.push(format!(
+                "{}: expected {}, got {actual}",
+                v["id"], v["expected"]
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:?}");
+}

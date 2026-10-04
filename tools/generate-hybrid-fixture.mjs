@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { create, clone, fromBinary, toBinary, getOption } from '@bufbuild/protobuf';
 import { encode, decode } from '../packages/typescript/dist/v1alpha2/_collaboration-msgpack.js';
-import { SignedRecordSchema, RecordSignatureSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
+import { SignedRecordSchema, RecordSignatureSchema, SpoolRefSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import { ThreadControlAuthoritySchema } from '../packages/typescript/dist/v1alpha2/identity_pb.js';
 import { LandThreadRequestSchema } from '../packages/typescript/dist/v1alpha2/thread_pb.js';
 import { unarySigningBytes } from '../packages/typescript/dist/signing.js';
@@ -32,6 +32,7 @@ const artifact={format_version:1,messages:[...Object.values(common),...Object.va
 for(const schema of [...Object.values(common),...Object.values(api),CommitImportJobRequestSchema,ImportSourceRequestSchema,ProviderRepositorySchema,ResolveImportSourceRequestSchema,ResolveImportSourceResponseSchema,ProtocolCompatibilitySchema].filter(v=>v?.kind==='message'))artifact.descriptors.push({name:schema.typeName,fields:schema.fields.map(f=>({name:f.name,number:f.number,type:f.message?.typeName??f.enum?.typeName??String(f.scalar),list:f.fieldKind==='list'}))});
 for(const schema of [...Object.values(common),...Object.values(api),MandatoryProtocolFeatureSchema].filter(v=>v?.kind==='enum'))artifact.enums.push({name:schema.typeName,values:schema.values.map(v=>({name:v.name,number:v.number}))});
 function wire(name,schema,value){
+ if(schema===api.GetImportJobStateResponseSchema&&value.retainedSource)value.retainedSource=create(api.ImportSourceSelectionV1Schema,value.retainedSource);
  if(schema===api.GetImportConfigurationResponseSchema)value.providers=value.providers.map(p=>create(api.ImportProviderConfigurationV1Schema,p));
  if(schema===ProviderRepositorySchema)value.refs=value.refs.map(r=>create(ProviderRefSchema,r));
  if(schema===api.PrepareImportJobRequestSchema&&value.source)value.source=create(api.ImportSourceSelectionV1Schema,value.source);
@@ -541,8 +542,8 @@ retainedPartial.statements=[statements[0],devGenesisAdmission,publicationStateme
 const retainedEmpty=clone(api.ImportPublicProofBundleV1Schema,initialProof);
 retainedEmpty.terminalManifest=beforePublication;retainedEmpty.manifests=[beforePublication];
 wire('job_state_request',api.GetImportJobStateRequestSchema,create(api.GetImportJobStateRequestSchema,{destination,logicalJobId}));
-const readPartial=wire('job_state_partial',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{state:{...emptyState,committedManifest:partialManifest},retainedProof:retainedPartial}));
-const readEmpty=wire('job_state_empty',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{state:emptyState,retainedProof:retainedEmpty}));
+const readPartial=wire('job_state_partial',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{state:{...emptyState,committedManifest:partialManifest},retainedProof:retainedPartial,retainedSource:prepareRequest.source}));
+const readEmpty=wire('job_state_empty',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{state:emptyState,retainedProof:retainedEmpty,retainedSource:prepareRequest.source}));
 function renewRequest(name,read,certificate,parent,ownerHistory,ownerChain){
  const b=clone(api.ImportPublicProofBundleV1Schema,read.retainedProof);
  b.memberPermission=parent;
@@ -760,5 +761,51 @@ for(const [id,mutate] of [
  ['wrong_lineage',r=>r.retryLineageId=raw(0xfe,16)],
  ['wrong_destination',r=>r.destination.id='fefefefe-fefe-fefe-fefe-fefefefefefe'],
 ]){const r=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest);mutate(r);const name='renew_prepare_bad_'+id;wire(name,api.PrepareImportJobRequestSchema,r);sv.renewal_prepare.push({id,request:name,source:'renew_source_moved_head',retained:true,expected:'StaleContext'});}
+// alpha.27: exact retained custody recovery and Resolve identity preservation.
+artifact.custody_vectors={read:[],prepare:[],resolve:[]};
+const cv=artifact.custody_vectors;
+cv.read.push({id:'second_browser_recovery',response:'job_state_partial',expected:'OK'});
+for(const [id,mutate] of [
+ ['missing_selector',r=>r.retainedSource=undefined],
+ ['public_custody_for_connected',r=>r.retainedSource={providerRepositoryId:scope.sourceUrl}],
+ ['missing_installation',r=>r.retainedSource.installationId=''],
+ ['scoped_connection',r=>r.retainedSource.connection.spool=create(SpoolRefSchema,destination)],
+]){const r=clone(api.GetImportJobStateResponseSchema,readPartial);mutate(r);const name='custody_read_'+id;wire(name,api.GetImportJobStateResponseSchema,r);cv.read.push({id,response:name,expected:'SourceSelection'});}
+cv.prepare.push({id:'second_browser_recovery',request:'renew_prepare_request',source:'renew_source_moved_head',expected:'OK'});
+for(const [id,mutate] of [
+ ['replacement_connection',r=>r.source.connection.id='27272727-2727-2727-2727-272727272727'],
+ ['changed_repository_grant',r=>r.source.providerRepositoryId='328'],
+ ['changed_installation_grant',r=>r.source.installationId='124'],
+ ['changed_visibility',r=>r.source.private=false],
+]){const r=clone(api.PrepareImportJobRequestSchema,renewalPrepareRequest);mutate(r);const name='custody_prepare_'+id;wire(name,api.PrepareImportJobRequestSchema,r);
+ const current=clone(ProviderRepositorySchema,movedHead);for(const k of ['connection','providerRepositoryId','installationId','private'])current[k]=r.source[k];const sourceName=name+'_current';wire(sourceName,ProviderRepositorySchema,current);
+ cv.prepare.push({id,request:name,source:sourceName,expected:'SourceSelection'});}
+// Revocation is a current host gate: the retained identifiers remain readable,
+// but there is no authenticated current connection provider or authorized fetch.
+cv.prepare.push({id:'revoked_connection',request:'renew_prepare_request',source:'renew_source_moved_head',revoked:true,expected:'SourceSelection'});
+function resolveCase(id,input,output,provider,expected){const request='resolve_identity_'+id+'_request',response='resolve_identity_'+id+'_response';wire(request,ResolveImportSourceRequestSchema,create(ResolveImportSourceRequestSchema,{source:input}));wire(response,ResolveImportSourceResponseSchema,create(ResolveImportSourceResponseSchema,{source:output}));cv.resolve.push({id,request,response,connection_provider:provider,expected});}
+resolveCase('connected_exact',repo,repo,'github','OK');
+resolveCase('public_exact',pub,pub,undefined,'OK');
+const emptyPublic=clone(ProviderRepositorySchema,pub);emptyPublic.providerRepositoryId='';
+resolveCase('public_id_completion',emptyPublic,pub,undefined,'OK');
+const noGit=clone(ProviderRepositorySchema,pub);noGit.cloneUrl=noGit.cloneUrl.slice(0,-4);noGit.providerRepositoryId=noGit.cloneUrl;
+resolveCase('dot_git_added',noGit,pub,undefined,'SourceSelection');
+resolveCase('dot_git_removed',pub,noGit,undefined,'SourceSelection');
+const redirect=clone(ProviderRepositorySchema,pub);redirect.cloneUrl='https://gitlab.com/acme/redirect.git';redirect.providerRepositoryId=redirect.cloneUrl;
+resolveCase('redirect_destination',pub,redirect,undefined,'SourceSelection');
+const redirectedConnected=clone(ProviderRepositorySchema,repo);redirectedConnected.cloneUrl='https://github.com/acme/renamed.git';
+resolveCase('connected_redirect',repo,redirectedConnected,'github','SourceSelection');
+for(const [id,mutate] of [
+ ['connection',r=>r.connection.id='27272727-2727-2727-2727-272727272727'],
+ ['repository',r=>r.providerRepositoryId='328'],
+ ['installation',r=>r.installationId='124'],
+ ['visibility',r=>r.private=false],
+]){const r=clone(ProviderRepositorySchema,repo);mutate(r);resolveCase('changed_'+id,repo,r,'github','SourceSelection');}
+const uncompleted=clone(ProviderRepositorySchema,pub);uncompleted.providerRepositoryId='';
+resolveCase('uncompleted_public_id',pub,uncompleted,undefined,'SourceSelection');
+const noncanonical=clone(ProviderRepositorySchema,pub);noncanonical.cloneUrl='https://GitHub.com/acme/example.git';noncanonical.providerRepositoryId=noncanonical.cloneUrl;
+resolveCase('noncanonical_input',noncanonical,pub,undefined,'Canonical');
+const observations=clone(ProviderRepositorySchema,repo);observations.name='new display name';observations.defaultBranch='other';observations.hashAlgorithm=0;observations.refs=[];
+resolveCase('observations_change',repo,observations,'github','OK');
 writeFileSync(new URL('../tests/fixtures/import-authority-host-witness-v1.json',import.meta.url),JSON.stringify(artifact,null,2)+'\n');
 console.log(`Frozen ${artifact.messages.length} messages, ${Object.keys(artifact.signed_vectors).length} signed byte vectors, ${artifact.negative_vectors.length} witness/operation negatives, ${artifact.commit_vectors.negative.length} Commit negatives, ${artifact.trees.length} trees, ${artifact.retry_scenarios.length} retry scenarios.`);

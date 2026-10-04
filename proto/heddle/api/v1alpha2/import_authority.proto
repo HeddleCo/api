@@ -247,6 +247,7 @@ message ImportPublicProofBundleV1 {
 // Explicit custody selector. The URL is proposed_scope.source_url. The host
 // resolves this selector for the authenticated caller at Prepare and Commit;
 // a domain alone NEVER selects credential custody.
+// Identifiers/visibility only: no credentials, grants or execution authority.
 message ImportSourceSelectionV1 {
   RecordRef connection = 1; // Absent for unconnected public HTTPS Git.
   string provider_repository_id = 2;
@@ -370,6 +371,15 @@ message GetImportJobStateResponse {
   // terminal_manifest selects state.committed_manifest even when empty. Same
   // record-count limits as the public bundle; <=2 MiB entire response, no truncation.
   ImportPublicProofBundleV1 retained_proof = 2;
+  // Required on success. Exact accepted selector, retained transactionally with
+  // destination/job and signed provider/source_url; public repository ID = URL.
+  // Disclosed only to current destination writers, even when source projections
+  // elsewhere are hidden or the connection is revoked. No credentials/authority.
+  // Missing durable association -> UNAVAILABLE after writer authorization; never
+  // guess from inventory. Renewal must use this selector unchanged: no rebinding.
+  // Host re-authorizes current caller connection, exact repository/installation
+  // grant and selected-commit availability at Prepare and renewal activation.
+  ImportSourceSelectionV1 retained_source = 3;
 }
 message RenewImportJobRequest {
   string client_operation_id = 1;

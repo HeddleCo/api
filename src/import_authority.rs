@@ -323,6 +323,22 @@ pub fn resolve_import_provider(
 }
 
 /// Discovery may report unknown. Preparing/signing requires known=true; no SHA-1 fallback.
+pub fn validate_resolve_import_source_response(
+    _request: &ResolveImportSourceRequest,
+    response: &ResolveImportSourceResponse,
+    _connection_provider: Option<&str>,
+) -> Result<(), Reject> {
+    use prost::Message;
+    if response.encoded_len() > MAX_BUNDLE_BYTES {
+        return Err(Reject::Bounds);
+    }
+    validate_repository_hash_algorithm(
+        response.source.as_ref().ok_or(Reject::SourceSelection)?,
+        false,
+    )
+}
+
+/// Discovery may report unknown. Preparing/signing requires known=true; no SHA-1 fallback.
 pub fn validate_repository_hash_algorithm(
     source: &ProviderRepository,
     known: bool,

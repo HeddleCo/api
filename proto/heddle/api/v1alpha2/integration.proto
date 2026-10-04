@@ -80,6 +80,12 @@ message ProviderRefsRequest {
 // (or is empty on input). Connected: current caller-owned GitHub connection,
 // exact repository and installation grant. Host applies URL/SSRF and redirect
 // checks before any fetch; discovery never enrolls or stores credentials.
+// Accept the selected identity exactly or refuse: connection, repository ID,
+// installation, visibility and clone_url must match the result. Public empty
+// repository ID may only be completed to the exact requested clone_url.
+// Validate canonical HTTPS; never normalize. repo and repo.git are distinct.
+// Redirects are host-controlled transport only and never redefine the selected
+// or signed URL/custody. A different resolved identity is refused, not adopted.
 message ResolveImportSourceRequest {
   ProviderRepository source = 1; // Projection hints are never trusted.
   bool include_refs = 2;
@@ -88,7 +94,9 @@ message ResolveImportSourceRequest {
   PageRequest page = 3;
 }
 message ResolveImportSourceResponse {
-  // Authoritative resolved source; <=1 MiB entire response. No credentials.
+  // Independently resolved, identity-preserving source; <=1 MiB entire response.
+  // No credentials. Name, default branch, refs and hash format are observations,
+  // not identity hints that can substitute a different selected repository.
   // hash_algorithm may be unknown even with an exhausted/empty ref page.
   // refs_status has the same coverage/PageInfo semantics as inventory discovery.
   ProviderRepository source = 1;

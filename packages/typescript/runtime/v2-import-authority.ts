@@ -1,6 +1,6 @@
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
-import { CommitImportJobRequestSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository } from "./integration_pb.js";
+import { CommitImportJobRequestSchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse } from "./integration_pb.js";
 import type { HybridImportJobSelector, MutationResponse, OperationRecord } from "./common_pb.js";
 import { OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
@@ -56,6 +56,10 @@ export function resolveImportProvider(source:ProviderRepository, connectionProvi
   }
   if(connectionProvider!==undefined||source.private||source.installationId||(source.providerRepositoryId&&source.providerRepositoryId!==source.cloneUrl))reject("SourceSelection");
   return "public-git";
+}
+export function validateResolveImportSourceResponse(_request:ResolveImportSourceRequest,response:ResolveImportSourceResponse,_connectionProvider?:string):void {
+  if(toBinary(ResolveImportSourceResponseSchema,response).length>MAX_BUNDLE_BYTES)reject("Bounds");
+  validateRepositoryHashAlgorithm(response.source??reject("SourceSelection"),false);
 }
 export function validateRepositoryHashAlgorithm(source:ProviderRepository, known:boolean):void {
   const size=source.hashAlgorithm===1?40:source.hashAlgorithm===2?64:source.hashAlgorithm===0&&!known?undefined:reject("Version");

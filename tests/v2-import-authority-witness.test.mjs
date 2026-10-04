@@ -572,3 +572,29 @@ test('alpha25 fresh source Prepare with null retained context still requires the
  const request=vector('fresh_prepare_retained_pin');
  assert.throws(()=>authority.prepareImportSourceScope(request,vector('renew_source_moved_head'),'github',vector('import_configuration'),request.proposedScope.destinationVersion,null),expected('RefPinning'));
 });
+
+test('alpha27 retained custody recovery and grant refusal vectors',async()=>{
+ const read=vector('job_state_partial'),state=read.state;
+ const predecessor=await authority.verifyImportRenewalPredecessor(state,vector('permission'),ownerContext(1600n));
+ const failures=[];
+ const result=(label,run,want)=>{let actual='OK';try{run();}catch(e){actual=e.reason;}console.log(`ALPHA27 ${label}: ${actual}`);if(actual!==want)failures.push(`${label}: expected ${want}, got ${actual}`);};
+ for(const v of fixture.custody_vectors.read)result(`read.${v.id}`,()=>authority.validateImportJobStateResponse(vector('job_state_request'),vector(v.response)),v.expected);
+ for(const v of fixture.custody_vectors.prepare){
+  const request=vector(v.request),source=vector(v.source);
+  // A second browser recovers the selector from the read, without inventory.
+  if(v.id==='second_browser_recovery')assert.deepEqual(request.source,read.retainedSource);
+  result(`browser.${v.id}`,()=>authority.validateRenewalPreparationFromRead(request,vector('renewal_preparation'),read),v.revoked?'OK':v.expected);
+  result(`host.${v.id}`,()=>authority.prepareImportSourceScope(request,source,v.revoked?undefined:'github',vector('import_configuration'),vector('scope').destinationVersion,{predecessor,state,source:read.retainedSource}),v.expected);
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('alpha27 Resolve exact identity and redirect refusal vectors',()=>{
+ const failures=[];
+ for(const v of fixture.custody_vectors.resolve){
+  let actual='OK';try{authority.validateResolveImportSourceResponse(vector(v.request),vector(v.response),v.connection_provider);}catch(e){actual=e.reason;}
+  console.log(`ALPHA27 resolve.${v.id}: ${actual}`);
+  if(actual!==v.expected)failures.push(`${v.id}: expected ${v.expected}, got ${actual}`);
+ }
+ assert.deepEqual(failures,[]);
+});

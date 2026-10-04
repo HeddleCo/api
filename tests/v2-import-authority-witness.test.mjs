@@ -79,7 +79,7 @@ test('submission signed observe disclosure REJECT then PASS; known OID always pi
  authority.validateImportRefSelection(pinned,pinned.pinnedCommitOid);
  assert.throws(()=>authority.validateImportRefSelection(observe,pinned.pinnedCommitOid),expected('RefPinning'));
  authority.validateImportRefSelection(observe);
- const parent=vector('commit_observe_parent'),geneses=['dev','main'].map(n=>vector(`commit_observe_genesis_${n}`));
+ const parent=undefined,geneses=[0,1].map(n=>vector(`direct_genesis_${n}`));
  await assert.rejects(authority.verifyPreparedImportDelegation(vector('submission_observe_undisclosed_preparation'),vector('submission_observe_undisclosed_delegation'),parent,geneses,ownerContext()),expected('RefDisclosure'));
  await authority.verifyPreparedImportDelegation(vector('submission_observe_preparation'),vector('submission_observe_delegation'),parent,geneses,ownerContext());
 });
@@ -161,7 +161,7 @@ for(const v of fixture.negative_vectors)test(`isolated negative gate: ${v.id}; f
   if(v.type==='new_operation')await assert.rejects(authority.verifyNewImportOperation(vector('operation_main'),d,BigInt(v.now_seconds)),expected(v.expected));
   if(v.type==='operation')await authority.verifyDelegatedImportOperation(vector(v.control),d);
   if(v.type==='new_operation')await authority.verifyNewImportOperation(vector(v.control),d,1299n);
-  if(v.type==='renewal')await assert.rejects(authority.verifyImportRenewal(authority.strictDecode(api.SignedImportJobRenewalV1Schema,bytes(v.wire_hex)),d,vector('partial_manifest'),1n,v.member===false?undefined:vector('renewed_permission'),ownerContext(BigInt(v.now_seconds))),expected(v.expected));
+  if(v.type==='renewal')await assert.rejects(authority.verifyImportRenewal(authority.strictDecode(api.SignedImportJobRenewalV1Schema,bytes(v.wire_hex)),d,vector('partial_manifest'),1n,v.member===false?undefined:vector(v.parent??'renewed_permission'),ownerContext(BigInt(v.now_seconds))),expected(v.expected));
   if(v.type==='renewal')await authority.verifyImportRenewal(vector(v.control),d,vector('partial_manifest'),1n,vector('renewed_permission'),ownerContext(1200n));
 });
 for(const v of fixture.unrelated_permissions)test(`correctly signed ${v.format} cannot delegate import`,async()=>{assertCrypto(bytes(v.public_key_hex),bytes(v.signing_input_hex),bytes(v.signature_hex));if(v.wire_hex){const record=fromBinary(api.SignedOwnerCapabilitySchema,bytes(v.wire_hex));assert.deepEqual(record.signature.signature,bytes(v.signature_hex));assert.equal(record.capability.formatVersion,v.format==='PURGE-v1'?1:3);}const evidence=v.wire_hex?{kind:'owner_capability',record:fromBinary(api.SignedOwnerCapabilitySchema,bytes(v.wire_hex))}:{kind:'online_role',role:'Developer'};assert.throws(()=>authority.selectImportPermission(evidence),expected('ImportPermission'));const parent=authority.selectImportPermission({kind:'import',record:vector('permission')});await authority.verifyImportDelegation(vector('delegation'),parent,ownerContext());});
@@ -342,4 +342,83 @@ for(const name of fixture.commit_vectors.passing)test(`browser-completed Commit:
   await authority.verifyNewImportOperation(operation,d,1200n);
   console.log('COMMIT FUTURE OPERATION: 1199 Expired; 1200 PASS');
  }
+});
+
+test('P2 isolated private-source gate: public control differs only by private',async()=>{
+ const good=vector('commit_public_source'),bad=vector('submission_private_without_connection');
+ bad.source.private=false;assert.deepEqual(bad,good);bad.source.private=true;
+ await authority.validateImportCommitRequest(good,'github');console.log('P2 PRIVATE CONTROL PASS');
+ await assert.rejects(authority.validateImportCommitRequest(bad,'github'),expected('SourceSelection'));
+ console.log('P2 PRIVATE NEGATIVE SourceSelection');
+});
+test('P2 isolated signed direct-owner disclosure gate',async()=>{
+ const good=vector('submission_observe_request'),bad=vector('submission_observe_undisclosed_request');
+ const gd=good.proof.delegations[0].body,bd=bad.proof.delegations[0].body;
+ bd.scope.branches[0].refDisclosure=1;bd.branchManifest[0].limit.refDisclosure=1;assert.deepEqual(bd,gd);
+ assert.deepEqual(bad.proof.originalGeneses,good.proof.originalGeneses);assert.deepEqual(bad.proof.genesisAuthorities,good.proof.genesisAuthorities);
+ await authority.verifyImportCommitSubmission(good,vector('submission_observe_preparation'),'github',ownerContext());console.log('P2 DISCLOSURE CONTROL PASS');
+ await assert.rejects(authority.verifyImportCommitSubmission(vector('submission_observe_undisclosed_request'),vector('submission_observe_undisclosed_preparation'),'github',ownerContext()),expected('RefDisclosure'));
+ console.log('P2 DISCLOSURE NEGATIVE RefDisclosure');
+});
+for(const v of fixture.amendment_vectors.permission_negatives)test(`remaining renewal parent: ${v.id}`,async()=>{
+ const old=await authority.verifyImportDelegation(vector('delegation'),vector('permission'),ownerContext());
+ await assert.rejects(authority.verifyImportRenewal(vector(v.renewal),old,vector('partial_manifest'),1n,vector(v.parent),ownerContext(1200n)),expected(v.expected));
+ await authority.verifyImportRenewal(vector('renewal'),old,vector('partial_manifest'),1n,vector('renewed_permission'),ownerContext(1200n));
+});
+test('renewed permission retains cancellation lineage, fresh nonce and exact replay',async()=>{
+ const old=vector('permission'),next=vector('renewed_permission'),d=vector('renewed_delegation');
+ assert.deepEqual(next.body.cancellationId,old.body.cancellationId);assert.notDeepEqual(next.body.nonce,old.body.nonce);
+ assert.deepEqual(next.body.scope, d.body.scope);assert.equal(next.body.scope.branches.length,1);
+ await authority.verifyImportMemberPermission(next,ownerContext(1350n));await authority.verifyImportMemberPermission(vector('renewed_permission'),ownerContext(1350n));
+ assert.deepEqual(toBinary(api.SignedImportMemberPermissionV1Schema,next),bytes(fixture.signed_vectors.renewed_permission.wire_hex));
+ const sameParent=await authority.verifyImportDelegation(d,next,ownerContext(1350n));
+ await authority.verifyImportRenewal(vector('reused_parent_renewal'),sameParent,vector('partial_manifest'),2n,next,ownerContext(1350n));
+ authority.checkImportRevocations(d,next,[]);
+ for(const id of [old.body.cancellationId,d.body.cancellationId])assert.throws(()=>authority.checkImportRevocations(d,next,[id]),expected('Revoked'));
+});
+for(const v of fixture.amendment_vectors.cancel_negatives)test(`active Cancel selector: ${v.id}`,()=>{
+ assert.throws(()=>authority.checkImportCancelRequest(vector(v.request),vector(v.active),BigInt(v.epoch),v.cancelled),expected(v.expected));
+ authority.checkImportCancelRequest(vector('cancel_active'),vector('delegation'),1n,false);
+});
+test('Cancel exact replay precedes terminal and epoch checks; changed replay refuses',()=>{
+ authority.checkImportCancelReplay(vector('cancel_active'),vector('cancel_active'));
+ assert.throws(()=>authority.checkImportCancelReplay(vector('cancel_changed_replay'),vector('cancel_active')),expected('OperationIdReused'));
+});
+for(const v of fixture.amendment_vectors.recovery)test(`non-executable expired predecessor: ${v.id}`,async()=>{
+ const state=vector(v.state),e=ownerContext(BigInt(v.now));assert.ok(state.activePredecessor.body.expiresAtUnixSeconds<=e.nowUnixSeconds);
+ await assert.rejects(authority.verifyImportDelegation(state.activePredecessor,vector('permission'),e),expected('Expired'));
+ const token=await authority.verifyImportRenewalPredecessor(state,vector('permission'),e);
+ await assert.rejects(authority.verifyNewImportOperation(vector('operation_main'),token,e.nowUnixSeconds),expected('Canonical'));
+ const renewed=await authority.verifyImportRenewalFromState(vector(v.renewal),token,state,vector('renewed_permission'),e);
+ assert.deepEqual(renewed.digest,authority.signedDelegationDigest(vector('renewed_delegation')));
+ for(const mutate of [s=>s.authorityEpoch++,s=>s.logicalJobId[0]^=1,s=>{if(s.committedManifest.slots.length)s.committedManifest.slots[0].signedOperationDigest[0]^=1;else s.committedManifest.slots.push(vector('partial_manifest').slots[0]);},s=>s.activePredecessor.delegatingSignature.signature[0]^=1]){
+  const changed=vector(v.state);mutate(changed);
+  await assert.rejects(authority.verifyImportRenewalFromState(vector(v.renewal),token,changed,vector('renewed_permission'),e),expected('StaleContext'));
+ }
+ const bad=vector(v.state);bad.activePredecessor.delegatingSignature.signature[0]^=1;
+ await assert.rejects(authority.verifyImportRenewalPredecessor(bad,vector('permission'),e),expected('Signature'));
+ await assert.rejects(authority.verifyImportRenewalFromState(vector(v.renewal),token,state,vector('renewed_permission'),ownerContext(1800n)),expected('Expired'));
+ // Mutation after async verification cannot change the bound snapshot.
+ state.authorityEpoch++;await assert.rejects(authority.verifyImportRenewalFromState(vector(v.renewal),token,state,vector('renewed_permission'),e),expected('StaleContext'));
+});
+for(const v of fixture.amendment_vectors.preflight)test(`browser preflight and strict host Commit: ${v.id}`,async()=>{
+ const p=vector('commit_preparation'),d=vector('delegation'),member=vector('permission'),g=[vector('genesis_dev'),vector('genesis_main')],e=ownerContext(BigInt(v.now));
+ for(const [method,result] of [[authority.preflightPreparedImportDelegation,v.preflight],[authority.verifyPreparedImportDelegation,v.host]]){
+  if(result==='OK'){const token=await method(p,d,member,g,e);if(method===authority.preflightPreparedImportDelegation)assert.equal(token,undefined);}
+  else await assert.rejects(method(p,d,member,g,e),expected(result));
+ }
+});
+test('browser preflight still checks proposal, signatures, parent and exclusive expiry',async()=>{
+ const g=[vector('genesis_dev'),vector('genesis_main')];
+ await assert.rejects(authority.preflightPreparedImportDelegation(vector('commit_preparation'),vector('commit_bad_signature'),vector('permission'),g,ownerContext(999n)),expected('Signature'));
+ await assert.rejects(authority.preflightPreparedImportDelegation(vector('prepare_changed_converterVersion'),vector('delegation'),vector('permission'),g,ownerContext(999n)),expected('PreparedFields'));
+ await assert.rejects(authority.preflightPreparedImportDelegation(vector('commit_preparation'),vector('delegation'),undefined,g,ownerContext(999n)),expected('ImportPermission'));
+});
+for(const v of fixture.amendment_vectors.lineage)test(`initial lineage allocation: ${v.id}`,()=>{
+ if(v.expected==='OK')assert.equal(authority.initialImportOperationId(bytes(v.lineage_hex),v.occupied),v.operation_id);
+ else assert.throws(()=>authority.initialImportOperationId(bytes(v.lineage_hex),v.occupied),expected(v.expected));
+});
+test('Commit receipt must name the reserved first physical operation',()=>{
+ authority.validateImportCommitResponse(vector('commit_request'),vector('commit_response'));
+ assert.throws(()=>authority.validateImportCommitResponse(vector('commit_request'),vector('commit_wrong_lineage_response')),expected('PendingOperation'));
 });

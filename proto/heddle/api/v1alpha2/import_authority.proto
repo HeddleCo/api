@@ -83,14 +83,17 @@ message ImportMemberPermissionV1 {
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
   bytes logical_job_id = 3; // 16 bytes.
-  bytes retry_lineage_id = 4; // 16 bytes, original operation UUID.
+  bytes retry_lineage_id = 4; // Caller UUID, reserved first physical operation ID; non-nil.
   bytes subject_public_key = 5;
   ImportDelegationPurpose purpose = 6;
   ImportPermissionScopeV1 scope = 7;
   int64 not_before_unix_seconds = 8;
   int64 expires_at_unix_seconds = 9;
-  bytes cancellation_id = 10; // 32 random bytes; namespace heddle-import-cancel-v1.
+  // CSPRNG 32 bytes at lineage start; stable across grants for the same
+  // logical-job/retry-lineage/grantee. Namespace heddle-import-cancel-v1.
+  bytes cancellation_id = 10;
   bytes owner_chain_digest = 11; // Exact independently verified public chain digest.
+  // Fresh CSPRNG 32 bytes per new grant. Byte-identical replay preserves it.
   bytes nonce = 12;
 }
 message SignedImportMemberPermissionV1 {
@@ -157,6 +160,8 @@ message ImportResultManifestV1 {
 // P2 #2: replacement includes only uncommitted slots, preserves original
 // geneses/envelopes/first receipts and uses a fresh key. expected_authority_epoch
 // and committed_manifest_digest CAS serialize two renewals with publication.
+// Renewed parent scope MUST also exclude committed slots and reduce budgets;
+// original parent/envelope remain unchanged for retained genesis verification.
 message ImportJobRenewalV1 {
   uint32 format_version = 1;
   bytes predecessor_delegation_digest = 2;
@@ -328,8 +333,13 @@ message CancelImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
   bytes logical_job_id = 3;
+  // ACTIVE delegation ID only, never its parent or a retained predecessor.
+  // With matching epoch: mismatch refuses Scope; stale epoch: StaleContext.
   bytes cancellation_id = 4;
   uint64 expected_authority_epoch = 5;
+  // Whole-job terminal cancellation; epoch advances once. Exact caller-scoped
+  // replay returns the stored receipt before epoch/terminal revalidation.
+  // Changed inputs under client_operation_id refuse OPERATION_ID_REUSED.
 }
 // Public digest-holder policy, survives deletion and lost read grant. No batch,
 // listing, prefix or pagination. Validate exactly 64 bytes before archive I/O.
@@ -406,6 +416,9 @@ message HostedLandingWitnessV1 {
   repeated SignedRecord review_evidence = 5; // Sorted signed-native-record digests.
   bytes authority_envelope = 6;
 }
+// Authenticated Prepare snapshot. Signature/scope-only predecessor recovery
+// does not establish current execution or historical admission. Current
+// replacement authority and transactional activation CAS remain mandatory.
 message ImportJobCasStateV1 {
   uint32 format_version = 1;
   bytes logical_job_id = 2;

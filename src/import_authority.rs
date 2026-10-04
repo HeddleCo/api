@@ -182,6 +182,16 @@ fn interval(start: i64, end: i64, now: i64) -> Result<(), Reject> {
     }
     Ok(())
 }
+// Structural validation never substitutes a synthetic historical clock.
+fn validity(start: i64, end: i64, now: i64, current: bool) -> Result<(), Reject> {
+    if start < 0 || end <= start {
+        return Err(Reject::Semantic);
+    }
+    if current {
+        interval(start, end, now)?;
+    }
+    Ok(())
+}
 fn branch(value: &ImportBranchLimitV1) -> Result<(), Reject> {
     if !value.ref_name.starts_with("refs/heads/")
         || value.ref_name.len() > 1024
@@ -564,7 +574,19 @@ pub fn validate_commit_response(
         || receipt.client_operation_id != request.client_operation_id
         || request.destination.is_none()
         || operation.spool != request.destination
-        || operation.id.is_empty()
+        || operation.id
+            != initial_operation_id(
+                &request
+                    .proof
+                    .as_ref()
+                    .ok_or(Reject::PendingOperation)?
+                    .delegations
+                    .first()
+                    .and_then(|d| d.body.as_ref())
+                    .ok_or(Reject::PendingOperation)?
+                    .retry_lineage_id,
+                false,
+            )?
     {
         return Err(Reject::PendingOperation);
     }
@@ -659,6 +681,13 @@ pub fn verify_member_permission(
     signed: &SignedImportMemberPermissionV1,
     expected: &ImportOwnerExpectation<'_>,
 ) -> Result<(), Reject> {
+    verify_member_permission_inner(signed, expected, true)
+}
+fn verify_member_permission_inner(
+    signed: &SignedImportMemberPermissionV1,
+    expected: &ImportOwnerExpectation<'_>,
+    current: bool,
+) -> Result<(), Reject> {
     let p = signed.body.as_ref().ok_or(Reject::ImportPermission)?;
     if p.format_version != 1 || p.purpose != 1 {
         return Err(Reject::ImportPermission);
@@ -676,10 +705,11 @@ pub fn verify_member_permission(
     width(&p.nonce, 32)?;
     width(&p.owner_chain_digest, 32)?;
     validate_scope(p.scope.as_ref().ok_or(Reject::Canonical)?)?;
-    interval(
+    validity(
         p.not_before_unix_seconds,
         p.expires_at_unix_seconds,
         expected.now_unix_seconds,
+        current,
     )?;
     if p.expires_at_unix_seconds > expected.authority_expires_at_seconds {
         return Err(Reject::Scope);
@@ -696,6 +726,7 @@ pub fn verify_member_permission(
 pub struct VerifiedImportDelegation {
     body: ImportJobDelegationV1,
     digest: Vec<u8>,
+    member: Option<SignedImportMemberPermissionV1>,
 }
 impl VerifiedImportDelegation {
     pub fn body(&self) -> &ImportJobDelegationV1 {
@@ -709,6 +740,14 @@ pub fn verify_delegation(
     signed: &SignedImportJobDelegationV1,
     member: Option<&SignedImportMemberPermissionV1>,
     expected: &ImportOwnerExpectation<'_>,
+) -> Result<VerifiedImportDelegation, Reject> {
+    verify_delegation_inner(signed, member, expected, true)
+}
+fn verify_delegation_inner(
+    signed: &SignedImportJobDelegationV1,
+    member: Option<&SignedImportMemberPermissionV1>,
+    expected: &ImportOwnerExpectation<'_>,
+    current: bool,
 ) -> Result<VerifiedImportDelegation, Reject> {
     let d = signed.body.as_ref().ok_or(Reject::Canonical)?;
     if d.format_version != 1 || d.purpose != 1 {
@@ -764,10 +803,11 @@ pub fn verify_delegation(
             return Err(Reject::Scope);
         }
     }
-    interval(
+    validity(
         d.not_before_unix_seconds,
         d.expires_at_unix_seconds,
         expected.now_unix_seconds,
+        current,
     )?;
     if d.expires_at_unix_seconds > expected.authority_expires_at_seconds {
         return Err(Reject::Scope);
@@ -778,7 +818,7 @@ pub fn verify_delegation(
         }
     } else {
         let member = member.ok_or(Reject::ImportPermission)?;
-        verify_member_permission(member, expected)?;
+        verify_member_permission_inner(member, expected, current)?;
         let p = member.body.as_ref().ok_or(Reject::ImportPermission)?;
         if d.parent_permission_digest != signed_permission_digest(member)?
             || d.delegating_public_key != p.subject_public_key
@@ -803,6 +843,7 @@ pub fn verify_delegation(
     Ok(VerifiedImportDelegation {
         body: d.clone(),
         digest: signed_delegation_digest(signed)?,
+        member: member.cloned(),
     })
 }
 /// Frozen canonical projection. The browser completes only the fields absent
@@ -835,6 +876,26 @@ pub fn verify_prepared_delegation(
     geneses: &[SignedImportGenesisAuthorityV1],
     expected: &ImportOwnerExpectation<'_>,
 ) -> Result<VerifiedImportDelegation, Reject> {
+    verify_prepared_inner(prepared, signed, member, geneses, expected, false)
+}
+/// Browser signing preflight only: no execution or admission token is returned.
+pub fn preflight_prepared_delegation(
+    prepared: &PrepareImportJobResponse,
+    signed: &SignedImportJobDelegationV1,
+    member: Option<&SignedImportMemberPermissionV1>,
+    geneses: &[SignedImportGenesisAuthorityV1],
+    expected: &ImportOwnerExpectation<'_>,
+) -> Result<(), Reject> {
+    verify_prepared_inner(prepared, signed, member, geneses, expected, true).map(|_| ())
+}
+fn verify_prepared_inner(
+    prepared: &PrepareImportJobResponse,
+    signed: &SignedImportJobDelegationV1,
+    member: Option<&SignedImportMemberPermissionV1>,
+    geneses: &[SignedImportGenesisAuthorityV1],
+    expected: &ImportOwnerExpectation<'_>,
+    browser: bool,
+) -> Result<VerifiedImportDelegation, Reject> {
     let proposal = prepared.proposal.as_ref().ok_or(Reject::Canonical)?;
     let d = signed.body.as_ref().ok_or(Reject::Canonical)?;
     if canonical(proposal)? != canonical(&delegation_preparation(d))? {
@@ -858,7 +919,8 @@ pub fn verify_prepared_delegation(
     let at = i128::from(prepared.prepared_at_unix_seconds);
     let skew = i128::from(prepared.clock_skew_allowance_seconds);
     if at < 0
-        || now < at
+        || now < 0
+        || if browser { now + skew < at } else { now < at }
         || i128::from(prepared.reservation_expires_at_unix_seconds) != at + 3600
         || now >= i128::from(prepared.reservation_expires_at_unix_seconds)
     {
@@ -875,7 +937,17 @@ pub fn verify_prepared_delegation(
         return Err(Reject::ValidityBounds);
     }
     if let Some(parent) = member {
-        verify_member_permission(parent, expected)?;
+        if browser {
+            let p = parent.body.as_ref().ok_or(Reject::ImportPermission)?;
+            verify_member_permission_inner(parent, expected, false)?;
+            if i128::from(p.not_before_unix_seconds) > now + skew
+                || i128::from(p.expires_at_unix_seconds) <= now
+            {
+                return Err(Reject::Expired);
+            }
+        } else {
+            verify_member_permission(parent, expected)?;
+        }
     }
     // Future not-before within skew can be committed, but verify_new_operation
     // still refuses execution until that exact signed time. Parent/owner expiry
@@ -884,7 +956,12 @@ pub fn verify_prepared_delegation(
         now_unix_seconds: expected.now_unix_seconds.max(d.not_before_unix_seconds),
         ..*expected
     };
-    let verified = verify_delegation(signed, member, &at_start)?;
+    let verified = verify_delegation_inner(
+        signed,
+        member,
+        if browser { expected } else { &at_start },
+        !browser,
+    )?;
     if geneses.len() != d.branch_manifest.len() {
         return Err(Reject::GenesisBinding);
     }
@@ -1157,6 +1234,25 @@ pub fn verify_renewal(
         })
     {
         return Err(Reject::RenewalFork);
+    }
+    if let Some(parent) = member {
+        let p = parent.body.as_ref().ok_or(Reject::ImportPermission)?;
+        remaining_scope(
+            p.scope.as_ref().ok_or(Reject::Canonical)?,
+            old_scope,
+            committed,
+        )?;
+        if let Some(old_parent) = &previous.member {
+            let old = old_parent.body.as_ref().ok_or(Reject::ImportPermission)?;
+            if p.subject_public_key == old.subject_public_key
+                && p.logical_job_id == old.logical_job_id
+                && p.retry_lineage_id == old.retry_lineage_id
+                && (p.cancellation_id != old.cancellation_id
+                    || (parent != old_parent && p.nonce == old.nonce))
+            {
+                return Err(Reject::ImportPermission);
+            }
+        }
     }
     verify_authorization_signature(
         &after.delegating_public_key,
@@ -2142,4 +2238,208 @@ pub fn validate_renewal_preparation(response: &PrepareImportJobResponse) -> Resu
         return Err(Reject::StaleContext);
     }
     Ok(())
+}
+
+/// Caller-generated non-nil UUID, reserved as the first physical operation ID.
+/// Occupancy is checked under the host's reservation/activation transaction.
+pub fn initial_operation_id(lineage: &[u8], occupied: bool) -> Result<String, Reject> {
+    width(lineage, 16)?;
+    if lineage.iter().all(|b| *b == 0) {
+        return Err(Reject::Canonical);
+    }
+    if occupied {
+        return Err(Reject::OperationIdReused);
+    }
+    let h = hex::encode(lineage);
+    Ok(format!(
+        "{}-{}-{}-{}-{}",
+        &h[..8],
+        &h[8..12],
+        &h[12..16],
+        &h[16..20],
+        &h[20..]
+    ))
+}
+
+/// Evaluate inside the cancellation transaction, after caller-scoped replay lookup.
+/// The selector names only the ACTIVE delegation. Parent revocation is independent.
+pub fn check_cancel_request(
+    request: &CancelImportJobRequest,
+    active: &SignedImportJobDelegationV1,
+    durable_epoch: u64,
+    cancelled: bool,
+) -> Result<(), Reject> {
+    let d = active.body.as_ref().ok_or(Reject::Canonical)?;
+    width(&request.logical_job_id, 16)?;
+    width(&request.cancellation_id, 32)?;
+    let id = d.identity.as_ref().ok_or(Reject::Canonical)?;
+    if request.client_operation_id.is_empty()
+        || request.destination.as_ref().is_none_or(|s| {
+            initial_operation_id(&id.spool_uuid, false).map_or(true, |uuid| s.id != uuid)
+        })
+        || request.logical_job_id != d.logical_job_id
+    {
+        return Err(Reject::Scope);
+    }
+    if durable_epoch == 0 || request.expected_authority_epoch != durable_epoch {
+        return Err(Reject::StaleContext);
+    }
+    if request.cancellation_id != d.cancellation_id {
+        return Err(Reject::Scope);
+    }
+    if cancelled {
+        return Err(Reject::Revoked);
+    }
+    Ok(())
+}
+/// Exact replay acknowledges the stored cancellation without advancing the epoch.
+pub fn check_cancel_replay(
+    request: &CancelImportJobRequest,
+    stored: &CancelImportJobRequest,
+) -> Result<(), Reject> {
+    if request != stored {
+        return Err(Reject::OperationIdReused);
+    }
+    Ok(())
+}
+/// Check both independent revocation selectors, regardless of Cancel's selector.
+pub fn check_import_revocations(
+    delegation: &SignedImportJobDelegationV1,
+    member: Option<&SignedImportMemberPermissionV1>,
+    revoked: &[Vec<u8>],
+) -> Result<(), Reject> {
+    let d = delegation.body.as_ref().ok_or(Reject::Canonical)?;
+    width(&d.cancellation_id, 32)?;
+    if revoked.contains(&d.cancellation_id) {
+        return Err(Reject::Revoked);
+    }
+    if let Some(parent) = member {
+        let p = parent.body.as_ref().ok_or(Reject::ImportPermission)?;
+        width(&p.cancellation_id, 32)?;
+        if revoked.contains(&p.cancellation_id) {
+            return Err(Reject::Revoked);
+        }
+    }
+    Ok(())
+}
+
+fn remaining_scope(
+    scope: &ImportPermissionScopeV1,
+    old: &ImportPermissionScopeV1,
+    committed: &ImportResultManifestV1,
+) -> Result<(), Reject> {
+    if !scope_subset(scope, old) {
+        return Err(Reject::RenewalFork);
+    }
+    let mut consumed = 0_u64;
+    let mut removed = 0_u32;
+    for slot in &committed.slots {
+        if let Some(branch) = old
+            .branches
+            .iter()
+            .find(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
+        {
+            if slot.result_bytes > branch.max_result_bytes {
+                return Err(Reject::RenewalFork);
+            }
+            consumed = consumed
+                .checked_add(slot.result_bytes)
+                .ok_or(Reject::Bounds)?;
+            removed += 1;
+        }
+        if scope
+            .branches
+            .iter()
+            .any(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
+        {
+            return Err(Reject::CommittedSlot);
+        }
+    }
+    if scope.max_operations
+        > old
+            .max_operations
+            .checked_sub(removed)
+            .ok_or(Reject::RenewalFork)?
+        || scope.max_result_bytes
+            > old
+                .max_result_bytes
+                .checked_sub(consumed)
+                .ok_or(Reject::RenewalFork)?
+    {
+        return Err(Reject::RenewalFork);
+    }
+    Ok(())
+}
+
+/// Signature/scope-verified recovery evidence. This is neither currently
+/// executable authority nor evidence of historical admission. No receipt needed.
+///
+/// ```compile_fail
+/// use heddle_api::import_authority::{VerifiedImportRenewalPredecessor, verify_new_operation};
+/// use heddle_api::heddle::api::v1alpha2::SignedDelegatedImportOperationV1;
+/// fn cannot_execute(op: &SignedDelegatedImportOperationV1, old: &VerifiedImportRenewalPredecessor) {
+///     verify_new_operation(op, old, 0);
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct VerifiedImportRenewalPredecessor {
+    previous: VerifiedImportDelegation,
+    state_digest: Vec<u8>,
+}
+fn validate_cas_state(state: &ImportJobCasStateV1) -> Result<(), Reject> {
+    let previous = state.active_predecessor.as_ref().ok_or(Reject::Canonical)?;
+    let p = previous.body.as_ref().ok_or(Reject::Canonical)?;
+    let manifest = state.committed_manifest.as_ref().ok_or(Reject::Canonical)?;
+    validate_manifest(manifest)?;
+    if state.format_version != 1
+        || state.authority_epoch == 0
+        || state.logical_job_id != p.logical_job_id
+        || state.retry_lineage_id != p.retry_lineage_id
+        || manifest.logical_job_id != state.logical_job_id
+        || manifest.retry_lineage_id != state.retry_lineage_id
+    {
+        return Err(Reject::StaleContext);
+    }
+    Ok(())
+}
+/// State MUST come from authenticated Prepare or receiver-owned durable state.
+/// Expected owner context independently verifies the predecessor's selected history.
+pub fn verify_renewal_predecessor(
+    state: &ImportJobCasStateV1,
+    member: Option<&SignedImportMemberPermissionV1>,
+    expected: &ImportOwnerExpectation<'_>,
+) -> Result<VerifiedImportRenewalPredecessor, Reject> {
+    validate_cas_state(state)?;
+    let previous = verify_delegation_inner(
+        state.active_predecessor.as_ref().ok_or(Reject::Canonical)?,
+        member,
+        expected,
+        false,
+    )?;
+    Ok(VerifiedImportRenewalPredecessor {
+        previous,
+        state_digest: signing_digest("heddle-import-job-cas-state-v1", state)?,
+    })
+}
+/// Current replacement authority remains mandatory. Activation MUST recheck the
+/// durable active predecessor/epoch/manifest and terminal state atomically.
+pub fn verify_renewal_from_state(
+    signed: &SignedImportJobRenewalV1,
+    previous: &VerifiedImportRenewalPredecessor,
+    state: &ImportJobCasStateV1,
+    member: Option<&SignedImportMemberPermissionV1>,
+    expected: &ImportOwnerExpectation<'_>,
+) -> Result<VerifiedImportDelegation, Reject> {
+    validate_cas_state(state)?;
+    if signing_digest("heddle-import-job-cas-state-v1", state)? != previous.state_digest {
+        return Err(Reject::StaleContext);
+    }
+    verify_renewal(
+        signed,
+        &previous.previous,
+        state.committed_manifest.as_ref().ok_or(Reject::Canonical)?,
+        state.authority_epoch,
+        member,
+        expected,
+    )
 }

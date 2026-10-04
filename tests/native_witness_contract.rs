@@ -17,15 +17,29 @@ fn wire<T: Message + Default>(f: &Value, name: &str) -> T {
 }
 fn verify(f: &Value, b: &api::NativePublicProofBundleV1) -> Result<(), codec::Reject> {
     let root = hex(&f["keys"]["root"]["public_key_hex"]);
-    let now = b
-        .witness_set
+    // Fixture context independently supplies the authenticated set. The carrier
+    // must match it; substituting the carrier digest cannot change this pin.
+    let selected: heddle_api::heddle::api::common::SignedHostedWitnessSetV1 = wire(
+        f,
+        if b.witness_set
+            .as_ref()
+            .and_then(|s| s.body.as_ref())
+            .map(|s| s.generation)
+            == Some(51)
+        {
+            "retired_set"
+        } else {
+            "current_set"
+        },
+    );
+    let now = selected
+        .body
         .as_ref()
-        .and_then(|s| s.body.as_ref())
         .ok_or(codec::Reject::Canonical)?
         .issued_at_unix_millis
         + 1;
     let set = witness::verify_set(
-        b.witness_set.as_ref().ok_or(codec::Reject::Canonical)?,
+        &selected,
         &witness::SetExpectation {
             authority: "https://weft.example.test",
             root_id: "descriptor-root-1",
@@ -126,6 +140,8 @@ negatives!(
     substituted_envelope,
     missing_genesis_statement,
     missing_owner_history,
+    missing_owner_chain,
+    carried_set_digest_substitution,
     missing_policy,
     missing_ownership_claim,
     missing_authority_statement,

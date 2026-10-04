@@ -181,7 +181,7 @@ fn thread(record: &api::SignedRecord) -> Result<Vec<u8>, Reject> {
 }
 /// Reference completeness, including a statement for every sidecar, a witnessed
 /// genesis for every original/dependency and an explicit claim for LocalKey.
-/// Presence is never permission. Call verify_native_bundle_witnesses with a
+/// Presence is never permission. Call verify_bundle_witnesses with a
 /// separately authenticated fresh set, then native owner/model verification.
 pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), Reject> {
     if b.format_version != 1 {
@@ -190,6 +190,8 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     if b.encoded_len() > import::MAX_BUNDLE_BYTES
         || b.owner_histories.len() > 64
         || b.ownership_transfers.len() > 64
+        || b.owner_chains.is_empty()
+        || b.owner_chains.len() > 64
         || b.policies.len() > 256
         || b.genesis_witnesses.is_empty()
         || b.genesis_witnesses.len() > 256
@@ -205,20 +207,23 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
         .as_ref()
         .and_then(|o| o.genesis.as_ref())
         .ok_or(Reject::Canonical)?;
-    let chain = b.owner_chain.as_ref().ok_or(Reject::Canonical)?;
-    let chain_digest = import::owner_chain_digest(chain)?;
+    sorted(&b.owner_chains, import::owner_chain_digest)?;
+    let chain = b.owner_chains.first().ok_or(Reject::Canonical)?;
     b.witness_set.as_ref().ok_or(Reject::Canonical)?;
-    if chain
-        .owner_state_hashes
-        .iter()
-        .any(|h| !b.owner_histories.iter().any(|o| o.state_hash == *h))
-        || chain.transfer_audit_hashes.iter().any(|h| {
-            !b.ownership_transfers
+    for retained in &b.owner_chains {
+        if retained.spool_genesis_digest != chain.spool_genesis_digest
+            || retained
+                .owner_state_hashes
                 .iter()
-                .any(|t| t.audit_record_hash == *h)
-        })
-    {
-        return Err(Reject::Scope);
+                .any(|h| !b.owner_histories.iter().any(|o| o.state_hash == *h))
+            || retained.transfer_audit_hashes.iter().any(|h| {
+                !b.ownership_transfers
+                    .iter()
+                    .any(|t| t.audit_record_hash == *h)
+            })
+        {
+            return Err(Reject::Scope);
+        }
     }
     sorted(&b.genesis_witnesses, |p| {
         signed_genesis_digest(p.binding.as_ref().ok_or(Reject::GenesisBinding)?)
@@ -241,7 +246,10 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
         )?;
         if id.spool_uuid != owner.spool_uuid
             || id.spool_genesis_digest != chain.spool_genesis_digest
-            || g.owner_chain_digest != chain_digest
+            || !b
+                .owner_chains
+                .iter()
+                .any(|c| import::owner_chain_digest(c).is_ok_and(|h| h == g.owner_chain_digest))
             || !b.owner_histories.iter().any(|h| {
                 h.state_hash == id.owner_state_hash
                     && h.root

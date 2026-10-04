@@ -140,7 +140,7 @@ reinterpreted from one basis to the other.
 ## Public native carrier completeness
 
 `NativePublicProofBundleV1` contains public owner genesis, owner histories,
-accepted ownership transfers, the original binding's exact owner chain, policies,
+accepted ownership transfers, digest-sorted exact owner-chain history, policies,
 native genesis payloads, native purpose-2 payloads, optional hosted landing
 payloads, the complete signed witness set, signed statements and per-statement
 retirement proofs. Originals and envelopes are embedded in their payloads.
@@ -148,7 +148,13 @@ It has no job, import permission, delegation, renewal, result slot or terminal
 manifest. Foreign evidence is verified against independently selected roots;
 carried owner roots and witness sets never enroll themselves.
 
-Bounds: 1 MiB encoded carrier, <=64 owner histories/transfers, <=256 policies and
+Every binding resolves its own exact `owner_chain_digest` in `owner_chains`,
+including when source/target geneses were admitted under different owner states.
+Each chain keeps its original sorted state hashes and accepted transfer order
+and resolves every reference in the carrier. All chains share the selected
+immutable Spool genesis; no older signed binding is rewritten.
+
+Bounds: 1 MiB encoded carrier, <=64 owner histories/transfers/chains, <=256 policies and
 each payload list, <=1024 statements/proofs, existing 64 KiB payload/original
 bounds, <=128 native dependencies/receipts, <=16 original signatures and <=64
 retirement siblings. No truncation. Payload lists are strictly sorted unique by

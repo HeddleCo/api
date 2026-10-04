@@ -75,17 +75,18 @@ function requiresAuthority(r:SignedRecord){if(r.format!=="heddle-thread-operatio
 export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1):Promise<void> {
   b=clone(api.NativePublicProofBundleV1Schema,b);
   if(b.formatVersion!==1)reject("Version");
-  if(toBinary(api.NativePublicProofBundleV1Schema,b).length>1048576||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.policies.length>256||!b.genesisWitnesses.length||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256||b.statements.length>1024||b.historyProofs.length>1024)reject("Bounds");
-  const owner=b.ownerGenesis?.genesis??reject("Canonical"),chain=b.ownerChain??reject("Canonical"),chainDigest=ownerChainDigest(chain);
+  if(toBinary(api.NativePublicProofBundleV1Schema,b).length>1048576||b.ownerHistories.length>64||b.ownershipTransfers.length>64||!b.ownerChains.length||b.ownerChains.length>64||b.policies.length>256||!b.genesisWitnesses.length||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256||b.statements.length>1024||b.historyProofs.length>1024)reject("Bounds");
+  const owner=b.ownerGenesis?.genesis??reject("Canonical"),chain=b.ownerChains[0]??reject("Canonical");
+  sorted(b.ownerChains,ownerChainDigest);
   if(!b.witnessSet)reject("Canonical");
-  if(chain.ownerStateHashes.some(h=>!b.ownerHistories.some(o=>equal(o.stateHash,h)))||chain.transferAuditHashes.some(h=>!b.ownershipTransfers.some(t=>equal(t.auditRecordHash,h))))reject("Scope");
+  for(const c of b.ownerChains)if(!equal(c.spoolGenesisDigest,chain.spoolGenesisDigest)||c.ownerStateHashes.some(h=>!b.ownerHistories.some(o=>equal(o.stateHash,h)))||c.transferAuditHashes.some(h=>!b.ownershipTransfers.some(t=>equal(t.auditRecordHash,h))))reject("Scope");
   sorted(b.genesisWitnesses,p=>signedNativeGenesisAuthorityDigest(p.binding??reject("GenesisBinding")));
   sorted(b.authorityWitnesses,authorityDigest);sorted(b.landingWitnesses,p=>signingDigest("heddle-hosted-landing-witness-payload-v1",HostedLandingWitnessV1Schema,p));sorted(b.statements,s=>statementSigningDigest(s.body??reject("Canonical")));
   const requireStatement=(purpose:number,payload:Uint8Array)=>{if(b.statements.filter(s=>s.body?.purpose===purpose&&equal(s.body.canonicalPayload,payload)).length!==1)reject("Scope");};
   for(const p of b.genesisWitnesses){
     const g=p.binding?.body??reject("GenesisBinding"),id=g.identity??reject("Canonical");
     await verifyNativeGenesisAuthority(p.binding!,p.originalGenesis??reject("Canonical"),p.creatorAuthorityEnvelope);
-    if(!equal(id.spoolUuid,owner.spoolUuid)||!equal(id.spoolGenesisDigest,chain.spoolGenesisDigest)||!equal(g.ownerChainDigest,chainDigest)||!b.ownerHistories.some(h=>equal(h.stateHash,id.ownerStateHash)&&h.root?.root&&equal(h.root.root.ownerId,id.ownerId)&&equal(h.root.root.accountUuid,id.ownerAccountUuid)))reject("Scope");
+    if(!equal(id.spoolUuid,owner.spoolUuid)||!equal(id.spoolGenesisDigest,chain.spoolGenesisDigest)||!b.ownerChains.some(c=>equal(ownerChainDigest(c),g.ownerChainDigest))||!b.ownerHistories.some(h=>equal(h.stateHash,id.ownerStateHash)&&h.root?.root&&equal(h.root.root.ownerId,id.ownerId)&&equal(h.root.root.accountUuid,id.ownerAccountUuid)))reject("Scope");
     if(g.ownerKind===2&&!b.authorityWitnesses.some(a=>a.kind===2&&a.original&&equal(thread(a.original),g.genesisDigest)))reject("Scope");
     requireStatement(1,canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p));
   }
@@ -122,7 +123,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
 export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint):Promise<void> {
   b=clone(api.NativePublicProofBundleV1Schema,b);await validatePublicNativeBundle(b);
   // The opaque verified snapshot, rather than the carrier, selects trust.
-  if(!b.witnessSet?.body||!equal(signingDigest("heddle-hosted-witness-set-v1\0",(await import("../common/hosted_witness_pb.js")).HostedWitnessSetV1Schema,b.witnessSet.body),set.digest))reject("StaleContext");
+  if(!b.witnessSet?.body||!equal(b.witnessSet.bodyDigest,set.digest)||!equal(signingDigest("heddle-hosted-witness-set-v1\0",(await import("../common/hosted_witness_pb.js")).HostedWitnessSetV1Schema,b.witnessSet.body),set.digest))reject("StaleContext");
   for(const signed of b.statements){
     try { await resolveWitnessStatement(set,signed,undefined,false,now);continue; }
     catch(error){if(!(error instanceof HybridContractError)||error.reason!=="Proof")throw error;}

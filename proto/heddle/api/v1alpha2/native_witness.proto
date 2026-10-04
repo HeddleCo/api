@@ -51,7 +51,9 @@ message NativePublicProofBundleV1 {
   SignedSpoolOwnerGenesis owner_genesis = 2;
   repeated OwnerHistory owner_histories = 3;
   repeated ResourceTransferAuditRecord ownership_transfers = 4;
-  ImportOwnerChainV1 owner_chain = 5;
+  // Digest-sorted complete binding-chain history; no global chain substitution
+  // across owner changes. Every genesis binding resolves its exact chain here.
+  repeated ImportOwnerChainV1 owner_chains = 5; // Nonempty; at most 64.
   repeated SignedSpoolPolicyRecord policies = 6;
   repeated NativeGenesisWitnessV1 genesis_witnesses = 7;
   repeated ImportAuthorityWitnessV1 authority_witnesses = 8;

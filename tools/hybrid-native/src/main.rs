@@ -1379,6 +1379,17 @@ fn verify_native_witness_fixture() -> Result<()> {
                 }
             }
         }
+        for p in &b.landing_witnesses {
+            for r in p
+                .execution
+                .iter()
+                .chain(p.source_operation.iter())
+                .chain(p.review_evidence.iter())
+            {
+                let op = operation(r)?;
+                operations.insert(op.id()?, op);
+            }
+        }
         for op in operations.values() {
             let parents = op
                 .parents
@@ -1586,10 +1597,10 @@ fn verify_native_genesis_boundary(
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
-        Some("child-state") => {
+        Some("child-state" | "descendant-state") => {
             let mut state = State::decode_current_msgpack(&input()?)?;
             ensure!(
-                state.parents.is_empty(),
+                args[1] == "descendant-state" || state.parents.is_empty(),
                 "fixture base must be an initial State"
             );
             let base = state.id();
@@ -1648,7 +1659,7 @@ fn main() -> Result<()> {
             println!("export closure accepted");
         }
         _ => bail!(
-            "usage: hybrid-native-conformance child-state | encode FORMAT | verify FIXTURE | verify-native-witness | verify-capture OLD_VECTOR | verify-export FIXTURE"
+            "usage: hybrid-native-conformance child-state | descendant-state | encode FORMAT | verify FIXTURE | verify-native-witness | verify-capture OLD_VECTOR | verify-export FIXTURE"
         ),
     }
     Ok(())

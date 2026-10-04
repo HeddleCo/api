@@ -6,6 +6,7 @@ import { create, clone, fromBinary, toBinary } from '@bufbuild/protobuf';
 import * as api from '../packages/typescript/dist/v1alpha2/native_witness_pb.js';
 import * as imp from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
 import * as host from '../packages/typescript/dist/common/hosted_witness_pb.js';
+import { OwnerHistorySchema } from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
 import { SignedRecordSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import { StartThreadRequestSchema } from '../packages/typescript/dist/v1alpha2/thread_pb.js';
 import { ThreadGenesisRecordSchema } from '../packages/typescript/dist/v1alpha2/sync_pb.js';
@@ -33,7 +34,7 @@ const metadata=JSON.parse(execFileSync('cargo',['metadata','--locked','--no-deps
 const codec=metadata.target_directory+'/debug/hybrid-native-conformance';
 function nativeId(format,bytes){const n=new Uint8Array(8);new DataView(n.buffer).setBigUint64(0,BigInt(bytes.length),true);return blake3(join(str(format),n,Uint8Array.of(0),bytes));}
 function native(format,value,signers){const bytes=raw(execFileSync(codec,['encode',format],{input:hex(encode(value)),encoding:'utf8'}).trim());return create(SignedRecordSchema,{format,canonicalRecord:bytes,signatures:signers.map(n=>({publicKey:key(n),signature:sig(n,join(str(format),Uint8Array.of(0),bytes))})).sort((a,b)=>compare(a.publicKey,b.publicKey))});}
-function statement(n,p,schema,authority,signatures,publisher='device',boundary){const body=create(host.HostedWitnessStatementV1Schema,{formatVersion:1,executorId:witnessId(key('witness')),purpose:schema===api.NativeGenesisWitnessV1Schema?1:2,spoolUuid:identity.spoolUuid,spoolGenesisDigest:identity.spoolGenesisDigest,ownerId:identity.ownerId,ownerStateHash:identity.ownerStateHash,ownershipTransferSequence:0n,policyStateHash:oldBundle.policies[0].body.policyStateHash,policySequence:1n,basis:boundary?2:1,publisherKeyId:keyId(key(publisher)),authorityDigest:authority,originalSignaturesDigest:signatures,hostTransactionId:fill(n,16),admissionOrder:BigInt(n),observedAtUnixMillis:1100000n,canonicalPayload:canonicalHybridV1(schema,p),boundaryAcceptance:boundary});const signed=create(host.SignedHostedWitnessStatementV1Schema,{body,signature:sig('witness',statementSigningDigest(body))});return signed;}
+function statement(n,p,schema,authority,signatures,publisher='device',boundary){const body=create(host.HostedWitnessStatementV1Schema,{formatVersion:1,executorId:witnessId(key('witness')),purpose:schema===api.NativeGenesisWitnessV1Schema?1:schema===imp.HostedLandingWitnessV1Schema?4:2,spoolUuid:identity.spoolUuid,spoolGenesisDigest:identity.spoolGenesisDigest,ownerId:identity.ownerId,ownerStateHash:identity.ownerStateHash,ownershipTransferSequence:0n,policyStateHash:oldBundle.policies[0].body.policyStateHash,policySequence:1n,basis:boundary?2:1,publisherKeyId:keyId(key(publisher)),authorityDigest:authority,originalSignaturesDigest:signatures,hostTransactionId:fill(n,16),admissionOrder:BigInt(n),observedAtUnixMillis:1100000n,canonicalPayload:canonicalHybridV1(schema,p),boundaryAcceptance:boundary});const signed=create(host.SignedHostedWitnessStatementV1Schema,{body,signature:sig('witness',statementSigningDigest(body))});return signed;}
 async function genesis(name,original,env,signer){const binding=await signNativeGenesisAuthority(original,env,identity,chain,{publicKey:key(signer),sign:bytes=>sig(signer,bytes)});wire(name+'_binding',api.SignedNativeGenesisAuthorityV1Schema,binding);commit(name+'_binding_body',api.NativeGenesisAuthorityV1Schema,binding.body,'heddle-native-genesis-authority-v1');commit(name+'_binding',api.SignedNativeGenesisAuthorityV1Schema,binding,'heddle-signed-native-genesis-authority-v1');const p=create(api.NativeGenesisWitnessV1Schema,{formatVersion:1,kind:2,binding,originalGenesis:original,creatorAuthorityEnvelope:env});wire(name+'_payload',api.NativeGenesisWitnessV1Schema,p);commit(name+'_payload',api.NativeGenesisWitnessV1Schema,p,'heddle-native-genesis-witness-payload-v1');return p;}
 // Original genesis is unchanged; this second signature binds native StartThread
 // authority, with no import permission. Every carrier below is native typed.
@@ -60,6 +61,43 @@ const metadataPayload=load('authority_admission_payload',imp.ImportAuthorityWitn
 cases.native_metadata=bundle([accountSource],[sourcePayload,metadataPayload],[sourceGenesisStatement,authorityStatement(sourcePayload,204),authorityStatement(metadataPayload,209)]);
 // Build statements for each retained claim and the explicit resolution.
 const resolutionBundle=cases.ownership_resolution;resolutionBundle.statements=[localStatement,...resolutionBundle.authorityWitnesses.map((p,i)=>authorityStatement(p,206+i))].sort((a,b)=>compare(statementSigningDigest(a.body),statementSigningDigest(b.body)));
+function sortBundle(b){
+ b.ownerChains.sort((a,b)=>compare(ownerChainDigest(a),ownerChainDigest(b)));
+ b.genesisWitnesses.sort((a,b)=>compare(signedNativeGenesisAuthorityDigest(a.binding),signedNativeGenesisAuthorityDigest(b.binding)));
+ b.authorityWitnesses.sort((a,b)=>compare(signingDigest('heddle-import-authority-witness-payload-v1',imp.ImportAuthorityWitnessV1Schema,a),signingDigest('heddle-import-authority-witness-payload-v1',imp.ImportAuthorityWitnessV1Schema,b)));
+ b.landingWitnesses.sort((a,b)=>compare(signingDigest('heddle-hosted-landing-witness-payload-v1',imp.HostedLandingWitnessV1Schema,a),signingDigest('heddle-hosted-landing-witness-payload-v1',imp.HostedLandingWitnessV1Schema,b)));
+ b.statements.sort((a,b)=>compare(statementSigningDigest(a.body),statementSigningDigest(b.body)));
+ return b;
+}
+function landingStatement(p,n){return statement(n,p,imp.HostedLandingWitnessV1Schema,authorityEnvelopeDigest(p.authorityEnvelope),originalSignaturesDigest([p.execution,p.sourceOperation,...p.reviewEvidence],[p.request.signature]));}
+// Genuine native landing, followed by an account capture on the landed target.
+const landing=load('landing_payload',imp.HostedLandingWitnessV1Schema);
+const landingThreads=new Set([landing.execution,landing.sourceOperation,...landing.reviewEvidence].map(r=>hex(new Uint8Array(decode(r.canonicalRecord).thread))));
+const landingGeneses=[];
+for(const g of oldBundle.genesisWitnesses){if(landingThreads.has(hex(threadGenesisId(g.originalGenesis.canonicalRecord))))landingGeneses.push(await genesis('landing_'+landingGeneses.length,g.originalGenesis,envelope,'device'));}
+const landingAuthorities=[create(imp.ImportAuthorityWitnessV1Schema,{formatVersion:1,kind:1,original:landing.sourceOperation,authorityEnvelope:envelope}),create(imp.ImportAuthorityWitnessV1Schema,{formatVersion:1,kind:1,original:landing.reviewEvidence[0],dependencies:[landing.sourceOperation],authorityEnvelope:envelope})];
+cases.native_landing=bundle(landingGeneses,landingAuthorities,[...landingGeneses.map((p,i)=>statement(211+i,p,api.NativeGenesisWitnessV1Schema,signedNativeGenesisAuthorityDigest(p.binding),originalSignaturesDigest([p.originalGenesis]))),...landingAuthorities.map((p,i)=>authorityStatement(p,213+i)),landingStatement(landing,215)]);
+cases.native_landing.landingWitnesses=[landing];
+const captureValue=decode(landing.sourceOperation.canonicalRecord);
+captureValue.thread=decode(landing.execution.canonicalRecord).thread;
+captureValue.parents=[Array.from(nativeId(landing.execution.format,landing.execution.canonicalRecord))];
+const integration=decode(new Uint8Array(decode(landing.execution.canonicalRecord).body.canonical));
+const child=JSON.parse(execFileSync(codec,['descendant-state'],{input:hex(new Uint8Array(integration.result.state)),encoding:'utf8'}));
+captureValue.body.canonical.result.state=Array.from(raw(child.state_hex));
+const capture=native('heddle-thread-operation-v1',captureValue,['device']);
+const capturePayload=create(imp.ImportAuthorityWitnessV1Schema,{formatVersion:1,kind:1,original:capture,dependencies:[landing.execution],authorityEnvelope:envelope});
+cases.post_landing_capture=clone(api.NativePublicProofBundleV1Schema,cases.native_landing);
+cases.post_landing_capture.authorityWitnesses.push(capturePayload);
+cases.post_landing_capture.statements.push(authorityStatement(capturePayload,216));
+sortBundle(cases.post_landing_capture);
+// Different bindings select exact retained chains; no binding is rewritten on export.
+const longerChain=load('renew_rotated_chain',imp.ImportOwnerChainV1Schema);
+const selected=clone(api.NativeGenesisWitnessV1Schema,landingGeneses[0]);
+selected.binding=await signNativeGenesisAuthority(selected.originalGenesis,envelope,identity,longerChain,{publicKey:key('device'),sign:bytes=>sig('device',bytes)});
+cases.distinct_owner_chains=bundle([selected,landingGeneses[1]],[],[statement(217,selected,api.NativeGenesisWitnessV1Schema,signedNativeGenesisAuthorityDigest(selected.binding),originalSignaturesDigest([selected.originalGenesis])),statement(218,landingGeneses[1],api.NativeGenesisWitnessV1Schema,signedNativeGenesisAuthorityDigest(landingGeneses[1].binding),originalSignaturesDigest([landingGeneses[1].originalGenesis]))]);
+cases.distinct_owner_chains.ownerHistories.push(load('renew_rotated_owner_history',OwnerHistorySchema));
+cases.distinct_owner_chains.ownerChains.push(longerChain);
+sortBundle(cases.distinct_owner_chains);
 // Exact native boundary evidence over the account genesis + native envelope.
 const oldBoundary=load('boundary_main',imp.ImportBoundaryAcceptanceV1Schema);
 const manifestValue=decode(oldBoundary.originalsManifest);manifestValue.entries[0].authority.authority_digest=Array.from(nativeId('heddle-thread-control-authority-v1',envelope));
@@ -93,6 +131,14 @@ negative('forged_binding','start_thread',b=>b.genesisWitnesses[0].binding.creato
 negative('substituted_envelope','start_thread',b=>b.genesisWitnesses[0].creatorAuthorityEnvelope[5]^=1,'GenesisBinding');
 negative('missing_genesis_statement','start_thread',b=>b.statements=[],'Scope');
 negative('missing_owner_chain','start_thread',b=>b.ownerChains=[],'Bounds');
+negative('missing_selected_owner_chain','distinct_owner_chains',b=>b.ownerChains=b.ownerChains.filter(c=>hex(ownerChainDigest(c))!==hex(ownerChainDigest(longerChain))),'Scope');
+negative('post_landing_missing_purpose4','post_landing_capture',b=>{b.landingWitnesses=[];b.statements=b.statements.filter(s=>s.body.purpose!==4);},'Scope');
+negative('post_landing_missing_purpose4_statement','post_landing_capture',b=>b.statements=b.statements.filter(s=>s.body.purpose!==4),'Scope');
+negative('post_landing_substituted_purpose4','post_landing_capture',b=>{
+ const p=b.landingWitnesses[0],v=decode(p.execution.canonicalRecord);v.body.canonical=Array.from(raw(execFileSync(codec,['encode','heddle-hosted-integration-v1'],{input:hex(encode({...integration,executed_at_ms:1100001n})),encoding:'utf8'}).trim()));
+ p.execution=native('heddle-thread-operation-v1',v,['witness']);
+ b.statements=b.statements.filter(s=>s.body.purpose!==4);b.statements.push(landingStatement(p,215));sortBundle(b);
+},'Scope');
 negative('carried_set_digest_substitution','start_thread',b=>b.witnessSet.bodyDigest[0]^=1,'StaleContext','witness');
 negative('missing_owner_history','start_thread',b=>b.ownerHistories=[],'Scope');
 negative('missing_policy','start_thread',b=>b.policies=[],'Scope');

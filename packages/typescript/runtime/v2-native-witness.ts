@@ -7,7 +7,7 @@ import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, r
 import { ThreadControlAuthoritySchema } from "./identity_pb.js";
 import { threadGenesisId, type ThreadGenesisSigner } from "./thread-genesis.js";
 import { decode, type Value } from "./_collaboration-msgpack.js";
-import { verifyNativeRecord, signedNativeDigest, originalSignaturesDigest, ownerChainDigest, matchWitnessBoundary, requireBoundaryOriginal, verifyWitnessPayload, validatePublicBundle, requirePolicyHistory } from "./import-authority.js";
+import { verifyNativeRecord, originalSignaturesDigest, ownerChainDigest, matchWitnessBoundary, requireBoundaryOriginal, verifyWitnessPayload, validatePublicBundle, requirePolicyHistory } from "./import-authority.js";
 import { resolveWitnessStatement, verifyWitnessInclusion, leafDigest, statementSigningDigest, type VerifiedWitnessSet } from "./witness-trust.js";
 
 export const NATIVE_GENESIS_DOMAIN = "heddle-native-genesis-authority-v1";
@@ -69,7 +69,7 @@ export async function verifyNativeGenesisPayload(s:HostedWitnessStatementV1,p:ap
 const authorityDigest=(p:import("./import_authority_pb.js").ImportAuthorityWitnessV1)=>signingDigest("heddle-import-authority-witness-payload-v1",ImportAuthorityWitnessV1Schema,p);
 function sorted<T>(values:T[],digest:(v:T)=>Uint8Array){values.forEach((v,i)=>{if(i&&compare(digest(values[i-1]!),digest(v))>=0)reject("Canonical");});}
 function thread(r:SignedRecord){return r.format==="heddle-thread-genesis-v1"?threadGenesisId(r.canonicalRecord):octets(selectors(r).thread,32);}
-function requiresAuthority(r:SignedRecord){if(r.format!=="heddle-thread-operation-v1")return true;const body=map(selectors(r).body);return body.kind!=="capture"||map(map(body.canonical).author).kind!=="local_key";}
+function requiresAuthority(r:SignedRecord){if(r.format!=="heddle-thread-operation-v1")return true;const body=map(selectors(r).body);return body.kind!=="integration"&&(body.kind!=="capture"||map(map(body.canonical).author).kind!=="local_key");}
 /** Reference completeness and original signatures. This cannot enroll an owner,
  * authenticate a carried set or replace native causal/authority verification. */
 export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1):Promise<void> {
@@ -83,6 +83,21 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   sorted(b.genesisWitnesses,p=>signedNativeGenesisAuthorityDigest(p.binding??reject("GenesisBinding")));
   sorted(b.authorityWitnesses,authorityDigest);sorted(b.landingWitnesses,p=>signingDigest("heddle-hosted-landing-witness-payload-v1",HostedLandingWitnessV1Schema,p));sorted(b.statements,s=>statementSigningDigest(s.body??reject("Canonical")));
   const requireStatement=(purpose:number,payload:Uint8Array)=>{if(b.statements.filter(s=>s.body?.purpose===purpose&&equal(s.body.canonicalPayload,payload)).length!==1)reject("Scope");};
+  const exact=(a:SignedRecord|undefined,r:SignedRecord)=>!!a&&equal(toBinary(SignedRecordSchema,a),toBinary(SignedRecordSchema,r));
+  const requireNativeDependency=async(original:SignedRecord)=>{
+    if(requiresAuthority(original)){
+      const p=b.authorityWitnesses.find(p=>exact(p.original,original))??reject("Scope");
+      requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
+    }else if(map(selectors(original).body).kind==="integration"){
+      const p=b.landingWitnesses.find(p=>exact(p.execution,original))??reject("Scope");
+      requireStatement(4,canonicalHybridV1(HostedLandingWitnessV1Schema,p));
+    }else{
+      // Local captures retain their native proof and exact hosted ownership claim.
+      await verifyNativeRecord(original,"heddle-thread-operation-v1");
+      const p=b.authorityWitnesses.find(p=>p.kind===2&&p.original&&equal(thread(p.original),thread(original)))??reject("Scope");
+      requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
+    }
+  };
   for(const p of b.genesisWitnesses){
     const g=p.binding?.body??reject("GenesisBinding"),id=g.identity??reject("Canonical");
     await verifyNativeGenesisAuthority(p.binding!,p.originalGenesis??reject("Canonical"),p.creatorAuthorityEnvelope);
@@ -92,12 +107,13 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   }
   for(const p of b.authorityWitnesses){
     requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
+    if(!requiresAuthority(p.original??reject("Canonical")))reject("Scope");
     for(const original of [...(p.original?[p.original]:[]),...p.dependencies]){
       if(["heddle-thread-genesis-v1","heddle-thread-operation-v1","heddle-thread-ownership-claim-v1","heddle-thread-ownership-resolution-v1"].includes(original.format)){
         const t=thread(original);
         if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),t)))reject("Scope");
         if(original.format==="heddle-thread-genesis-v1"&&!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(toBinary(SignedRecordSchema,g.originalGenesis),toBinary(SignedRecordSchema,original))))reject("Scope");
-        if(original.format!=="heddle-thread-genesis-v1"&&original!==p.original&&requiresAuthority(original)&&!b.authorityWitnesses.some(a=>a.original&&equal(signedNativeDigest(a.original),signedNativeDigest(original))))reject("Scope");
+        if(original.format!=="heddle-thread-genesis-v1"&&original!==p.original)await requireNativeDependency(original);
       }else if(!["heddle-original-boundary-acceptance-v1","heddle-thread-genesis-admission-v2","heddle-thread-authority-admission-v3"].includes(original.format))reject("Version");
     }
   }
@@ -106,7 +122,8 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     const execution=p.execution??reject("Canonical");
     if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(execution))))reject("Scope");
     for(const original of [...(p.sourceOperation?[p.sourceOperation]:[]),...p.reviewEvidence]){
-      if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(original)))||(requiresAuthority(original)&&!b.authorityWitnesses.some(p=>p.original&&equal(signedNativeDigest(p.original),signedNativeDigest(original)))))reject("Scope");
+      if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(original))))reject("Scope");
+      await requireNativeDependency(original);
     }
   }
   for(const signed of b.statements){

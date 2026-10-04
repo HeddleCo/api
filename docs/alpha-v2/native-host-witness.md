@@ -167,7 +167,11 @@ conflicting first admissions for one subject must reject at the native gate.
 Require a witnessed genesis for every selected native original/dependency,
 byte-identical genesis dependencies, purpose-2 sidecars for every account
 source/control/claim/resolution dependency and an explicit witnessed claim for
-every hosted LocalKey genesis. Retain every causal parent, ownership claim,
+every hosted LocalKey genesis. A hosted integration dependency resolves through
+its byte-identical purpose-4 execution and matching statement; it must never be
+given a purpose-2 source-author receipt. Local captures retain their native proof
+and required witnessed ownership claim. Apply these same role-specific rules to
+landing source/review closure. Retain every causal parent, ownership claim,
 conflict resolution and acceptance dependency required by the native model.
 Hosted landing resolves its own exact source/review/target and witness history;
 landing is never authorized by genesis admission alone. All selected owner-state

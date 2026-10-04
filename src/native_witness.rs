@@ -276,6 +276,9 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     }
     for p in &b.authority_witnesses {
         require_statement(b, 2, &canonical(p)?)?;
+        if !requires_authority(p.original.as_ref().ok_or(Reject::Canonical)?)? {
+            return Err(Reject::Scope);
+        }
         for original in p.original.iter().chain(p.dependencies.iter()) {
             if [
                 "heddle-thread-genesis-v1",
@@ -301,17 +304,10 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                 {
                     return Err(Reject::Scope);
                 }
-                // Every account authority/ownership dependency needs its own
-                // first-admission sidecar; local captures remain native proof.
                 if original.format != "heddle-thread-genesis-v1"
                     && p.original.as_ref() != Some(original)
-                    && requires_authority(original)?
-                    && !b
-                        .authority_witnesses
-                        .iter()
-                        .any(|a| a.original.as_ref() == Some(original))
                 {
-                    return Err(Reject::Scope);
+                    require_native_dependency(b, original)?;
                 }
             } else if ![
                 "heddle-original-boundary-acceptance-v1",
@@ -340,14 +336,10 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                 g.original_genesis
                     .as_ref()
                     .is_some_and(|o| import::native_id(o) == t)
-            }) || (requires_authority(original)?
-                && !b
-                    .authority_witnesses
-                    .iter()
-                    .any(|p| p.original.as_ref() == Some(original)))
-            {
+            }) {
                 return Err(Reject::Scope);
             }
+            require_native_dependency(b, original)?;
         }
     }
     for signed in &b.statements {
@@ -427,12 +419,52 @@ fn requires_authority(record: &api::SignedRecord) -> Result<bool, Reject> {
     }
     let op: OperationSelectors =
         rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Canonical)?;
+    if op.body.kind == "integration" {
+        return Ok(false);
+    }
     if op.body.kind != "capture" {
         return Ok(true);
     }
     let op: CaptureOperationSelectors =
         rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Canonical)?;
     Ok(op.body.canonical.author.kind != "local_key")
+}
+fn require_native_dependency(
+    b: &api::NativePublicProofBundleV1,
+    original: &api::SignedRecord,
+) -> Result<(), Reject> {
+    if requires_authority(original)? {
+        let p = b
+            .authority_witnesses
+            .iter()
+            .find(|p| p.original.as_ref() == Some(original))
+            .ok_or(Reject::Scope)?;
+        return require_statement(b, 2, &canonical(p)?);
+    }
+    let op: OperationSelectors =
+        rmp_serde::from_slice(&original.canonical_record).map_err(|_| Reject::Canonical)?;
+    if op.body.kind == "integration" {
+        let p = b
+            .landing_witnesses
+            .iter()
+            .find(|p| p.execution.as_ref() == Some(original))
+            .ok_or(Reject::Scope)?;
+        return require_statement(b, 4, &canonical(p)?);
+    }
+    // Local captures retain their native proof and exact hosted ownership claim.
+    import::verify_native(original, "heddle-thread-operation-v1")?;
+    let t = thread(original)?;
+    let claim = b
+        .authority_witnesses
+        .iter()
+        .find(|p| {
+            p.kind == 2
+                && p.original
+                    .as_ref()
+                    .is_some_and(|o| thread(o).is_ok_and(|id| id == t))
+        })
+        .ok_or(Reject::Scope)?;
+    require_statement(b, 2, &canonical(claim)?)
 }
 fn require_statement(
     b: &api::NativePublicProofBundleV1,

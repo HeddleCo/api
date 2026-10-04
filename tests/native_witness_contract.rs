@@ -63,6 +63,55 @@ fn native_positive_bundles() {
     }
 }
 #[test]
+fn bindings_select_distinct_retained_owner_chains() {
+    let f = fixture();
+    let b: api::NativePublicProofBundleV1 = wire(&f, "distinct_owner_chains");
+    assert_eq!(b.owner_chains.len(), 2);
+    let selected: Vec<_> = b
+        .genesis_witnesses
+        .iter()
+        .map(|p| {
+            &p.binding
+                .as_ref()
+                .expect("binding")
+                .body
+                .as_ref()
+                .expect("body")
+                .owner_chain_digest
+        })
+        .collect();
+    assert_eq!(selected.len(), 2);
+    assert_ne!(selected[0], selected[1]);
+    for digest in selected {
+        assert!(b.owner_chains.iter().any(|c| {
+            heddle_api::import_authority::owner_chain_digest(c).expect("chain") == *digest
+        }));
+    }
+    let missing: api::NativePublicProofBundleV1 = wire(&f, "missing_selected_owner_chain");
+    assert_eq!(missing.owner_chains.len(), 1);
+    assert_eq!(missing.genesis_witnesses, b.genesis_witnesses);
+    assert_eq!(missing.statements, b.statements);
+}
+#[test]
+fn post_landing_capture_retains_exact_execution_dependency() {
+    let f = fixture();
+    let b: api::NativePublicProofBundleV1 = wire(&f, "post_landing_capture");
+    let execution = b.landing_witnesses[0]
+        .execution
+        .as_ref()
+        .expect("execution");
+    assert!(
+        b.authority_witnesses
+            .iter()
+            .any(|p| p.dependencies.contains(execution))
+    );
+    assert!(
+        !b.authority_witnesses
+            .iter()
+            .any(|p| p.original.as_ref() == Some(execution))
+    );
+}
+#[test]
 fn native_canonical_parity() {
     let f = fixture();
     for (name, v) in f["canonical_vectors"].as_object().expect("vectors") {
@@ -141,6 +190,10 @@ negatives!(
     missing_genesis_statement,
     missing_owner_history,
     missing_owner_chain,
+    missing_selected_owner_chain,
+    post_landing_missing_purpose4,
+    post_landing_missing_purpose4_statement,
+    post_landing_substituted_purpose4,
     carried_set_digest_substitution,
     missing_policy,
     missing_ownership_claim,

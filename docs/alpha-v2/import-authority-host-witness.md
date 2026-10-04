@@ -115,6 +115,27 @@ is at most 1 MiB. Cursors bind caller, exact custody/URL/repository identity,
 accepted bounds and provider snapshot. Unknown/unauthorized connected sources
 use uniform NOT_FOUND. No credential is returned or acquired by public discovery.
 
+Resolve accepts a selected source **unchanged or refuses it**. The result must
+preserve the exact `clone_url`, connection (including absence), repository ID,
+installation ID and visibility. The sole completion is an empty public input
+repository ID becoming the exact requested URL; a successful public result
+always carries that URL as its ID. Connected IDs are never completed or replaced.
+Name, default branch, refs and object format are independently observed metadata,
+not identity substitutions. Validate both URLs against canonical HTTPS v1 without
+normalizing: `repo` and `repo.git`, path case and different origins remain distinct.
+Noncanonical input refuses; it is not repaired into an accepted selection.
+
+Host redirect/SSRF policy governs transport before each fetch/hop. An allowed
+transport redirect never changes the requested or signed source identity. If
+resolution can only return a different URL or custody identity, refuse rather
+than adopt the redirect target, append/remove `.git` or infer alias equivalence.
+Any different source requires a new explicit selection, review and Prepare; a
+redirect never rewrites prepared or signed bytes. The portable
+`validate_resolve_import_source_response` / `validateResolveImportSourceResponse`
+check request/result identity and discovery bounds/format, using the host's
+independently authenticated connection provider. They perform no network or
+current-grant authorization.
+
 Both repository and ref `hash_algorithm` come from independently established
 repository object format (for example an authenticated provider object-format
 read or Git's object-format advertisement), not the selected OID length, URL,
@@ -1252,7 +1273,8 @@ returned. This is distinct from the public witness-history proof lookup.
 The request has one canonical destination UUID and one non-nil 16-byte logical
 job ID, at most 4096 encoded bytes. A successful response has `state` containing
 the existing `ImportJobCasStateV1` and `retained_proof` containing exact accepted
-public evidence. The whole response is at most 2 MiB, the proof at most 1 MiB,
+public evidence, plus required `retained_source` (`ImportSourceSelectionV1`).
+The whole response is at most 2 MiB, the proof at most 1 MiB,
 and all existing bundle counts apply (64 permissions/owner histories/transfers/
 delegations, 63 accepted renewals, 320 manifests, 256 operations/branches/native
 originals/policies, 1024 statements/history proofs). Exceeding bounds refuses;
@@ -1261,6 +1283,31 @@ manifest with job and lineage IDs, **including an explicit empty slots array**
 before the first publication. The retained proof's terminal selector equals
 that snapshot and its digest resolves in the sorted manifest history. Its final
 accepted delegation equals the snapshot's exact active signed predecessor.
+
+At initial acceptance, retain the accepted connection/repository/installation/
+visibility selector transactionally with the destination, logical job, and exact
+signed provider/URL. Public selectors have no connection/installation,
+`private = false`, and repository ID equal to that exact URL. Return the selector
+in the same snapshot on every successful writer read, including after reload,
+ordinary expiry, source-detail hiding elsewhere or connection revocation. This
+disclosure is only to current destination writers; it carries identifiers and
+visibility, never credentials, connection ownership or authority. It is absent
+from the portable public proof and operation projection. Unknown/unauthorized
+jobs still use uniform NOT_FOUND. After writer authorization, inability to obtain
+the complete durable association refuses UNAVAILABLE; no partial success, legacy
+fallback, connection-list reverse lookup or first matching connection is allowed.
+The accepted association is immutable across physical retries and renewals.
+
+Renewal Prepare must use the retained selector exactly. Connection replacement,
+repository/installation changes or visibility changes refuse `SourceSelection`,
+even if the caller currently holds the proposed replacement grant. No rebinding
+mechanism is defined. A structurally valid selector's association is a host
+transaction invariant; portable validators cannot authenticate custody history
+from the signed provider/URL alone. The host must independently re-authorize the
+caller's current connection, exact repository/installation grant and availability
+of every selected commit at Prepare and renewal activation. Revocation or lost
+grant refuses work; reading retained identifiers cannot restore access. Do not
+use a retained selector as proof of an active connection or an authorization token.
 
 Retain original signed permission parents, genesis bindings, native originals,
 creator envelopes, owner genesis, accepted owner histories/handoffs, and the
@@ -1283,7 +1330,8 @@ The browser flow is:
 1. Read and independently verify retained evidence and the authenticated snapshot.
 2. Compute and review the remaining scope from the committed slots and consumed
    budgets. Request an ordinary exact renewal Prepare with this caller-selected
-   scope. Only an empty destination token may be filled.
+   scope and the exact `retained_source`; no inventory lookup is needed, including
+   from a second browser. Only an empty destination token may be filled.
 3. Validate the exact scope response and require its **complete** `renewal_state`
    to equal the read snapshot: predecessor bytes, epoch, job/lineage and manifest.
    If publication or another renewal raced, read again, recompute/review and
@@ -1296,7 +1344,10 @@ The browser flow is:
 `validate_job_state_request` / `validateImportJobStateRequest` enforce read
 request bounds; response validators enforce snapshot and retained-proof closure.
 `validate_renewal_preparation_from_read` / `validateRenewalPreparationFromRead`
-enforce the publication race before signing. Authentication, writer permission,
+enforce exact retained custody and the publication race before signing. The host
+passes the retained selector together with verified predecessor/CAS state to
+`prepare_import_source_scope` / `prepareImportSourceScope`, separately from the
+independently resolved current source. Authentication, writer permission,
 transaction serialization and native owner/witness verification belong to the
 consumer implementation; composition helpers do not claim to implement a host.
 

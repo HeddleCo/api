@@ -1,6 +1,6 @@
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
-import { CommitImportJobRequestSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository } from "./integration_pb.js";
+import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse } from "./integration_pb.js";
 import type { HybridImportJobSelector, MutationResponse, OperationRecord } from "./common_pb.js";
 import { OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
@@ -57,6 +57,28 @@ export function resolveImportProvider(source:ProviderRepository, connectionProvi
   if(connectionProvider!==undefined||source.private||source.installationId||(source.providerRepositoryId&&source.providerRepositoryId!==source.cloneUrl))reject("SourceSelection");
   return "public-git";
 }
+function sourceSelection(source:ProviderRepository):api.ImportSourceSelectionV1 {
+  return create(api.ImportSourceSelectionV1Schema,{connection:source.connection,providerRepositoryId:source.providerRepositoryId,installationId:source.installationId,private:source.private});
+}
+function sameSourceSelection(a:api.ImportSourceSelectionV1,b:api.ImportSourceSelectionV1):boolean {
+  return equal(toBinary(api.ImportSourceSelectionV1Schema,a),toBinary(api.ImportSourceSelectionV1Schema,b));
+}
+/** Exact identity preservation; network/redirect policy and current grants are host gates. */
+export function validateResolveImportSourceResponse(request:ResolveImportSourceRequest,response:ResolveImportSourceResponse,connectionProvider?:string):void {
+  if(toBinary(ResolveImportSourceResponseSchema,response).length>MAX_BUNDLE_BYTES)reject("Bounds");
+  const selected=request.source??reject("SourceSelection"),resolved=response.source??reject("SourceSelection");
+  const provider=resolveImportProvider(selected,connectionProvider),selection=sourceSelection(selected);
+  if(!selection.connection&&!selection.providerRepositoryId)selection.providerRepositoryId=selected.cloneUrl;
+  if(resolveImportProvider(resolved,connectionProvider)!==provider||selected.cloneUrl!==resolved.cloneUrl
+    ||!sameSourceSelection(selection,sourceSelection(resolved))
+    ||(!resolved.connection&&resolved.providerRepositoryId!==selected.cloneUrl))reject("SourceSelection");
+  validateRepositoryHashAlgorithm(resolved,false);
+}
+function validateRetainedImportSource(selector:api.ImportSourceSelectionV1,scope:api.ImportPermissionScopeV1):void {
+  const source=create(ProviderRepositorySchema,{connection:selector.connection,providerRepositoryId:selector.providerRepositoryId,installationId:selector.installationId,private:selector.private,cloneUrl:scope.sourceUrl});
+  if(resolveImportProvider(source,selector.connection?"github":undefined)!==scope.provider
+    ||(!selector.connection&&selector.providerRepositoryId!==scope.sourceUrl))reject("SourceSelection");
+}
 export function validateRepositoryHashAlgorithm(source:ProviderRepository, known:boolean):void {
   const size=source.hashAlgorithm===1?40:source.hashAlgorithm===2?64:source.hashAlgorithm===0&&!known?undefined:reject("Version");
   if(source.refs.length>512)reject("Bounds");
@@ -81,7 +103,7 @@ function validateDiscoveredImportScopeInner(scope:api.ImportPermissionScopeV1, s
 }
 /** Host rechecks current grants and selected-commit availability. Retained state
  * comes from an authenticated read or durable host state, bound to the verified token. */
-export function prepareImportSourceScope(request:api.PrepareImportJobRequest, currentSource:ProviderRepository, connectionProvider:string|undefined, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array, retained?:{predecessor:VerifiedImportRenewalPredecessor;state:api.ImportJobCasStateV1}):api.ImportPermissionScopeV1 {
+export function prepareImportSourceScope(request:api.PrepareImportJobRequest, currentSource:ProviderRepository, connectionProvider:string|undefined, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array, retained?:{predecessor:VerifiedImportRenewalPredecessor;state:api.ImportJobCasStateV1;source:api.ImportSourceSelectionV1}):api.ImportPermissionScopeV1 {
   const s=request.source??reject("SourceSelection");
   if(s.connection?.id!==currentSource.connection?.id||s.connection?.spool?.id!==currentSource.connection?.spool?.id||(s.providerRepositoryId!==currentSource.providerRepositoryId&&(s.connection!==undefined||s.providerRepositoryId!==""))||s.installationId!==currentSource.installationId||s.private!==currentSource.private)reject("SourceSelection");
   const scope=request.proposedScope??reject("Canonical");
@@ -92,6 +114,8 @@ export function prepareImportSourceScope(request:api.PrepareImportJobRequest, cu
     if(!equal(signingDigest("heddle-import-job-cas-state-v1",api.ImportJobCasStateV1Schema,state),old.stateDigest)
       ||!equal(request.renewLogicalJobId,previous.logicalJobId)||!equal(request.retryLineageId,previous.retryLineageId)
       ||request.destination?.id!==initialImportOperationId(previous.identity!.spoolUuid,false))reject("StaleContext");
+    validateRetainedImportSource(retained.source,previous.scope!);
+    if(!sameSourceSelection(s,retained.source))reject("SourceSelection");
     const selected=clone(api.ImportPermissionScopeV1Schema,scope);
     if(!selected.destinationVersion.length)selected.destinationVersion=currentDestinationVersion.slice();
     remainingScope(selected,previous.scope!,state.committedManifest!);
@@ -501,11 +525,14 @@ export function validateImportJobStateResponse(request:api.GetImportJobStateRequ
   retainedProof(state,proof);
   const id=state.activePredecessor?.body?.identity??reject("Canonical");
   if(!equal(state.logicalJobId,request.logicalJobId)||request.destination?.id!==initialImportOperationId(id.spoolUuid,false))reject("Scope");
+  const selector=response.retainedSource??reject("SourceSelection");
+  for(const d of proof.delegations)validateRetainedImportSource(selector,d.body?.scope??reject("Canonical"));
 }
 /** A changed snapshot requires recomputation and another exact Prepare before signing. */
 export function validateRenewalPreparationFromRead(request:api.PrepareImportJobRequest,response:api.PrepareImportJobResponse,read:api.GetImportJobStateResponse):void {
   validateImportPreparationResponse(request,response);
   validateImportJobStateResponse(create(api.GetImportJobStateRequestSchema,{destination:request.destination,logicalJobId:request.renewLogicalJobId}),read);
+  if(!request.source||!read.retainedSource||!sameSourceSelection(request.source,read.retainedSource))reject("SourceSelection");
   if(!read.state||!response.renewalState||!equal(toBinary(api.ImportJobCasStateV1Schema,read.state),toBinary(api.ImportJobCasStateV1Schema,response.renewalState)))reject("StaleContext");
 }
 /** Composition/references only. Independently verify owner/policy and witnessed

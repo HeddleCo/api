@@ -322,6 +322,56 @@ pub fn resolve_import_provider(
     }
 }
 
+/// Preserve selected identity exactly. Redirect/SSRF and current grants are host gates.
+pub fn validate_resolve_import_source_response(
+    request: &ResolveImportSourceRequest,
+    response: &ResolveImportSourceResponse,
+    connection_provider: Option<&str>,
+) -> Result<(), Reject> {
+    use prost::Message;
+    if response.encoded_len() > MAX_BUNDLE_BYTES {
+        return Err(Reject::Bounds);
+    }
+    let selected = request.source.as_ref().ok_or(Reject::SourceSelection)?;
+    let resolved = response.source.as_ref().ok_or(Reject::SourceSelection)?;
+    let provider = resolve_import_provider(selected, connection_provider)?;
+    if resolve_import_provider(resolved, connection_provider)? != provider
+        || selected.clone_url != resolved.clone_url
+        || selected.connection != resolved.connection
+        || selected.installation_id != resolved.installation_id
+        || selected.private != resolved.private
+        || (selected.provider_repository_id != resolved.provider_repository_id
+            && (selected.connection.is_some() || !selected.provider_repository_id.is_empty()))
+        || (resolved.connection.is_none() && resolved.provider_repository_id != selected.clone_url)
+    {
+        return Err(Reject::SourceSelection);
+    }
+    validate_repository_hash_algorithm(resolved, false)
+}
+
+/// Structural binding to signed provider/URL; durable custody association is a host invariant.
+fn validate_retained_import_source(
+    selector: &ImportSourceSelectionV1,
+    scope: &ImportPermissionScopeV1,
+) -> Result<(), Reject> {
+    let source = ProviderRepository {
+        connection: selector.connection.clone(),
+        provider_repository_id: selector.provider_repository_id.clone(),
+        installation_id: selector.installation_id.clone(),
+        private: selector.private,
+        clone_url: scope.source_url.clone(),
+        ..Default::default()
+    };
+    let provider =
+        resolve_import_provider(&source, selector.connection.as_ref().map(|_| "github"))?;
+    if scope.provider != provider
+        || (selector.connection.is_none() && selector.provider_repository_id != scope.source_url)
+    {
+        return Err(Reject::SourceSelection);
+    }
+    Ok(())
+}
+
 /// Discovery may report unknown. Preparing/signing requires known=true; no SHA-1 fallback.
 pub fn validate_repository_hash_algorithm(
     source: &ProviderRepository,
@@ -411,7 +461,11 @@ pub fn prepare_import_source_scope(
     connection_provider: Option<&str>,
     configuration: &GetImportConfigurationResponse,
     current_destination_version: &[u8],
-    retained: Option<(&VerifiedImportRenewalPredecessor, &ImportJobCasStateV1)>,
+    retained: Option<(
+        &VerifiedImportRenewalPredecessor,
+        &ImportJobCasStateV1,
+        &ImportSourceSelectionV1,
+    )>,
 ) -> Result<ImportPermissionScopeV1, Reject> {
     let selector = request.source.as_ref().ok_or(Reject::SourceSelection)?;
     if selector.connection != current_source.connection
@@ -427,7 +481,7 @@ pub fn prepare_import_source_scope(
     if scope.provider != provider {
         return Err(Reject::SourceSelection);
     }
-    if let Some((predecessor, state)) = retained {
+    if let Some((predecessor, state, retained_source)) = retained {
         validate_cas_state(state)?;
         let previous = &predecessor.previous.body;
         let identity = previous.identity.as_ref().ok_or(Reject::Canonical)?;
@@ -439,6 +493,13 @@ pub fn prepare_import_source_scope(
             })
         {
             return Err(Reject::StaleContext);
+        }
+        validate_retained_import_source(
+            retained_source,
+            previous.scope.as_ref().ok_or(Reject::Canonical)?,
+        )?;
+        if selector != retained_source {
+            return Err(Reject::SourceSelection);
         }
         let mut selected = scope.clone();
         if selected.destination_version.is_empty() {
@@ -2862,6 +2923,18 @@ pub fn validate_job_state_response(
     {
         return Err(Reject::Scope);
     }
+    let selector = response
+        .retained_source
+        .as_ref()
+        .ok_or(Reject::SourceSelection)?;
+    for delegation in &proof.delegations {
+        let scope = delegation
+            .body
+            .as_ref()
+            .and_then(|d| d.scope.as_ref())
+            .ok_or(Reject::Canonical)?;
+        validate_retained_import_source(selector, scope)?;
+    }
     Ok(())
 }
 
@@ -2881,6 +2954,9 @@ pub fn validate_renewal_preparation_from_read(
         },
         read,
     )?;
+    if request.source != read.retained_source {
+        return Err(Reject::SourceSelection);
+    }
     if response.renewal_state.as_ref() != Some(state) {
         return Err(Reject::StaleContext);
     }

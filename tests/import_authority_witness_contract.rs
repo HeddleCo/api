@@ -3018,7 +3018,11 @@ fn alpha25_renewal_source_prepare_vectors() {
         let retained = v["retained"]
             .as_bool()
             .expect("retained state selection")
-            .then_some((&predecessor, current_state));
+            .then_some((
+                &predecessor,
+                current_state,
+                read.retained_source.as_ref().expect("retained selector"),
+            ));
         let result = import::prepare_import_source_scope(
             &request,
             &current,
@@ -3045,4 +3049,104 @@ fn alpha25_renewal_source_prepare_vectors() {
         }
     }
     assert!(failures.is_empty(), "{failures:?}");
+}
+
+#[test]
+fn alpha27_retained_custody_recovery_and_grant_refusal_vectors() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let read: api::GetImportJobStateResponse = record(&f, "job_state_partial");
+    let state = read.state.as_ref().expect("authenticated state");
+    let parent = record(&f, "permission");
+    let predecessor = import::verify_renewal_predecessor(state, Some(&parent), &c.owner(1600))
+        .expect("authenticated predecessor");
+    let mut failures = Vec::new();
+    let mut check = |label: String, result: Result<(), codec::Reject>, want: &str| {
+        let actual = result.map_or_else(|r| format!("{r:?}"), |_| "OK".into());
+        println!("ALPHA27 {label}: {actual}");
+        if actual != want {
+            failures.push(format!("{label}: expected {want}, got {actual}"));
+        }
+    };
+    for v in f["custody_vectors"]["read"].as_array().expect("read cases") {
+        check(
+            format!("read.{}", v["id"].as_str().expect("id")),
+            import::validate_job_state_response(
+                &record(&f, "job_state_request"),
+                &record(&f, v["response"].as_str().expect("response")),
+            ),
+            v["expected"].as_str().expect("expected"),
+        );
+    }
+    for v in f["custody_vectors"]["prepare"]
+        .as_array()
+        .expect("prepare cases")
+    {
+        let request: api::PrepareImportJobRequest =
+            record(&f, v["request"].as_str().expect("request"));
+        let current = record(&f, v["source"].as_str().expect("source"));
+        if v["id"] == "second_browser_recovery" {
+            assert_eq!(
+                request.source, read.retained_source,
+                "recover without inventory"
+            );
+        }
+        let revoked = v["revoked"].as_bool().unwrap_or(false);
+        let want = v["expected"].as_str().expect("expected");
+        check(
+            format!("browser.{}", v["id"].as_str().expect("id")),
+            import::validate_renewal_preparation_from_read(
+                &request,
+                &record(&f, "renewal_preparation"),
+                &read,
+            ),
+            if revoked { "OK" } else { want },
+        );
+        check(
+            format!("host.{}", v["id"].as_str().expect("id")),
+            import::prepare_import_source_scope(
+                &request,
+                &current,
+                if revoked { None } else { Some("github") },
+                &record(&f, "import_configuration"),
+                &record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version,
+                Some((
+                    &predecessor,
+                    state,
+                    read.retained_source.as_ref().expect("retained selector"),
+                )),
+            )
+            .map(|_| ()),
+            want,
+        );
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn alpha27_resolve_exact_identity_and_redirect_refusal_vectors() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    for v in f["custody_vectors"]["resolve"]
+        .as_array()
+        .expect("resolve cases")
+    {
+        let result = import::validate_resolve_import_source_response(
+            &record(&f, v["request"].as_str().expect("request")),
+            &record(&f, v["response"].as_str().expect("response")),
+            v["connection_provider"].as_str(),
+        );
+        let actual = result.map_or_else(|r| format!("{r:?}"), |_| "OK".into());
+        println!(
+            "ALPHA27 resolve.{}: {actual}",
+            v["id"].as_str().expect("id")
+        );
+        if actual != v["expected"].as_str().expect("expected") {
+            failures.push(format!(
+                "{}: expected {}, got {actual}",
+                v["id"], v["expected"]
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

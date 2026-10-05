@@ -1,8 +1,9 @@
-//! Shape validation for the public invitation capability preview.
+//! Portable invitation validation and host transaction planning.
 
 use crate::heddle::api::common::{CallFailure, CallFailureCode, ErrorDetail, ErrorReason};
 use crate::heddle::api::v1alpha2::{
-    InvitationRecord, InvitationState, invitation_record::Recipient,
+    CreateInvitationRequest, CreateInvitationResponse, InvitationRecord, InvitationState,
+    invitation_record::Recipient,
 };
 use crate::heddle::api::v1alpha2::{InvitationResolution, invitation_resolution::Status};
 use prost_types::Timestamp;
@@ -139,11 +140,16 @@ pub fn resolve_invitation_recipient(
     record: &InvitationRecord,
     resolve_public_handle: impl FnOnce(&str) -> Option<String>,
 ) -> Result<Option<String>, InvitationError> {
-    let _ = resolve_public_handle;
     match normalize_invitation_recipient(record)? {
         Recipient::Email(_) => Ok(None),
         Recipient::AccountId(id) => Ok(Some(id)),
-        Recipient::Handle(_) => Err(InvitationError::Unavailable),
+        Recipient::Handle(handle) => {
+            let id = resolve_public_handle(&handle).ok_or(InvitationError::HandleNotFound)?;
+            if !is_account_uuid(&id) {
+                return Err(InvitationError::HandleNotFound);
+            }
+            Ok(Some(id.to_ascii_lowercase()))
+        }
     }
 }
 
@@ -164,6 +170,38 @@ pub fn validate_create_invitation(record: &InvitationRecord) -> Result<(), Invit
         return Err(InvitationError::InvalidRecord);
     }
     Ok(())
+}
+
+/// Prevent exposing a private handle binding by substituting the account_id
+/// arm, or exposing a link secret on an account/handle invitation.
+pub fn validate_create_invitation_response(
+    request: &CreateInvitationRequest,
+    response: &CreateInvitationResponse,
+) -> Result<(), InvitationError> {
+    let input = request
+        .invitation
+        .as_ref()
+        .ok_or(InvitationError::InvalidRecord)?;
+    let output = response
+        .invitation
+        .as_ref()
+        .ok_or(InvitationError::InvalidRecord)?;
+    let recipient = normalize_invitation_recipient(input)?;
+    if normalize_invitation_recipient(output)? != recipient
+        || output.state != InvitationState::Pending as i32
+        || output.r#ref != input.r#ref
+        || output.role != input.role
+        || output.expires_at != input.expires_at
+        || matches!(recipient, Recipient::Email(_)) == response.redemption_secret.is_empty()
+    {
+        return Err(InvitationError::InvalidRecord);
+    }
+    validate_invitation_resolution(&InvitationResolution {
+        inviter: output.inviter.clone(),
+        inviter_via_agent_label: output.inviter_via_agent_label.clone(),
+        ..Default::default()
+    })
+    .map_err(|_| InvitationError::InvalidRecord)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -213,12 +251,42 @@ pub fn plan_invitation_response(
     action: InvitationResponseAction,
     now: &Timestamp,
 ) -> Result<InvitationResponsePlan, InvitationError> {
-    let _ = (stored_recipient_account, authenticated_account, action, now);
+    let caller = authenticated_account
+        .filter(|id| !id.is_empty())
+        .ok_or(InvitationError::Unauthenticated)?;
+    let recipient = stored_recipient_account.ok_or(InvitationError::Unavailable)?;
+    if !is_account_uuid(caller)
+        || !is_account_uuid(recipient)
+        || !caller.eq_ignore_ascii_case(recipient)
+        || !matches!(
+            record.recipient,
+            Some(Recipient::Handle(_) | Recipient::AccountId(_))
+        )
+    {
+        return Err(InvitationError::Unavailable);
+    }
+    let state = effective_invitation_state(record, now)?;
+    let target = match action {
+        InvitationResponseAction::Accept => InvitationState::Accepted,
+        InvitationResponseAction::Decline => InvitationState::Declined,
+    };
+    if state == target {
+        return Ok(InvitationResponsePlan {
+            state,
+            changed: false,
+            grant_role: false,
+            notification_kind: None,
+        });
+    }
+    if state != InvitationState::Pending {
+        return Err(InvitationError::Lifecycle);
+    }
     Ok(InvitationResponsePlan {
-        state: InvitationState::try_from(record.state).map_err(|_| InvitationError::Lifecycle)?,
+        state: target,
         changed: true,
-        grant_role: false,
-        notification_kind: Some(SPOOL_INVITATION_DECLINED),
+        grant_role: action == InvitationResponseAction::Accept,
+        notification_kind: (action == InvitationResponseAction::Decline)
+            .then_some(SPOOL_INVITATION_DECLINED),
     })
 }
 

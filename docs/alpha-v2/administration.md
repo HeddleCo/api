@@ -1,0 +1,219 @@
+# Spool invitations and People
+
+This is the normative alpha.37 API contract for hosts and clients. This API
+repository ships protobufs, route/signing metadata, portable Rust/TypeScript
+gates and vectors. Hosts implement storage, authentication, transactions and
+delivery; the helpers do not implement weft handlers. The
+[canonical identity model](https://github.com/HeddleCo/weft/blob/integration/docs/IDENTITY_RESOURCE_AUTHORIZATION_MODEL.md)
+governs account rooting and delegation.
+
+## Typed recipients and disclosure
+
+`SpoolService.CreateInvitation` takes `CreateInvitationRequest` with
+`client_operation_id = 1` and `invitation = 2`. `InvitationRecord.recipient`
+is a required oneof: `email = 8`, `handle = 9`, or `account_id = 10`.
+The old string tag 3 is reserved, with no compatibility path. Old revoked and
+redeemed booleans at tags 6/7 are also reserved; use `state` instead. Create
+accepts only ref, recipient, role and optional future expires_at. All version,
+state, timestamps, inviter and spool display fields MUST be unset on create.
+Unknown/unspecified roles are invalid.
+
+Email is trimmed and ASCII-lowercased: maximum 320 UTF-8 bytes before trimming,
+one `@`, nonempty local/domain parts, no internal whitespace/control characters.
+Email invitations remain link invitations even for registered mailboxes. The
+account arm is an explicit human UUID already supplied by the caller. The host
+MUST validate that it identifies a human, never an independent agent principal;
+hide unknown/private account eligibility with `NOT_FOUND / RESOURCE_NOT_FOUND`.
+
+Handles are at most 256 UTF-8 bytes before trimming; reject empty input,
+internal whitespace/control characters and `/`, `@`, or discriminator `#`.
+Reuse `weft_base::handle::parse_canonical_text` and the account-management
+grammar: native `mara`, GitHub `gh:Mara`, or host-qualified `gitlab.com:Mara`.
+Trim and ASCII-lowercase lookup coordinates; never confusable-fold, guess an
+email or reinterpret a UUID-looking handle as an account arm. Portable helpers
+validate shape; the host owns grammar and provider/directory validation.
+
+The host MUST authorize spool administration and quotas before resolving a
+handle. Reuse `IdentityService.ResolveHandles`' publicly claimed-account
+eligibility, exact lookup/query shape and shared enumeration/rate budget.
+AVAILABLE, HELD, RESERVED, CONFUSABLE, tombstoned, absent and otherwise
+unresolvable handles all return the same envelope:
+
+```
+CallFailure.code = CALL_FAILURE_CODE_NOT_FOUND (5)
+CallFailure.message = "no such user"
+CallFailure.error.reason = ERROR_REASON_INVITATION_HANDLE_NOT_FOUND (302)
+CallFailure.error.field = "invitation.handle"
+CallFailure.error.resource = ""
+CallFailure.error.context = absent
+```
+
+**Exact disclosure:** an authorized inviter learns only whether the supplied
+handle currently resolves to a publicly claimed account. This is a subset of
+ResolveHandles' existing public status/profile disclosure. Create MUST NOT
+expose the resolved UUID, email, provider subject, private lifecycle, credential
+readiness, delivery, membership or another invitation. Do not add private
+eligibility distinctions to publicly identical outcomes: a publicly claimed
+binding can be stored while its account is locked/disabled; its own sign-in
+policy controls later action. Handles the directory withholds stay unresolvable.
+Malformed input returns `INVALID_ARGUMENT / FIELD_INVALID`, field
+`invitation.handle`, without lookup. Unauthorized callers receive only the
+existing spool authorization failure, with no handle-dependent result.
+
+Resolve and store the private human account binding transactionally once.
+Handle removal/rename/reassignment MUST NOT retarget it. Return only the
+original normalized recipient arm. A handle is never replaced/supplemented
+with its account UUID in create, observations, inbox, receipts, notification
+text or errors. Explicit account-ID inputs may echo that same supplied ID.
+
+`CreateInvitationResponse` has `receipt = 1`, `invitation = 2`, and
+`redemption_secret = 3`. Only email invitations receive a secret. Account and
+handle invitations MUST have an empty secret and no link capability. Stored
+secrets never enter reads. `validate_create_invitation_response` /
+`validateCreateInvitationResponse` check this split and recipient preservation
+against the original request.
+
+## Signed-in Accept and Decline
+
+`SpoolService.AcceptInvitation(AcceptInvitationRequest) -> MutationResponse`
+and `SpoolService.DeclineInvitation(DeclineInvitationRequest) -> MutationResponse`
+take only `client_operation_id = 1` and `invitation = 2` (`RecordRef`). They
+require authenticated-principal Tier-1 proof of possession, durable receipts,
+client-operation-ID retries, caller-bound authorization and hidden existence.
+There is no secret, OAuth-only gate, owner signature or existing membership
+prerequisite. A session or credential acts for its verified human account;
+agents act as their delegating user within credential ceilings, never as an
+independent recipient.
+
+Compare the verified caller account with the stored recipient binding, never
+the current handle owner or caller-selected principal. Recheck active auth and
+this comparison BEFORE state inspection and BEFORE receipt replay, on every
+retry. Missing credentials use `UNAUTHENTICATED / CREDENTIAL_MISSING`.
+Signed-in foreign callers, nonexistent invites and email-only invites uniformly
+use `NOT_FOUND / RESOURCE_NOT_FOUND`, field `invitation`, message
+`invitation unavailable`, empty resource and absent context. Neither the
+inviter nor a spool administrator bypasses recipient matching.
+
+Accept atomically commits ACCEPTED and grants the offered role once. Preserve
+any stronger existing grant role, its expiry and `include_descendants` bit; a
+new grant has `include_descendants = false` and no grant expiry. Invitation
+expiry limits acceptance, not membership. Acceptance never grants owner/purge
+authority. A retry MUST NOT recreate a subsequently revoked grant. Decline
+commits DECLINED without a grant and emits one `spool_invitation_declined`
+notification to the original human inviter, including if they have left the
+spool. That notification permits only its invitation-scoped projection.
+
+Serialize Accept/Decline/Redeem/Revoke/expiry races. Commit state/version/time,
+grant, attention update, receipt and required notification/outbox in one
+transaction, rolling back if a required effect fails. Deduplicate notifications
+by invitation plus transition, not only operation ID. Same operation ID and
+same bytes replay the receipt AFTER reauthorization; changed bytes return
+OPERATION_ID_REUSED. A fresh operation ID against a matching terminal state
+returns a successful no-op receipt, preserving version/time and producing no
+grant or notification effects.
+
+## State machine and email links
+
+`InvitationState`: UNSPECIFIED=0, PENDING=1, ACCEPTED=2, DECLINED=3,
+REVOKED=4, EXPIRED=5. UNSPECIFIED is create input only, never a read state.
+
+| Current | Event | Result and effect |
+| --- | --- | --- |
+| PENDING | Account/handle Accept | ACCEPTED; grant once; attention ACTED_ON |
+| PENDING | Account/handle Decline | DECLINED; notify inviter once; attention ACTED_ON |
+| PENDING | Email Redeem | ACCEPTED; grant once |
+| PENDING | Authorized Revoke with matching version | REVOKED; attention DISMISSED |
+| PENDING | Server time >= expires_at | EXPIRED; attention DISMISSED |
+| ACCEPTED | Authorized matching Accept or email Redeem retry | Success, no effects |
+| DECLINED | Authorized matching Decline retry | Success, no effects |
+| REVOKED | Authorized matching Revoke retry | Success, no effects |
+| Any terminal | Conflicting lifecycle command | FAILED_PRECONDITION / LIFECYCLE_STATE |
+
+No terminal state reopens. Use a fresh ID for another invitation. At the exact
+expiry instant (seconds/nanos), pending cannot be accepted, declined or
+redeemed; project EXPIRED before the expiry worker persists it. Accepted and
+declined never later expire. Missing expiry means no deadline. Hosts validate
+Timestamp bounds. Revoke retains spool-admin authorization and CAS: a stale
+expected_version returns VERSION_CONFLICT; exact receipt retries reauthorize.
+Same-state Revoke under a fresh operation ID requires the current version.
+
+`RedeemInvitation` remains email-only, using a link secret or the existing
+verified matching OAuth-email flow. It uses the same ACCEPTED transaction,
+grant and retry rules. It MUST NOT redeem account/handle invitations by secret
+guessing or handle re-resolution. Anonymous `ResolveInvitation` remains an
+email-link preview: wrong secret, non-email, declined, expired, revoked or
+unavailable all return the byte-identical UNAVAILABLE projection. Valid pending
+email links project AVAILABLE; accepted links project REDEEMED. Existing public
+inviter and timing protections apply. Email links have no in-app Decline in
+this release.
+
+## Inbox and delivery
+
+Reuse `ObserveNotifications` / `NotificationEvent.notification`,
+`ObserveAttention` / `AttentionEvent.item`, `EntityRef.invitation`,
+`ActionAvailability` and existing pagination/continuity/removal semantics.
+`NotificationRecord.invitation = 10` and `AttentionItem.invitation = 15`
+carry the safe typed projection; `AttentionItem.kind = 16` shares the existing
+open string vocabulary. No new inbox service is added.
+
+**`spool_invitation`** is a direct ask to the stored recipient account, with
+title/headline "Invited to <spool> as <role> by <inviter.handle>". Optional
+display name accompanies the handle; a public agent label may only follow as
+"via <label>". If inviter identity is unavailable, omit it and use
+"Invited to <spool> as <role>". Reuse InvitationResolution's read-time public
+inviter/lifecycle omission rules; never fabricate a username or disclose a UUID.
+
+The stored binding authorizes the invitee to read only invitation state, spool
+name/address, role, expiry and public attribution before membership. It grants
+no other spool access. The notification/outbox authorizer MUST use this binding
+instead of requiring the membership Accept has yet to create. Terminal updates
+retain this narrow read authority for the intended invitee.
+
+Pending account/handle items advertise fully qualified routes
+`/heddle.api.v1alpha2.SpoolService/AcceptInvitation` and
+`/heddle.api.v1alpha2.SpoolService/DeclineInvitation`, with invitation target,
+host endpoint and existing implemented/authorized/requirements flags.
+Capabilities are `CAPABILITY_ACCEPT_INVITATION = 10` and
+`CAPABILITY_DECLINE_INVITATION = 11`. Advice never grants authority. Terminal
+updates remove actionable advice and update all devices. Marking read,
+dismissal or snoozing MUST NOT decline; only DeclineInvitation does that.
+
+**`spool_invitation_declined`** is an ambient update to the human inviter,
+without Accept/Decline advice or a separate pending attention ask. Both kinds
+reuse [preferences, effective delivery, outbox, authorizer and unsubscribe](notifications.md).
+Invitations default to immediate in-app/email/push when available; decline
+defaults to in-app + daily email digest + push off. Per-channel preferences
+apply, including disabled in-app: suppression does not alter invite lifecycle.
+No security-email lock is added. Invitees without membership use account-level
+preferences; never disclose unauthorized spool cells in the preference matrix.
+
+## Inviter read model and people-only rows
+
+`ObserveSpool(SPOOL_SECTION_INVITATIONS, SpoolPages.invitations)` returns the
+existing paginated `SpoolEvent.invitation`. Administrators can see all retained
+states in People/invitations with live versions and the existing read budget.
+
+| InvitationRecord field | Tag | Meaning |
+| --- | --- | --- |
+| ref / version | 1 / 2 | Stable invitation/spool identity and opaque CAS version |
+| role / expires_at | 4 / 5 | Offered role and optional acceptance deadline |
+| email / handle / account_id | 8 / 9 / 10 | Only the original normalized recipient arm |
+| state | 11 | Authoritative effective lifecycle status |
+| created_at / updated_at | 12 / 13 | Server creation / last effective transition time |
+| inviter | 14 | Optional current PublicOwner, no UUID |
+| inviter_via_agent_label | 15 | Public label only alongside inviter handle |
+| spool_name / spool_address | 16 / 17 | Invitation-scoped display, not authority |
+
+On migration omit historically unknown timestamps. Preserve private human
+bindings; old account UUID strings become account arms, email strings email
+arms. Redeemed maps to ACCEPTED, revoked to REVOKED, otherwise deadline decides
+EXPIRED/PENDING. Inconsistent legacy rows require host reconciliation; do not
+infer agent recipients.
+
+**Normative:** agents are delegations of a user, not people. Every member,
+grant and invitation read (MemberRecord, GrantRecord, InvitationRecord and
+composed directories) MUST NOT return an agent/service principal as its own
+row, recipient or inviter. Materialize human account rows only. Delegated
+actions inherit human attribution, optionally qualified by a public agent
+label. Direct grant/account-recipient inputs naming agents MUST be refused,
+including UUID-shaped agent credential identifiers.

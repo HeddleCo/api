@@ -1,8 +1,12 @@
 use heddle_api::{
-    heddle::api::v1alpha2::{InvitationRecord, invitation_record::Recipient},
+    heddle::api::v1alpha2::{
+        CreateInvitationRequest, CreateInvitationResponse, InvitationRecord,
+        invitation_record::Recipient,
+    },
     v2::invitation::{
         InvitationError, InvitationResponseAction, plan_invitation_response,
-        resolve_invitation_recipient,
+        resolve_invitation_recipient, validate_create_invitation,
+        validate_create_invitation_response,
     },
 };
 use prost_types::Timestamp;
@@ -38,6 +42,30 @@ fn refusal(error: InvitationError, v: &Value) {
 }
 fn vectors() -> Value {
     serde_json::from_str(include_str!("fixtures/in-app-invitations.json")).expect("shared vectors")
+}
+
+#[test]
+fn typed_recipient_wire_vectors_do_not_reuse_legacy_tags() {
+    use prost::Message;
+    for v in vectors()["wire"].as_array().expect("wire vectors") {
+        let wire = hex::decode(v["hex"].as_str().expect("hex")).expect("bytes");
+        let record = InvitationRecord {
+            recipient: recipient(v),
+            state: v["state"].as_i64().expect("state") as i32,
+            ..Default::default()
+        };
+        assert_eq!(record.encode_to_vec(), wire, "{}", v["name"]);
+        assert_eq!(
+            InvitationRecord::decode(wire.as_slice()).expect("decode"),
+            record
+        );
+    }
+    let legacy = InvitationRecord::decode(&[0x1a, 4, b'm', b'a', b'r', b'a'][..])
+        .expect("old tag is unknown");
+    assert!(
+        legacy.recipient.is_none(),
+        "never reinterpret legacy recipient"
+    );
 }
 
 #[test]
@@ -167,6 +195,81 @@ fn accept_refuses_a_different_signed_in_account_even_on_retry() {
                 &now
             ),
             Err(InvitationError::Unavailable)
+        );
+    }
+}
+
+#[test]
+fn create_response_preserves_handle_and_never_returns_its_binding_or_secret() {
+    use prost::Message;
+    let input = InvitationRecord {
+        recipient: Some(Recipient::Handle("mara".into())),
+        role: 1,
+        ..Default::default()
+    };
+    validate_create_invitation(&input).expect("typed input");
+    let request = CreateInvitationRequest {
+        invitation: Some(input.clone()),
+        ..Default::default()
+    };
+    let output = InvitationRecord { state: 1, ..input };
+    let response = CreateInvitationResponse {
+        invitation: Some(output.clone()),
+        ..Default::default()
+    };
+    validate_create_invitation_response(&request, &response).expect("safe handle projection");
+    let id = "11111111-1111-4111-8111-111111111111";
+    let wire = response.encode_to_vec();
+    assert!(!wire.windows(id.len()).any(|chunk| chunk == id.as_bytes()));
+    let substituted = CreateInvitationResponse {
+        invitation: Some(InvitationRecord {
+            recipient: Some(Recipient::AccountId(id.into())),
+            ..output
+        }),
+        ..Default::default()
+    };
+    assert_eq!(
+        validate_create_invitation_response(&request, &substituted),
+        Err(InvitationError::InvalidRecord)
+    );
+    assert_eq!(
+        validate_create_invitation_response(
+            &request,
+            &CreateInvitationResponse {
+                redemption_secret: vec![1],
+                ..response
+            }
+        ),
+        Err(InvitationError::InvalidRecord)
+    );
+}
+
+#[test]
+fn create_input_rejects_server_fields_and_invalid_roles() {
+    let input = InvitationRecord {
+        recipient: Some(Recipient::Email("mara@example.org".into())),
+        role: 2,
+        ..Default::default()
+    };
+    validate_create_invitation(&input).expect("email input");
+    for invalid in [
+        InvitationRecord {
+            state: 1,
+            ..input.clone()
+        },
+        InvitationRecord {
+            version: vec![1],
+            ..input.clone()
+        },
+        InvitationRecord {
+            spool_name: "private".into(),
+            ..input.clone()
+        },
+        InvitationRecord { role: 99, ..input },
+    ] {
+        assert_eq!(
+            validate_create_invitation(&invalid),
+            Err(InvitationError::InvalidRecord)
         );
     }
 }

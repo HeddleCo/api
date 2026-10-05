@@ -208,6 +208,8 @@ mod descriptor {
                 ("CAPABILITY_PLATFORM_EMAIL_DELIVERY".into(), 7),
                 ("CAPABILITY_PLATFORM_ANALYTICS".into(), 8),
                 ("CAPABILITY_PLATFORM_INVITATION_DIRECTORY".into(), 9),
+                ("CAPABILITY_ACCEPT_INVITATION".into(), 10),
+                ("CAPABILITY_DECLINE_INVITATION".into(), 11),
             ]
         );
         field(

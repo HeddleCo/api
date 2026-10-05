@@ -91,6 +91,14 @@ implement the weft email sender or scheduler.
 
 ## Default classes and kind vocabulary
 
+Spool invitations add `spool_invitation` (direct ask to the privately bound
+invitee) and `spool_invitation_declined` (ambient update to the human inviter).
+They reuse this delivery/preferences/outbox contract. The invitation itself
+authorizes its narrow inbox projection before membership. Pending items carry
+Accept/Decline advice; read/dismiss/snooze never declines an invite. See
+[administration](administration.md#inbox-and-delivery) for fields, binding,
+projection authorization and terminal updates.
+
 V2 uses string kinds; it removed the v1 `NotificationKind` enum during the
 contract freeze. The table names every real historical enum value and its v2
 selector, rather than introducing or renumbering an enum. Historical source:

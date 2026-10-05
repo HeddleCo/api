@@ -14,6 +14,9 @@ struct Candidate {
     is_public: bool,
 }
 impl Candidate {
+    // Defaults keep the schema ID-leak mutation compilable, so it must fail
+    // projection assertions rather than merely fail to build.
+    #[allow(clippy::needless_update)]
     fn candidate(&self) -> PeopleCandidate {
         PeopleCandidate {
             person: SuggestedPrincipal {

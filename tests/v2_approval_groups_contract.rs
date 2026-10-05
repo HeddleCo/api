@@ -38,6 +38,8 @@ struct Fixture {
     refused_policy_roles: Vec<i32>,
 }
 
+// Defaults permit the added-ID schema mutation to reach real assertions.
+#[allow(clippy::needless_update)]
 #[test]
 fn role_members_count_live_and_demoted_removed_members_drop_out() {
     let fixture: Fixture = serde_json::from_str(include_str!("fixtures/role-approval-groups.json"))
@@ -156,6 +158,8 @@ fn reader_refused_with_typed_wire_reason() {
     }
 }
 
+// Defaults permit the added-ID schema mutation to reach real assertions.
+#[allow(clippy::needless_update)]
 #[test]
 fn an_existing_approval_stops_counting_when_its_role_member_is_demoted() {
     let group = ApprovalGroupRecord {

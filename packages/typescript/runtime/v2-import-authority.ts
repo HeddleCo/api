@@ -468,9 +468,12 @@ function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolea
   }
   foreign.finish();
   for(const {body:s} of b.statements){if(!s)reject("Canonical");validateStatementBoundary(s);requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);
-    if(s.purpose===2||s.purpose===4){
-      const envelope=s.purpose===2?b.authorityWitnesses.find(p=>equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope:b.landingWitnesses.find(p=>equal(canonicalHybridV1(api.HostedLandingWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope;
-      checkWitnessWriter(s,envelope??reject("Scope"),b.ownerHistories,b.policies,spoolAccountForStatement(s,[...b.delegations.flatMap(d=>d.body?.identity?[d.body.identity]:[]),...b.genesisAuthorities.flatMap(g=>g.body?.identity?[g.body.identity]:[])],b.ownershipTransfers),b.authorityWitnesses.find(p=>(p.kind===2||p.kind===3)&&equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))?.original?.signatures??[]);
+    if(s.purpose===2||s.purpose===4||(s.purpose===1&&s.basis===2)){
+      const genesis=s.purpose===1?b.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p),s.canonicalPayload)):undefined;
+      const authority=s.purpose===2?b.authorityWitnesses.find(p=>equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload)):undefined;
+      const boundary=genesis?.boundaryAcceptance??authority?.boundaryAcceptances.find(e=>s.boundaryAcceptance&&e.binding&&equal(canonicalHybridV1(common.HostedWitnessBoundaryAcceptanceV1Schema,e.binding),canonicalHybridV1(common.HostedWitnessBoundaryAcceptanceV1Schema,s.boundaryAcceptance)));
+      const envelope=s.purpose===1?genesis?.creatorAuthorityEnvelope:s.purpose===2?b.authorityWitnesses.find(p=>equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope:b.landingWitnesses.find(p=>equal(canonicalHybridV1(api.HostedLandingWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope;
+      checkWitnessWriter(s,envelope??reject("Scope"),b.ownerHistories,b.policies,spoolAccountForStatement(s,[...b.delegations.flatMap(d=>d.body?.identity?[d.body.identity]:[]),...b.genesisAuthorities.flatMap(g=>g.body?.identity?[g.body.identity]:[])],b.ownershipTransfers),b.authorityWitnesses.find(p=>(p.kind===2||p.kind===3)&&equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))?.original?.signatures??[],boundary);
     }
   }
   for(const list of [b.manifests.map(manifestDigest)])for(let i=1;i<list.length;i++)if(compare(list[i-1]!,list[i]!)>=0)reject("Canonical");

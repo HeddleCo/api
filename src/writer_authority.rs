@@ -67,6 +67,7 @@ pub(crate) fn check_witness_writer(
     policies: &[api::SignedSpoolPolicyRecord],
     spool_account: &[u8],
     co_signers: &[api::RecordSignature],
+    boundary: Option<&api::ImportBoundaryAcceptanceV1>,
 ) -> Result<(), Reject> {
     validate_owner_histories(histories)?;
     crate::import_authority::require_policy_history(
@@ -86,6 +87,64 @@ pub(crate) fn check_witness_writer(
         .and_then(|p| p.policy.as_ref())
         .map(|p| p.revoked_key_ids.as_slice())
         .unwrap_or(&[]);
+    if statement.basis == 2 {
+        // Originals remain provenance: keep their envelope/account checks, but
+        // authorize and cut only the current, signature-bound accepting party.
+        // P1 provenance is checked by its existing genesis binding verifier.
+        // Import P1 keeps its delegated-authority path and envelope commitment.
+        if statement.purpose != 1 {
+            let original = decode_authority(envelope)?;
+            let account = original
+                .owner
+                .as_ref()
+                .and_then(|h| h.root.as_ref())
+                .and_then(|s| s.root.as_ref())
+                .ok_or(Reject::Root)?;
+            verify_account_binding(
+                &original,
+                &account.account_uuid,
+                spool_account,
+                &statement.owner_id,
+            )?;
+        }
+        let evidence = boundary.ok_or(Reject::BoundaryAcceptance)?;
+        if statement.boundary_acceptance.is_none()
+            || evidence.binding != statement.boundary_acceptance
+        {
+            return Err(Reject::BoundaryAcceptance);
+        }
+        crate::import_authority::verify_boundary_acceptance(evidence)?;
+        let signed = evidence
+            .signed_acceptance
+            .as_ref()
+            .ok_or(Reject::BoundaryAcceptance)?;
+        let acceptance: NativeAcceptingWriter =
+            rmp_serde::from_slice(&signed.canonical_record).map_err(|_| Reject::Canonical)?;
+        if signed.signatures.len() != 1
+            || signed.signatures[0].public_key != acceptance.accepting_publisher
+        {
+            return Err(Reject::Signature);
+        }
+        let actor = acceptance.accepting_author;
+        if actor.kind != "account" || actor.spool != statement.spool_uuid {
+            return Err(Reject::Scope);
+        }
+        if crate::import_authority::native_octets_id(
+            "heddle-thread-control-authority-v1",
+            &actor.authority,
+        ) != actor.authority_digest
+        {
+            return Err(Reject::GenesisBinding);
+        }
+        let current = decode_authority(&actor.authority)?;
+        verify_account_binding(
+            &current,
+            &actor.actor.principal_id,
+            spool_account,
+            &statement.owner_id,
+        )?;
+        return check_writer_keys(&current, &key_id(&acceptance.accepting_publisher), revoked);
+    }
     if revoked.contains(&statement.publisher_key_id)
         || co_signers
             .iter()
@@ -113,6 +172,26 @@ pub(crate) fn check_witness_writer(
         &statement.owner_id,
     )?;
     check_writer_keys(&authority, &statement.publisher_key_id, revoked)
+}
+
+// Read authority selectors from the signed native acceptance, never the carrier
+// or the immutable original. Full native model/Biscuit verification is separate.
+#[derive(serde::Deserialize)]
+struct NativeAcceptingWriter {
+    accepting_publisher: [u8; 32],
+    accepting_author: NativeAcceptingAuthor,
+}
+#[derive(serde::Deserialize)]
+struct NativeAcceptingAuthor {
+    kind: String,
+    spool: Vec<u8>,
+    actor: NativeAcceptingActor,
+    authority: Vec<u8>,
+    authority_digest: [u8; 32],
+}
+#[derive(serde::Deserialize)]
+struct NativeAcceptingActor {
+    principal_id: Vec<u8>,
 }
 
 /// Reject ambiguous carrier lookups before resolving any owner context.

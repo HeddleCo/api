@@ -29,10 +29,13 @@ cargo clippy --locked --manifest-path tools/hybrid-native/Cargo.toml --all-targe
 npm run build
 npm run typecheck
 node tools/verify-alpha34-vector-continuity.mjs
+node tools/verify-alpha36-vector-continuity.mjs
 node tools/verify-alpha33-guards.mjs
 node tools/verify-alpha34-guards.mjs
 python3 tools/verify-alpha35-guards.py rust
 python3 tools/verify-alpha35-guards.py ts
+python3 tools/verify-alpha36-guards.py rust
+python3 tools/verify-alpha36-guards.py ts
 node tests/review-probe.mjs
 node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs

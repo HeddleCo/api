@@ -262,6 +262,15 @@ permissions remain exact: source acceptance grants no metadata authority; a
 local claim or resolution still needs its original co-signatures. No receipt is
 reinterpreted from one basis to the other.
 
+For basis 2, select the accepting account and envelope from the signed
+`accepting_author`, and require exactly one acceptance signature whose key equals
+`accepting_publisher`. Apply account binding, the owner-ID hard rule and the bound
+policy's publisher/mint cuts to that acceptor. Preserve the original signature,
+envelope and binding checks without applying that revocation cut to original
+keys or original co-signers. Select credential identities from the acceptor's
+verified sealed authority, never from the original envelope. Both native and
+import bundles follow this selection; basis 1 keeps ordinary authority checks.
+
 ## Public native carrier completeness
 
 `NativePublicProofBundleV1` contains public owner genesis, owner histories,

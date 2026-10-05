@@ -39,6 +39,8 @@ python3 tools/verify-alpha36-guards.py rust
 python3 tools/verify-alpha36-guards.py ts
 python3 tools/verify-alpha37-guards.py rust
 python3 tools/verify-alpha37-guards.py ts
+python3 tools/verify-alpha38-guards.py rust
+python3 tools/verify-alpha38-guards.py ts
 node tests/review-probe.mjs
 node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs

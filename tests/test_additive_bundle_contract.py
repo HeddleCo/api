@@ -126,6 +126,7 @@ class AdditiveBundleContractTest(unittest.TestCase):
                 ("created_at", 7),
                 ("read_at", 8),
                 ("actions", 9),
+                ("invitation", 10),
             ],
         )
         self.assertEqual(

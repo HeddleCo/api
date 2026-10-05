@@ -1,0 +1,1795 @@
+[
+  {
+    "name": "child inherits parent disabled",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "personal root inherits account",
+    "rules": [
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 2
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000001",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 2,
+      "source": 4,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "parent inherits account",
+    "rules": [
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000002",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 4,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "child inherits account",
+    "rules": [
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 4,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "nearest ancestor beats root and account",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      },
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "child override beats parent",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 1,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "personal root rule reaches child",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 2
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 2,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000001",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "nonmatching parent falls through root",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "discussion_reply",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 2
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 2,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000001",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "nearest wildcard beats distant exact",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "kind": "mention",
+        "channel": 1,
+        "actorOrigin": "human",
+        "delivery": 1
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "*",
+        "channel": 1,
+        "actorOrigin": "any",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 1,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "specificity kind before channel before origin",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "*",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "any",
+        "delivery": 2
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 2,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "specificity channel before origin",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 0,
+        "actorOrigin": "human",
+        "delivery": 1
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "any",
+        "delivery": 2
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 2,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "specificity exact origin",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "any",
+        "delivery": 2
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "first rule wins ties",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 2
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 2,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "same mode still reports ancestor",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "unreadable winner is generic",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": false,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 3,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "do not substitute readable outer ancestor",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": false,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 3,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "remove all local matches returns to parent",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 2
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "any",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 1,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null,
+    "removeSpool": "00000000-0000-4000-8000-000000000003",
+    "after": {
+      "delivery": 2,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    }
+  },
+  {
+    "name": "remove parent matches returns to account",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      },
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 2
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null,
+    "removeSpool": "00000000-0000-4000-8000-000000000002",
+    "after": {
+      "delivery": 2,
+      "source": 4,
+      "sourceSpool": null,
+      "locked": false
+    }
+  },
+  {
+    "name": "default without any rules",
+    "rules": [],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 2,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 2,
+      "source": 2,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "account read identifies own rule",
+    "rules": [
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [],
+    "cell": {
+      "kind": "mention",
+      "spool": null,
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 3,
+      "source": 1,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "account default",
+    "rules": [],
+    "ancestors": [],
+    "cell": {
+      "kind": "mention",
+      "spool": null,
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 2,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "digest off preserves inherited source",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 2
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": false,
+    "expected": {
+      "delivery": 3,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null
+  },
+  {
+    "name": "security email default remains locked",
+    "rules": [],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "account_security",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 3,
+    "digestEnabled": false,
+    "expected": {
+      "delivery": 1,
+      "source": 2,
+      "sourceSpool": null,
+      "locked": true
+    },
+    "violation": null
+  },
+  {
+    "name": "security email inherited immediate",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "security_surface",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "security_surface",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": true
+    },
+    "violation": null
+  },
+  {
+    "name": "system root rule invalid",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": "InvalidRule"
+  },
+  {
+    "name": "unspecified local rule invalid",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 0
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": "InvalidRule"
+  },
+  {
+    "name": "unspecified ancestor rule invalid",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 0
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": "InvalidRule"
+  },
+  {
+    "name": "unspecified account rule invalid",
+    "rules": [
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 0
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": "InvalidRule"
+  },
+  {
+    "name": "ancestor email lock enforced",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "account_security",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 3
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "account_security",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": true
+    },
+    "violation": "LockedEmail"
+  },
+  {
+    "name": "cyclic chain rejected",
+    "rules": [],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": "InvalidAncestry"
+  },
+  {
+    "name": "wrong target rejected",
+    "rules": [],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": "InvalidAncestry"
+  },
+  {
+    "name": "unreadable target rejected",
+    "rules": [],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": false,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": "InvalidSource"
+  },
+  {
+    "name": "disclose unreadable ancestor rejected",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": false,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null,
+    "spoofSourceSpool": "00000000-0000-4000-8000-000000000002"
+  },
+  {
+    "name": "disclose nonancestor rejected",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null,
+    "spoofSourceSpool": "00000000-0000-4000-8000-000000000099"
+  },
+  {
+    "name": "disclose target as ancestor rejected",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null,
+    "spoofSourceSpool": "00000000-0000-4000-8000-000000000003"
+  },
+  {
+    "name": "disclose system root rejected",
+    "rules": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 3,
+      "sourceSpool": "00000000-0000-4000-8000-000000000002",
+      "locked": false
+    },
+    "violation": null,
+    "spoofSourceSpool": "00000000-0000-4000-8000-000000000000"
+  },
+  {
+    "name": "account provenance cannot carry ancestor",
+    "rules": [
+      {
+        "spool": null,
+        "kind": "mention",
+        "channel": 2,
+        "actorOrigin": "human",
+        "delivery": 1
+      }
+    ],
+    "ancestors": [
+      {
+        "spool": "00000000-0000-4000-8000-000000000003",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000002",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000001",
+        "readable": true,
+        "systemRoot": false
+      },
+      {
+        "spool": "00000000-0000-4000-8000-000000000000",
+        "readable": false,
+        "systemRoot": true
+      }
+    ],
+    "cell": {
+      "kind": "mention",
+      "spool": "00000000-0000-4000-8000-000000000003",
+      "channel": 2,
+      "actorOrigin": "human"
+    },
+    "defaultDelivery": 1,
+    "digestEnabled": true,
+    "expected": {
+      "delivery": 1,
+      "source": 4,
+      "sourceSpool": null,
+      "locked": false
+    },
+    "violation": null,
+    "spoofSourceSpool": "00000000-0000-4000-8000-000000000002"
+  }
+]

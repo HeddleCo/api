@@ -134,6 +134,8 @@ message SpoolMount {
   string name = 4;
   bytes version = 5;
 }
+// People reads MUST contain human accounts only. Agents are delegations of
+// their user and MUST NOT appear as independent member/grant/invitation rows.
 message MemberRecord {
   RecordRef ref = 1;
   string principal_id = 2;
@@ -145,6 +147,8 @@ message MemberRecord {
 message GrantRecord {
   RecordRef ref = 1;
   bytes version = 2;
+  // Human account only, never an agent/service principal. Delegated credentials
+  // exercise their user's grant within their own attenuation ceilings.
   string principal_id = 3;
   ResourceRole role = 4;
   // Ancestor grants admit AUDIENCE_MEMBERS on a descendant only when this
@@ -158,17 +162,57 @@ message GrantRecord {
   PublicPrincipalSummary principal = 7;
   // Ordinary grants never imply owner purge authority.
 }
+enum InvitationState {
+  INVITATION_STATE_UNSPECIFIED = 0;
+  INVITATION_STATE_PENDING = 1;
+  INVITATION_STATE_ACCEPTED = 2;
+  INVITATION_STATE_DECLINED = 3;
+  INVITATION_STATE_REVOKED = 4;
+  INVITATION_STATE_EXPIRED = 5;
+}
+
+// Inviter-side People/invitations read model, also used in the invitee's inbox.
+// Terminal states never reopen. Only the selected recipient arm is returned:
+// a handle is NEVER replaced/supplemented with its resolved account UUID.
+// This protects private bindings before acceptance; after Accept/Redeem the
+// member/grant records expose the human principal under normal authorization.
+// InvitationRecord keeps its original arm even after acceptance. Hosts MUST run
+// the shared InvitationRecord projection gate on ObserveSpool, notification,
+// attention and Create/replay outputs. Server-only bindings are not wire fields.
 message InvitationRecord {
   RecordRef ref = 1;
   bytes version = 2;
-  string recipient = 3;
+  reserved 3, 6, 7;
+  reserved "revoked", "redeemed";
+  oneof recipient {
+    // Email-only link flow; trimmed, ASCII-lowercased, <= 320 UTF-8 bytes.
+    string email = 8;
+    // Same canonical lookup coordinates as ResolveHandles; <= 256 UTF-8 bytes
+    // before trimming. Host resolves once and stores the account binding.
+    // Reassignment/removal of this handle never retargets a pending invitation.
+    string handle = 9;
+    // Explicit human account UUID supplied by the caller, never an agent ID.
+    string account_id = 10;
+  }
   ResourceRole role = 4;
   google.protobuf.Timestamp expires_at = 5;
-  bool revoked = 6;
-  bool redeemed = 7;
-  // Redemption secrets are returned only by CreateInvitation, never observations.
-  // This record has no include_descendants field. Redeeming MUST preserve an
-  // existing GrantRecord.include_descendants bit on conflict.
+  // Read-only. Create requires UNSPECIFIED; the host commits PENDING.
+  InvitationState state = 11;
+  // Read-only server commit times. No-op retries preserve version and times.
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  // Current public accountable human, with the same lifecycle/handle omission
+  // and "handle, optionally display name, optionally via label" rules as
+  // InvitationResolution. Never an agent principal as a separate person.
+  PublicOwner inviter = 14;
+  string inviter_via_agent_label = 15;
+  // Read-only invitation-scoped display, including for invitees without spool
+  // membership. This permits no other spool read and does not imply membership.
+  string spool_name = 16;
+  SpoolAddress spool_address = 17;
+  // Secrets are returned only for email CreateInvitation, never observations.
+  // Accept/Redeem grant once, preserving an active existing role if stronger
+  // and preserving its include_descendants bit; a new grant sets it false.
 }
 message ApprovalGroupRecord {
   RecordRef ref = 1;
@@ -321,11 +365,16 @@ message RevokeGrantRequest {
 }
 message CreateInvitationRequest {
   string client_operation_id = 1;
+  // Exactly one typed recipient; no legacy string. Ref/role/future expiry are
+  // inputs; all projection fields MUST be unset. Spool admin authorization
+  // precedes handle resolution. See docs/alpha-v2/administration.md for the
+  // exact public-directory disclosure and typed refusal.
   InvitationRecord invitation = 2;
 }
 message CreateInvitationResponse {
   MutationReceipt receipt = 1;
   InvitationRecord invitation = 2;
+  // Nonempty for email only. Account/handle invitations have no link secret.
   bytes redemption_secret = 3;
 }
 // Public capability preview. The invitation ID alone reveals nothing; the
@@ -379,6 +428,26 @@ message RedeemInvitationRequest {
   string client_operation_id = 1;
   RecordRef invitation = 2;
   bytes redemption_secret = 3;
+}
+// Caller-bound signed-in in-app commands. No secret, OAuth-only restriction,
+// or pre-existing spool membership. The host MUST compare the verified caller's
+// account with the stored resolved recipient before state/idempotency lookup.
+// Foreign/nonexistent/link-only invitations uniformly hide existence.
+// Accept/Decline REQUIRE a human session; agent/delegated credentials refuse
+// PERMISSION_DENIED / INVITATION_HUMAN_SESSION_REQUIRED before lookup/replay.
+// Accept AND Redeem recheck current inviter grant authority before replay/grant:
+// administrator for admin invites, otherwise at least the offered role. Loss
+// returns FAILED_PRECONDITION / INVITATION_INVITER_AUTHORITY_LOST. Auto-revoke
+// affected pending invitations on authority loss, serializing all transitions.
+// Decline to an inviter without spool read routes at ACCOUNT scope; lack of
+// spool access must never make its required notification fail InvalidSource.
+message AcceptInvitationRequest {
+  string client_operation_id = 1;
+  RecordRef invitation = 2;
+}
+message DeclineInvitationRequest {
+  string client_operation_id = 1;
+  RecordRef invitation = 2;
 }
 message RevokeInvitationRequest {
   string client_operation_id = 1;

@@ -4083,13 +4083,80 @@ fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
 }
 
 #[test]
-fn alpha32_total_over_1gib_reject_then_pass() {
+fn alpha32_total_above_current_host_max_reject_then_pass() {
     let f = fixture();
-    assert_eq!(
-        import::validate_scope(&record(&f, "alpha32_total_over_1gib")),
-        Err(codec::Reject::Bounds)
-    );
-    import::validate_scope(&record(&f, "scope")).expect("bounded control");
+    for (scope, config, commit) in [
+        (
+            "alpha32_total_over_host_max",
+            "alpha32_configuration_over_host_max",
+            "alpha32_commit_over_host_max",
+        ),
+        (
+            "alpha32_total_large",
+            "alpha32_configuration_lowered",
+            "alpha32_commit_large",
+        ),
+    ] {
+        let proposed: api::ImportPermissionScopeV1 = record(&f, scope);
+        let configuration = record(&f, config);
+        import::validate_scope(&proposed).expect("positive u64 scope");
+        import::validate_import_configuration(&configuration).expect("host maximum");
+        let refusal =
+            codec::Reject::PreparationRefused(api::ImportPreparationRefusalReason::BudgetExceeded);
+        assert_eq!(
+            import::prepare_scope(&proposed, &configuration, &proposed.destination_version),
+            Err(refusal.clone())
+        );
+        assert_eq!(
+            import::validate_commit_request(
+                &record(&f, commit),
+                "github",
+                &record(&f, "source_connected"),
+                &configuration
+            ),
+            Err(refusal)
+        );
+        let control: api::ImportPermissionScopeV1 = record(&f, "alpha32_total_large");
+        let host = record(&f, "alpha32_configuration_large");
+        import::prepare_scope(&control, &host, &control.destination_version)
+            .expect("large control");
+        import::validate_commit_request(
+            &record(&f, "alpha32_commit_large"),
+            "github",
+            &record(&f, "source_connected"),
+            &host,
+        )
+        .expect("large Commit control");
+    }
+}
+#[test]
+fn alpha32_large_total_and_full_positive_u64_range() {
+    let f = fixture();
+    for name in ["large", "u64_max"] {
+        let scope: api::ImportPermissionScopeV1 = record(&f, &format!("alpha32_total_{name}"));
+        let host = record(&f, &format!("alpha32_configuration_{name}"));
+        import::validate_scope(&scope).expect("positive u64");
+        import::validate_import_configuration(&host).expect("positive u64 host maximum");
+        assert_eq!(
+            import::prepare_scope(&scope, &host, &scope.destination_version).expect("Prepare"),
+            scope
+        );
+        import::validate_commit_request(
+            &record(&f, &format!("alpha32_commit_{name}")),
+            "github",
+            &record(&f, "source_connected"),
+            &host,
+        )
+        .expect("Commit");
+        import::validate_manifest(&record(&f, &format!("alpha32_manifest_{name}")))
+            .expect("large manifest");
+    }
+    let c = Context::new(&f);
+    import::verify_delegation(&record(&f, "alpha32_large_owner"), None, &c.owner(1100))
+        .expect("signed large total");
+    let mut zero: api::ImportPermissionScopeV1 = record(&f, "scope");
+    zero.max_result_bytes = 0;
+    assert_eq!(import::validate_scope(&zero), Err(codec::Reject::Bounds));
 }
 #[test]
 fn alpha32_widening_reject_then_narrowing_pass() {

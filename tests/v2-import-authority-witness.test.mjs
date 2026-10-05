@@ -768,9 +768,31 @@ for(const n of fixture.review_alpha31_vectors.scheduled.execution_negative)test(
 });
 
 // alpha.32 uses frozen vectors; no test-time signing or expected-byte regeneration.
-test('alpha32 total over 1 GiB rejects then accepts the bounded control',()=>{
- assert.throws(()=>authority.validateImportScope(vector('alpha32_total_over_1gib')),expected('Bounds'));
- authority.validateImportScope(vector('scope'));
+test('alpha32 total above current advertised host max rejects then accepts the control',async()=>{
+ const reason=api.ImportPreparationRefusalReason.BUDGET_EXCEEDED;
+ const refused=e=>e instanceof authority.HybridContractError&&e.reason==='PreparationRefused'&&e.preparationRefusalReason===reason;
+ for(const [scope,config,commit] of [['alpha32_total_over_host_max','alpha32_configuration_over_host_max','alpha32_commit_over_host_max'],['alpha32_total_large','alpha32_configuration_lowered','alpha32_commit_large']]){
+  const proposed=vector(scope),configuration=vector(config);
+  authority.validateImportScope(proposed);authority.validateImportConfiguration(configuration);
+  assert.throws(()=>authority.prepareImportScope(proposed,configuration,proposed.destinationVersion),refused);
+  await assert.rejects(authority.validateImportCommitRequest(vector(commit),'github',vector('source_connected'),configuration),refused);
+  const control=vector('alpha32_total_large'),host=vector('alpha32_configuration_large');
+  authority.prepareImportScope(control,host,control.destinationVersion);
+  await authority.validateImportCommitRequest(vector('alpha32_commit_large'),'github',vector('source_connected'),host);
+ }
+});
+test('alpha32 large total and full positive u64 range accept',async()=>{
+ for(const name of ['large','u64_max']){
+  const scope=vector('alpha32_total_'+name),host=vector('alpha32_configuration_'+name);
+  authority.validateImportScope(scope);authority.validateImportConfiguration(host);
+  assert.deepEqual(authority.prepareImportScope(scope,host,scope.destinationVersion),scope);
+  await authority.validateImportCommitRequest(vector('alpha32_commit_'+name),'github',vector('source_connected'),host);
+  authority.validateImportManifest(vector('alpha32_manifest_'+name));
+ }
+ await authority.verifyImportDelegation(vector('alpha32_large_owner'),undefined,ownerContext());
+ for(const total of [0n,1n<<64n]){
+  const scope=vector('scope');scope.maxResultBytes=total;assert.throws(()=>authority.validateImportScope(scope),expected('Bounds'));
+ }
 });
 test('alpha32 widening rejects then narrowing accepts',async()=>{
  await assert.rejects(authority.verifyImportDelegation(vector('alpha32_widening'),vector('permission'),ownerContext()),expected('Scope'));

@@ -2737,7 +2737,8 @@ service IntegrationService {
   // initial physical operation. Success is receipt.pending_operation, never
   // applied; no later ImportSource call. An exact client_operation_id replay
   // returns the same receipt/operation without reactivation, even after expiry.
-  // Changed inputs under that ID fail ERROR_REASON_OPERATION_ID_REUSED.
+  // Changed inputs under an ID that already has an accepted receipt fail
+  // ERROR_REASON_OPERATION_ID_REUSED.
   rpc CommitImportJob(CommitImportJobRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

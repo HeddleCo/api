@@ -935,6 +935,7 @@ pub fn validate_commit_response(
 
 /// Use a durable caller-scoped idempotency row BEFORE rechecking expired job
 /// authority. Host stores the original request/receipt atomically with activation.
+/// Changed inputs refuse OperationIdReused only for an ID with an accepted receipt.
 pub fn check_commit_replay(
     request: &CommitImportJobRequest,
     stored: &CommitImportJobRequest,

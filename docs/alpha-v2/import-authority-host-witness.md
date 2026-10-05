@@ -930,7 +930,8 @@ Commit freezes exact request bytes and the source/base association, activates ep
 1, and creates the initial physical operation identified by the client-generated,
 non-nil retry-lineage UUID. It returns receipt.pending_operation. Exact caller-scoped
 Commit/Retry/Cancel replays return their original receipts before current expiry/CAS
-checks. Changed bytes under an existing request ID refuse OPERATION_ID_REUSED.
+checks. Changed bytes under a request ID that already has an accepted receipt
+refuse OPERATION_ID_REUSED.
 Retry allocates an unused host UUID from the complete durable prior-attempt set,
 persists both supersession links and the receipt atomically, and never uses the
 idempotency key as that UUID. Current owner/policy/revocation, leases, source grants,

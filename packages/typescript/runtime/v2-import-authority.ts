@@ -277,7 +277,8 @@ export function validateImportCommitResponse(request:CommitImportJobRequest, res
   if (!r || r.outcome.case!=="pendingOperation" || !request.clientOperationId || r.clientOperationId!==request.clientOperationId || !request.destination || r.outcome.value.spool?.id!==request.destination.id || r.outcome.value.id!==initialImportOperationId(request.proof?.delegations[0]?.body?.retryLineageId??reject("PendingOperation"),false)) reject("PendingOperation");
 }
 
-/** Host looks up its durable caller-scoped row before revalidating expired authority. */
+/** Host looks up its durable caller-scoped row before revalidating expired authority.
+ * Changed inputs refuse OperationIdReused only for an ID with an accepted receipt. */
 export function checkImportCommitReplay(request:CommitImportJobRequest, stored:CommitImportJobRequest, response:MutationResponse):void {
   if (!equal(toBinary(CommitImportJobRequestSchema,request),toBinary(CommitImportJobRequestSchema,stored))) reject("OperationIdReused");
   validateImportCommitResponse(request,response);

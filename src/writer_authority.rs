@@ -107,39 +107,10 @@ pub(crate) fn check_witness_writer(
                 &statement.owner_id,
             )?;
         }
-        let evidence = boundary.ok_or(Reject::BoundaryAcceptance)?;
-        if statement.boundary_acceptance.is_none()
-            || evidence.binding != statement.boundary_acceptance
-        {
-            return Err(Reject::BoundaryAcceptance);
-        }
-        crate::import_authority::verify_boundary_acceptance(evidence)?;
-        let signed = evidence
-            .signed_acceptance
-            .as_ref()
-            .ok_or(Reject::BoundaryAcceptance)?;
-        let acceptance: NativeAcceptingWriter =
-            rmp_serde::from_slice(&signed.canonical_record).map_err(|_| Reject::Canonical)?;
-        if signed.signatures.len() != 1
-            || signed.signatures[0].public_key != acceptance.accepting_publisher
-        {
-            return Err(Reject::Signature);
-        }
-        let actor = acceptance.accepting_author;
-        if actor.kind != "account" || actor.spool != statement.spool_uuid {
-            return Err(Reject::Scope);
-        }
-        if crate::import_authority::native_octets_id(
-            "heddle-thread-control-authority-v1",
-            &actor.authority,
-        ) != actor.authority_digest
-        {
-            return Err(Reject::GenesisBinding);
-        }
-        let current = decode_authority(&actor.authority)?;
+        let (current, acceptance) = boundary_writer(statement, boundary)?;
         verify_account_binding(
             &current,
-            &actor.actor.principal_id,
+            &acceptance.accepting_author.actor.principal_id,
             spool_account,
             &statement.owner_id,
         )?;
@@ -174,10 +145,66 @@ pub(crate) fn check_witness_writer(
     check_writer_keys(&authority, &statement.publisher_key_id, revoked)
 }
 
+/// Select only the witness-bound, signature-bound accepting party. Callers must
+/// authenticate the complete payload/boundary evidence before admission.
+fn boundary_writer(
+    statement: &host::HostedWitnessStatementV1,
+    boundary: Option<&api::ImportBoundaryAcceptanceV1>,
+) -> Result<(api::ThreadControlAuthority, NativeAcceptingWriter), Reject> {
+    let evidence = boundary.ok_or(Reject::BoundaryAcceptance)?;
+    if statement.basis != 2
+        || statement.boundary_acceptance.is_none()
+        || evidence.binding != statement.boundary_acceptance
+    {
+        return Err(Reject::BoundaryAcceptance);
+    }
+    let binding = statement
+        .boundary_acceptance
+        .as_ref()
+        .ok_or(Reject::BoundaryAcceptance)?;
+    let signed = evidence
+        .signed_acceptance
+        .as_ref()
+        .ok_or(Reject::BoundaryAcceptance)?;
+    if signed.format != "heddle-original-boundary-acceptance-v1" {
+        return Err(Reject::Version);
+    }
+    if signed.canonical_record.is_empty() || signed.canonical_record.len() > 65536 {
+        return Err(Reject::Bounds);
+    }
+    if crate::import_authority::native_octets_id(&signed.format, &signed.canonical_record)
+        != binding.acceptance_id
+        || crate::import_authority::signed_native_digest(signed)?
+            != binding.signed_acceptance_digest
+    {
+        return Err(Reject::BoundaryAcceptance);
+    }
+    let acceptance: NativeAcceptingWriter =
+        rmp_serde::from_slice(&signed.canonical_record).map_err(|_| Reject::Canonical)?;
+    if signed.signatures.len() != 1
+        || signed.signatures[0].public_key != acceptance.accepting_publisher
+    {
+        return Err(Reject::Signature);
+    }
+    let actor = &acceptance.accepting_author;
+    if actor.kind != "account" || actor.spool != statement.spool_uuid {
+        return Err(Reject::Scope);
+    }
+    if crate::import_authority::native_octets_id(
+        "heddle-thread-control-authority-v1",
+        &actor.authority,
+    ) != actor.authority_digest
+    {
+        return Err(Reject::GenesisBinding);
+    }
+    Ok((decode_authority(&actor.authority)?, acceptance))
+}
+
 // Read authority selectors from the signed native acceptance, never the carrier
 // or the immutable original. Full native model/Biscuit verification is separate.
 #[derive(serde::Deserialize)]
 struct NativeAcceptingWriter {
+    #[serde(deserialize_with = "integer_array_32")]
     accepting_publisher: [u8; 32],
     accepting_author: NativeAcceptingAuthor,
 }
@@ -187,11 +214,42 @@ struct NativeAcceptingAuthor {
     spool: Vec<u8>,
     actor: NativeAcceptingActor,
     authority: Vec<u8>,
+    #[serde(deserialize_with = "integer_array_32")]
     authority_digest: [u8; 32],
 }
 #[derive(serde::Deserialize)]
 struct NativeAcceptingActor {
     principal_id: Vec<u8>,
+}
+
+// rmp-serde's tuple reader also accepts binary via a byte sequence. Use the
+// actual MessagePack type so fixed native arrays agree with the TS reader.
+fn integer_array_32<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<[u8; 32], D::Error> {
+    struct IntegerArray;
+    impl<'de> serde::de::Visitor<'de> for IntegerArray {
+        type Value = [u8; 32];
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("an array of 32 octet integers")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(
+            self,
+            mut seq: A,
+        ) -> Result<Self::Value, A::Error> {
+            let mut result = [0; 32];
+            for (i, byte) in result.iter_mut().enumerate() {
+                *byte = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
+            }
+            if seq.next_element::<serde::de::IgnoredAny>()?.is_some() {
+                return Err(serde::de::Error::invalid_length(33, &self));
+            }
+            Ok(result)
+        }
+    }
+    deserializer.deserialize_any(IntegerArray)
 }
 
 /// Reject ambiguous carrier lookups before resolving any owner context.
@@ -358,28 +416,44 @@ pub enum WriterWitnessPayload<'a> {
 /// An exact attachment extracted from an authenticated witness and matched payload.
 pub struct AdmittedMintRootAttachment(api::SignedOwnerMintRootAttachment);
 /// Receiver MUST resolve witness trust/signature/retirement BEFORE calling this.
-/// This helper verifies payload commitments and original signatures itself.
+/// This helper verifies payload commitments and original/acceptance signatures.
+/// Basis 1 admits the original attachment; basis 2 admits the signed acceptor's.
 pub fn admitted_owner_mint_root_attachment(
     authenticated_statement: &host::HostedWitnessStatementV1,
     payload: WriterWitnessPayload<'_>,
 ) -> Result<AdmittedMintRootAttachment, Reject> {
-    let envelope = match payload {
+    let (envelope, boundary) = match payload {
         WriterWitnessPayload::NativeGenesis(p) => {
             crate::native_witness::verify_genesis_payload(authenticated_statement, p)?;
-            &p.creator_authority_envelope
+            (
+                p.creator_authority_envelope.as_slice(),
+                p.boundary_acceptance.as_ref(),
+            )
         }
         WriterWitnessPayload::Import(p) => {
             crate::import_authority::verify_witness_payload(authenticated_statement, p)?;
             match p {
-                crate::import_authority::WitnessPayload::Genesis(p) => {
-                    &p.creator_authority_envelope
+                crate::import_authority::WitnessPayload::Genesis(p) => (
+                    p.creator_authority_envelope.as_slice(),
+                    p.boundary_acceptance.as_ref(),
+                ),
+                crate::import_authority::WitnessPayload::Authority(p) => (
+                    p.authority_envelope.as_slice(),
+                    p.boundary_acceptances
+                        .iter()
+                        .find(|e| e.binding == authenticated_statement.boundary_acceptance),
+                ),
+                crate::import_authority::WitnessPayload::Landing(p) => {
+                    (p.authority_envelope.as_slice(), None)
                 }
-                crate::import_authority::WitnessPayload::Authority(p) => &p.authority_envelope,
-                crate::import_authority::WitnessPayload::Landing(p) => &p.authority_envelope,
             }
         }
     };
-    let authority = decode_authority(envelope)?;
+    let authority = if authenticated_statement.basis == 2 {
+        boundary_writer(authenticated_statement, boundary)?.0
+    } else {
+        decode_authority(envelope)?
+    };
     match authority.mint_root_association {
         Some(api::thread_control_authority::MintRootAssociation::OwnerMintRootAttachment(a)) => {
             Ok(AdmittedMintRootAttachment(a))

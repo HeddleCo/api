@@ -593,7 +593,7 @@
       "sha256": "bb2f655a30a9669e19180df0060f8bc99c70fdb4e556e0de426db34251cda60b"
     },
     "tests/fixtures/foreign-dependencies-alpha34.json": {
-      "sha256": "d90167e9bb6ec017f7b87ea261425cd5ace2b6de0b931d7b4fb4efe6eb8592f3",
+      "sha256": "0c9014deed763427b7af35bcf3bcdf108f5a67b758fa5c0434432c6743f8ff7c",
       "new_file": true
     }
   },

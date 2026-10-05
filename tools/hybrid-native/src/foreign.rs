@@ -109,10 +109,16 @@ fn import_stage(f: &Value, b: &wire::ImportPublicProofBundleV1) -> Result<()> {
     Ok(())
 }
 
+struct InstalledOriginal {
+    origin: i32,
+    record: wire::SignedRecord,
+    job: Option<Vec<u8>>,
+}
+
 #[derive(Default)]
 struct Receiver {
     // Only stage installation writes these rows. No caller-supplied resolver.
-    rows: BTreeMap<Vec<u8>, (i32, wire::SignedRecord, Option<Vec<u8>>)>,
+    rows: BTreeMap<Vec<u8>, InstalledOriginal>,
     installed: BTreeSet<String>,
     targets: BTreeSet<String>,
 }
@@ -196,11 +202,31 @@ impl Receiver {
                                 && p.resulting_content_digest == content)),
                     "exact P3 frontier/content binding"
                 );
+                let original_genesis = imported
+                    .original_geneses
+                    .iter()
+                    .find_map(|r| {
+                        genesis(r)
+                            .ok()
+                            .filter(|g| g.id().is_ok_and(|id| id == op.thread))
+                    })
+                    .context("import genesis")?;
+                ensure!(
+                    op.validate_parents(&original_genesis, &[]).is_err(),
+                    "converted Git root must still reject through the standalone native rule"
+                );
                 Some(d.job_public_key.clone())
             } else {
                 None
             };
-            pending.push((import::signed_native_digest(&r)?, (origin, r, job)));
+            pending.push((
+                import::signed_native_digest(&r)?,
+                InstalledOriginal {
+                    origin,
+                    record: r,
+                    job,
+                },
+            ));
         }
         self.rows.extend(pending);
         self.installed.insert(name.into());
@@ -241,12 +267,13 @@ impl Receiver {
             }
         }
         for reference in references {
-            let (origin, original, _) = self
+            let installed = self
                 .rows
                 .get(&reference.signed_native_digest)
                 .ok_or(codec::Reject::Scope)?;
-            if *origin != reference.origin
-                || reference.thread_genesis_digest != operation(original)?.thread.as_bytes()
+            if installed.origin != reference.origin
+                || reference.thread_genesis_digest
+                    != operation(&installed.record)?.thread.as_bytes()
             {
                 return Err(codec::Reject::Scope.into());
             }
@@ -256,16 +283,16 @@ impl Receiver {
         let mut originals: BTreeMap<ContentHash, ThreadOperation> = self
             .rows
             .values()
-            .map(|(_, r, _)| {
-                let op = operation(r)?;
+            .map(|installed| {
+                let op = operation(&installed.record)?;
                 Ok((op.id()?, op))
             })
             .collect::<Result<_>>()?;
         if carrier == "import" {
             let mut own = Receiver::default();
             own.stage(f, "import_stage")?;
-            for (_, r, _) in own.rows.values() {
-                let op = operation(r)?;
+            for installed in own.rows.values() {
+                let op = operation(&installed.record)?;
                 originals.insert(op.id()?, op);
             }
         }
@@ -303,11 +330,12 @@ impl Receiver {
             match source.source_author()? {
                 Some(SourceAuthor::LocalKey) => {
                     let digest = import::signed_native_digest(source_record)?;
-                    let (_, _, job) = self
+                    let installed = self
                         .rows
                         .get(&digest)
                         .ok_or(codec::Reject::ImportPermission)?;
-                    if job
+                    if installed
+                        .job
                         .as_ref()
                         .is_none_or(|job| job.as_slice() != source.publisher)
                     {
@@ -348,6 +376,18 @@ impl Receiver {
             };
             let integration = HostedIntegration::decode(bytes)?;
             integration.validate_source(&source)?;
+            let review_ids = p
+                .review_evidence
+                .iter()
+                .map(|r| Ok(operation(r)?.id()?))
+                .collect::<Result<Vec<_>>>()?;
+            ensure!(
+                review_ids.len() == integration.review_evidence.len()
+                    && review_ids
+                        .iter()
+                        .all(|id| integration.review_evidence.contains(id)),
+                "exact native review closure"
+            );
             request_binding(request, &integration)?;
             let g = genesis_records
                 .iter()
@@ -398,8 +438,8 @@ pub(super) fn verify() -> Result<()> {
             receiver.stage(&f, stage)?;
         }
         if v["unbind"] == true {
-            for (_, _, job) in receiver.rows.values_mut() {
-                *job = None;
+            for installed in receiver.rows.values_mut() {
+                installed.job = None;
             }
         }
         let counts = (

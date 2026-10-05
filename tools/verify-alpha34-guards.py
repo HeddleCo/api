@@ -12,7 +12,8 @@ model = 'tools/hybrid-native/src/foreign.rs'
 text = Path(model).read_text()
 start = text.index('        for reference in references {')
 end = text.index('        let job_key', start)
-binding = '''if job
+binding = '''if installed
+                        .job
                         .as_ref()
                         .is_none_or(|job| job.as_slice() != source.publisher)'''
 cases = [
@@ -44,6 +45,12 @@ def run(name, phase, staged):
     if phase == 'green' and not re.search(r'test result: ok\. [1-9]\d* passed;',result.stdout):
         raise RuntimeError(f'{name}: no passing test; inspect log')
     return result.returncode
+
+if len(sys.argv) > 2:
+    selected = set(sys.argv[2].split(','))
+    cases = [case for case in cases if case[0] in selected]
+    if not cases or {case[0] for case in cases} != selected:
+        raise RuntimeError('unknown probe selection')
 
 for name, filename, before, after, staged in cases:
     path = Path(filename)

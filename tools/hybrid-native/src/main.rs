@@ -414,7 +414,7 @@ fn verify_export(f: &Value, b: &wire::ImportPublicProofBundleV1) -> Result<()> {
         times.insert(body.canonical_payload.clone(), time);
     }
     let mut active = Vec::new();
-    for (i, d) in b.delegations.iter().enumerate() {
+    for d in &b.delegations {
         let body = d.body.as_ref().context("delegation")?;
         let op = b
             .operations
@@ -436,26 +436,7 @@ fn verify_export(f: &Value, b: &wire::ImportPublicProofBundleV1) -> Result<()> {
             )
             .context("authenticated time")?;
         let parent = import::resolve_bundle_permission(b, &body.parent_permission_digest)?;
-        let verified = if i == 0 {
-            import::verify_delegation(d, parent, &context(time))?
-        } else {
-            let r = &b.renewals[i - 1];
-            let committed = import::resolve_bundle_manifest(
-                b,
-                &r.body
-                    .as_ref()
-                    .context("renewal")?
-                    .committed_manifest_digest,
-            )?;
-            import::verify_renewal(
-                r,
-                &active[i - 1],
-                committed,
-                i as u64,
-                parent,
-                &context(time),
-            )?
-        };
+        let verified = import::verify_delegation(d, parent, &context(time))?;
         // verify_publication authenticates the statement and uses its witnessed
         // time for the exact signed operation; no caller-supplied historical time.
         let proof = matching_proof(f, &set, statement)?;
@@ -489,6 +470,25 @@ fn verify_export(f: &Value, b: &wire::ImportPublicProofBundleV1) -> Result<()> {
             import::WitnessPayload::Genesis(payload),
         )?;
         let binding = payload.binding.as_ref().context("binding")?;
+        let digest = &binding
+            .body
+            .as_ref()
+            .context("genesis binding")?
+            .genesis_digest;
+        let operation = b
+            .operations
+            .iter()
+            .find(|o| o.body.as_ref().is_some_and(|o| &o.genesis_digest == digest))
+            .context("P1 needs branch publication")?;
+        let (_, published) = publication(b, operation)?;
+        let p1 = s.body.as_ref().context("P1")?;
+        let p3 = published.body.as_ref().context("P3")?;
+        ensure!(
+            p1.observed_at_unix_millis == p3.observed_at_unix_millis
+                && p1.host_transaction_id == p3.host_transaction_id
+                && p1.admission_order < p3.admission_order,
+            "P1/P3 publication transaction"
+        );
         let g = genesis(
             payload
                 .original_genesis
@@ -615,7 +615,7 @@ fn encode(format: &str, bytes: &[u8]) -> Result<Vec<u8>> {
 }
 
 fn verify_native(f: &Value) -> Result<()> {
-    let b: wire::ImportPublicProofBundleV1 = record(f, "complete_renewed_export")?;
+    let b: wire::ImportPublicProofBundleV1 = record(f, "complete_export")?;
     let set = set(f, &b)?;
     let mut originals = b.original_geneses.clone();
     for name in ["converted_dev", "converted_main"] {
@@ -994,7 +994,7 @@ fn verify_boundary_native(
         original_boundary_acceptance::{ManifestSubject, OriginalManifestEntry},
         thread_replication::{SourceAuthor, integration::TrustedHostedExecutor},
     };
-    let bundle: wire::ImportPublicProofBundleV1 = record(f, "complete_renewed_export")?;
+    let bundle: wire::ImportPublicProofBundleV1 = record(f, "complete_export")?;
     let set = set(f, &bundle)?;
     let signed: host::SignedHostedWitnessStatementV1 = record(f, statement_name)?;
     let time = authenticate(f, &set, &signed)?;
@@ -1833,7 +1833,7 @@ fn main() -> Result<()> {
             let f = read_json(args.get(2).context("fixture path")?)?;
             verify_native(&f)?;
             verify_boundaries(&f)?;
-            verify_export(&f, &record(&f, "complete_renewed_export")?)?;
+            verify_export(&f, &record(&f, "complete_export")?)?;
         }
         Some("verify-native-witness") => verify_native_witness_fixture()?,
         Some("verify-capture") => {
@@ -1841,8 +1841,7 @@ fn main() -> Result<()> {
         }
         Some("verify-export") => {
             let f = read_json(args.get(2).context("fixture path")?)?;
-            let mut bundle: wire::ImportPublicProofBundleV1 =
-                record(&f, "complete_renewed_export")?;
+            let mut bundle: wire::ImportPublicProofBundleV1 = record(&f, "complete_export")?;
             if let Some(option) = args.get(3) {
                 ensure!(
                     option == "--without-admission",
@@ -1961,7 +1960,7 @@ mod tests {
     fn owner_history_must_be_active_and_exact_at_admission() {
         let f = fixture();
         let mut history: wire::OwnerHistory =
-            record(&f, "renew_rotated_owner_history").expect("signed rotation control");
+            record(&f, "rotated_owner_history").expect("signed rotation control");
         assert!(
             verify_owner_history(&history, 1100).is_err(),
             "future rotation must fail"
@@ -2260,7 +2259,7 @@ mod tests {
     fn fixed_native_vectors_and_complete_historical_export() {
         let f = fixture();
         verify_native(&f).expect("native gate");
-        verify_export(&f, &record(&f, "complete_renewed_export").expect("export"))
+        verify_export(&f, &record(&f, "complete_export").expect("export"))
             .expect("historical gate");
     }
     #[test]
@@ -2277,7 +2276,7 @@ mod tests {
         println!("A REJECT old parentless capture: {error:#}");
     }
     #[test]
-    fn old_controls_and_old_export_are_rejected() {
+    fn old_controls_are_rejected() {
         let old: Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/hybrid-native-old-parentless-v1.json"
         ))
@@ -2292,24 +2291,11 @@ mod tests {
             );
             println!("A REJECT {name}: {error:#}");
         }
-        let bundle = wire::ImportPublicProofBundleV1::decode(
-            hex_field(&old["old_export_wire_hex"])
-                .expect("hex")
-                .as_slice(),
-        )
-        .expect("old export");
-        assert!(bundle.policies.is_empty());
-        assert_eq!(
-            import::validate_public_bundle(&bundle),
-            Err(codec::Reject::Scope)
-        );
-        println!("B REJECT verbatim acf67659 zero-policy export: Scope");
     }
     #[test]
     fn export_requires_selected_policy_and_each_genesis_original() {
         let f = fixture();
-        let b: wire::ImportPublicProofBundleV1 =
-            record(&f, "complete_renewed_export").expect("bundle");
+        let b: wire::ImportPublicProofBundleV1 = record(&f, "complete_export").expect("bundle");
         let mut old = b.clone();
         old.policies.clear();
         assert_eq!(
@@ -2358,8 +2344,7 @@ mod tests {
     #[test]
     fn historical_policy_requires_authentic_preimage_and_owner_signature() {
         let f = fixture();
-        let b: wire::ImportPublicProofBundleV1 =
-            record(&f, "complete_renewed_export").expect("bundle");
+        let b: wire::ImportPublicProofBundleV1 = record(&f, "complete_export").expect("bundle");
         let mut changed = b.clone();
         changed.policies[0]
             .body

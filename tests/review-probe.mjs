@@ -14,10 +14,10 @@ function vector(name){const v=fixture.signed_vectors[name]??fixture.wire_vectors
 function ownerContext(now=1100n){return {identity:vector('identity'),ownerPublicKey:bytes(fixture.keys.owner.public_key_hex),ownerChainDigest:bytes(fixture.context.owner_chain_digest_hex),authorityExpiresAtSeconds:2000n,nowUnixSeconds:now,forbiddenJobKeys:['owner','device','witness','next_witness','root'].map(n=>bytes(fixture.keys[n].public_key_hex)),knownJobAssociations:[]};}
 const pin={authority:fixture.context.authority,rootId:fixture.context.root_id,publicKey:bytes(fixture.keys.root.public_key_hex),epoch:1n};
 const policy=(b)=>{const p=vector('signed_policy');if(b.policies.length!==1||!Buffer.from(toBinary(common.SignedPolicyChainV1Schema??schemaFor(fixture.signed_vectors.signed_policy?.schema??fixture.wire_vectors.signed_policy.schema),b.policies[0])).equals(Buffer.from(toBinary(schemaFor(fixture.signed_vectors.signed_policy?.schema??fixture.wire_vectors.signed_policy.schema),p))))throw new authority.HybridContractError('Signature');};
-const reason=async p=>{try{const r=await p;return 'OK '+JSON.stringify(r.ownerCheckTimesUnixSeconds.map(String));}catch(e){return e.reason??String(e);}};
+const reason=async p=>{try{const r=await p;return 'OK '+JSON.stringify([r.ownerCheckTimeUnixSeconds].map(String));}catch(e){return e.reason??String(e);}};
 // P1: live aggregate
 {
- const b=vector('alpha32_aggregate_over'),d=b.delegations[0],parent=b.memberPermissions.find(()=>true);
+ const b=vector('aggregate_over'),d=b.delegations[0],parent=b.memberPermission;
  const t=d.body.notBeforeUnixSeconds;
  const verified=await authority.verifyImportDelegation(d,b.memberPermission??parent,ownerContext(t));
  const total=d.body.scope.maxResultBytes;
@@ -29,10 +29,8 @@ const reason=async p=>{try{const r=await p;return 'OK '+JSON.stringify(r.ownerCh
 }
 // P2: owner facts
 {
- const b=vector('review_control');
- const run=exp=>authority.verifyImportBundleWitnesses(b,pin,undefined,1350000n,(i,time)=>{const {nowUnixSeconds,...f}=ownerContext();f.authorityExpiresAtSeconds=exp[i];f.effectiveFromUnixSeconds=i===1&&exp[i]===(2n**63n-1n)?1260n:0n;f.effectiveUntilUnixSeconds=undefined;return f;},policy);
- await assert.rejects(run([2n**63n-1n,2n**63n-1n]),e=>e.reason==='Scope');
- await assert.rejects(run([2n**63n-1n,1240n]),e=>e.reason==='Scope');
- console.log('PROBE TS owners [MAX,MAX]:',await reason(run([2n**63n-1n,2n**63n-1n])));
- console.log('PROBE TS owners [MAX,1240]:',await reason(run([2n**63n-1n,1240n])));
+ const b=vector('current_export');
+ const run=(expiry,effectiveFrom=0n)=>authority.verifyImportBundleWitnesses(b,pin,undefined,1200000n,time=>({...ownerContext(time),authorityExpiresAtSeconds:expiry,effectiveFromUnixSeconds:effectiveFrom,effectiveUntilUnixSeconds:undefined}),policy);
+ await run(2000n);await assert.rejects(run(2000n,1200n),e=>e.reason==='Scope');await assert.rejects(run(1299n),e=>e.reason==='Scope');
+ console.log('PROBE TS authenticated owner interval/expiry: Scope -> OK');
 }

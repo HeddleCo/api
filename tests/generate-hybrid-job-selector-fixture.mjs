@@ -28,7 +28,7 @@ function add(name, expected = 'OK', options = {}) {
 }
 add('initial');
 add('retry', 'OK', { retry: first, physical: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' });
-add('renewal', 'OK', { retry: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', physical: 'cccccccc-cccc-cccc-cccc-cccccccccccc' });
+add('later-retry', 'OK', { retry: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', physical: 'cccccccc-cccc-cccc-cccc-cccccccccccc' });
 add('same-job-id-other-destination', 'OK', { destination: '22222222-2222-2222-2222-222222222222' });
 add('non-nil-with-zero-octets', 'OK', { selector: Uint8Array.from([1, ...new Array(15).fill(0)]) });
 add('non-hybrid', 'unavailable', { selector: null });

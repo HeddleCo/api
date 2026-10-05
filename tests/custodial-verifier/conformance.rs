@@ -206,13 +206,13 @@ fn prepare_then_winning_veto_cannot_assemble_portable_recover() {
 }
 
 #[test]
-fn published_verifier_authenticates_alpha24_rotated_renew_owner_evidence() {
+fn published_verifier_authenticates_rotated_owner_evidence() {
     let f: Value = serde_json::from_str(contract::IMPORT_AUTHORITY_HOST_WITNESS_V1_FIXTURE_JSON)
         .expect("HYBRID fixture");
     let wire = |name: &str| {
         hex::decode(f["wire_vectors"][name]["wire_hex"].as_str().expect("wire")).expect("fixed hex")
     };
-    let history = native::OwnerHistory::decode(wire("renew_rotated_owner_history").as_slice())
+    let history = native::OwnerHistory::decode(wire("rotated_owner_history").as_slice())
         .expect("published history codec");
     let initial = verify_owner_root(history.root.as_ref().expect("original root"))
         .expect("independently selected root");

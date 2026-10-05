@@ -6,8 +6,6 @@ use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum Reject {
-    #[error("original admission window ended")]
-    OriginalWindowEnded,
     #[error("unsupported format")]
     Version,
     #[error("noncanonical or missing field")]
@@ -54,11 +52,9 @@ pub enum Reject {
     GenesisBinding,
     #[error("missing typed owner import permission")]
     ImportPermission,
-    #[error("renewal forks the logical job or widens remaining scope")]
-    RenewalFork,
-    #[error("committed manifest changed before renewal")]
+    #[error("referenced publication manifest is missing")]
     StaleManifest,
-    #[error("replacement includes an already committed slot")]
+    #[error("publication includes an already committed slot")]
     CommittedSlot,
     #[error("context is stale at mutation boundary")]
     StaleContext,

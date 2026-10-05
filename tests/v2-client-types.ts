@@ -31,13 +31,8 @@ void platformChecks;
 const platformStream: AsyncIterable<PlatformAuthorizationResponse> = platform.authorizeAnalytics({});
 void platformStream;
 
-import { verifyNewImportOperation, preflightPreparedImportDelegation, type VerifiedImportRenewalPredecessor, type VerifiedImportDelegation } from "../packages/typescript/dist/v1alpha2/import-authority.js";
+import { verifyNewImportOperation, preflightPreparedImportDelegation, type VerifiedImportDelegation } from "../packages/typescript/dist/v1alpha2/import-authority.js";
 import type { ImportResultManifestV1, ImportPublicProofBundleV1, SignedDelegatedImportOperationV1 } from "../packages/typescript/dist/v1alpha2/import_authority_pb.js";
-declare const recoveredPredecessor: VerifiedImportRenewalPredecessor;
-declare const importOperation: SignedDelegatedImportOperationV1;
-declare const committedBefore: ImportResultManifestV1;
-// @ts-expect-error Recovery evidence cannot authorize execution.
-verifyNewImportOperation(importOperation, recoveredPredecessor, 1350n, committedBefore);
 declare const preflightResult: Awaited<ReturnType<typeof preflightPreparedImportDelegation>>;
 // @ts-expect-error Signing preflight returns void, never execution authority.
 const executablePreflight: VerifiedImportDelegation = preflightResult;
@@ -55,7 +50,7 @@ void callerTimedOwner; void assumedSnapshot;
 declare const importBundle: ImportPublicProofBundleV1;
 declare const witnessPin: ImportWitnessRootPin;
 verifyImportBundleWitnesses(importBundle, witnessPin, undefined, 1350000n,
-  (_index, _authenticatedTime) => bundleOwnerFacts, () => {});
+  (_authenticatedTime) => bundleOwnerFacts, () => {});
 // @ts-expect-error Caller owner lists cannot replace historical resolution.
 verifyImportBundleWitnesses(importBundle, witnessPin, undefined, 1350000n, [bundleOwnerFacts], () => {});
 // @ts-expect-error The effective owner resolver has no default.
@@ -63,3 +58,5 @@ verifyImportBundleWitnesses(importBundle, witnessPin, undefined, 1350000n, () =>
 declare const activeImport: VerifiedImportDelegation;
 // @ts-expect-error Publication admission requires a cumulative pre-operation manifest.
 verifyNewImportOperation(importOperation, activeImport, 1350n);
+
+declare const importOperation: SignedDelegatedImportOperationV1;

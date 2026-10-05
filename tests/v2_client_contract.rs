@@ -299,7 +299,6 @@ fn old_peer_advertising_import_methods_never_reaches_transport() {
         "SynchronizeRemote",
         "PrepareImportJob",
         "CommitImportJob",
-        "RenewImportJob",
         "CancelImportJob",
         "GetHostedWitnessHistoryProof",
         "GetImportJobState",
@@ -358,7 +357,6 @@ fn old_peer_advertising_import_methods_never_reaches_transport() {
             rpc::IntegrationServiceCommitImportJob,
             CommitImportJobRequest
         );
-        rejects!(rpc::IntegrationServiceRenewImportJob, RenewImportJobRequest);
         rejects!(
             rpc::IntegrationServiceCancelImportJob,
             CancelImportJobRequest

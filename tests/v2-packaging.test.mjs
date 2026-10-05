@@ -75,11 +75,14 @@ test('every built v2 runtime module has a public export or an explicit exception
   assert.deepEqual(missing, [], `Missing public exports for built v2 runtime modules: ${missing.join(', ')}`);
 });
 
-test('npm public import-authority export includes alpha32 scope and recovery helpers', async () => {
+test('npm public import-authority export includes alpha33 one-shot helpers', async () => {
   const runtime = await import('@heddleco/api/v2/import-authority');
   assert.equal(typeof runtime.verifyImportBundleWitnesses, 'function');
   assert.equal(typeof runtime.effectiveOwnerAuthorityExpiry, 'function');
   assert.equal(typeof runtime.remainingImportScope, 'function');
-  assert.equal(typeof runtime.originalImportRetryUnavailable, 'function');
+  assert.equal(typeof runtime.checkImportRetryAdmission, 'function');
+  assert.equal(runtime.originalImportRetryUnavailable, undefined);
+  assert.equal(runtime.verifyImportRenewal, undefined);
+  assert.equal(runtime.signImportRenewal, undefined);
   assert.equal(typeof runtime.validateRepositorySizeEstimate, 'function');
 });

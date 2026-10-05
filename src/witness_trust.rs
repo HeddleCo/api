@@ -60,7 +60,7 @@ pub fn leaf_digest(purpose: i32, canonical: &[u8], signature: &[u8]) -> Result<V
 }
 
 /// Receiver-owned inputs, serialized with durable mutation. Known job keys
-/// include retained associations across expiry, renewal and deletion.
+/// include retained associations across expiry and deletion.
 #[derive(Clone, Copy)]
 pub struct SetExpectation<'a> {
     pub authority: &'a str,

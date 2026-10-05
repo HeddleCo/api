@@ -52,8 +52,8 @@ message ProviderRepository {
   // infer SHA-1. Unknown blocks Prepare/signing; retry discovery. Every known
   // OID and ProviderRef algorithm MUST agree with this repository format.
   ImportGitHashAlgorithm hash_algorithm = 11;
-  // Connected GitHub reports repository API size in KiB (1024 bytes). Public
-  // HTTPS Git has no cheap estimate and returns UNKNOWN with git_size_kib=0.
+  // Hosts MAY use connected GitHub API size in KiB (1024 bytes).
+  // UNKNOWN with git_size_kib=0 is always permitted, including connected GitHub.
   // AVAILABLE may be zero for an empty repository. Unknown enum values refuse.
   ProviderRepositorySizeEstimateState size_estimate_state = 12;
   // Clients calculate estimate × headroom, capped by GetImportConfiguration
@@ -265,9 +265,9 @@ message RetryImportSourceRequest {
   bytes expected_operation_version = 3;
   // Resolves retry_original_operation to this ORIGINAL logical job, not the
   // new physical operation UUID. Current same-key retry needs no new signature;
-  // expired authority needs state read -> remaining-scope Prepare -> sign ->
-  // authority-only Renew -> state read -> Retry with a NEW request ID and active
-  // replacement digest/epoch. Explicitly cancelled/revoked jobs NEVER revive.
+  // Expired authority is terminal: import remaining work as a NEW logical job.
+  // Retry uses a NEW request ID and the sole active delegation digest/epoch.
+  // Explicitly cancelled/revoked jobs NEVER revive.
   bytes logical_job_id = 4;
   bytes active_delegation_digest = 5;
   uint64 expected_authority_epoch = 6;

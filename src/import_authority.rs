@@ -16,6 +16,7 @@ pub const PUBLICATION_DOMAIN: &str = "heddle-import-publication-payload-v1";
 pub const MAX_BRANCHES: usize = 256;
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub const MAX_BUNDLE_BYTES: usize = 1024 * 1024;
+pub const MAX_COMMIT_REQUEST_BYTES: usize = 2 * MAX_BUNDLE_BYTES;
 pub const MAX_RESULT_BYTES: u64 = 1 << 30;
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
 
@@ -698,6 +699,23 @@ pub fn validate_preparation_response(
     Ok(())
 }
 
+/// Enforce inclusive decoded protobuf sizes before semantic admission.
+/// Transport must also bound the whole uncompressed payload before decoding.
+pub fn validate_commit_request_bounds(request: &CommitImportJobRequest) -> Result<(), Reject> {
+    use prost::Message;
+    if request.encoded_len() > MAX_COMMIT_REQUEST_BYTES
+        || request
+            .proof
+            .as_ref()
+            .ok_or(Reject::Canonical)?
+            .encoded_len()
+            > MAX_BUNDLE_BYTES
+    {
+        return Err(Reject::Bounds);
+    }
+    Ok(())
+}
+
 /// Source association/provider comes from the host's authenticated resolver,
 /// never a projection hint. Native base decoding/identity and current grants
 /// remain host gates; this validates carrier, bounds and exact originals.
@@ -708,6 +726,7 @@ pub fn validate_commit_request(
     configuration: &GetImportConfigurationResponse,
 ) -> Result<(), Reject> {
     use prost::Message;
+    validate_commit_request_bounds(request)?;
     let source = request.source.as_ref().ok_or(Reject::SourceSelection)?;
     let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
     if request.client_operation_id.is_empty()
@@ -984,10 +1003,27 @@ pub struct ImportOwnerExpectation<'a> {
     pub identity: &'a ImportIdentityV1,
     pub owner_public_key: &'a [u8],
     pub owner_chain_digest: &'a [u8],
+    /// From the independently verified EFFECTIVE owner state at `now`, not
+    /// the immutable root. Accepted claim/deferral clearing is unbounded.
     pub authority_expires_at_seconds: i64,
     pub now_unix_seconds: i64,
     pub forbidden_job_keys: &'a [Vec<u8>], // Every user/root/witness key, including tombstones.
     pub known_job_associations: &'a [(Vec<u8>, Vec<u8>)], // key -> logical job.
+}
+/// Inputs MUST come from the selected, independently verified effective state.
+/// Historical verification selects the state at its authenticated observation.
+pub fn effective_owner_authority_expiry(
+    deferred_human: bool,
+    claimable_until: i64,
+) -> Result<i64, Reject> {
+    if deferred_human {
+        if claimable_until <= 0 {
+            return Err(Reject::Scope);
+        }
+        Ok(claimable_until)
+    } else {
+        Ok(i64::MAX)
+    }
 }
 pub fn verify_member_permission(
     signed: &SignedImportMemberPermissionV1,
@@ -1455,6 +1491,25 @@ pub fn verify_renewal(
     member: Option<&SignedImportMemberPermissionV1>,
     expected: &ImportOwnerExpectation<'_>,
 ) -> Result<VerifiedImportDelegation, Reject> {
+    verify_renewal_inner(
+        signed,
+        previous,
+        committed,
+        authority_epoch,
+        member,
+        expected,
+        true,
+    )
+}
+fn verify_renewal_inner(
+    signed: &SignedImportJobRenewalV1,
+    previous: &VerifiedImportDelegation,
+    committed: &ImportResultManifestV1,
+    authority_epoch: u64,
+    member: Option<&SignedImportMemberPermissionV1>,
+    expected: &ImportOwnerExpectation<'_>,
+    current: bool,
+) -> Result<VerifiedImportDelegation, Reject> {
     let r = signed.body.as_ref().ok_or(Reject::Canonical)?;
     if r.format_version != 1 {
         return Err(Reject::Version);
@@ -1470,7 +1525,7 @@ pub fn verify_renewal(
         return Err(Reject::StaleManifest);
     }
     let signed_next = r.replacement.as_ref().ok_or(Reject::Canonical)?;
-    let next = verify_delegation(signed_next, member, expected)?;
+    let next = verify_delegation_inner(signed_next, member, expected, current)?;
     let before = &previous.body;
     let after = &next.body;
     let before_id = before.identity.as_ref().ok_or(Reject::Canonical)?;
@@ -2962,13 +3017,18 @@ pub fn validate_renewal_preparation_from_read(
 /// Composition/reference validation only. Independently verify owner histories,
 /// policies, accepted admissions/publications and the current owner head before
 /// using them. The authenticated read supplies exact retained evidence.
+/// logical_job_terminal is independently selected under the host transaction.
 pub fn validate_renew_request(
     request: &RenewImportJobRequest,
     read: &GetImportJobStateResponse,
+    logical_job_terminal: bool,
 ) -> Result<(), Reject> {
     use prost::Message;
     if request.encoded_len() > 2 * MAX_BUNDLE_BYTES {
         return Err(Reject::Bounds);
+    }
+    if logical_job_terminal {
+        return Err(Reject::Transition);
     }
     if request.client_operation_id.is_empty() || request.client_operation_id.len() > 128 {
         return Err(Reject::Canonical);
@@ -3087,8 +3147,9 @@ pub fn verify_renew_submission(
     read: &GetImportJobStateResponse,
     predecessor_owner: &ImportOwnerExpectation<'_>,
     current_owner: &ImportOwnerExpectation<'_>,
+    logical_job_terminal: bool,
 ) -> Result<VerifiedImportDelegation, Reject> {
-    validate_renew_request(request, read)?;
+    validate_renew_request(request, read, logical_job_terminal)?;
     let state = read.state.as_ref().ok_or(Reject::Canonical)?;
     let retained = read.retained_proof.as_ref().ok_or(Reject::Canonical)?;
     let active = state
@@ -3130,4 +3191,732 @@ pub fn check_renew_replay(request_bytes: &[u8], stored_bytes: &[u8]) -> Result<(
         return Err(Reject::OperationIdReused);
     }
     Ok(())
+}
+
+/// Independently installed descriptor pin; never learned from a response.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportWitnessRootPin {
+    pub authority: String,
+    pub root_id: String,
+    pub public_key: Vec<u8>,
+    pub epoch: u64,
+}
+/// Receiver-owned durable data, committed atomically with accepted history.
+/// Do not deserialize this from the incoming proof or lower its clock floor.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportWitnessSnapshot {
+    pub root: ImportWitnessRootPin,
+    pub witness_set: crate::heddle::api::common::SignedHostedWitnessSetV1,
+    pub clock_floor_unix_millis: i64,
+    pub job_associations: Vec<(Vec<u8>, Vec<u8>)>,
+    pub accepted_history: Vec<ImportPublicProofBundleV1>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerifiedImportBundleWitnesses {
+    pub accepted_history: ImportJobCasStateV1,
+    pub snapshot: ImportWitnessSnapshot,
+}
+/// Verify retained evidence after authenticating the state RPC. Owner contexts
+/// are independently verified in delegation order at the first authenticated
+/// publication time, or the initial admission time if no publication exists.
+/// Unwitnessed certificates are time-free recovery only.
+/// The mandatory hook verifies the selected policy chain and owner/native context
+/// at each authenticated statement time (heddle capability-verifier / WASM).
+/// With no statements it receives None and verifies time-free policy closure.
+/// No snapshot is returned on any failure. Persist the result under the trust lock.
+pub fn verify_import_bundle_witnesses(
+    bundle: &ImportPublicProofBundleV1,
+    pin: &ImportWitnessRootPin,
+    snapshot: Option<&ImportWitnessSnapshot>,
+    now_ms: i64,
+    owners: &[ImportOwnerExpectation<'_>],
+    mut verify_policy: impl FnMut(
+        &ImportPublicProofBundleV1,
+        Option<&crate::heddle::api::common::HostedWitnessStatementV1>,
+    ) -> Result<(), Reject>,
+) -> Result<VerifiedImportBundleWitnesses, Reject> {
+    use crate::witness_trust as trust;
+    width(&pin.public_key, 32)?;
+    if pin.epoch == 0 {
+        return Err(Reject::StaleContext);
+    }
+    validate_bundle_bounds(bundle)?;
+    let terminal = bundle.terminal_manifest.as_ref().ok_or(Reject::Canonical)?;
+    validate_bundle_history(bundle, !terminal.slots.is_empty())?;
+    if owners.len() != bundle.delegations.len() {
+        return Err(Reject::Root);
+    }
+    let mut associations = snapshot.map_or_else(Vec::new, |s| s.job_associations.clone());
+    for owner in owners {
+        for (key, job) in owner.known_job_associations {
+            if associations.iter().any(|(k, j)| k == key && j != job) {
+                return Err(Reject::KeyRole);
+            }
+            if !associations.iter().any(|(k, _)| k == key) {
+                associations.push((key.clone(), job.clone()));
+            }
+        }
+    }
+    for d in &bundle.delegations {
+        let b = d.body.as_ref().ok_or(Reject::Canonical)?;
+        if associations
+            .iter()
+            .any(|(key, job)| *key == b.job_public_key && *job != b.logical_job_id)
+        {
+            return Err(Reject::KeyRole);
+        }
+        if !associations.iter().any(|(key, _)| *key == b.job_public_key) {
+            associations.push((b.job_public_key.clone(), b.logical_job_id.clone()));
+        }
+    }
+    let job_keys = associations
+        .iter()
+        .map(|(key, _)| key.clone())
+        .collect::<Vec<_>>();
+    fn expectation<'a>(
+        root: &'a ImportWitnessRootPin,
+        floor: i64,
+        now: i64,
+        keys: &'a [Vec<u8>],
+    ) -> trust::SetExpectation<'a> {
+        trust::SetExpectation {
+            authority: &root.authority,
+            root_id: &root.root_id,
+            root_public_key: &root.public_key,
+            root_epoch: root.epoch,
+            now_unix_millis: now,
+            clock_floor_unix_millis: floor,
+            known_job_keys: keys,
+        }
+    }
+    let previous = if let Some(s) = snapshot {
+        if s.root.authority != pin.authority {
+            return Err(Reject::Root);
+        }
+        let restored = trust::restore_history_snapshot(
+            &s.witness_set,
+            &expectation(&s.root, 0, now_ms, &job_keys),
+        )?;
+        Some(restored)
+    } else {
+        None
+    };
+    let carried = bundle.witness_set.as_ref().ok_or(Reject::Canonical)?;
+    let selected = expectation(
+        pin,
+        snapshot.map_or(0, |s| s.clock_floor_unix_millis),
+        now_ms,
+        &job_keys,
+    );
+    let set = if snapshot.is_some_and(|s| s.root != *pin) {
+        trust::verify_set_after_root_replacement(
+            carried,
+            &selected,
+            previous.as_ref().ok_or(Reject::StaleContext)?,
+        )?
+    } else {
+        trust::verify_set(carried, &selected, previous.as_ref())?
+    };
+    // Authenticate statements before using their observation times or policies.
+    let mut resolved = Vec::new();
+    for signed in &bundle.statements {
+        let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        let entry = set
+            .body()
+            .entries
+            .iter()
+            .find(|e| e.executor_id == s.executor_id)
+            .ok_or(Reject::Root)?;
+        let proof = if entry.state == 2 {
+            let leaf = trust::leaf_digest(s.purpose, &canonical(s)?, &signed.signature)?;
+            bundle.history_proofs.iter().find(|p| {
+                p.purpose == s.purpose && trust::verify_inclusion(&leaf, p, entry).is_ok()
+            })
+        } else {
+            None
+        };
+        let context = trust::resolve_statement(&set, signed, proof, false, now_ms)?;
+        verify_policy(bundle, Some(s))?;
+        resolved.push((context, proof));
+    }
+    if bundle.statements.is_empty() {
+        // Time-free policy/owner/native closure; this asserts no admission event.
+        verify_policy(bundle, None)?;
+    }
+    // Derive owner-selection times only from authenticated receipts. Prefer the
+    // first publication for each delegation; initial admissions stand alone too.
+    let mut times = vec![None; bundle.delegations.len()];
+    let mut publications = Vec::new();
+    for signed in &bundle.statements {
+        let statement = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        if statement.purpose != 3 {
+            continue;
+        }
+        let (operation, manifest) = bundle
+            .operations
+            .iter()
+            .flat_map(|o| bundle.manifests.iter().map(move |m| (o, m)))
+            .find(|(o, m)| {
+                publication_payload(o, m)
+                    .and_then(|p| canonical(&p))
+                    .is_ok_and(|b| b == statement.canonical_payload)
+            })
+            .ok_or(Reject::Scope)?;
+        let digest = &operation
+            .body
+            .as_ref()
+            .ok_or(Reject::Canonical)?
+            .delegation_digest;
+        let index = bundle
+            .delegations
+            .iter()
+            .position(|d| signed_delegation_digest(d).is_ok_and(|h| h == *digest))
+            .ok_or(Reject::Scope)?;
+        let time = statement.observed_at_unix_millis / 1000;
+        // First means accepted publication order, independent of array order.
+        if times[index].is_none_or(|(order, _)| statement.admission_order < order) {
+            times[index] = Some((statement.admission_order, time));
+        }
+        publications.push((signed, operation, manifest, index));
+    }
+    if times[0].is_none() {
+        times[0] = bundle
+            .statements
+            .iter()
+            .filter_map(|s| s.body.as_ref())
+            .filter(|s| s.purpose == 1)
+            .min_by_key(|s| (s.observed_at_unix_millis, s.admission_order))
+            .map(|s| (s.admission_order, s.observed_at_unix_millis / 1000));
+    }
+    let mut verified = Vec::new();
+    for (i, d) in bundle.delegations.iter().enumerate() {
+        let body = d.body.as_ref().ok_or(Reject::Canonical)?;
+        let parent = resolve_bundle_permission(bundle, &body.parent_permission_digest)?;
+        let owner = ImportOwnerExpectation {
+            known_job_associations: &associations,
+            ..owners[i]
+        };
+        if times[i].is_some_and(|(_, time)| owner.now_unix_seconds != time) {
+            return Err(Reject::Root);
+        }
+        let token = if i == 0 {
+            verify_delegation_inner(d, parent, &owner, times[i].is_some())?
+        } else {
+            let renewal = &bundle.renewals[i - 1];
+            let r = renewal.body.as_ref().ok_or(Reject::Canonical)?;
+            verify_renewal_inner(
+                renewal,
+                &verified[i - 1],
+                resolve_bundle_manifest(bundle, &r.committed_manifest_digest)?,
+                i as u64,
+                parent,
+                &owner,
+                times[i].is_some(),
+            )?
+        };
+        verified.push(token);
+    }
+    let initial = verified.first().ok_or(Reject::Canonical)?;
+    for branch in &initial.body.branch_manifest {
+        let limit = branch.limit.as_ref().ok_or(Reject::Canonical)?;
+        let binding = bundle
+            .genesis_authorities
+            .iter()
+            .find(|g| signed_genesis_digest(g).is_ok_and(|h| h == branch.genesis_authority_digest))
+            .ok_or(Reject::Scope)?;
+        let original = bundle
+            .original_geneses
+            .iter()
+            .find(|o| native_id(o) == limit.genesis_digest)
+            .ok_or(Reject::Scope)?;
+        let g = binding.body.as_ref().ok_or(Reject::Canonical)?;
+        let envelope = bundle
+            .creator_authority_envelopes
+            .iter()
+            .find(|e| hash(&[e]) == g.creator_authority_envelope_digest)
+            .ok_or(Reject::Scope)?;
+        verify_native(original, "heddle-thread-genesis-v1")?;
+        let signature = original.signatures.first().ok_or(Reject::Signature)?;
+        verify_genesis_authority(
+            binding,
+            initial,
+            &limit.genesis_digest,
+            &signature.signature,
+            &hash(&[envelope]),
+        )?;
+    }
+    for ((context, proof), signed) in resolved.iter().zip(&bundle.statements) {
+        let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        if !verified.iter().any(|d| {
+            d.body.identity.as_ref().is_some_and(|id| {
+                s.spool_uuid == id.spool_uuid
+                    && s.spool_genesis_digest == id.spool_genesis_digest
+                    && s.owner_id == id.owner_id
+                    && s.owner_state_hash == id.owner_state_hash
+                    && s.ownership_transfer_sequence == id.ownership_transfer_sequence
+            })
+        }) {
+            return Err(Reject::Scope);
+        }
+        match s.purpose {
+            1 => {
+                // Every original admission must independently satisfy [N,E).
+                let owner = ImportOwnerExpectation {
+                    now_unix_seconds: s.observed_at_unix_millis / 1000,
+                    known_job_associations: &associations,
+                    ..owners[0]
+                };
+                verify_delegation(
+                    &bundle.delegations[0],
+                    resolve_bundle_permission(bundle, &initial.body.parent_permission_digest)?,
+                    &owner,
+                )?;
+                verify_witness_payload(
+                    s,
+                    WitnessPayload::Genesis(
+                        bundle
+                            .genesis_witnesses
+                            .iter()
+                            .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                            .ok_or(Reject::Scope)?,
+                    ),
+                )?;
+            }
+            2 => verify_witness_payload(
+                s,
+                WitnessPayload::Authority(
+                    bundle
+                        .authority_witnesses
+                        .iter()
+                        .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                        .ok_or(Reject::Scope)?,
+                ),
+            )?,
+            4 => verify_witness_payload(
+                s,
+                WitnessPayload::Landing(
+                    bundle
+                        .landing_witnesses
+                        .iter()
+                        .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                        .ok_or(Reject::Scope)?,
+                ),
+            )?,
+            3 => {
+                let (_, operation, manifest, index) = publications
+                    .iter()
+                    .find(|(statement, _, _, _)| *statement == signed)
+                    .ok_or(Reject::Scope)?;
+                let d = &bundle.delegations[*index];
+                let body = d.body.as_ref().ok_or(Reject::Canonical)?;
+                let owner = ImportOwnerExpectation {
+                    now_unix_seconds: s.observed_at_unix_millis / 1000,
+                    known_job_associations: &associations,
+                    ..owners[*index]
+                };
+                let delegation = verify_delegation(
+                    d,
+                    resolve_bundle_permission(bundle, &body.parent_permission_digest)?,
+                    &owner,
+                )?;
+                verify_publication(
+                    operation,
+                    &delegation,
+                    manifest,
+                    signed,
+                    &set,
+                    *proof,
+                    now_ms,
+                )?;
+            }
+            _ => return Err(Reject::Version),
+        }
+        trust::recheck_context(context, &set, signed, now_ms)?;
+    }
+    // Operations are accepted publication order, while manifest slots are sorted.
+    let mut progressive = ImportResultManifestV1 {
+        slots: vec![],
+        ..terminal.clone()
+    };
+    let mut order = 0;
+    let mut observed = 0;
+    let mut active_index = 0usize;
+    for o in &bundle.operations {
+        let before = manifest_digest(&progressive)?;
+        let digest = signed_operation_digest(o)?;
+        let slot = terminal
+            .slots
+            .iter()
+            .find(|s| s.signed_operation_digest == digest)
+            .ok_or(Reject::Scope)?;
+        progressive.slots.push(slot.clone());
+        progressive
+            .slots
+            .sort_by(|a, b| (&a.ref_name, a.slot_id).cmp(&(&b.ref_name, b.slot_id)));
+        let payload = canonical(&publication_payload(o, &progressive)?)?;
+        let s = bundle
+            .statements
+            .iter()
+            .filter_map(|s| s.body.as_ref())
+            .find(|s| s.purpose == 3 && s.canonical_payload == payload)
+            .ok_or(Reject::Transition)?;
+        if s.admission_order <= order || s.observed_at_unix_millis < observed {
+            return Err(Reject::Transition);
+        }
+        order = s.admission_order;
+        observed = s.observed_at_unix_millis;
+        let digest = &o.body.as_ref().ok_or(Reject::Canonical)?.delegation_digest;
+        let index = verified
+            .iter()
+            .position(|d| d.digest == *digest)
+            .ok_or(Reject::Scope)?;
+        if index < active_index {
+            return Err(Reject::Transition);
+        }
+        while active_index < index {
+            let renewal = bundle.renewals[active_index]
+                .body
+                .as_ref()
+                .ok_or(Reject::Canonical)?;
+            if renewal.committed_manifest_digest != before {
+                return Err(Reject::StaleManifest);
+            }
+            active_index += 1;
+        }
+    }
+    if progressive != *terminal {
+        return Err(Reject::Scope);
+    }
+    let final_digest = manifest_digest(&progressive)?;
+    for renewal in &bundle.renewals[active_index..] {
+        if renewal
+            .body
+            .as_ref()
+            .ok_or(Reject::Canonical)?
+            .committed_manifest_digest
+            != final_digest
+        {
+            return Err(Reject::StaleManifest);
+        }
+    }
+    let mut history = snapshot.map_or_else(Vec::new, |s| s.accepted_history.clone());
+    if let Some(old) = history.iter_mut().find(|b| {
+        b.terminal_manifest
+            .as_ref()
+            .is_some_and(|m| m.logical_job_id == terminal.logical_job_id)
+            && b.delegations
+                .first()
+                .and_then(|d| d.body.as_ref())
+                .and_then(|d| d.identity.as_ref())
+                .map(|id| &id.spool_uuid)
+                == bundle
+                    .delegations
+                    .first()
+                    .and_then(|d| d.body.as_ref())
+                    .and_then(|d| d.identity.as_ref())
+                    .map(|id| &id.spool_uuid)
+    }) {
+        if !bundle.delegations.starts_with(&old.delegations)
+            || !bundle.renewals.starts_with(&old.renewals)
+            || !bundle.operations.starts_with(&old.operations)
+            || bundle.owner_genesis != old.owner_genesis
+            || !bundle
+                .ownership_transfers
+                .starts_with(&old.ownership_transfers)
+            || !old
+                .owner_histories
+                .iter()
+                .all(|v| bundle.owner_histories.contains(v))
+            || !old
+                .member_permissions
+                .iter()
+                .all(|v| bundle.member_permissions.contains(v))
+            || !old
+                .genesis_authorities
+                .iter()
+                .all(|v| bundle.genesis_authorities.contains(v))
+            || !old
+                .original_geneses
+                .iter()
+                .all(|v| bundle.original_geneses.contains(v))
+            || !old
+                .creator_authority_envelopes
+                .iter()
+                .all(|v| bundle.creator_authority_envelopes.contains(v))
+            || !old.manifests.iter().all(|v| bundle.manifests.contains(v))
+            || !old.statements.iter().all(|v| bundle.statements.contains(v))
+            || !old.policies.iter().all(|v| bundle.policies.contains(v))
+            || !old
+                .genesis_witnesses
+                .iter()
+                .all(|v| bundle.genesis_witnesses.contains(v))
+            || !old
+                .authority_witnesses
+                .iter()
+                .all(|v| bundle.authority_witnesses.contains(v))
+            || !old
+                .landing_witnesses
+                .iter()
+                .all(|v| bundle.landing_witnesses.contains(v))
+        {
+            return Err(Reject::HighWater);
+        }
+        *old = bundle.clone();
+    } else {
+        history.push(bundle.clone());
+    }
+    let active = bundle.delegations.last().ok_or(Reject::Canonical)?.clone();
+    Ok(VerifiedImportBundleWitnesses {
+        accepted_history: ImportJobCasStateV1 {
+            format_version: 1,
+            logical_job_id: terminal.logical_job_id.clone(),
+            retry_lineage_id: terminal.retry_lineage_id.clone(),
+            active_predecessor: Some(active),
+            authority_epoch: bundle.delegations.len() as u64,
+            committed_manifest: Some(terminal.clone()),
+        },
+        snapshot: ImportWitnessSnapshot {
+            root: pin.clone(),
+            witness_set: carried.clone(),
+            clock_floor_unix_millis: now_ms,
+            job_associations: associations,
+            accepted_history: history,
+        },
+    })
+}
+
+/// These facts MUST come from current authenticated host state, never request
+/// claims. Retry/Renew fetches use this exact authorized source association.
+pub struct ImportControlCaller<'a> {
+    pub authenticated_pop: bool,
+    pub destination_writer: bool,
+    pub caller_account: &'a str,
+    pub connection_owner_account: Option<&'a str>,
+    pub authorized_source: Option<&'a ImportSourceSelectionV1>,
+    pub exact_grants_current: bool,
+    pub selected_commits_available: bool,
+}
+#[derive(Clone, Copy)]
+pub enum ImportControlAction {
+    Cancel,
+    Retry,
+    Renew,
+}
+
+/// Destination control is independent of source custody. Cancel never fetches.
+/// Run at Retry admission / Renew activation after checking signed authority.
+pub fn check_import_control_caller(
+    action: ImportControlAction,
+    retained: &ImportSourceSelectionV1,
+    scope: &ImportPermissionScopeV1,
+    caller: &ImportControlCaller<'_>,
+) -> Result<(), Reject> {
+    if !caller.authenticated_pop || !caller.destination_writer || caller.caller_account.is_empty() {
+        return Err(Reject::Scope);
+    }
+    if matches!(action, ImportControlAction::Cancel) {
+        return Ok(());
+    }
+    validate_retained_import_source(retained, scope)?;
+    if retained.connection.is_some()
+        && (caller.connection_owner_account != Some(caller.caller_account)
+            || caller.authorized_source != Some(retained)
+            || !caller.exact_grants_current)
+    {
+        return Err(Reject::SourceSelection);
+    }
+    if !caller.selected_commits_available {
+        return Err(Reject::SourceSelection);
+    }
+    Ok(())
+}
+
+fn validate_retry_availability(
+    response: &GetImportJobStateResponse,
+    destination: &SpoolRef,
+) -> Result<(), Reject> {
+    use get_import_job_state_response::RetryAvailability;
+    match response
+        .retry_availability
+        .as_ref()
+        .ok_or(Reject::Canonical)?
+    {
+        RetryAvailability::EligibleRetryTarget(target) => {
+            let operation = target.operation_ref.as_ref().ok_or(Reject::Canonical)?;
+            let raw = hex::decode(operation.id.replace('-', "")).map_err(|_| Reject::Canonical)?;
+            if initial_operation_id(&raw, false)? != operation.id {
+                return Err(Reject::Canonical);
+            }
+            if operation.spool.as_ref() != Some(destination) {
+                return Err(Reject::Scope);
+            }
+            if target.operation_version.is_empty() || target.operation_version.len() > 256 {
+                return Err(Reject::Bounds);
+            }
+        }
+        RetryAvailability::RetryUnavailable(reason) => {
+            if !(1..=6).contains(reason) {
+                return Err(Reject::Canonical);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validate the additive writer disclosure separately from historical recovery
+/// carriers, whose frozen alpha.30 bytes have no retry_availability field.
+pub fn validate_retry_state_response(
+    request: &GetImportJobStateRequest,
+    response: &GetImportJobStateResponse,
+) -> Result<(), Reject> {
+    validate_job_state_response(request, response)?;
+    validate_retry_availability(response, request.destination.as_ref().ok_or(Reject::Scope)?)
+}
+
+/// Receiver-owned facts locked together with job/authority/source state. The
+/// operation-lineage association is durable host state, not an ID inference.
+pub struct ImportRetryAdmission<'a> {
+    pub read: &'a GetImportJobStateResponse,
+    pub original: &'a OperationRecord,
+    pub retry_lineage_id: &'a [u8],
+    pub logical_job_terminal: bool,
+    pub now_unix_seconds: i64,
+}
+
+/// Run after caller-scoped frozen replay lookup, under ONE admission transaction.
+/// Full owner/policy/revocation/lease checks and allocation remain host gates.
+pub fn check_retry_admission(
+    request: &RetryImportSourceRequest,
+    context: &ImportRetryAdmission<'_>,
+    active: &VerifiedImportDelegation,
+    caller: &ImportControlCaller<'_>,
+) -> Result<(), Reject> {
+    use get_import_job_state_response::RetryAvailability;
+    let destination = request
+        .original_operation
+        .as_ref()
+        .and_then(|r| r.spool.clone());
+    let read_request = GetImportJobStateRequest {
+        destination,
+        logical_job_id: request.logical_job_id.clone(),
+    };
+    validate_retry_state_response(&read_request, context.read)?;
+    if request.client_operation_id.is_empty() || request.client_operation_id.len() > 128 {
+        return Err(Reject::Canonical);
+    }
+    if context.logical_job_terminal {
+        return Err(Reject::Revoked);
+    }
+    let Some(RetryAvailability::EligibleRetryTarget(target)) = &context.read.retry_availability
+    else {
+        return Err(Reject::StaleContext);
+    };
+    let target_ref = target.operation_ref.as_ref().ok_or(Reject::Canonical)?;
+    let original_ref = context.original.r#ref.as_ref().ok_or(Reject::Scope)?;
+    if request.original_operation.as_ref() != Some(original_ref)
+        || original_ref.spool != target_ref.spool
+        || original_ref.id != target_ref.id
+        || context.retry_lineage_id != active.body.retry_lineage_id
+        || import_job_state_request_from_operation(context.original)?.as_ref()
+            != Some(&read_request)
+    {
+        return Err(Reject::Scope);
+    }
+    if request.expected_operation_version != target.operation_version
+        || context.original.version != target.operation_version
+        || context.original.superseded_by.is_some()
+        || !matches!(context.original.state, 4 | 5)
+    {
+        return Err(Reject::StaleContext);
+    }
+    let state = context.read.state.as_ref().ok_or(Reject::Canonical)?;
+    if signed_delegation_digest(state.active_predecessor.as_ref().ok_or(Reject::Canonical)?)?
+        != active.digest
+    {
+        return Err(Reject::StaleContext);
+    }
+    check_job_fence(
+        &request.logical_job_id,
+        &request.active_delegation_digest,
+        request.expected_authority_epoch,
+        active,
+        state.authority_epoch,
+    )?;
+    interval(
+        active.body.not_before_unix_seconds,
+        active.body.expires_at_unix_seconds,
+        context.now_unix_seconds,
+    )?;
+    let manifest = state.committed_manifest.as_ref().ok_or(Reject::Canonical)?;
+    let scope = active.body.scope.as_ref().ok_or(Reject::Canonical)?;
+    if !scope.branches.iter().any(|b| {
+        !manifest
+            .slots
+            .iter()
+            .any(|s| s.ref_name == b.ref_name && s.slot_id == b.slot_id)
+    }) {
+        return Err(Reject::StaleContext);
+    }
+    check_import_control_caller(
+        ImportControlAction::Retry,
+        context
+            .read
+            .retained_source
+            .as_ref()
+            .ok_or(Reject::SourceSelection)?,
+        scope,
+        caller,
+    )
+}
+
+/// Check a host-generated UUID against the COMPLETE durable attempt set, including
+/// the first lineage UUID. Persist the allocation, both direct links and receipt
+/// atomically; do not generate a UUID from the request idempotency key.
+pub fn validate_retry_response(
+    request: &RetryImportSourceRequest,
+    response: &MutationResponse,
+    prior_attempt_ids: &[String],
+) -> Result<(), Reject> {
+    let receipt = response.receipt.as_ref().ok_or(Reject::PendingOperation)?;
+    let Some(mutation_receipt::Outcome::PendingOperation(operation)) = &receipt.outcome else {
+        return Err(Reject::PendingOperation);
+    };
+    let original = request
+        .original_operation
+        .as_ref()
+        .ok_or(Reject::PendingOperation)?;
+    let raw = hex::decode(operation.id.replace('-', "")).map_err(|_| Reject::PendingOperation)?;
+    if initial_operation_id(&raw, false).map_or(true, |id| id != operation.id)
+        || request.client_operation_id.is_empty()
+        || receipt.client_operation_id != request.client_operation_id
+        || original.spool.is_none()
+        || operation.spool != original.spool
+        || operation.id == original.id
+        || operation.id == request.client_operation_id
+        || prior_attempt_ids.contains(&operation.id)
+    {
+        return Err(Reject::PendingOperation);
+    }
+    Ok(())
+}
+
+/// Authority-only acknowledgement. Empty Applied.resulting_versions is valid;
+/// scheduling is forbidden and the activated epoch/certificate comes from state.
+pub fn validate_renew_response(
+    request: &RenewImportJobRequest,
+    response: &MutationResponse,
+) -> Result<(), Reject> {
+    let receipt = response.receipt.as_ref().ok_or(Reject::Semantic)?;
+    if request.client_operation_id.is_empty()
+        || receipt.client_operation_id != request.client_operation_id
+        || !matches!(receipt.outcome, Some(mutation_receipt::Outcome::Applied(_)))
+    {
+        return Err(Reject::Semantic);
+    }
+    Ok(())
+}
+
+/// Exact frozen Retry replay returns the stored receipt without allocating.
+pub fn check_retry_replay(request_bytes: &[u8], stored_bytes: &[u8]) -> Result<(), Reject> {
+    check_renew_replay(request_bytes, stored_bytes)
 }

@@ -348,7 +348,7 @@ fn verify_export(f: &Value, b: &wire::ImportPublicProofBundleV1) -> Result<()> {
         identity,
         owner_public_key: &selected_owner,
         owner_chain_digest: &chain_digest,
-        // This verified owner root has no expiry; signed permissions and job
+        // This verified effective owner state is not deferred; signed permissions and job
         // certificates provide their own historical validity bounds.
         authority_expires_at_seconds: i64::MAX,
         now_unix_seconds: now,
@@ -1883,6 +1883,41 @@ mod tests {
             "../../../tests/fixtures/import-authority-host-witness-v1.json"
         ))
         .expect("fixed vectors")
+    }
+    #[test]
+    fn alpha31_effective_owner_signed_endpoints() {
+        let f = fixture();
+        for v in f["effective_owner_expiry_vectors"]["vectors"]
+            .as_array()
+            .expect("expiry vectors")
+        {
+            let history: wire::OwnerHistory =
+                record(&f, v["history"].as_str().expect("history")).expect("history wire");
+            let now = v["now_seconds"].as_i64().expect("clock");
+            let owner = verify_owner_history(&history, now).expect("native signed owner history");
+            let expected_key =
+                hex_field(&f["keys"][v["owner_key"].as_str().expect("key")]["public_key_hex"])
+                    .expect("key bytes");
+            assert_eq!(owner.authority_key().public_key, expected_key);
+            assert_eq!(
+                owner.sequence(),
+                if v["deferred"].as_bool().expect("deferral") {
+                    0
+                } else {
+                    1
+                }
+            );
+            println!(
+                "alpha31 NATIVE owner {}: root, claim and guardians PASS",
+                v["id"]
+            );
+        }
+        let future: wire::OwnerHistory = record(&f, "alpha31_claimed_history").expect("history");
+        assert!(
+            verify_owner_history(&future, 1050).is_err(),
+            "historical verification cannot select a future claim"
+        );
+        verify_owner_history(&future, 1120).expect("post-claim historical control");
     }
     #[test]
     fn native_witness_originals_and_start_thread_authority() {

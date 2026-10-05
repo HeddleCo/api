@@ -25,6 +25,11 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
         assert_eq!(
             message.fields().count(),
             descriptor["fields"].as_array().expect("fields").len()
+                + if message.full_name() == "heddle.api.v1alpha2.GetImportJobStateResponse" {
+                    2
+                } else {
+                    0
+                }
         );
         for expected in descriptor["fields"].as_array().expect("fields") {
             let field = message
@@ -2439,7 +2444,7 @@ fn alpha24_renew_and_read_negatives_reject_then_pass() {
                 .creator_authority_envelopes = vec![vec![1; size as usize]];
         }
         let read = record(&f, v["read"].as_str().expect("read"));
-        let result = import::validate_renew_request(&request, &read);
+        let result = import::validate_renew_request(&request, &read, false);
         let actual = result
             .err()
             .map(|r| format!("{r:?}"))
@@ -2448,8 +2453,12 @@ fn alpha24_renew_and_read_negatives_reject_then_pass() {
         if actual != v["expected"].as_str().expect("expected") {
             failures.push(format!("Renew {}: {actual}", v["id"]));
         }
-        import::validate_renew_request(&record(&f, v["control"].as_str().expect("control")), &read)
-            .expect("passing control");
+        import::validate_renew_request(
+            &record(&f, v["control"].as_str().expect("control")),
+            &read,
+            false,
+        )
+        .expect("passing control");
     }
     for v in vectors["read_request_negative"]
         .as_array()
@@ -2546,7 +2555,7 @@ fn superseded_renewal_recovery_remains_settled_and_replays_stored_receipt() {
             epoch
         );
         let verified =
-            import::verify_renew_submission(&request, &read, &c.owner(now), &c.owner(now))
+            import::verify_renew_submission(&request, &read, &c.owner(now), &c.owner(now), false)
                 .expect("accepted signed renewal");
         assert_eq!(
             verified.digest(),
@@ -2627,7 +2636,7 @@ fn superseded_renewal_recovery_remains_settled_and_replays_stored_receipt() {
     ));
     assert_eq!(response.encode_to_vec(), stored_response);
     assert_eq!(
-        import::validate_renew_request(&r1, &read),
+        import::validate_renew_request(&r1, &read, false),
         Err(codec::Reject::StaleContext)
     );
     let expired = v["replay_now_seconds"].as_i64().expect("replay time");
@@ -2637,6 +2646,7 @@ fn superseded_renewal_recovery_remains_settled_and_replays_stored_receipt() {
             &record(&f, v["r1_read"].as_str().expect("old read")),
             &c.owner(expired),
             &c.owner(expired),
+            false
         )
         .err(),
         Some(codec::Reject::Expired)
@@ -2656,11 +2666,17 @@ fn superseded_renewal_negatives_reject_then_pass() {
             record(&f, v["request"].as_str().expect("request"));
         let actual = if let Some(read_name) = v["read"].as_str() {
             let read = record(&f, read_name);
-            let reason = import::validate_renew_request(&request, &read)
+            let reason = import::validate_renew_request(&request, &read, false)
                 .expect_err("new candidate uses stale snapshot");
             assert_eq!(
-                import::verify_renew_submission(&request, &read, &c.owner(now), &c.owner(now))
-                    .err(),
+                import::verify_renew_submission(
+                    &request,
+                    &read,
+                    &c.owner(now),
+                    &c.owner(now),
+                    false
+                )
+                .err(),
                 Some(reason)
             );
             import::verify_renew_submission(
@@ -2668,6 +2684,7 @@ fn superseded_renewal_negatives_reject_then_pass() {
                 &record(&f, v["control_read"].as_str().expect("original snapshot")),
                 &c.owner(now),
                 &c.owner(now),
+                false,
             )
             .expect("same signed candidate passes against original snapshot");
             assert_ne!(request.client_operation_id, r1.client_operation_id);
@@ -2743,7 +2760,8 @@ fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
                     &request,
                     &read,
                     &current.owner(1350),
-                    &current.owner(1350)
+                    &current.owner(1350),
+                    false
                 ),
                 Err(codec::Reject::Root)
             ));
@@ -2753,6 +2771,7 @@ fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
             &read,
             &original.owner(1350),
             &current.owner(1350),
+            false,
         )
         .expect("historical predecessor and current replacement");
         assert_eq!(
@@ -2788,7 +2807,8 @@ fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
                 &request,
                 &read,
                 &original.owner(1350),
-                &current.owner(1800)
+                &current.owner(1800),
+                false
             ),
             Err(codec::Reject::Expired)
         ));
@@ -3319,6 +3339,750 @@ fn alpha27_resolve_exact_identity_and_redirect_refusal_vectors() {
                 v["id"], v["expected"]
             ));
         }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+fn alpha31_pin(f: &Value, replacement: bool) -> import::ImportWitnessRootPin {
+    import::ImportWitnessRootPin {
+        authority: "https://weft.example.test".into(),
+        root_id: if replacement {
+            "descriptor-root-2"
+        } else {
+            "descriptor-root-1"
+        }
+        .into(),
+        public_key: bytes(
+            &f["keys"][if replacement { "wrong_root" } else { "root" }]["public_key_hex"],
+        ),
+        epoch: if replacement { 2 } else { 1 },
+    }
+}
+fn alpha31_verify(
+    f: &Value,
+    name: &str,
+    pin: &import::ImportWitnessRootPin,
+    snapshot: Option<&import::ImportWitnessSnapshot>,
+) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
+    alpha31_verify_with_associations(f, name, pin, snapshot, &[])
+}
+fn alpha31_verify_with_associations(
+    f: &Value,
+    name: &str,
+    pin: &import::ImportWitnessRootPin,
+    snapshot: Option<&import::ImportWitnessSnapshot>,
+    associations: &[(Vec<u8>, Vec<u8>)],
+) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
+    let c = Context::new(f);
+    let mut first = c.owner(1100);
+    first.known_job_associations = associations;
+    import::verify_import_bundle_witnesses(
+        &record(f, name),
+        pin,
+        snapshot,
+        1_350_000,
+        &[first, c.owner(1250)],
+        |b, s| {
+            // Exact previously signature-verified policy input, as the WASM hook.
+            if b.policies != vec![record(f, "signed_policy")] {
+                return Err(codec::Reject::Signature);
+            }
+            if let Some(s) = s {
+                assert_eq!(s.policy_sequence, 1);
+            }
+            Ok(())
+        },
+    )
+}
+#[test]
+fn alpha31_bundle_positive_all_purposes() {
+    let f = fixture();
+    for name in f["import_bundle_vectors"]["positive"]
+        .as_array()
+        .expect("positives")
+    {
+        let r = alpha31_verify(
+            &f,
+            name.as_str().expect("name"),
+            &alpha31_pin(&f, false),
+            None,
+        )
+        .expect("authenticated bundle");
+        assert_eq!(r.accepted_history.authority_epoch, 2);
+        assert_eq!(
+            r.accepted_history
+                .committed_manifest
+                .expect("manifest")
+                .slots
+                .len(),
+            2
+        );
+        assert_eq!(r.snapshot.witness_set.body.expect("set").generation, 12);
+        assert_eq!(r.snapshot.clock_floor_unix_millis, 1_350_000);
+        assert_eq!(r.snapshot.job_associations.len(), 2);
+    }
+}
+fn alpha31_bundle_negative(id: &str) {
+    let f = fixture();
+    let v = f["import_bundle_vectors"]["negative"]
+        .as_array()
+        .expect("negatives")
+        .iter()
+        .find(|v| v["id"] == id)
+        .expect("vector");
+    let mut snapshot = v["snapshot_bundle"].as_str().map(|n| {
+        alpha31_verify(&f, n, &alpha31_pin(&f, false), None)
+            .expect("prior authenticated bundle")
+            .snapshot
+    });
+    if let Some(clock) = v["snapshot_clock"].as_i64() {
+        snapshot.as_mut().expect("snapshot").clock_floor_unix_millis = clock;
+    }
+    let original = snapshot.clone();
+    let replacement = v["replacement"].as_bool().unwrap_or(false);
+    let mut pin = alpha31_pin(&f, replacement);
+    if let Some(epoch) = v["pin_epoch"].as_u64() {
+        pin.epoch = epoch;
+    }
+    let associations = if v["known_association_conflict"].as_bool().unwrap_or(false) {
+        vec![(bytes(&f["keys"]["job"]["public_key_hex"]), vec![0xee; 16])]
+    } else {
+        vec![]
+    };
+    let result = alpha31_verify_with_associations(
+        &f,
+        v["bundle"].as_str().expect("bundle"),
+        &pin,
+        snapshot.as_ref(),
+        &associations,
+    );
+    let actual = format!("{:?}", result.expect_err("must reject"));
+    assert_eq!(actual, v["expected"].as_str().expect("reason"), "{id}");
+    assert_eq!(snapshot, original, "failure preserves snapshot");
+    if v["snapshot_clock"].is_number() {
+        snapshot.as_mut().expect("snapshot").clock_floor_unix_millis = 1_350_000;
+    }
+    let control = alpha31_verify(
+        &f,
+        v["control"].as_str().expect("control"),
+        &alpha31_pin(&f, replacement),
+        snapshot.as_ref(),
+    )
+    .expect("passing control");
+    if replacement {
+        assert_eq!(
+            control
+                .snapshot
+                .witness_set
+                .body
+                .as_ref()
+                .expect("set")
+                .generation,
+            14
+        );
+        assert_eq!(control.snapshot.root.epoch, 2);
+        assert_eq!(
+            control.snapshot.job_associations,
+            original.as_ref().expect("snapshot").job_associations
+        );
+        assert_eq!(
+            control.snapshot.accepted_history.len(),
+            original.expect("snapshot").accepted_history.len()
+        );
+    }
+    println!("alpha31 {id}: {actual} -> control PASS");
+}
+macro_rules! alpha31_negative_tests {
+    ($($name:ident),* $(,)?) => { $(#[test] fn $name() { alpha31_bundle_negative(stringify!($name).strip_prefix("alpha31_").expect("prefix")); })* };
+}
+alpha31_negative_tests!(
+    alpha31_corrupted_witness_signature,
+    alpha31_corrupted_statement,
+    alpha31_unknown_root,
+    alpha31_mismatched_root,
+    alpha31_wrong_root_key,
+    alpha31_high_water_rollback,
+    alpha31_missing_inclusion_proof,
+    alpha31_reordered_history,
+    alpha31_reordered_publications,
+    alpha31_stale_epoch,
+    alpha31_replacement_carries_high_water,
+    alpha31_replacement_preserves_seal,
+    alpha31_clock_rollback,
+    alpha31_accepted_history_omission,
+    alpha31_known_job_association_conflict
+);
+#[test]
+fn alpha31_policy_hook_rejects_then_passes() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let pin = alpha31_pin(&f, false);
+    assert_eq!(
+        import::verify_import_bundle_witnesses(
+            &record(&f, "alpha31_bundle"),
+            &pin,
+            None,
+            1_350_000,
+            &[c.owner(1100), c.owner(1200)],
+            |_, _| Err(codec::Reject::Signature)
+        )
+        .err(),
+        Some(codec::Reject::Signature)
+    );
+    alpha31_verify(&f, "alpha31_bundle", &pin, None).expect("verified policy hook");
+}
+#[test]
+fn alpha31_old_context_stale_after_replacement() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let old =
+        witness::verify_set(&record(&f, "retired_set"), &c.set(1_350_000), None).expect("old set");
+    let signed = record(&f, "publication_statement");
+    let proof = record(&f, "publication_proof");
+    let context = witness::resolve_statement(&old, &signed, Some(&proof), false, 1_350_000)
+        .expect("old context");
+    let pin = alpha31_pin(&f, true);
+    let mut e = c.set(1_350_000);
+    e.root_id = &pin.root_id;
+    e.root_public_key = &pin.public_key;
+    e.root_epoch = 2;
+    let next = witness::verify_set(&record(&f, "alpha31_replacement_set"), &e, None)
+        .expect("replacement set");
+    assert_eq!(
+        witness::recheck_context(&context, &next, &signed, 1_350_000),
+        Err(codec::Reject::StaleContext)
+    );
+    let fresh = witness::resolve_statement(&next, &signed, Some(&proof), false, 1_350_000)
+        .expect("fresh context");
+    witness::recheck_context(&fresh, &next, &signed, 1_350_000).expect("fresh control");
+}
+#[test]
+fn alpha31_effective_owner_expiry_signed_history() {
+    let f = fixture();
+    let vectors = f["effective_owner_expiry_vectors"]["vectors"]
+        .as_array()
+        .expect("vectors");
+    for v in vectors {
+        let c = Context::new(&f);
+        let d: api::SignedImportJobDelegationV1 =
+            record(&f, v["delegation"].as_str().expect("delegation"));
+        let b = d.body.as_ref().expect("body");
+        let chain = import::owner_chain_digest(&record(&f, v["chain"].as_str().expect("chain")))
+            .expect("chain");
+        let key = bytes(&f["keys"][v["owner_key"].as_str().expect("key")]["public_key_hex"]);
+        let mut e = c.owner(v["now_seconds"].as_i64().expect("now"));
+        e.identity = b.identity.as_ref().expect("identity");
+        e.owner_public_key = &key;
+        e.owner_chain_digest = &chain;
+        e.authority_expires_at_seconds = import::effective_owner_authority_expiry(
+            v["deferred"].as_bool().expect("effective deferral"),
+            1150,
+        )
+        .expect("valid effective expiry");
+        let result = import::verify_delegation(&d, None, &e);
+        let actual = result
+            .err()
+            .map(|r| format!("{r:?}"))
+            .unwrap_or_else(|| "OK".into());
+        assert_eq!(actual, v["expected"].as_str().expect("reason"));
+        let h: api::OwnerHistory = record(&f, v["history"].as_str().expect("history"));
+        let root = h.root.as_ref().expect("root");
+        let root_digest = bytes(&f["effective_owner_expiry_vectors"]["root_digest_hex"]);
+        codec::verify(
+            &c.owner,
+            &root_digest,
+            &root.authority_proof.as_ref().expect("root proof").signature,
+        )
+        .expect("signed deferred root");
+        if !h.accepted_transitions.is_empty() {
+            let claim = &h.accepted_transitions[0];
+            let digest = bytes(&f["effective_owner_expiry_vectors"]["claim_digest_hex"]);
+            codec::verify(&c.owner, &digest, &claim.authorizations[0].signature)
+                .expect("origin claim signature");
+            codec::verify(
+                &bytes(&f["keys"]["rotated_owner"]["public_key_hex"]),
+                &digest,
+                &claim
+                    .next_authority_key_proof
+                    .as_ref()
+                    .expect("new authority proof")
+                    .signature,
+            )
+            .expect("new human signature");
+        }
+        if actual != "OK" {
+            let control = vectors
+                .iter()
+                .find(|x| x["id"] == v["control"])
+                .expect("control");
+            let pass: api::SignedImportJobDelegationV1 =
+                record(&f, control["delegation"].as_str().expect("delegation"));
+            let pass_chain =
+                import::owner_chain_digest(&record(&f, control["chain"].as_str().expect("chain")))
+                    .expect("chain");
+            let pass_key = bytes(&f["keys"]["rotated_owner"]["public_key_hex"]);
+            e.identity = pass
+                .body
+                .as_ref()
+                .expect("body")
+                .identity
+                .as_ref()
+                .expect("id");
+            e.owner_public_key = &pass_key;
+            e.owner_chain_digest = &pass_chain;
+            e.authority_expires_at_seconds =
+                import::effective_owner_authority_expiry(false, 1150).expect("claimed expiry");
+            import::verify_delegation(&pass, None, &e).expect("claimed control");
+        }
+        println!("alpha31 expiry {}: {actual} -> control PASS", v["id"]);
+    }
+}
+#[test]
+fn alpha31_stale_manifest_refusal_rejects_then_new_signature_passes() {
+    let f = fixture();
+    let v = &f["stale_manifest_vectors"];
+    let c = Context::new(&f);
+    let old: api::RenewImportJobRequest = record(&f, v["frozen_request"].as_str().expect("old"));
+    let before = record(&f, v["signed_state"].as_str().expect("S"));
+    let after: api::GetImportJobStateResponse =
+        record(&f, v["fresh_read"].as_str().expect("S prime"));
+    let fresh: api::RenewImportJobRequest = record(&f, v["fresh_request"].as_str().expect("fresh"));
+    import::verify_renew_submission(&old, &before, &c.owner(1200), &c.owner(1200), false)
+        .expect("signature against S");
+    assert_eq!(
+        old.encode_to_vec(),
+        bytes(&v["refusal"]["request_wire_hex"])
+    );
+    assert_eq!(v["refusal"]["classification"], "StaleManifest");
+    assert_eq!(v["refusal"]["settled"], false);
+    assert_eq!(v["refusal"]["definitive"], true);
+    let candidate = old
+        .renewal
+        .as_ref()
+        .expect("renewal")
+        .body
+        .as_ref()
+        .expect("body")
+        .replacement
+        .as_ref()
+        .expect("candidate");
+    let digest = import::signed_delegation_digest(candidate).expect("digest");
+    assert!(
+        !after
+            .retained_proof
+            .as_ref()
+            .expect("accepted history")
+            .delegations
+            .iter()
+            .any(|d| import::signed_delegation_digest(d).expect("digest") == digest),
+        "refused bytes do not settle"
+    );
+    for n in v["negative"].as_array().expect("negatives") {
+        let reason = if n["id"] == "refused_bytes_not_settled" {
+            // StaleManifest is the stored refusal classification, not acceptance.
+            assert_eq!(
+                import::check_renew_replay(&old.encode_to_vec(), &fresh.encode_to_vec()),
+                Err(codec::Reject::OperationIdReused)
+            );
+            import::check_renew_replay(&fresh.encode_to_vec(), &fresh.encode_to_vec())
+                .expect("accepted replay control");
+            "OperationIdReused"
+        } else {
+            assert_eq!(
+                import::validate_renew_request(&old, &after, false),
+                Err(codec::Reject::StaleManifest)
+            );
+            "StaleManifest"
+        };
+        import::verify_renew_submission(&fresh, &after, &c.owner(1200), &c.owner(1200), false)
+            .expect("re-read remaining scope and new signature");
+        println!("alpha31 {}: {reason} -> control PASS", n["id"]);
+    }
+    assert_ne!(
+        old.renewal.as_ref().expect("old").delegating_signature,
+        fresh.renewal.as_ref().expect("fresh").delegating_signature
+    );
+    assert_ne!(
+        digest,
+        import::signed_delegation_digest(
+            fresh
+                .renewal
+                .as_ref()
+                .expect("fresh")
+                .body
+                .as_ref()
+                .expect("body")
+                .replacement
+                .as_ref()
+                .expect("new candidate")
+        )
+        .expect("digest")
+    );
+}
+
+fn review_verify(
+    f: &Value,
+    name: &str,
+    pin: &import::ImportWitnessRootPin,
+    snapshot: Option<&import::ImportWitnessSnapshot>,
+    times: &[i64],
+) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
+    review_verify_at(f, name, pin, snapshot, times, 1_350_000)
+}
+fn review_verify_at(
+    f: &Value,
+    name: &str,
+    pin: &import::ImportWitnessRootPin,
+    snapshot: Option<&import::ImportWitnessSnapshot>,
+    times: &[i64],
+    now_ms: i64,
+) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
+    let c = Context::new(f);
+    let owners = times.iter().map(|t| c.owner(*t)).collect::<Vec<_>>();
+    import::verify_import_bundle_witnesses(
+        &record(f, name),
+        pin,
+        snapshot,
+        now_ms,
+        &owners,
+        |b, _| {
+            if b.policies != vec![record(f, "signed_policy")] {
+                return Err(codec::Reject::Signature);
+            }
+            Ok(())
+        },
+    )
+}
+#[test]
+fn review_alpha31_signed_negatives_reject_then_pass() {
+    let f = fixture();
+    let mut failures = Vec::new();
+    for v in f["review_alpha31_vectors"]["negative"]
+        .as_array()
+        .expect("review negatives")
+    {
+        let snapshot = v["snapshot_bundle"].as_str().map(|name| {
+            review_verify(&f, name, &alpha31_pin(&f, false), None, &[1100, 1250])
+                .expect("snapshot control")
+                .snapshot
+        });
+        let replacement = v["replacement"].as_bool().unwrap_or(false);
+        let mut pin = alpha31_pin(&f, replacement);
+        if let Some(epoch) = v["pin_epoch"].as_u64() {
+            pin.epoch = epoch;
+        }
+        let times = v["owner_times"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .map(|t| t.as_i64().expect("time"))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(|| vec![1100, 1250]);
+        let name = v["bundle"].as_str().expect("bundle");
+        let actual = review_verify(&f, name, &pin, snapshot.as_ref(), &times)
+            .map_or_else(|r| format!("{r:?}"), |_| "OK".into());
+        let control = v["control"].as_str().expect("control");
+        let control_times = if control == "review_scheduled_admitted" {
+            vec![1200]
+        } else if control == "review_recovery" {
+            vec![1100]
+        } else {
+            vec![1100, 1250]
+        };
+        review_verify(
+            &f,
+            control,
+            &alpha31_pin(&f, replacement),
+            snapshot.as_ref(),
+            &control_times,
+        )
+        .expect("unchanged control");
+        println!("REVIEW {}: {actual} -> control PASS", v["id"]);
+        if actual != v["expected"].as_str().expect("reason") {
+            failures.push(format!(
+                "{}: expected {}, got {actual}",
+                v["id"], v["expected"]
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+#[test]
+fn review_alpha31_zero_statements_require_policy_hook() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let bundle = record(&f, "review_recovery");
+    let pin = alpha31_pin(&f, false);
+    assert_eq!(
+        import::verify_import_bundle_witnesses(
+            &bundle,
+            &pin,
+            None,
+            1_350_000,
+            &[c.owner(1100)],
+            |_, _| Err(codec::Reject::Signature)
+        ),
+        Err(codec::Reject::Signature)
+    );
+    let mut calls = 0;
+    import::verify_import_bundle_witnesses(
+        &bundle,
+        &pin,
+        None,
+        1_350_000,
+        &[c.owner(1100)],
+        |_, _| {
+            calls += 1;
+            Ok(())
+        },
+    )
+    .expect("verified recovery policy");
+    assert_eq!(calls, 1);
+}
+#[test]
+fn review_alpha31_historical_before_claim_is_bounded() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let v = &f["review_alpha31_vectors"]["historical_expiry"];
+    let d: api::SignedImportJobDelegationV1 =
+        record(&f, v["delegation"].as_str().expect("delegation"));
+    let old = f["effective_owner_expiry_vectors"]["vectors"]
+        .as_array()
+        .expect("expiry vectors")
+        .iter()
+        .find(|x| x["id"] == v["context"])
+        .expect("historical context");
+    let chain = import::owner_chain_digest(&record(&f, old["chain"].as_str().expect("chain")))
+        .expect("chain");
+    let mut e = c.owner(1050);
+    e.identity = d
+        .body
+        .as_ref()
+        .expect("body")
+        .identity
+        .as_ref()
+        .expect("id");
+    e.owner_chain_digest = &chain;
+    e.authority_expires_at_seconds = 1150;
+    assert_eq!(
+        import::verify_delegation(&d, None, &e),
+        Err(codec::Reject::Scope)
+    );
+    e.authority_expires_at_seconds = i64::MAX;
+    import::verify_delegation(&d, None, &e).expect("unbounded control proves expiry gate");
+}
+#[test]
+fn review_alpha31_scheduled_commit_defers_native_admission() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let v = &f["review_alpha31_vectors"]["scheduled"];
+    let request: api::CommitImportJobRequest = record(&f, v["commit"].as_str().expect("commit"));
+    assert!(request.proof.as_ref().expect("proof").statements.is_empty());
+    let committed = import::verify_commit_submission(
+        &request,
+        &record(&f, "commit_preparation"),
+        "github",
+        &record(&f, "source_connected"),
+        &record(&f, "import_configuration"),
+        &c.owner(1100),
+    )
+    .expect("scheduled Commit at 1100");
+    import::validate_commit_response(&request, &record(&f, "commit_response"))
+        .expect("pending operation");
+    import::validate_job_state_response(
+        &record(&f, "job_state_request"),
+        &record(&f, "review_scheduled_state_read"),
+    )
+    .expect("authenticated state-read carrier before N");
+    let recovered = review_verify_at(
+        &f,
+        "review_scheduled_recovery",
+        &alpha31_pin(&f, false),
+        None,
+        &[1100],
+        1_100_000,
+    )
+    .expect("time-free recovery before N");
+    assert!(recovered.snapshot.accepted_history[0].statements.is_empty());
+    let operation = record(&f, "commit_future_operation");
+    assert_eq!(
+        import::verify_new_operation(&operation, &committed, 1199),
+        Err(codec::Reject::Expired)
+    );
+    import::verify_new_operation(&operation, &committed, 1200).expect("execution at N");
+    review_verify(
+        &f,
+        "review_scheduled_admitted",
+        &alpha31_pin(&f, false),
+        Some(&recovered.snapshot),
+        &[1200],
+    )
+    .expect("historical admission at receiver 1350");
+    assert_eq!(
+        import::verify_new_operation(&operation, &committed, 1300),
+        Err(codec::Reject::Expired)
+    );
+    let parent = record(&f, "permission");
+    assert_eq!(
+        import::check_import_revocations(
+            &request.proof.as_ref().expect("proof").delegations[0],
+            Some(&parent),
+            &[parent.body.as_ref().expect("body").cancellation_id.clone()]
+        ),
+        Err(codec::Reject::Revoked)
+    );
+    import::check_import_revocations(
+        &request.proof.as_ref().expect("proof").delegations[0],
+        Some(&parent),
+        &[],
+    )
+    .expect("unrevoked control");
+    assert!(
+        recovered.snapshot.accepted_history[0].statements.is_empty(),
+        "refusal issues no testimony"
+    );
+}
+#[test]
+fn review_alpha31_refused_request_is_not_accepted_replay() {
+    let f = fixture();
+    let v = &f["review_alpha31_vectors"]["refused_replay"];
+    let old: api::RenewImportJobRequest = record(&f, v["request"].as_str().expect("request"));
+    let accepted: api::RenewImportJobRequest =
+        record(&f, v["accepted"].as_str().expect("accepted"));
+    assert_eq!(
+        import::check_renew_replay(&old.encode_to_vec(), &accepted.encode_to_vec()),
+        Err(codec::Reject::OperationIdReused)
+    );
+    import::check_renew_replay(&accepted.encode_to_vec(), &accepted.encode_to_vec())
+        .expect("accepted exact replay");
+}
+
+#[test]
+fn review_alpha31_renew_after_cancel_refuses() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let v = &f["review_alpha31_vectors"]["renew_after_cancel"];
+    let request = record(&f, v["request"].as_str().expect("request"));
+    let read = record(&f, v["read"].as_str().expect("read"));
+    assert_eq!(
+        import::validate_renew_request(&request, &read, true),
+        Err(codec::Reject::Transition)
+    );
+    assert_eq!(
+        import::verify_renew_submission(&request, &read, &c.owner(1200), &c.owner(1200), true),
+        Err(codec::Reject::Transition)
+    );
+    import::verify_renew_submission(&request, &read, &c.owner(1200), &c.owner(1200), false)
+        .expect("non-terminal control");
+}
+#[test]
+fn review_alpha31_invalid_deferred_deadlines_refuse() {
+    for deadline in [0, -5] {
+        assert_eq!(
+            import::effective_owner_authority_expiry(true, deadline),
+            Err(codec::Reject::Scope)
+        );
+    }
+    assert_eq!(
+        import::effective_owner_authority_expiry(true, 1150),
+        Ok(1150)
+    );
+    assert_eq!(
+        import::effective_owner_authority_expiry(false, 0),
+        Ok(i64::MAX)
+    );
+}
+#[test]
+fn review_alpha31_root_replacement_requires_same_authority() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let old =
+        witness::verify_set(&record(&f, "retired_set"), &c.set(1_350_000), None).expect("old set");
+    let key = bytes(&f["keys"]["wrong_root"]["public_key_hex"]);
+    let mut e = c.set(1_350_000);
+    e.root_id = "descriptor-root-2";
+    e.root_public_key = &key;
+    e.root_epoch = 2;
+    let signed = record(&f, "alpha31_replacement_set");
+    witness::verify_set_after_root_replacement(&signed, &e, &old).expect("replacement control");
+    e.authority = "https://other.example.test";
+    assert_eq!(
+        witness::verify_set_after_root_replacement(
+            &record(&f, "review_foreign_authority_replacement_set"),
+            &e,
+            &old
+        ),
+        Err(codec::Reject::Root)
+    );
+}
+#[test]
+fn review_alpha31_unwitnessed_renewal_is_time_free_recovery() {
+    let f = fixture();
+    let r = review_verify(
+        &f,
+        "review_renewed_recovery",
+        &alpha31_pin(&f, false),
+        None,
+        &[900, 900],
+    )
+    .expect("no invented activation clock");
+    assert_eq!(r.accepted_history.authority_epoch, 2);
+    assert!(r.snapshot.accepted_history[0].statements.is_empty());
+}
+#[test]
+fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let v = &f["review_alpha31_vectors"]["scheduled"];
+    let request: api::CommitImportJobRequest = record(&f, "review_scheduled_commit");
+    let committed = import::verify_commit_submission(
+        &request,
+        &record(&f, "commit_preparation"),
+        "github",
+        &record(&f, "source_connected"),
+        &record(&f, "import_configuration"),
+        &c.owner(1100),
+    )
+    .expect("Commit control");
+    let recovery = review_verify_at(
+        &f,
+        "review_scheduled_recovery",
+        &alpha31_pin(&f, false),
+        None,
+        &[1100],
+        1_100_000,
+    )
+    .expect("retained submission");
+    let parent: api::SignedImportMemberPermissionV1 = record(&f, "permission");
+    let signed = &request.proof.as_ref().expect("proof").delegations[0];
+    let operation = record(&f, "commit_future_operation");
+    let mut failures = Vec::new();
+    for n in v["execution_negative"]
+        .as_array()
+        .expect("execution refusals")
+    {
+        let revoked = if n["revoked_parent"].as_bool().unwrap_or(false) {
+            vec![parent.body.as_ref().expect("body").cancellation_id.clone()]
+        } else {
+            vec![]
+        };
+        let result =
+            import::check_import_revocations(signed, Some(&parent), &revoked).and_then(|_| {
+                import::verify_new_operation(
+                    &operation,
+                    &committed,
+                    n["at"].as_i64().expect("time"),
+                )
+            });
+        let actual = result.map_or_else(|r| format!("{r:?}"), |_| "OK".into());
+        println!("REVIEW {}: {actual}; no testimony", n["id"]);
+        if actual != n["expected"].as_str().expect("reason") {
+            failures.push(format!("{}: {actual}", n["id"]));
+        }
+        import::check_import_revocations(signed, Some(&parent), &[]).expect("unrevoked control");
+        import::verify_new_operation(&operation, &committed, 1200).expect("N control");
+        assert!(recovery.snapshot.accepted_history[0].statements.is_empty());
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

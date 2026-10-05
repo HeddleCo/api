@@ -449,11 +449,27 @@ equals the base in **every** original genesis. If absent, the exact base closure
 must already be hosted. Nonempty closures use SyncService publication.
 
 Under one authorization/destination/reservation transaction, Commit persists
-source/base and verified authority, installs epoch 1, creates the initial
-physical operation whose ID equals `retry_lineage_id` and makes it runnable. Its successful
-`MutationResponse.receipt` MUST contain `pending_operation` for that created
+source/base and verified authority, retains the originals pending native
+admission, installs epoch 1, and creates the initial physical operation whose ID
+equals `retry_lineage_id`. It queues that operation behind its signed not-before
+N. Its successful `MutationResponse.receipt` MUST contain `pending_operation` for that created
 operation in the destination Spool, never an `applied` acknowledgement. Failure
 leaves no activated job, operation or partial branch publication.
+
+A scheduled Commit accepted at T < N activates the logical job and returns the
+required `pending_operation` receipt, but MUST issue NO purpose-1 genesis admission
+or purpose-3 publication witness. The receipt acknowledges retained submission;
+it is not native admission testimony. At actual execution start U, the host MUST
+recheck the independently selected effective owner, original genesis parent,
+policy, revocation, source custody and authority under the admission transaction,
+require N <= U < E, and issue the first purpose-1 witness atomically with actual
+native admission at U. Each subsequent publication issues its own purpose-3
+witness at its actual publication time. Delayed start at U >= E, an intervening
+revocation, or any other failed gate MUST refuse without issuing testimony.
+Renewal MUST NOT replace the originals' genesis parent. Existing first testimony
+is preserved unchanged. Every native admission and publication MUST independently
+be valid at its own authenticated observation; later receiver time, Commit time,
+and a future claim cannot supply historical authority.
 
 Commit's caller-scoped `client_operation_id` is its own idempotency key, distinct
 from Prepare's. Persist the exact request and receipt with activation. Exact
@@ -526,7 +542,20 @@ Skew permits clock differences at not-before, never grace after expiry or an
 extension of parent/owner authority. Commit may accept `N > T` within skew;
 execution remains forbidden until `N`. The typed parent must be valid at actual
 Commit time and contain the entire child window, and the child's expiry cannot
-exceed the independently verified owner authority expiry. Use checked/widened
+exceed the independently verified owner authority expiry. Authority expiry MUST
+derive from the **effective selected owner state at the verification time**,
+never from the immutable sequence-zero root. A still-deferred, unclaimed owner
+with a positive deadline is bounded by `claimable_until_unix_seconds`. After an
+accepted `ClaimDeferredHuman`, or any accepted transition clearing deferral,
+authority is unbounded (`2^63 - 1` seconds), including after the original claim
+deadline. Historical verification MUST use the effective state at that historical
+time: a future claim cannot make earlier unclaimed authority unbounded.
+`effective_owner_authority_expiry` / `effectiveOwnerAuthorityExpiry` take only
+independently verified effective-state inputs. A deferred owner with a deadline
+<= 0 is inconsistent and MUST reject `Scope`; the Rust helper now returns
+`Result<i64, Reject>` and the TS helper throws. Signed parent and child validity
+windows still apply. This matches heddle's `authority_expires_at_seconds`.
+Use checked/widened
 integer arithmetic, including extreme uint64 duration/skew advertisements.
 
 Browser signing uses the separate `preflight_prepared_delegation` /
@@ -863,7 +892,13 @@ against that high-water and the saved clock floor. An uninformed fresh receiver 
 unexpired authentic older set; the five-minute bound is NOT owner/policy freshness.
 
 Explicit out-of-band descriptor-root replacement invalidates old contexts and
-preserves known seals/intervals/tombstones. Compromised-root recovery requires
+preserves authenticated history, generation high-water, known seals, intervals,
+tombstones, job-key associations and the clock floor. Replacement compares the
+expected old pin and advances its epoch by one; generation and high-water MUST
+NOT reset. There is no previous-root overlap. The old root MUST NOT authenticate
+new responses, and every context created under its epoch rejects as
+`StaleContext`. Clients install the new pin explicitly out of band.
+Compromised-root recovery requires
 independent pre-compromise provenance, not a newly signed archive/higher generation.
 Otherwise affected history is unavailable. The owner [accepted replica-held root
 custody](https://github.com/HeddleCo/weft/issues/2469#issuecomment-5943900946) for first
@@ -1337,6 +1372,8 @@ empty committed snapshot. No fabricated timestamps or synthetic receipts.
 The browser flow is:
 
 1. Read and independently verify retained evidence and the authenticated snapshot.
+   Derive each owner expiry from its effective selected state at that verification
+   time; a claimed human does not inherit the immutable root's claim deadline.
 2. Compute and review the remaining scope from the committed slots and consumed
    budgets. Request an ordinary exact renewal Prepare with this caller-selected
    scope and the exact `retained_source`; no inventory lookup is needed, including
@@ -1375,7 +1412,7 @@ through this read using the destination/job selector projected on a visible
 `ImportOperationSubject.hybrid_job = 4` is a typed `HybridImportJobSelector` whose
 `logical_job_id = 1` is exactly 16 bytes and not all zero. Hosts populate it from
 the durable destination/logical-job association for **every physical HYBRID
-attempt**, including the initial attempt, retries, renewals and historical or
+attempt**, including the initial attempt, retries after authority-only renewal, and historical or
 terminal attempts. The pair stays stable across attempts of one logical job;
 different destinations are distinct scopes even if job ID bytes match. Physical
 operation IDs, `retry_of`, `client_operation_id` and retry lineage never substitute
@@ -1430,8 +1467,12 @@ The exact `RenewImportJobRequest.proof` profile is based on that retained proof:
   select and carry the explicit empty manifest; operations and publication
   receipts are absent. Preserve real genesis admissions if present.
 
-`validate_renew_request` / `validateImportRenewRequest` check this request-level
-composition against the authenticated read. `verify_renew_submission` /
+`validate_renew_request` / `validateImportRenewRequest` require an explicit
+independently authenticated `logical_job_terminal` / `logicalJobTerminal` flag,
+selected under the host transaction. True MUST reject `Transition` before a
+renewal can revive a cancelled/revoked job; exact stored receipt replay remains a
+separate acknowledgement path. The submission composition requires this flag too.
+These helpers check this request-level composition against the authenticated read. `verify_renew_submission` /
 `verifyImportRenewSubmission` additionally run the existing time-free predecessor
 verification with its resolved old parent/context, then current replacement and
 renewal verification with the exact new parent/context. Accepted owner histories,
@@ -1450,3 +1491,186 @@ before current expiry/CAS/terminal checks and return the stored receipt without
 another epoch increment. A race requiring a different snapshot, proof or signature
 requires a new operation ID and preparation. Never mutate a pending frozen request
 in place. No v2 encoding or compatibility path is introduced.
+
+### Import bundle witness composition (alpha.31)
+
+`verify_import_bundle_witnesses` / `verifyImportBundleWitnesses` accept the retained
+`ImportPublicProofBundleV1`, an independently installed descriptor pin (authority,
+root ID, public key, epoch), the receiver's durable snapshot, actual verification
+clock, independently verified historical owner contexts in delegation order, and
+a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
+its response/retained closure, independently verify owner histories and original
+native authority/causal/landing context with heddle, then call this composition
+before reviewing or computing remaining scope. The hook receives each exact
+statement (`Some(statement)` in Rust) only after witness signature and inclusion
+verification; use heddle's `verifySignedPolicyChain` WASM to verify the selected chain, owner context and
+historical observation time. A carried policy hash alone is never verification.
+API verifies policy reference completeness, not heddle's policy signatures.
+When there are zero statements the hook MUST still run once with `None` (Rust) /
+`undefined` (TS), verifying the retained policy/owner/native closure without a
+historical timestamp or admission claim. TS MUST reject an undefined/non-function
+hook at runtime, including on this recovery path.
+
+For each delegation with publications, the supplied owner-check time MUST equal
+floor(observed_at_unix_millis / 1000) of its first authenticated publication in
+accepted admission order. For the initial delegation with admissions but no
+publication, use its earliest authenticated genesis admission. A mismatch rejects
+`Root`; neither receiver time nor a signed author's timestamp selects historical
+owner state. Each genesis admission and publication is additionally rechecked at
+its own authenticated observation. The policy hook MUST independently select and
+verify the effective owner/native/policy context for every statement at that
+observation, including when different events fall across an owner transition.
+Every statement's Spool UUID, Spool genesis digest, owner ID, owner state hash and
+ownership-transfer sequence MUST match a verified delegation identity. Initial
+genesis bindings MUST match the original delegation, creator, parent permission,
+owner chain and exact branch genesis, even before admission exists.
+
+Unwitnessed delegations/renewal activations have no authenticated observation:
+verify their original signatures, owner references, window shape, parent
+containment, scope and budget accounting time-free. Their supplied `now` is unused
+for interval checks. This is recovery evidence only, establishing no historical
+or executable authority; it permits a state read before N or after expiry. Do
+not invent an in-window clock or a witness for Commit/Renew activation.
+
+The composition verifies the root signature and complete witness history,
+monotonic generation and clock floor, every statement and retirement inclusion,
+exact admission/authority/publication/landing payloads and original signatures,
+signed delegation/renewal history and accepted publication order. Every renewal
+MUST commit the progressive manifest current before the first publication under
+its replacement; no publication may return to a superseded delegation. Any
+remaining renewal MUST commit the terminal manifest. These checks preserve
+owner-signed cumulative operation/byte budgets and scope narrowing across all
+renewals. Before any publication, absent admission statements confer no historical admission claim.
+It returns the authenticated committed manifest, active predecessor, authority
+epoch and an updated snapshot. Compare these with the authenticated read state.
+Persist the result atomically under the receiver's trust/mutation lock; failures
+return no snapshot and cannot advance trust. Never source a persisted snapshot,
+owner context or descriptor pin from the incoming bundle. Snapshot copies in TS
+prevent asynchronous hook mutation from changing verification inputs.
+
+Both Rust `verify_set_after_root_replacement` and TS
+`verifyWitnessSetAfterRootReplacement` are public and require the same deployment
+authority plus exactly epoch+1. A newer independently installed pin performs an
+explicit epoch+1 replacement.
+The previous pin in receiver-owned storage is used solely to restore previously
+accepted history, never to authenticate the response. New response signatures
+must verify under the installed pin, and all old context epochs remain stale.
+The signed wire set has no epoch field: epoch belongs to the independent pin and
+verified contexts. Same-generation equivocation, including at replacement,
+rejects. Lower generations, missing seals/tombstones and history rollback reject
+under the new root just as they do under the old root.
+
+The signed `StaleManifest` renewal-refusal vectors freeze a request at S, retain
+an accepted publication producing S′ at the same authority epoch, and classify
+the definitive refusal against the fresh read as `StaleManifest`. Replaying the
+refused bytes cannot settle the candidate: it is absent from accepted history.
+Its bytes MUST fail accepted-request replay matching with `OperationIdReused`;
+this gate is distinct from revalidating the old candidate against S′, which
+refuses `StaleManifest` again. The positive rereads S′, recomputes
+remaining scope and budget, selects a new job key/delegation ID, and obtains new
+parent, delegation and renewal signatures. Its candidate remains outside the
+retained accepted history until successful activation. No wire or refusal
+semantics change is introduced by this vector set.
+
+The durable snapshot retains each job's complete accepted bundle (up to 1 MiB
+per job) for the life of that receiver's history. Its total size grows with the
+number of jobs; snapshot copies and accepted-history searches also grow with
+that retained history. Purpose-3 payload matching remains O(statements ×
+operations × manifests), with up to 1024 statements, 256 operations and 320
+manifests per bundle; structural validation and composition both perform this
+matching. The interleaving check itself is O(operations + renewals), excluding
+manifest digest construction. These costs are not reduced by this fix.
+
+## Import job control (alpha.31 owner decisions, 2026-10-04)
+
+Renew is **authority activation only**. A successful `RenewImportJob` MUST return
+`receipt.applied` under its own `client_operation_id` and MUST create no physical
+attempt, enqueue no fetch and create no retry links. Empty `resulting_versions`
+is valid; recover the new epoch and active certificate through the authenticated
+job-state read. Persist activation and its exact receipt together. Exact frozen
+replay returns that stored receipt before current CAS/expiry/terminal checks,
+without reactivation; changed body bytes under the same caller-scoped ID MUST
+refuse `OPERATION_ID_REUSED`. Explicitly cancelled or revoked logical jobs can
+never be revived by Prepare, Renew or Retry.
+
+Retry is eligible only for an **incomplete terminal physical attempt**: FAILED
+or CANCELED, with remaining authorized slots and no direct replacement. Physical
+attempt cancellation does not mean logical-job cancellation. Queued, running,
+waiting, paused, completed, already superseded and complete-job attempts are
+ineligible. The job must remain executable under all current authority, policy,
+revocation, budget, frontier and lease checks. In-window eligible retries need
+no new signature. On expired authority, the required flow is authenticated state
+read -> compute/review remaining scope -> exact Prepare -> sign replacement
+permission/delegation and renewal -> Renew -> state read -> Retry with a **NEW
+request ID**, the active replacement digest/epoch and eligible operation CAS.
+Renew's request ID MUST NOT be reused for Retry.
+
+Every admitted Retry MUST allocate a fresh **host-generated physical UUID**,
+distinct from every prior attempt (including the first lineage UUID) and
+independent of the request idempotency key. Return `receipt.pending_operation`
+for that UUID under Retry's request ID. In one admission transaction, persist
+the allocation, immediate `retry_of`/`superseded_by` links, predecessor version
+advance and the exact receipt. At most one direct replacement can win. Exact
+frozen replay returns the same receipt/UUID without allocation or relinking,
+even after authority/target changes; changed bytes refuse `OPERATION_ID_REUSED`.
+The host MUST retain the complete attempt set; portable helpers do not allocate
+UUIDs or prove transactional persistence.
+
+Every successful writer-only `GetImportJobStateResponse` MUST contain exactly
+one `retry_availability`: `eligible_retry_target {operation_ref,
+operation_version}` or a known nonzero `retry_unavailable` reason. The target
+contains one canonical non-nil physical UUID, the exact destination and a
+1..256-byte opaque operation CAS token. It is the eligible unsuperseded terminal
+attempt selected from the durable job/lineage association, read transactionally
+with state, retained proof and retained source. The existing 2 MiB response
+bound includes it. Reasons distinguish no terminal attempt, attempt in progress,
+complete job, logical-job cancellation, logical-job revocation and an already
+superseded target. Authority expiry or lack of source custody alone does not
+hide an otherwise eligible physical target: Renew/custody checks still gate
+admission. If the durable association cannot be read, refuse UNAVAILABLE after
+writer authorization; never guess from IDs or return partial state.
+
+This is an explicitly authorized **narrow disclosure to current destination
+writers**, even if the physical operation is otherwise hidden from that writer.
+Retry does not require initiating-account equality or ordinary operation
+visibility. Ordinary OperationService visibility and unreadable-link redaction
+remain unchanged. In ONE admission transaction, Retry MUST bind this current
+target to the exact destination, logical job, transitive retry lineage, operation
+CAS, active certificate digest/epoch and current authorization. A stale target
+or concurrent replacement refuses; a target alone grants no execution authority.
+
+Any current destination writer may Cancel with authenticated PoP, exact
+job/destination, the active cancellation ID and expected epoch. Cancel requires
+no provider connection, source grant, selected-commit fetch or initiating-account
+match. It must remain available when the original importer's source access is
+lost. For CONNECTED imports, Retry admission and Renew activation MUST instead
+require the caller to **own the exact retained connection**, with current exact
+repository/installation grants and selected-commit availability, rechecked at
+those mutation boundaries. Another connection to the same repository cannot
+substitute. Subsequent fetches MUST bind to that authorized attempt and source
+association; credentials MUST NEVER be selected from the old initiator's
+account. Public-git permits Retry/Renew by any current destination writer with
+proper signed authority and all current checks, including commit availability.
+Prepare retains its existing current custody checks.
+
+`CommitImportJobRequest` has a maximum decoded protobuf message size of **2 MiB
+(2097152 bytes), inclusive**, and `proof` has a maximum of **1 MiB (1048576
+bytes), inclusive**. Measure the whole uncompressed protobuf payload before
+decoding and the decoded message's protobuf encoded size before semantic
+admission; reject one byte over either bound. All existing per-field and
+record-count bounds still apply. The compact boundary vectors synthesize exact
+size carriers for size validation; passing that check does not make an otherwise
+invalid carrier an admissible Commit.
+
+Rust/TS `check_import_control_caller` / `checkImportControlCaller` consume only
+independently authenticated current host facts. `validate_retry_state_response`
+/ `validateImportRetryStateResponse` require the additive disclosure;
+`check_retry_admission` / `checkImportRetryAdmission` compose its target,
+operation CAS, lineage, authority and custody checks. Historical recovery
+validators still accept the frozen alpha.30 carriers without the new fields;
+hosts MUST populate the new disclosure on current successful reads.
+`validate_renew_response` / `validateImportRenewResponse`,
+`validate_retry_response` / `validateImportRetryResponse`, frozen replay helpers
+and Commit size helpers validate the portable receipt/size requirements. Hosts
+own the authorization lookup, transaction, allocation, credential binding and
+worker fences; API helpers are not a storage or execution implementation.

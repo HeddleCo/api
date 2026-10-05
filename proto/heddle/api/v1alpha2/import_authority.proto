@@ -361,6 +361,21 @@ message GetImportJobStateRequest {
   SpoolRef destination = 1;
   bytes logical_job_id = 2; // Exactly 16 nonzero bytes; <=4096 encoded request bytes.
 }
+// Narrow writer-only disclosure; does not expose a full OperationRecord or
+// change ordinary OperationService visibility. Same destination/job/lineage.
+message ImportEligibleRetryTargetV1 {
+  OperationRef operation_ref = 1; // Canonical non-nil physical UUID; exact destination.
+  bytes operation_version = 2; // Opaque CAS token, 1..256 bytes.
+}
+enum ImportRetryUnavailableReason {
+  IMPORT_RETRY_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+  IMPORT_RETRY_UNAVAILABLE_REASON_NO_TERMINAL_ATTEMPT = 1;
+  IMPORT_RETRY_UNAVAILABLE_REASON_ATTEMPT_IN_PROGRESS = 2;
+  IMPORT_RETRY_UNAVAILABLE_REASON_COMPLETE = 3;
+  IMPORT_RETRY_UNAVAILABLE_REASON_JOB_CANCELLED = 4;
+  IMPORT_RETRY_UNAVAILABLE_REASON_JOB_REVOKED = 5;
+  IMPORT_RETRY_UNAVAILABLE_REASON_ALREADY_SUPERSEDED = 6;
+}
 message GetImportJobStateResponse {
   // One transactional snapshot, including an explicit empty manifest before
   // publication. Read -> compute/review remaining scope -> EXACT Prepare. Its
@@ -379,9 +394,25 @@ message GetImportJobStateResponse {
   // guess from inventory. Renewal must use this selector unchanged: no rebinding.
   // The accepted association is immutable across retries and renewals.
   // Host re-authorizes current caller connection, exact repository/installation
-  // grant and selected-commit availability at Prepare and renewal activation.
+  // grant and selected-commit availability at Prepare, Retry admission and Renew
+  // activation. CONNECTED requires ownership of this exact retained connection.
   ImportSourceSelectionV1 retained_source = 3;
+  // Required on success, read in the SAME transaction as state/retained_source.
+  // At most one unsuperseded FAILED/CANCELED physical attempt with remaining
+  // authorized slots; a canceled physical attempt is distinct from job Cancel.
+  // Authority expiry alone does not remove this target: Renew before Retry.
+  // Retry rechecks target, destination/job/lineage, operation CAS and active
+  // authority atomically. No initiating-account/ordinary visibility prerequisite.
+  oneof retry_availability {
+    ImportEligibleRetryTargetV1 eligible_retry_target = 4;
+    ImportRetryUnavailableReason retry_unavailable = 5; // Known nonzero reason.
+  }
 }
+// Authority activation ONLY: successful receipt.applied uses this request's ID;
+// empty resulting_versions is valid. Creates NO physical attempt. Recover the
+// new epoch/certificate via GetImportJobState. Exact frozen replay returns the
+// stored receipt without activation; changed bytes -> OPERATION_ID_REUSED.
+// Explicitly cancelled/revoked logical jobs can never be revived.
 message RenewImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
@@ -399,6 +430,8 @@ message RenewImportJobRequest {
   ImportPublicProofBundleV1 proof = 4;
 }
 message CancelImportJobRequest {
+  // Any current destination writer with authenticated PoP may cancel; no
+  // initiating-account restriction, provider connection or source fetch needed.
   string client_operation_id = 1;
   SpoolRef destination = 2;
   bytes logical_job_id = 3;

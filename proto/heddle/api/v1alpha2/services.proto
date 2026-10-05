@@ -2757,6 +2757,8 @@ service IntegrationService {
       mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
+  // Authority activation only; applied receipt, no physical attempt. CONNECTED
+  // requires current caller ownership of exact retained custody at activation.
   rpc RenewImportJob(RenewImportJobRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -2776,6 +2778,7 @@ service IntegrationService {
       mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
+  // Any current destination writer may cancel; provider custody is not required.
   rpc CancelImportJob(CancelImportJobRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -2932,6 +2935,8 @@ service IntegrationService {
       mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
+  // Admit against the writer-only job-state target in one transaction; ordinary
+  // OperationService visibility is unchanged. Recheck exact caller-owned custody.
   rpc RetryImportSource(RetryImportSourceRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL

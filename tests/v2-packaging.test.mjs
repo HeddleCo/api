@@ -74,3 +74,9 @@ test('every built v2 runtime module has a public export or an explicit exception
     !barrelOnlyModules.has(name) && !internalModules.has(name));
   assert.deepEqual(missing, [], `Missing public exports for built v2 runtime modules: ${missing.join(', ')}`);
 });
+
+test('npm public import-authority export includes alpha31 composition', async () => {
+  const runtime = await import('@heddleco/api/v2/import-authority');
+  assert.equal(typeof runtime.verifyImportBundleWitnesses, 'function');
+  assert.equal(typeof runtime.effectiveOwnerAuthorityExpiry, 'function');
+});

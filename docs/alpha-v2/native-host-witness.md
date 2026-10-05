@@ -145,7 +145,7 @@ accepted ownership transfers, digest-sorted exact owner-chain history, policies,
 native genesis payloads, native purpose-2 payloads, optional hosted landing
 payloads, the complete signed witness set, signed statements and per-statement
 retirement proofs. Originals and envelopes are embedded in their payloads.
-It has no job, import permission, delegation, renewal, result slot or terminal
+It has no job, import permission, delegation, result slot or terminal
 manifest. Foreign evidence is verified against independently selected roots;
 carried owner roots and witness sets never enroll themselves.
 

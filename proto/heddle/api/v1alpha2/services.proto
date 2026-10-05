@@ -2737,7 +2737,8 @@ service IntegrationService {
   // initial physical operation. Success is receipt.pending_operation, never
   // applied; no later ImportSource call. An exact client_operation_id replay
   // returns the same receipt/operation without reactivation, even after expiry.
-  // Changed inputs under that ID fail ERROR_REASON_OPERATION_ID_REUSED.
+  // Changed inputs under an ID that already has an accepted receipt fail
+  // ERROR_REASON_OPERATION_ID_REUSED.
   rpc CommitImportJob(CommitImportJobRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
@@ -2757,27 +2758,7 @@ service IntegrationService {
       mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
     };
   }
-  // Authority activation only; applied receipt, no physical attempt. CONNECTED
-  // requires current caller ownership of exact retained custody at activation.
-  rpc RenewImportJob(RenewImportJobRequest) returns (MutationResponse) {
-    option (heddle.api.common.rpc_contract) = {
-      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
-      effect: RPC_EFFECT_DURABLE_WRITE
-      retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
-      client_operation_id_required: true
-      capability: CAPABILITY_AREA_SYNCHRONIZATION
-      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
-      authorization_role: AUTHORIZATION_ROLE_RESOURCE_WRITER
-      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
-      authorization_request_targets: {
-        path: "destination"
-        role: AUTHORIZATION_ROLE_RESOURCE_WRITER
-      }
-      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
-      mandatory_features: [MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1]
-    };
-  }
+
   // Any current destination writer may cancel; provider custody is not required.
   rpc CancelImportJob(CancelImportJobRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {

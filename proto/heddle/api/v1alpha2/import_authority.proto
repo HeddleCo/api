@@ -47,7 +47,7 @@ message ImportOwnerChainV1 {
   repeated bytes transfer_audit_hashes = 3;
 }
 // One authorized result slot. First release permits one result per branch;
-// slot_id is stable across physical retries, certificates and signing keys.
+// slot_id is stable across physical retries under the job's single certificate.
 // Reservation identity is (spool UUID, full ref, slot_id), not slot_id alone.
 // Full refs are exclusive across all non-terminal jobs in the same spool.
 message ImportBranchLimitV1 {
@@ -76,8 +76,8 @@ message ImportPermissionScopeV1 {
   bytes destination_version = 4;
   bytes options_digest = 5;
   string converter_version = 6;
-  uint32 max_operations = 7; // Logical-job total; never reset by renewal/retry.
-  // ONE positive u64 logical-job authorization total; narrow-only, never reset.
+  uint32 max_operations = 7; // Logical-job total; never reset by retry.
+  // ONE positive u64 logical-job authorization total; never reset.
   // Bounds server-held job-key writes under delegation; not a storage quota.
   uint64 max_result_bytes = 8;
 }
@@ -96,8 +96,8 @@ message ImportMemberPermissionV1 {
   ImportPermissionScopeV1 scope = 7;
   int64 not_before_unix_seconds = 8;
   int64 expires_at_unix_seconds = 9;
-  // CSPRNG 32 bytes at lineage start; stable across grants for the same
-  // logical-job/retry-lineage/grantee. Namespace heddle-import-cancel-v1.
+  // CSPRNG 32 bytes for this job's sole member permission; retries preserve it.
+  // The delegation has a separate ID. Namespace heddle-import-cancel-v1.
   bytes cancellation_id = 10;
   bytes owner_chain_digest = 11; // Exact independently verified public chain digest.
   // Fresh CSPRNG 32 bytes per new grant. Byte-identical replay preserves it.
@@ -129,9 +129,11 @@ message ImportBranchManifestV1 {
 // adds only fields 8, 9, 13 (binding digests, never limits), 14 and 15, and signs
 // the complete body. Prepare supplies no placeholders for these fields.
 message ImportJobDelegationV1 {
+  reserved 17;
+  reserved "predecessor_delegation_digest";
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
-  bytes delegation_id = 3; // Unique random 16 bytes, renewed certificates get new IDs.
+  bytes delegation_id = 3; // Unique random 16 bytes.
   bytes logical_job_id = 4;
   bytes retry_lineage_id = 5;
   bytes job_public_key = 6;
@@ -145,7 +147,6 @@ message ImportJobDelegationV1 {
   int64 not_before_unix_seconds = 14; // Browser-selected within prepared host bounds.
   int64 expires_at_unix_seconds = 15; // Exclusive; no clock-skew grace after expiry.
   bytes cancellation_id = 16;
-  bytes predecessor_delegation_digest = 17; // Zero32 initially.
 }
 message SignedImportJobDelegationV1 {
   ImportJobDelegationV1 body = 1;
@@ -164,22 +165,7 @@ message ImportResultManifestV1 {
   bytes retry_lineage_id = 3;
   repeated ImportCommittedSlotV1 slots = 4; // Sorted by ref UTF-8, slot; unique.
 }
-// P2 #2: replacement includes only uncommitted slots, preserves original
-// geneses/envelopes/first receipts and uses a fresh key. expected_authority_epoch
-// and committed_manifest_digest CAS serialize two renewals with publication.
-// Renewed parent scope MUST also exclude committed slots and reduce budgets;
-// original parent/envelope remain unchanged for retained genesis verification.
-message ImportJobRenewalV1 {
-  uint32 format_version = 1;
-  bytes predecessor_delegation_digest = 2;
-  uint64 expected_authority_epoch = 3;
-  bytes committed_manifest_digest = 4;
-  SignedImportJobDelegationV1 replacement = 5;
-}
-message SignedImportJobRenewalV1 {
-  ImportJobRenewalV1 body = 1;
-  AuthorizationSignature delegating_signature = 2;
-}
+
 message DelegatedImportOperationV1 {
   uint32 format_version = 1;
   bytes spool_uuid = 2;
@@ -224,14 +210,15 @@ message ImportPublicationWitnessV1 {
 // select the immutable lineage, verify owner histories/handoffs and current or
 // witnessed historical authority. This public carrier cannot enroll its owner.
 message ImportPublicProofBundleV1 {
+  reserved 8, 18;
+  reserved "renewals", "member_permissions";
   uint32 format_version = 1;
   SignedSpoolOwnerGenesis owner_genesis = 2;
   repeated OwnerHistory owner_histories = 3;
   repeated ResourceTransferAuditRecord ownership_transfers = 4;
   SignedImportMemberPermissionV1 member_permission = 5; // Absent for direct owner.
   repeated SignedImportGenesisAuthorityV1 genesis_authorities = 6;
-  repeated SignedImportJobDelegationV1 delegations = 7; // Initial plus accepted renewals.
-  repeated SignedImportJobRenewalV1 renewals = 8;
+  repeated SignedImportJobDelegationV1 delegations = 7; // Exactly ONE signed delegation per logical job.
   repeated SignedDelegatedImportOperationV1 operations = 9;
   ImportResultManifestV1 terminal_manifest = 10;
   heddle.api.common.SignedHostedWitnessSetV1 witness_set = 11;
@@ -241,11 +228,8 @@ message ImportPublicProofBundleV1 {
   repeated SignedRecord original_geneses = 15;
   repeated bytes creator_authority_envelopes = 16;
   ImportOwnerChainV1 owner_chain = 17;
-  // Authoritative digest-sorted unique history. Field 5 is an optional alias;
-  // field 10 is the required terminal selector. Both MUST equal exact entries.
-  // Never rewrite old signed records.
-  repeated SignedImportMemberPermissionV1 member_permissions = 18; // At most 64.
-  repeated ImportResultManifestV1 manifests = 19; // At most 320.
+  // Digest-sorted unique cumulative publication manifests; field 10 selects an exact entry.
+  repeated ImportResultManifestV1 manifests = 19; // At most 256: one cumulative manifest per publication, or one empty recovery manifest.
   // Exact statement payloads, indexed by H(purpose-domain || canonical payload).
   repeated ImportGenesisWitnessV1 genesis_witnesses = 20;
   repeated ImportAuthorityWitnessV1 authority_witnesses = 21;
@@ -262,6 +246,8 @@ message ImportSourceSelectionV1 {
   bool private = 4;
 }
 message PrepareImportJobRequest {
+  reserved 6;
+  reserved "renew_logical_job_id";
   string client_operation_id = 1;
   SpoolRef destination = 2;
   ImportIdentityV1 identity = 3;
@@ -270,7 +256,6 @@ message PrepareImportJobRequest {
   // reductions or substituted converter/options; accept unchanged or refuse.
   ImportPermissionScopeV1 proposed_scope = 4;
   bytes retry_lineage_id = 5;
-  bytes renew_logical_job_id = 6; // Empty initially; no execution authority.
   // Required. Revalidate current grants, provider support, repository object
   // format and known OIDs before issuing a reservation. Unknown format blocks.
   ImportSourceSelectionV1 source = 7;
@@ -280,6 +265,8 @@ message PrepareImportJobRequest {
 // Canonical bytes use numbered-field order and the framing above. Commit must
 // compare this projection byte-for-byte with the stored reservation.
 message ImportJobPreparationV1 {
+  reserved 12;
+  reserved "predecessor_delegation_digest";
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
   bytes delegation_id = 3;
@@ -291,19 +278,18 @@ message ImportJobPreparationV1 {
   ImportDelegationPurpose purpose = 9;
   ImportPermissionScopeV1 scope = 10;
   bytes cancellation_id = 11;
-  bytes predecessor_delegation_digest = 12;
 }
 message PrepareImportJobResponse {
+  reserved 3;
+  reserved "renewal_state";
   ImportJobPreparationV1 proposal = 1;
   int64 reservation_expires_at_unix_seconds = 2; // Prepare time + 3600, exclusive.
-  // Mandatory for renew_logical_job_id; absent for initial preparation. Read in
-  // one authorized transaction with proposal, never assembled from stale reads.
-  ImportJobCasStateV1 renewal_state = 3;
-  uint64 max_validity_duration_seconds = 4; // Positive; expires - not_before.
+  // Bounds from one authorized transaction with proposal, never stale reads.
+  // Positive host duration, at most 604800 seconds (7 days); 86400 is supported.
+  uint64 max_validity_duration_seconds = 4;
   uint64 clock_skew_allowance_seconds = 5; // No grace after exclusive expiry.
   int64 prepared_at_unix_seconds = 6; // Host clock; reservation expiry = this + 3600.
-  // Exactly one of proposal/refusal. A refusal has no reservation, key, bounds
-  // or renewal_state and MUST NOT activate work or return a changed proposal.
+  // Exactly one of proposal/refusal. A refusal has no reservation, key or bounds.
   ImportPreparationRefusalV1 refusal = 7;
 }
 enum ImportPreparationRefusalReason {
@@ -380,6 +366,7 @@ message ImportEligibleRetryTargetV1 {
   bytes operation_version = 2; // Opaque CAS token, 1..256 bytes.
 }
 enum ImportRetryUnavailableReason {
+  reserved "IMPORT_RETRY_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED";
   IMPORT_RETRY_UNAVAILABLE_REASON_UNSPECIFIED = 0;
   IMPORT_RETRY_UNAVAILABLE_REASON_NO_TERMINAL_ATTEMPT = 1;
   IMPORT_RETRY_UNAVAILABLE_REASON_ATTEMPT_IN_PROGRESS = 2;
@@ -387,92 +374,29 @@ enum ImportRetryUnavailableReason {
   IMPORT_RETRY_UNAVAILABLE_REASON_JOB_CANCELLED = 4;
   IMPORT_RETRY_UNAVAILABLE_REASON_JOB_REVOKED = 5;
   IMPORT_RETRY_UNAVAILABLE_REASON_ALREADY_SUPERSEDED = 6;
-  // No original native admission before the original exclusive expiry.
-  // Renewal cannot replace original genesis authority; start a new logical job.
-  IMPORT_RETRY_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED = 7;
+  IMPORT_RETRY_UNAVAILABLE_REASON_AUTHORITY_EXPIRED = 7;
 }
-// Caller-relative advisory state, computed from authenticated host facts at read
-// time. Never conveys another account's source/connection/grant details.
-enum ImportControlUnavailableReason {
-  IMPORT_CONTROL_UNAVAILABLE_REASON_UNSPECIFIED = 0;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_NOT_CONNECTION_OWNER = 1;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_GRANT_MISSING = 2;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_TERMINAL = 3;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED = 4;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_NO_RETRY_TARGET = 5;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_COMMIT_UNAVAILABLE = 6;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_AUTHORITY_EXPIRED = 7;
-  IMPORT_CONTROL_UNAVAILABLE_REASON_AUTHORITY_NOT_YET_VALID = 8;
-}
-message ImportControlAvailabilityV1 {
-  oneof availability {
-    bool available = 1; // MUST be true; presence is required.
-    ImportControlUnavailableReason unavailable = 2; // Known nonzero reason.
-  }
-}
-message ImportJobControlAvailabilityV1 {
-  ImportControlAvailabilityV1 retry = 1;
-  ImportControlAvailabilityV1 renew = 2;
-  ImportControlAvailabilityV1 cancel = 3;
+
+// One snapshot for Cancel and Retry; public proofs travel through Fetch/export.
+// Host custody/source associations remain durable admission inputs, not read fields.
+enum ImportJobStatus {
+  IMPORT_JOB_STATUS_UNSPECIFIED = 0;
+  IMPORT_JOB_STATUS_ACTIVE = 1;
+  IMPORT_JOB_STATUS_COMPLETE = 2;
+  IMPORT_JOB_STATUS_CANCELLED = 3;
+  IMPORT_JOB_STATUS_REVOKED = 4;
+  IMPORT_JOB_STATUS_EXPIRED = 5;
 }
 message GetImportJobStateResponse {
-  // One transactional snapshot, including an explicit empty manifest before
-  // publication. Read -> compute/review remaining scope -> EXACT Prepare. Its
-  // renewal_state MUST equal this snapshot; otherwise recompute and re-prepare.
-  ImportJobCasStateV1 state = 1;
-  // Bounded retained accepted evidence, including original genesis parents,
-  // owner histories/handoffs and their original chain commitment. No candidate.
-  // terminal_manifest selects state.committed_manifest even when empty. Same
-  // record-count limits as the public bundle; <=2 MiB entire response, no truncation.
-  ImportPublicProofBundleV1 retained_proof = 2;
-  // Required on success. Exact accepted selector, retained transactionally with
-  // destination/job and signed provider/source_url; public repository ID = URL.
-  // Disclosed only to current destination writers, even when source projections
-  // elsewhere are hidden or the connection is revoked. No credentials/authority.
-  // Missing durable association -> UNAVAILABLE after writer authorization; never
-  // guess from inventory. Renewal must use this selector unchanged: no rebinding.
-  // The accepted association is immutable across retries and renewals.
-  // Host re-authorizes current caller connection, exact repository/installation
-  // grant and selected-commit availability at Prepare, Retry admission and Renew
-  // activation. CONNECTED requires ownership of this exact retained connection.
-  ImportSourceSelectionV1 retained_source = 3;
-  // Required on success, read in the SAME transaction as state/retained_source.
-  // At most one unsuperseded FAILED/CANCELED physical attempt with remaining
-  // authorized slots; a canceled physical attempt is distinct from job Cancel.
-  // Authority expiry alone does not remove this target: Renew before Retry.
-  // Retry rechecks target, destination/job/lineage, operation CAS and active
-  // authority atomically. No initiating-account/ordinary visibility prerequisite.
+  reserved "state", "retained_proof", "retained_source", "control_availability";
+  ImportJobStatus status = 1; // Required, known nonzero; expiry is terminal.
+  bytes active_cancellation_id = 2; // 32 bytes, used by Cancel.
+  uint64 authority_epoch = 3; // Positive; fences Cancel/Retry against terminal transitions.
   oneof retry_availability {
     ImportEligibleRetryTargetV1 eligible_retry_target = 4;
-    ImportRetryUnavailableReason retry_unavailable = 5; // Known nonzero reason.
+    ImportRetryUnavailableReason retry_unavailable = 5; // Required, known nonzero.
   }
-  // Required on success. Caller-relative Retry/Renew/Cancel availability in the
-  // SAME read snapshot. Advisory only: admission still rechecks all authority,
-  // policy, PoP, custody, grants, commit availability, CAS and terminal state.
-  // Cancel needs destination write only; connected Retry/Renew require ownership
-  // of the EXACT retained connection. Public-git requires no connection owner.
-  ImportJobControlAvailabilityV1 control_availability = 6;
-}
-// Authority activation ONLY: successful receipt.applied uses this request's ID;
-// empty resulting_versions is valid. Creates NO physical attempt. Recover the
-// new epoch/certificate via GetImportJobState. Exact frozen replay returns the
-// stored receipt without activation; changed bytes -> OPERATION_ID_REUSED.
-// Explicitly cancelled/revoked logical jobs can never be revived.
-message RenewImportJobRequest {
-  string client_operation_id = 1;
-  SpoolRef destination = 2;
-  SignedImportJobRenewalV1 renewal = 3;
-  // Renew submission profile: exact retained accepted evidence from the state
-  // read, plus the digest-sorted replacement permission and current owner/policy
-  // evidence. owner_chain selects the current chain; the read retains the old
-  // chain. Original genesis parents MUST NOT be rebound. Candidate occurs ONLY
-  // in field 3, never proof.delegations/renewals. terminal_manifest and manifests
-  // resolve the exact authenticated snapshot, including an explicit empty one.
-  // Before publication: no operations/publication receipts; retain any actual
-  // genesis admissions, but never invent them. Freeze complete protobuf request
-  // bytes for client_operation_id replay; extend history only after activation.
-  // <=2 MiB request; proof <=1 MiB and existing record-count limits apply.
-  ImportPublicProofBundleV1 proof = 4;
+  bytes active_delegation_digest = 6; // 32 bytes, used by Retry; one certificate per job.
 }
 message CancelImportJobRequest {
   // Any current destination writer with authenticated PoP may cancel; no
@@ -480,7 +404,7 @@ message CancelImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;
   bytes logical_job_id = 3;
-  // ACTIVE delegation ID only, never its parent or a retained predecessor.
+  // Delegation cancellation ID only, never its parent's cancellation ID.
   // With matching epoch: mismatch refuses Scope; stale epoch: StaleContext.
   bytes cancellation_id = 4;
   uint64 expected_authority_epoch = 5;
@@ -562,15 +486,4 @@ message HostedLandingWitnessV1 {
   SignedRecord source_operation = 4;
   repeated SignedRecord review_evidence = 5; // Sorted signed-native-record digests.
   bytes authority_envelope = 6;
-}
-// Authenticated job-state read / Prepare snapshot. Signature/scope-only predecessor recovery
-// does not establish current execution or historical admission. Current
-// replacement authority and transactional activation CAS remain mandatory.
-message ImportJobCasStateV1 {
-  uint32 format_version = 1;
-  bytes logical_job_id = 2;
-  bytes retry_lineage_id = 3;
-  SignedImportJobDelegationV1 active_predecessor = 4;
-  uint64 authority_epoch = 5;
-  ImportResultManifestV1 committed_manifest = 6;
 }

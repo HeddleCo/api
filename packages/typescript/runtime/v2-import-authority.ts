@@ -2,16 +2,18 @@ import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
 import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse, type RetryImportSourceRequest } from "./integration_pb.js";
 import { RecordRefSchema, SpoolRefSchema } from "./common_pb.js";
-import type { HybridImportJobSelector, MutationResponse, OperationRecord, SpoolRef } from "./common_pb.js";
+import type { HybridImportJobSelector, MutationResponse, OperationRecord, SpoolRef, RecordRef } from "./common_pb.js";
 import { SignedSpoolOwnerGenesisSchema, OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
+import { CallFailureSchema, CallFailureCode, ErrorReason, type CallFailure } from "../common/errors_pb.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { SignedHostedWitnessSetV1Schema, HostedWitnessStatementV1Schema, SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessSetV1, type HostedWitnessStatementV1, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
 import { resolveWitnessStatement, restoreWitnessHistorySnapshot, verifyWitnessSetAfterRootReplacement, verifyWitnessSet, verifyWitnessInclusion, leafDigest, recheckWitnessContext, type WitnessSetExpectation, type ResolvedWitnessStatement, type VerifiedWitnessSet } from "./witness-trust.js";
 import { canonicalHybridV1, signingDigest, equal, width, keyId, verifySignature, reject, canonicalHttps, hash, compare, sized, utf8, HybridContractError } from "./_hybrid-codec.js";
+export const PERMISSION_DOMAIN="heddle-import-member-permission-v1",GENESIS_DOMAIN="heddle-import-genesis-authority-v1",DELEGATION_DOMAIN="heddle-import-job-delegation-v1",OPERATION_DOMAIN="heddle-delegated-import-operation-v1",MANIFEST_DOMAIN="heddle-import-result-manifest-v1";
 export { canonicalHybridV1, signingDigest, strictDecode, HybridContractError } from "./_hybrid-codec.js";
 
-export const PERMISSION_DOMAIN="heddle-import-member-permission-v1",GENESIS_DOMAIN="heddle-import-genesis-authority-v1",DELEGATION_DOMAIN="heddle-import-job-delegation-v1",RENEWAL_DOMAIN="heddle-import-job-renewal-v1",OPERATION_DOMAIN="heddle-delegated-import-operation-v1",MANIFEST_DOMAIN="heddle-import-result-manifest-v1";
 export const MAX_BRANCHES=256,MAX_RECORD_BYTES=65536,MAX_BUNDLE_BYTES=1048576;
+export const MAX_DELEGATION_WINDOW_SECONDS=7n*24n*60n*60n;
 export const MAX_COMMIT_REQUEST_BYTES=2*MAX_BUNDLE_BYTES;
 export const CANCELLATION_NAMESPACE="heddle-import-cancel-v1";
 export const signedPermissionDigest=(v:api.SignedImportMemberPermissionV1)=>signingDigest("heddle-signed-import-member-permission-v1",api.SignedImportMemberPermissionV1Schema,v);
@@ -105,43 +107,28 @@ export function validateRepositoryHashAlgorithm(source:ProviderRepository, known
   });
 }
 export function validateDiscoveredImportScope(scope:api.ImportPermissionScopeV1, source:ProviderRepository):void {
-  validateDiscoveredImportScopeInner(scope,source,false);
+  validateDiscoveredImportScopeInner(scope,source);
 }
-function validateDiscoveredImportScopeInner(scope:api.ImportPermissionScopeV1, source:ProviderRepository, retained:boolean):void {
+function validateDiscoveredImportScopeInner(scope:api.ImportPermissionScopeV1, source:ProviderRepository):void {
   validateRepositoryHashAlgorithm(source,true);
   if(scope.sourceUrl!==source.cloneUrl)reject("SourceSelection");
   for(const b of scope.branches){
     if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
     const text=source.refs.find(r=>r.name===b.refName)?.headOid;
     const oid=text?Uint8Array.from(text.match(/../g)!,v=>parseInt(v,16)):undefined;
-    validateImportRefSelection(b,retained&&b.refMode===1?undefined:oid);
+    validateImportRefSelection(b,oid);
   }
 }
 /** Host rechecks current grants and selected-commit availability. Retained state
  * comes from an authenticated read or durable host state, bound to the verified token. */
-export function prepareImportSourceScope(request:api.PrepareImportJobRequest, currentSource:ProviderRepository, connectionProvider:string|undefined, configuration:api.GetImportConfigurationResponse, currentDestinationVersion:Uint8Array, originalAdmission:ImportOriginalAdmission|undefined, retained?:{predecessor:VerifiedImportRenewalPredecessor;state:api.ImportJobCasStateV1;source:api.ImportSourceSelectionV1}):api.ImportPermissionScopeV1 {
-  const s=request.source??reject("SourceSelection");
-  if(s.connection?.id!==currentSource.connection?.id||s.connection?.spool?.id!==currentSource.connection?.spool?.id||(s.providerRepositoryId!==currentSource.providerRepositoryId&&(s.connection!==undefined||s.providerRepositoryId!==""))||s.installationId!==currentSource.installationId||s.private!==currentSource.private)reject("SourceSelection");
-  const scope=request.proposedScope??reject("Canonical");
+export function prepareImportSourceScope(request:api.PrepareImportJobRequest,currentSource:ProviderRepository,connectionProvider:string|undefined,configuration:api.GetImportConfigurationResponse,currentDestinationVersion:Uint8Array):api.ImportPermissionScopeV1 {
+  const selector=request.source??reject("SourceSelection"),scope=request.proposedScope??reject("Canonical");
+  if(!sameRecordRef(selector.connection,currentSource.connection)||(selector.providerRepositoryId!==currentSource.providerRepositoryId&&(selector.connection!==undefined||selector.providerRepositoryId!==""))||selector.installationId!==currentSource.installationId||selector.private!==currentSource.private)reject("SourceSelection");
   if(scope.provider!==resolveImportProvider(currentSource,connectionProvider))reject("SourceSelection");
-  if(retained){
-    checkOriginalImportWindow(originalAdmission??reject("Canonical"));
-    const old=predecessors.get(retained.predecessor)??reject("Canonical"),state=retained.state;
-    validateCasState(state);const previous=read(old.previous).body;
-    if(!equal(signingDigest("heddle-import-job-cas-state-v1",api.ImportJobCasStateV1Schema,state),old.stateDigest)
-      ||!equal(request.renewLogicalJobId,previous.logicalJobId)||!equal(request.retryLineageId,previous.retryLineageId)
-      ||request.destination?.id!==initialImportOperationId(previous.identity!.spoolUuid,false))reject("StaleContext");
-    validateRetainedImportSource(retained.source,previous.scope!);
-    if(!sameSourceSelection(s,retained.source))reject("SourceSelection");
-    const selected=clone(api.ImportPermissionScopeV1Schema,scope);
-    if(!selected.destinationVersion.length)selected.destinationVersion=currentDestinationVersion.slice();
-    remainingScope(selected,previous.scope!,state.committedManifest!);
-  }else if(request.renewLogicalJobId.length)reject("StaleContext");
-  validateDiscoveredImportScopeInner(scope,currentSource,Boolean(retained));
-  validateImportConfiguration(configuration);
-  const selectedConfiguration=clone(api.GetImportConfigurationResponseSchema,configuration);if(retained)selectedConfiguration.limits!.maxResultBytes=(1n<<64n)-1n;
-  return prepareImportScope(scope,selectedConfiguration,currentDestinationVersion);
+  validateDiscoveredImportScope(scope,currentSource);
+  return prepareImportScope(scope,configuration,currentDestinationVersion);
 }
+
 function validateProviderSupport(provider:string,configuration:api.GetImportConfigurationResponse):void {
   if(!configuration.providers.some(p=>p.provider===provider))reject("SourceSelection");
 }
@@ -193,22 +180,27 @@ export interface ImportSpoolReservation {
 }
 
 /** Full refs and (full ref, slot_id) keys are exclusive per spool across jobs,
- * regardless of source. Same-job renewal keeps the original branch identity.
+ * regardless of source. Same-job checks keep the original branch identity.
  * This check stores nothing; hosts atomically reserve the entire selection. */
-export function checkImportSpoolReservations(spoolUuid:Uint8Array,logicalJobId:Uint8Array,scope:api.ImportPermissionScopeV1,reservations:readonly ImportSpoolReservation[],activation:boolean):void {
+export function checkImportSpoolReservations(spoolUuid:Uint8Array,logicalJobId:Uint8Array,scope:api.ImportPermissionScopeV1,reservations:readonly ImportSpoolReservation[]):void {
   initialImportOperationId(spoolUuid,false);initialImportOperationId(logicalJobId,false);validateImportScope(scope);
-  if(typeof activation!=="boolean")reject("Canonical");
-  let ownsReservation=false;
   for(const held of reservations){
     initialImportOperationId(held.spoolUuid,false);initialImportOperationId(held.logicalJobId,false);
     if(!equal(held.spoolUuid,spoolUuid))continue;
-    const sameJob=equal(held.logicalJobId,logicalJobId);ownsReservation ||= sameJob;
+    const sameJob=equal(held.logicalJobId,logicalJobId);
     for(const selected of scope.branches){
       const conflict=sameJob?!held.branches.some(b=>branchSubset(selected,b)):held.branches.some(b=>b.refName===selected.refName||equal(b.targetThreadId,selected.targetThreadId)||equal(b.genesisDigest,selected.genesisDigest));
       if(conflict)throw new HybridContractError("PreparationRefused",api.ImportPreparationRefusalReason.DESTINATION_CONFLICT);
     }
   }
-  if(activation&&!ownsReservation)throw new HybridContractError("PreparationRefused",api.ImportPreparationRefusalReason.DESTINATION_CONFLICT);
+}
+
+/** Commit-only admission failure; destroy prepared custody, do not freeze a receipt. */
+export function importCommitConflictFailure(error:HybridContractError):CallFailure|undefined {
+  if(error.reason==="PreparationRefused"&&error.preparationRefusalReason===api.ImportPreparationRefusalReason.DESTINATION_CONFLICT)
+    return create(CallFailureSchema,{code:CallFailureCode.ALREADY_EXISTS,error:{reason:ErrorReason.IMPORT_DESTINATION_CONFLICT}});
+  if(error.reason==="StaleContext")return create(CallFailureSchema,{code:CallFailureCode.ABORTED,error:{reason:ErrorReason.VERSION_CONFLICT}});
+  return undefined;
 }
 
 /** Configuration/ownership/policy CAS at activation; other imports do not
@@ -223,7 +215,7 @@ export function validateImportPreparationResponse(request:api.PrepareImportJobRe
   const r=response.refusal;
   if (r) {
     if (r.reason<0 || r.reason>6) reject("Version");
-    if (r.reason===0 || r.field.length>256 || !/^[\x00-\x7f]*$/.test(r.field) || response.proposal || response.renewalState || response.reservationExpiresAtUnixSeconds!==0n || response.preparedAtUnixSeconds!==0n || response.maxValidityDurationSeconds!==0n || response.clockSkewAllowanceSeconds!==0n) reject("Canonical");
+    if (r.reason===0 || r.field.length>256 || !/^[\x00-\x7f]*$/.test(r.field) || response.proposal || response.reservationExpiresAtUnixSeconds!==0n || response.preparedAtUnixSeconds!==0n || response.maxValidityDurationSeconds!==0n || response.clockSkewAllowanceSeconds!==0n) reject("Canonical");
     throw new HybridContractError("PreparationRefused",r.reason);
   }
   const p=response.proposal??reject("Canonical"),returned=p.scope??reject("Canonical");
@@ -232,12 +224,6 @@ export function validateImportPreparationResponse(request:api.PrepareImportJobRe
   if (!requested.destinationVersion.length) requested.destinationVersion=returned.destinationVersion.slice();
   if (!equal(canonicalHybridV1(api.ImportPermissionScopeV1Schema,requested),canonicalHybridV1(api.ImportPermissionScopeV1Schema,returned)) || !request.identity || !p.identity || !sameIdentity(p.identity,request.identity) || !equal(p.retryLineageId,request.retryLineageId)) reject("PreparedFields");
   validateImportScope(returned);
-  if (!request.renewLogicalJobId.length) {
-    if (response.renewalState || p.predecessorDelegationDigest.some(Boolean)) reject("PreparedFields");
-  } else {
-    if (!equal(p.logicalJobId,request.renewLogicalJobId)) reject("PreparedFields");
-    validateRenewalPreparation(response);
-  }
 }
 
 /** Provider identity comes from an authenticated resolver, never projection hints.
@@ -248,13 +234,12 @@ export async function validateImportCommitRequest(request:CommitImportJobRequest
   const source=request.source??reject("SourceSelection"),proof=request.proof??reject("Canonical");
   if (!request.clientOperationId || utf8.encode(request.clientOperationId).length>128 || !request.destination?.id) reject("Canonical");
   if (request.initialBaseState.length>4096 || toBinary(api.ImportPublicProofBundleV1Schema,proof).length>MAX_BUNDLE_BYTES) reject("Bounds");
-  if (proof.formatVersion!==1 || proof.delegations.length!==1 || proof.renewals.length || proof.operations.length || proof.terminalManifest || proof.manifests.length) reject("Canonical");
+  if (proof.formatVersion!==1 || proof.delegations.length!==1 || proof.operations.length || proof.terminalManifest || proof.manifests.length) reject("Canonical");
   const d=proof.delegations[0]!.body??reject("Canonical"),scope=d.scope??reject("Canonical");validateImportScope(scope);
   identity(d.identity);
   const uuid=Array.from(d.identity.spoolUuid,b=>b.toString(16).padStart(2,"0")).join("");
   const destinationId=`${uuid.slice(0,8)}-${uuid.slice(8,12)}-${uuid.slice(12,16)}-${uuid.slice(16,20)}-${uuid.slice(20)}`;
   if (request.destination.id!==destinationId) reject("Scope");
-  if (d.predecessorDelegationDigest.length!==32 || d.predecessorDelegationDigest.some(Boolean)) reject("Canonical");
   if (source.cloneUrl!==scope.sourceUrl || resolvedProvider!==scope.provider || utf8.encode(source.providerRepositoryId).length>4096 || utf8.encode(source.name).length>4096) reject("SourceSelection");
   if(source.connection?.id!==currentSource.connection?.id||source.connection?.spool?.id!==currentSource.connection?.spool?.id||(source.providerRepositoryId!==currentSource.providerRepositoryId&&(source.connection!==undefined||source.providerRepositoryId!==""))||source.cloneUrl!==currentSource.cloneUrl||source.installationId!==currentSource.installationId||source.private!==currentSource.private)reject("SourceSelection");
   const provider=resolveImportProvider(currentSource,currentSource.connection?resolvedProvider:undefined);
@@ -283,8 +268,7 @@ export function validateImportSource(_request:ImportSourceRequest):never { retur
 export async function verifyImportCommitSubmission(request:CommitImportJobRequest, prepared:api.PrepareImportJobResponse, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse, e:ImportOwnerExpectation):Promise<VerifiedImportDelegation> {
   request=clone(CommitImportJobRequestSchema,request);prepared=clone(api.PrepareImportJobResponseSchema,prepared);e=snapshotExpectation(e);
   await validateImportCommitRequest(request,resolvedProvider,currentSource,configuration);
-  const proof=request.proof!,member=proof.memberPermission??proof.memberPermissions[0];
-  if (proof.memberPermissions.length>1 || (proof.memberPermissions[0] && (!member || !equal(canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,proof.memberPermissions[0]),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,member))))) reject("ImportPermission");
+  const proof=request.proof!,member=proof.memberPermission;
   return verifyPreparedImportDelegation(prepared,proof.delegations[0]!,member,proof.genesisAuthorities,e);
 }
 
@@ -293,7 +277,8 @@ export function validateImportCommitResponse(request:CommitImportJobRequest, res
   if (!r || r.outcome.case!=="pendingOperation" || !request.clientOperationId || r.clientOperationId!==request.clientOperationId || !request.destination || r.outcome.value.spool?.id!==request.destination.id || r.outcome.value.id!==initialImportOperationId(request.proof?.delegations[0]?.body?.retryLineageId??reject("PendingOperation"),false)) reject("PendingOperation");
 }
 
-/** Host looks up its durable caller-scoped row before revalidating expired authority. */
+/** Host looks up its durable caller-scoped row before revalidating expired authority.
+ * Changed inputs refuse OperationIdReused only for an ID with an accepted receipt. */
 export function checkImportCommitReplay(request:CommitImportJobRequest, stored:CommitImportJobRequest, response:MutationResponse):void {
   if (!equal(toBinary(CommitImportJobRequestSchema,request),toBinary(CommitImportJobRequestSchema,stored))) reject("OperationIdReused");
   validateImportCommitResponse(request,response);
@@ -312,7 +297,7 @@ export async function verifyImportDelegation(signed:api.SignedImportJobDelegatio
 }
 async function verifyDelegationInner(signed:api.SignedImportJobDelegationV1,member:api.SignedImportMemberPermissionV1|undefined,e:ImportOwnerExpectation,current:boolean):Promise<VerifiedImportDelegation>{
   e=snapshotExpectation(e);member=member?clone(api.SignedImportMemberPermissionV1Schema,member):undefined;
-  const snapshot=clone(api.SignedImportJobDelegationV1Schema,signed),d=snapshot.body;if(!d)reject("Canonical");if(d.formatVersion!==1||d.purpose!==1)reject("Version");identity(d.identity);if(!sameIdentity(d.identity,e.identity)||!equal(d.ownerChainDigest,e.ownerChainDigest))reject("Root");for(const b of [d.delegationId,d.logicalJobId,d.retryLineageId]){width(b,16);if(!b.some(Boolean))reject("Canonical");}for(const b of [d.jobPublicKey,d.jobKeyId,d.delegatingPublicKey,d.parentPermissionDigest,d.ownerChainDigest,d.cancellationId,d.predecessorDelegationDigest])width(b,32);if(!equal(d.jobKeyId,keyId(d.jobPublicKey)))reject("Canonical");if(equal(d.jobPublicKey,d.delegatingPublicKey)||equal(d.jobPublicKey,e.ownerPublicKey)||e.forbiddenJobKeys.some(k=>equal(k,d.jobPublicKey)))reject("KeyRole");if(e.knownJobAssociations.some(a=>equal(a.key,d.jobPublicKey)&&!equal(a.logicalJobId,d.logicalJobId)))reject("Scope");if(!d.scope)reject("Canonical");validateImportScope(d.scope);if(d.branchManifest.length!==d.scope.branches.length)reject("Scope");d.branchManifest.forEach((m,i)=>{width(m.genesisAuthorityDigest,32);if(!m.limit||!equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,m.limit),canonicalHybridV1(api.ImportBranchLimitV1Schema,d.scope!.branches[i]!)))reject("Scope");});validity(d.notBeforeUnixSeconds,d.expiresAtUnixSeconds,e.nowUnixSeconds,current);if(d.expiresAtUnixSeconds>e.authorityExpiresAtSeconds)reject("Scope");
+  const snapshot=clone(api.SignedImportJobDelegationV1Schema,signed),d=snapshot.body;if(!d)reject("Canonical");if(d.formatVersion!==1||d.purpose!==1)reject("Version");identity(d.identity);if(!sameIdentity(d.identity,e.identity)||!equal(d.ownerChainDigest,e.ownerChainDigest))reject("Root");for(const b of [d.delegationId,d.logicalJobId,d.retryLineageId]){width(b,16);if(!b.some(Boolean))reject("Canonical");}for(const b of [d.jobPublicKey,d.jobKeyId,d.delegatingPublicKey,d.parentPermissionDigest,d.ownerChainDigest,d.cancellationId])width(b,32);if(!equal(d.jobKeyId,keyId(d.jobPublicKey)))reject("Canonical");if(equal(d.jobPublicKey,d.delegatingPublicKey)||equal(d.jobPublicKey,e.ownerPublicKey)||e.forbiddenJobKeys.some(k=>equal(k,d.jobPublicKey)))reject("KeyRole");if(e.knownJobAssociations.some(a=>equal(a.key,d.jobPublicKey)&&!equal(a.logicalJobId,d.logicalJobId)))reject("Scope");if(!d.scope)reject("Canonical");validateImportScope(d.scope);if(d.branchManifest.length!==d.scope.branches.length)reject("Scope");d.branchManifest.forEach((m,i)=>{width(m.genesisAuthorityDigest,32);if(!m.limit||!equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,m.limit),canonicalHybridV1(api.ImportBranchLimitV1Schema,d.scope!.branches[i]!)))reject("Scope");});if(d.expiresAtUnixSeconds-d.notBeforeUnixSeconds>MAX_DELEGATION_WINDOW_SECONDS)reject("ValidityBounds");validity(d.notBeforeUnixSeconds,d.expiresAtUnixSeconds,e.nowUnixSeconds,current);if(d.expiresAtUnixSeconds>e.authorityExpiresAtSeconds)reject("Scope");
   if(equal(d.delegatingPublicKey,e.ownerPublicKey)){if(member||d.parentPermissionDigest.some(Boolean))reject("ImportPermission");}
   else{if(!member)reject("ImportPermission");await verifyMemberPermissionInner(member,e,current);const p=member.body!;if(!equal(d.parentPermissionDigest,signedPermissionDigest(member))||!equal(d.delegatingPublicKey,p.subjectPublicKey)||!equal(d.logicalJobId,p.logicalJobId)||!equal(d.retryLineageId,p.retryLineageId)||d.notBeforeUnixSeconds<p.notBeforeUnixSeconds||d.expiresAtUnixSeconds>p.expiresAtUnixSeconds||!subset(d.scope,p.scope!))reject("Scope");}
   await auth(d.delegatingPublicKey,DELEGATION_DOMAIN,api.ImportJobDelegationV1Schema,d,snapshot.delegatingSignature);const digest=signedDelegationDigest(snapshot);const result={get body(){return clone(api.ImportJobDelegationV1Schema,d);},get digest(){return digest.slice();}};checked.set(result,{body:d,digest,member});return result;
@@ -323,12 +308,12 @@ export function delegationPreparation(d:api.ImportJobDelegationV1):api.ImportJob
     formatVersion:d.formatVersion, identity:d.identity, delegationId:d.delegationId,
     logicalJobId:d.logicalJobId, retryLineageId:d.retryLineageId, jobPublicKey:d.jobPublicKey,
     jobKeyId:d.jobKeyId, ownerChainDigest:d.ownerChainDigest, purpose:d.purpose,
-    scope:d.scope, cancellationId:d.cancellationId, predecessorDelegationDigest:d.predecessorDelegationDigest,
+    scope:d.scope, cancellationId:d.cancellationId,
   });
 }
 /** Compare with HOST-STORED preparation and independently selected authority.
  * Native originals, online revocation and transactional activation remain host
- * gates. Renewal's retained genesis bindings use their original context. */
+ * gates. Genesis bindings use the single certificate context. */
 export async function verifyPreparedImportDelegation(
   prepared:api.PrepareImportJobResponse, signed:api.SignedImportJobDelegationV1,
   member:api.SignedImportMemberPermissionV1|undefined, geneses:readonly api.SignedImportGenesisAuthorityV1[],
@@ -356,7 +341,7 @@ async function verifyPreparedInner(prepared:api.PrepareImportJobResponse,signed:
   const now=e.nowUnixSeconds,start=d.notBeforeUnixSeconds,end=d.expiresAtUnixSeconds,
     at=prepared.preparedAtUnixSeconds,skew=prepared.clockSkewAllowanceSeconds;
   if(at<0n||now<0n||(browser?now+skew<at:now<at)||prepared.reservationExpiresAtUnixSeconds!==at+3600n||now>=prepared.reservationExpiresAtUnixSeconds)reject("Expired");
-  if(prepared.maxValidityDurationSeconds===0n||start<0n||start<at-skew||start>now+skew||end<=start||end<=now||end-start>prepared.maxValidityDurationSeconds)reject("ValidityBounds");
+  if(prepared.maxValidityDurationSeconds===0n||prepared.maxValidityDurationSeconds>MAX_DELEGATION_WINDOW_SECONDS||start<0n||start<at-skew||start>now+skew||end<=start||end<=now||end-start>prepared.maxValidityDurationSeconds)reject("ValidityBounds");
   if(member){
     if(browser){await verifyMemberPermissionInner(member,e,false);const p=member.body!;if(p.notBeforeUnixSeconds>now+skew||p.expiresAtUnixSeconds<=now)reject("Expired");}
     else await verifyImportMemberPermission(member,e);
@@ -366,7 +351,7 @@ async function verifyPreparedInner(prepared:api.PrepareImportJobResponse,signed:
   for(const m of d.branchManifest){
     const branch=m.limit!,g=geneses.find(g=>equal(signedGenesisDigest(g),m.genesisAuthorityDigest))??reject("GenesisBinding"),body=g.body??reject("GenesisBinding");
     if(!equal(body.genesisDigest,branch.genesisDigest))reject("GenesisBinding");
-    if(!d.predecessorDelegationDigest.some(Boolean))await verifyImportGenesisAuthority(g,verified,branch.genesisDigest,body.originalCreatorSignature,body.creatorAuthorityEnvelopeDigest);
+    await verifyImportGenesisAuthority(g,verified,branch.genesisDigest,body.originalCreatorSignature,body.creatorAuthorityEnvelopeDigest);
   }
   return verified;
 }
@@ -374,8 +359,7 @@ export async function verifyImportGenesisAuthority(signed:api.SignedImportGenesi
 export async function verifyDelegatedImportOperation(signed:api.SignedDelegatedImportOperationV1,delegation:VerifiedImportDelegation){const o=signed.body,{body:d,digest}=read(delegation);if(!o)reject("Canonical");if(o.formatVersion!==1)reject("Version");width(o.physicalOperationId,16);for(const b of [o.spoolGenesisDigest,o.delegationDigest,o.genesisDigest,o.targetThreadId,o.expectedFrontierDigest,o.resultingFrontierDigest,o.resultingContentDigest,o.optionsDigest])width(b,32);width(o.spoolUuid,16);width(o.logicalJobId,16);width(o.retryLineageId,16);const s=d.scope!,b=s.branches.find(b=>b.refName===o.refName&&b.slotId===o.slotId);if(!b)reject("Scope");width(o.observedCommitOid,o.hashAlgorithm===1?20:o.hashAlgorithm===2?32:reject("Version"));if(!equal(o.spoolUuid,d.identity!.spoolUuid)||!equal(o.spoolGenesisDigest,d.identity!.spoolGenesisDigest)||!equal(o.logicalJobId,d.logicalJobId)||!equal(o.retryLineageId,d.retryLineageId)||!equal(o.delegationDigest,digest)||o.hashAlgorithm!==b.hashAlgorithm||(b.refMode===1&&!equal(o.observedCommitOid,b.pinnedCommitOid))||!equal(o.genesisDigest,b.genesisDigest)||!equal(o.targetThreadId,b.targetThreadId)||!equal(o.expectedFrontierDigest,b.expectedFrontierDigest)||o.resultBytes>d.scope!.maxResultBytes||o.resultBytes===0n||!equal(o.optionsDigest,s.optionsDigest)||o.converterVersion!==s.converterVersion)reject("Scope");await auth(d.jobPublicKey,OPERATION_DOMAIN,api.DelegatedImportOperationV1Schema,o,signed.jobSignature);}
 export async function verifyNewImportOperation(signed:api.SignedDelegatedImportOperationV1,d:VerifiedImportDelegation,now:bigint,committedBefore:api.ImportResultManifestV1){const b=read(d).body;interval(b.notBeforeUnixSeconds,b.expiresAtUnixSeconds,now);await checkImportPublicationBudget(signed,d,committedBefore);}
 export function validateImportManifest(m:api.ImportResultManifestV1){if(m.formatVersion!==1)reject("Version");width(m.logicalJobId,16);width(m.retryLineageId,16);if(m.slots.length>MAX_BRANCHES)reject("Bounds");m.slots.forEach((s,i)=>{width(s.signedOperationDigest,32);width(s.resultingFrontierDigest,32);if(!s.refName.startsWith("refs/heads/")||!/^[\x00-\x7f]+$/.test(s.refName))reject("Canonical");if(new TextEncoder().encode(s.refName).length>1024||s.resultBytes<=0n||s.resultBytes>=(1n<<64n))reject("Bounds");const p=m.slots[i-1];if(p&&(p.refName>s.refName||(p.refName===s.refName&&p.slotId>=s.slotId)))reject("Canonical");});}
-export async function verifyImportRenewal(signed:api.SignedImportJobRenewalV1,previous:VerifiedImportDelegation,committed:api.ImportResultManifestV1,epoch:bigint,member:api.SignedImportMemberPermissionV1|undefined,e:ImportOwnerExpectation):Promise<VerifiedImportDelegation>{return verifyRenewalInner(signed,previous,committed,epoch,member,e,true);}
-async function verifyRenewalInner(signed:api.SignedImportJobRenewalV1,previous:VerifiedImportDelegation,committed:api.ImportResultManifestV1,epoch:bigint,member:api.SignedImportMemberPermissionV1|undefined,e:ImportOwnerExpectation,current:boolean):Promise<VerifiedImportDelegation>{e=snapshotExpectation(e);signed=clone(api.SignedImportJobRenewalV1Schema,signed);committed=clone(api.ImportResultManifestV1Schema,committed);member=member?clone(api.SignedImportMemberPermissionV1Schema,member):undefined;const r=signed.body;if(!r)reject("Canonical");if(r.formatVersion!==1)reject("Version");validateImportManifest(committed);if(r.expectedAuthorityEpoch!==epoch)reject("StaleContext");const old=read(previous);if(!equal(r.predecessorDelegationDigest,old.digest))reject("RenewalFork");if(!equal(r.committedManifestDigest,manifestDigest(committed)))reject("StaleManifest");if(!r.replacement)reject("Canonical");const next=await verifyDelegationInner(r.replacement,member,e,current),after=read(next).body,before=old.body;if(!equal(after.logicalJobId,before.logicalJobId)||!equal(after.retryLineageId,before.retryLineageId)||!equal(committed.logicalJobId,before.logicalJobId)||!equal(committed.retryLineageId,before.retryLineageId)||!equal(after.identity!.spoolUuid,before.identity!.spoolUuid)||!equal(after.identity!.spoolGenesisDigest,before.identity!.spoolGenesisDigest)||!equal(after.predecessorDelegationDigest,old.digest)||equal(after.jobPublicKey,before.jobPublicKey)||equal(after.delegationId,before.delegationId))reject("RenewalFork");const os=before.scope!,ns=after.scope!;if(!subset(ns,os))reject("RenewalFork");let consumed=0n;for(const slot of committed.slots){const b=os.branches.find(b=>b.refName===slot.refName&&b.slotId===slot.slotId);if(b){consumed+=slot.resultBytes;if(consumed>=(1n<<64n))reject("Bounds");}if(ns.branches.some(b=>b.refName===slot.refName&&b.slotId===slot.slotId))reject("CommittedSlot");}const removed=os.branches.filter(b=>committed.slots.some(s=>s.refName===b.refName&&s.slotId===b.slotId)).length;if(ns.maxOperations>os.maxOperations-removed||ns.maxResultBytes>os.maxResultBytes-consumed||after.branchManifest.some(m=>!before.branchManifest.some(old=>equal(old.genesisAuthorityDigest,m.genesisAuthorityDigest)&&old.limit&&m.limit&&old.limit.refName===m.limit.refName&&equal(old.limit.genesisDigest,m.limit.genesisDigest))))reject("RenewalFork");if(member){const p=member.body!;remainingScope(p.scope!,os,committed);if(old.member){const oldParent=old.member.body!;if(equal(p.subjectPublicKey,oldParent.subjectPublicKey)&&equal(p.logicalJobId,oldParent.logicalJobId)&&equal(p.retryLineageId,oldParent.retryLineageId)&&(!equal(p.cancellationId,oldParent.cancellationId)||(!equal(toBinary(api.SignedImportMemberPermissionV1Schema,member),toBinary(api.SignedImportMemberPermissionV1Schema,old.member))&&equal(p.nonce,oldParent.nonce))))reject("ImportPermission");}}await auth(after.delegatingPublicKey,RENEWAL_DOMAIN,api.ImportJobRenewalV1Schema,r,signed.delegatingSignature);return next;}
+
 export function checkImportSlotReplay(m:api.ImportResultManifestV1,signed:api.SignedDelegatedImportOperationV1):boolean{validateImportManifest(m);const o=signed.body;if(!o)reject("Canonical");if(!equal(m.logicalJobId,o.logicalJobId)||!equal(m.retryLineageId,o.retryLineageId))reject("Scope");const s=m.slots.find(s=>s.refName===o.refName&&s.slotId===o.slotId);if(!s)return false;if(!equal(s.signedOperationDigest,signedOperationDigest(signed))||!equal(s.resultingFrontierDigest,o.resultingFrontierDigest)||s.resultBytes!==o.resultBytes)reject("SlotConflict");return true;}
 export function requireHybridPeer(protocol:ProtocolCompatibility|undefined):void{if(!protocol||protocol.protocolVersion!==2||protocol.mandatoryFeatures.length!==1||protocol.mandatoryFeatures[0]!==1)reject("Protocol");}
 export async function verifyImportPublication(operation:api.SignedDelegatedImportOperationV1,delegation:VerifiedImportDelegation,manifest:api.ImportResultManifestV1,statement:SignedHostedWitnessStatementV1,set:VerifiedWitnessSet,proof:HostedWitnessHistoryProofV1|undefined,now:bigint){operation=clone(api.SignedDelegatedImportOperationV1Schema,operation);manifest=clone(api.ImportResultManifestV1Schema,manifest);statement=clone(SignedHostedWitnessStatementV1Schema,statement);proof=proof?clone(HostedWitnessHistoryProofV1Schema,proof):undefined;if(statement.body)validateStatementBoundary(statement.body);await verifyDelegatedImportOperation(operation,delegation);if(!checkImportSlotReplay(manifest,operation))reject("Scope");const before=clone(api.ImportResultManifestV1Schema,manifest);before.slots=before.slots.filter(slot=>slot.refName!==operation.body!.refName||slot.slotId!==operation.body!.slotId);await checkImportPublicationBudget(operation,delegation,before);const o=operation.body!,{body:d,digest}=read(delegation),s=statement.body,id=d.identity!;if(!s)reject("Canonical");const payload=create(api.ImportPublicationWitnessV1Schema,{formatVersion:1,signedOperationDigest:signedOperationDigest(operation),delegationDigest:digest,logicalJobId:o.logicalJobId,retryLineageId:o.retryLineageId,physicalOperationId:o.physicalOperationId,refName:o.refName,slotId:o.slotId,hashAlgorithm:o.hashAlgorithm,observedCommitOid:o.observedCommitOid,expectedFrontierDigest:o.expectedFrontierDigest,resultingFrontierDigest:o.resultingFrontierDigest,terminalManifestDigest:manifestDigest(manifest)});if(s.purpose!==3||!equal(s.spoolUuid,id.spoolUuid)||!equal(s.spoolGenesisDigest,id.spoolGenesisDigest)||!equal(s.ownerId,id.ownerId)||!equal(s.ownerStateHash,id.ownerStateHash)||s.ownershipTransferSequence!==id.ownershipTransferSequence||!equal(s.authorityDigest,digest)||!operation.jobSignature||!equal(s.originalSignaturesDigest,hash(operation.jobSignature.signature))||!equal(s.canonicalPayload,canonicalHybridV1(api.ImportPublicationWitnessV1Schema,payload))||s.basis!==1)reject("Scope");interval(d.notBeforeUnixSeconds,d.expiresAtUnixSeconds,s.observedAtUnixMillis/1000n);return resolveWitnessStatement(set,statement,proof,false,now);}
@@ -387,7 +371,7 @@ async function signature(domain:string,schema:Parameters<typeof canonicalHybridV
 export async function signImportMemberPermission(body:api.ImportMemberPermissionV1,signer:ImportSigner){const b=clone(api.ImportMemberPermissionV1Schema,body);return create(api.SignedImportMemberPermissionV1Schema,{body:b,ownerSignature:await signature(PERMISSION_DOMAIN,api.ImportMemberPermissionV1Schema,b,signer)});}
 export async function signImportGenesisAuthority(body:api.ImportGenesisAuthorityV1,signer:ImportSigner){const b=clone(api.ImportGenesisAuthorityV1Schema,body);if(!equal(b.creatorPublicKey,signer.publicKey))reject("Signature");return create(api.SignedImportGenesisAuthorityV1Schema,{body:b,creatorSignature:await signature(GENESIS_DOMAIN,api.ImportGenesisAuthorityV1Schema,b,signer)});}
 export async function signImportDelegation(body:api.ImportJobDelegationV1,signer:ImportSigner){const b=clone(api.ImportJobDelegationV1Schema,body);if(!equal(b.delegatingPublicKey,signer.publicKey))reject("Signature");return create(api.SignedImportJobDelegationV1Schema,{body:b,delegatingSignature:await signature(DELEGATION_DOMAIN,api.ImportJobDelegationV1Schema,b,signer)});}
-export async function signImportRenewal(body:api.ImportJobRenewalV1,signer:ImportSigner){const b=clone(api.ImportJobRenewalV1Schema,body);if(!b.replacement?.body||!equal(b.replacement.body.delegatingPublicKey,signer.publicKey))reject("Signature");return create(api.SignedImportJobRenewalV1Schema,{body:b,delegatingSignature:await signature(RENEWAL_DOMAIN,api.ImportJobRenewalV1Schema,b,signer)});}
+
 export async function signDelegatedImportOperation(body:api.DelegatedImportOperationV1,signer:ImportSigner){const b=clone(api.DelegatedImportOperationV1Schema,body);return create(api.SignedDelegatedImportOperationV1Schema,{body:b,jobSignature:await signature(OPERATION_DOMAIN,api.DelegatedImportOperationV1Schema,b,signer)});}
 
 import { SignedRecordSchema, type SignedRecord, type RecordSignature } from "./common_pb.js";
@@ -448,19 +432,19 @@ export async function verifyWitnessPayload(s:import("../common/hosted_witness_pb
   else{const p=clone(api.HostedLandingWitnessV1Schema,payload.payload);if(p.formatVersion!==1)reject("Version");if(!p.execution||!p.sourceOperation||!p.request?.signature)reject("Canonical");const r=p.request;if(r.formatVersion!==1||r.methodPath!=="/heddle.api.v1alpha2.ThreadService/LandThread")reject("Version");await verifyNativeRecord(p.execution,"heddle-thread-operation-v1");await verifyNativeRecord(p.sourceOperation,"heddle-thread-operation-v1");await matchWitnessBoundary(s,[]);await dependencies(p.reviewEvidence);if(r.signingIdentity!==`principal:device-key:${Array.from(r.signature!.publicKey,b=>b.toString(16).padStart(2,"0")).join("")}`)reject("Signature");width(r.nonce,16);if(r.timestampMillis<=0n||!r.requestBody.length||r.requestBody.length>MAX_RECORD_BYTES||!p.authorityEnvelope.length||p.authorityEnvelope.length>MAX_RECORD_BYTES)reject("Bounds");await verifySignature(r.signature!.publicKey,await unarySigningBytes(r.signingIdentity,r.methodPath,r.timestampMillis,r.nonce,r.requestBody),r.signature!.signature);purpose=4;bytes=canonicalHybridV1(api.HostedLandingWitnessV1Schema,p);authority=authorityEnvelopeDigest(p.authorityEnvelope);signatures=originalSignaturesDigest([p.execution,p.sourceOperation,...p.reviewEvidence],[r.signature!]);publisher=keyId(r.signature!.publicKey);}
   if(bytes.length>MAX_RECORD_BYTES)reject("Bounds");if(s.purpose!==purpose||!equal(s.canonicalPayload,bytes)||!equal(s.authorityDigest,authority)||!equal(s.originalSignaturesDigest,signatures)||!equal(s.publisherKeyId,publisher))reject("Scope");
 }
-export function resolveBundlePermission(bundle:api.ImportPublicProofBundleV1,digest:Uint8Array):api.SignedImportMemberPermissionV1|undefined{width(digest,32);if(!digest.some(Boolean))return;return bundle.memberPermissions.find(p=>equal(signedPermissionDigest(p),digest))??reject("ImportPermission");}
+export function resolveBundlePermission(bundle:api.ImportPublicProofBundleV1,digest:Uint8Array):api.SignedImportMemberPermissionV1|undefined{width(digest,32);if(!digest.some(Boolean))return;return bundle.memberPermission&&equal(signedPermissionDigest(bundle.memberPermission),digest)?bundle.memberPermission:reject("ImportPermission");}
 export function resolveBundleManifest(bundle:api.ImportPublicProofBundleV1,digest:Uint8Array):api.ImportResultManifestV1{width(digest,32);return bundle.manifests.find(m=>equal(manifestDigest(m),digest))??reject("StaleManifest");}
 export function publicationPayload(operation:api.SignedDelegatedImportOperationV1,m:api.ImportResultManifestV1):api.ImportPublicationWitnessV1{const o=operation.body??reject("Canonical");return create(api.ImportPublicationWitnessV1Schema,{formatVersion:1,signedOperationDigest:signedOperationDigest(operation),delegationDigest:o.delegationDigest,logicalJobId:o.logicalJobId,retryLineageId:o.retryLineageId,physicalOperationId:o.physicalOperationId,refName:o.refName,slotId:o.slotId,hashAlgorithm:o.hashAlgorithm,observedCommitOid:o.observedCommitOid,expectedFrontierDigest:o.expectedFrontierDigest,resultingFrontierDigest:o.resultingFrontierDigest,terminalManifestDigest:manifestDigest(m)});}
 export function validatePublicBundle(b:api.ImportPublicProofBundleV1):void { validateBundle(b,true); }
 function validateBundleBounds(b:api.ImportPublicProofBundleV1):void {
-  if(b.formatVersion!==1)reject("Version");if(toBinary(api.ImportPublicProofBundleV1Schema,b).length>MAX_BUNDLE_BYTES||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.delegations.length>64||b.renewals.length>63||b.memberPermissions.length>64||b.manifests.length>320||b.operations.length>256||b.genesisAuthorities.length>256||b.originalGeneses.length>256||b.creatorAuthorityEnvelopes.length>256||b.statements.length>1024||b.historyProofs.length>1024||b.policies.length>256||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256)reject("Bounds");
+  if(b.formatVersion!==1)reject("Version");if(toBinary(api.ImportPublicProofBundleV1Schema,b).length>MAX_BUNDLE_BYTES||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.delegations.length!==1||b.manifests.length>256||b.operations.length>256||b.genesisAuthorities.length>256||b.originalGeneses.length>256||b.creatorAuthorityEnvelopes.length>256||b.statements.length>1024||b.historyProofs.length>1024||b.policies.length>256||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256)reject("Bounds");
 }
 function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolean):void{
   validateBundleBounds(b);
   for(const {body:s} of b.statements){if(!s)reject("Canonical");validateStatementBoundary(s);requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);}
-  for(const list of [b.memberPermissions.map(signedPermissionDigest),b.manifests.map(manifestDigest)])for(let i=1;i<list.length;i++)if(compare(list[i-1]!,list[i]!)>=0)reject("Canonical");
-  if(b.memberPermission&&!equal(canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,resolveBundlePermission(b,signedPermissionDigest(b.memberPermission))!),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,b.memberPermission)))reject("ImportPermission");const terminal=b.terminalManifest??reject("Canonical");resolveBundleManifest(b,manifestDigest(terminal));if(!b.delegations.length||b.renewals.length+1!==b.delegations.length)reject("Canonical");
-  b.delegations.forEach((d,i)=>{const body=d.body??reject("Canonical");resolveBundlePermission(b,body.parentPermissionDigest);if(!i){if(body.predecessorDelegationDigest.some(Boolean))reject("RenewalFork");}else{const r=b.renewals[i-1]!.body??reject("Canonical");if(!r.replacement||!equal(signedDelegationDigest(r.replacement),signedDelegationDigest(d))||!equal(r.predecessorDelegationDigest,signedDelegationDigest(b.delegations[i-1]!))||!equal(body.predecessorDelegationDigest,r.predecessorDelegationDigest)||r.expectedAuthorityEpoch!==BigInt(i))reject("RenewalFork");resolveBundleManifest(b,r.committedManifestDigest);}for(const branch of body.branchManifest){const g=b.genesisAuthorities.find(g=>equal(signedGenesisDigest(g),branch.genesisAuthorityDigest))?.body??reject("Scope");resolveBundlePermission(b,g.parentPermissionDigest);if(!b.originalGeneses.some(o=>equal(threadGenesisId(o.canonicalRecord),g.genesisDigest))||!b.creatorAuthorityEnvelopes.some(e=>equal(hash(e),g.creatorAuthorityEnvelopeDigest)))reject("Scope");if(requireAdmissions&&!b.genesisWitnesses.some(p=>p.binding&&equal(signedGenesisDigest(p.binding),branch.genesisAuthorityDigest)&&p.originalGenesis&&equal(threadGenesisId(p.originalGenesis.canonicalRecord),g.genesisDigest)&&b.originalGeneses.some(o=>equal(signedNativeDigest(o),signedNativeDigest(p.originalGenesis!)))&&equal(hash(p.creatorAuthorityEnvelope),g.creatorAuthorityEnvelopeDigest)&&b.statements.some(s=>s.body?.purpose===1&&equal(s.body.canonicalPayload,canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p)))))reject("Scope");}});
+  for(const list of [b.manifests.map(manifestDigest)])for(let i=1;i<list.length;i++)if(compare(list[i-1]!,list[i]!)>=0)reject("Canonical");
+  if(b.memberPermission&&!equal(canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,resolveBundlePermission(b,signedPermissionDigest(b.memberPermission))!),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,b.memberPermission)))reject("ImportPermission");const terminal=b.terminalManifest??reject("Canonical");resolveBundleManifest(b,manifestDigest(terminal));if(b.delegations.length!==1)reject("Canonical");
+  b.delegations.forEach(d=>{const body=d.body??reject("Canonical");resolveBundlePermission(b,body.parentPermissionDigest);for(const branch of body.branchManifest){const g=b.genesisAuthorities.find(g=>equal(signedGenesisDigest(g),branch.genesisAuthorityDigest))?.body??reject("Scope");resolveBundlePermission(b,g.parentPermissionDigest);if(!b.originalGeneses.some(o=>equal(threadGenesisId(o.canonicalRecord),g.genesisDigest))||!b.creatorAuthorityEnvelopes.some(e=>equal(hash(e),g.creatorAuthorityEnvelopeDigest)))reject("Scope");if(requireAdmissions&&b.operations.some(o=>equal((o.body??reject("Canonical")).genesisDigest,g.genesisDigest))&&!b.genesisWitnesses.some(p=>p.binding&&equal(signedGenesisDigest(p.binding),branch.genesisAuthorityDigest)&&p.originalGenesis&&equal(threadGenesisId(p.originalGenesis.canonicalRecord),g.genesisDigest)&&b.originalGeneses.some(o=>equal(signedNativeDigest(o),signedNativeDigest(p.originalGenesis!)))&&equal(hash(p.creatorAuthorityEnvelope),g.creatorAuthorityEnvelopeDigest)&&b.statements.some(s=>s.body?.purpose===1&&equal(s.body.canonicalPayload,canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p)))))reject("Scope");}});
   for(const m of b.manifests){validateImportManifest(m);if(!equal(m.logicalJobId,terminal.logicalJobId)||!equal(m.retryLineageId,terminal.retryLineageId))reject("Scope");for(const slot of m.slots){const o=b.operations.find(o=>equal(signedOperationDigest(o),slot.signedOperationDigest))??reject("Scope");if(!checkImportSlotReplay(m,o)||!checkImportSlotReplay(terminal,o))reject("Scope");}}
   for(const o of b.operations){if(!o.body||!b.delegations.some(d=>equal(signedDelegationDigest(d),o.body!.delegationDigest))||!checkImportSlotReplay(terminal,o)||!b.manifests.some(m=>checkImportSlotReplay(m,o)&&b.statements.some(s=>s.body?.purpose===3&&equal(s.body.canonicalPayload,canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,m))))))reject("Scope");}
   for(const {body:s} of b.statements){if(!s)reject("Canonical");const payloads=s.purpose===1?b.genesisWitnesses.map(p=>canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p)):s.purpose===2?b.authorityWitnesses.map(p=>canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p)):s.purpose===4?b.landingWitnesses.map(p=>canonicalHybridV1(api.HostedLandingWitnessV1Schema,p)):s.purpose===3?b.operations.flatMap(o=>b.manifests.map(m=>canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,m)))):reject("Version");if(!payloads.some(p=>equal(p,s.canonicalPayload)))reject("Scope");}
@@ -474,7 +458,6 @@ export function requirePolicyHistory(policies:import("./owner_records_pb.js").Si
   }
   reject("Scope");
 }
-export function validateRenewalPreparation(response:api.PrepareImportJobResponse):void{const s=response.renewalState,p=response.proposal;if(!s?.activePredecessor?.body||!s.committedManifest||!p)reject("Canonical");const old=s.activePredecessor.body,m=s.committedManifest;validateImportManifest(m);if(s.formatVersion!==1||s.authorityEpoch===0n||!equal(s.logicalJobId,old.logicalJobId)||!equal(s.retryLineageId,old.retryLineageId)||!equal(p.logicalJobId,s.logicalJobId)||!equal(p.retryLineageId,s.retryLineageId)||!equal(m.logicalJobId,s.logicalJobId)||!equal(m.retryLineageId,s.retryLineageId)||!equal(p.predecessorDelegationDigest,signedDelegationDigest(s.activePredecessor)))reject("StaleContext");}
 
 /** Caller-generated non-nil UUID, reserved as the first physical operation ID.
  * Host checks occupancy in the reservation/activation transaction. */
@@ -505,36 +488,9 @@ export function checkImportRevocations(delegation:api.SignedImportJobDelegationV
 /** Exact remaining total/slots from an authenticated manifest. Empty means complete. */
 export function remainingImportScope(scope:api.ImportPermissionScopeV1,committed:api.ImportResultManifestV1):api.ImportPermissionScopeV1 {
   validateImportScope(scope);validateImportManifest(committed);const remaining=clone(api.ImportPermissionScopeV1Schema,scope);
-  for(const slot of committed.slots)if(scope.branches.some(b=>b.refName===slot.refName&&b.slotId===slot.slotId)){remaining.maxResultBytes-=slot.resultBytes;remaining.maxOperations--;}
-  if(remaining.maxResultBytes<0n||remaining.maxOperations<0)reject("RenewalFork");
+  for(const slot of committed.slots){if(!scope.branches.some(b=>b.refName===slot.refName&&b.slotId===slot.slotId))reject("Scope");remaining.maxResultBytes-=slot.resultBytes;remaining.maxOperations--;}
+  if(remaining.maxResultBytes<0n||remaining.maxOperations<0)reject("Scope");
   remaining.branches=remaining.branches.filter(b=>!committed.slots.some(s=>s.refName===b.refName&&s.slotId===b.slotId));return remaining;
-}
-function remainingScope(scope:api.ImportPermissionScopeV1,old:api.ImportPermissionScopeV1,committed:api.ImportResultManifestV1):void {
-  if(!subset(scope,old))reject("RenewalFork");let consumed=0n,removed=0;
-  for(const slot of committed.slots){const b=old.branches.find(b=>b.refName===slot.refName&&b.slotId===slot.slotId);if(b){consumed+=slot.resultBytes;if(consumed>=(1n<<64n))reject("Bounds");removed++;}if(scope.branches.some(b=>b.refName===slot.refName&&b.slotId===slot.slotId))reject("CommittedSlot");}
-  if(scope.maxOperations>old.maxOperations-removed||scope.maxResultBytes>old.maxResultBytes-consumed)reject("RenewalFork");
-}
-// Separate opaque storage: this token cannot enter operation/publication validation.
-const predecessors=new WeakMap<object,{previous:VerifiedImportDelegation;stateDigest:Uint8Array}>();
-declare const predecessorBrand:unique symbol;
-export interface VerifiedImportRenewalPredecessor {readonly [predecessorBrand]:true;}
-function validateCasState(state:api.ImportJobCasStateV1):void {
-  const p=state.activePredecessor?.body??reject("Canonical"),m=state.committedManifest??reject("Canonical");validateImportManifest(m);
-  if(state.formatVersion!==1||state.authorityEpoch===0n||!equal(state.logicalJobId,p.logicalJobId)||!equal(state.retryLineageId,p.retryLineageId)||!equal(m.logicalJobId,state.logicalJobId)||!equal(m.retryLineageId,state.retryLineageId))reject("StaleContext");
-}
-/** Authenticated Prepare/receiver-owned state and independently verified old
- * owner context. Signature/scope only: no historical admission or current grant. */
-export async function verifyImportRenewalPredecessor(state:api.ImportJobCasStateV1,member:api.SignedImportMemberPermissionV1|undefined,e:ImportOwnerExpectation):Promise<VerifiedImportRenewalPredecessor> {
-  state=clone(api.ImportJobCasStateV1Schema,state);e=snapshotExpectation(e);member=member?clone(api.SignedImportMemberPermissionV1Schema,member):undefined;
-  validateCasState(state);const previous=await verifyDelegationInner(state.activePredecessor!,member,e,false);
-  const token=Object.freeze({}) as VerifiedImportRenewalPredecessor;
-  predecessors.set(token,{previous,stateDigest:signingDigest("heddle-import-job-cas-state-v1",api.ImportJobCasStateV1Schema,state)});return token;
-}
-/** Current replacement authority and atomic activation CAS remain mandatory. */
-export async function verifyImportRenewalFromState(signed:api.SignedImportJobRenewalV1,previous:VerifiedImportRenewalPredecessor,state:api.ImportJobCasStateV1,member:api.SignedImportMemberPermissionV1|undefined,e:ImportOwnerExpectation):Promise<VerifiedImportDelegation> {
-  state=clone(api.ImportJobCasStateV1Schema,state);const old=predecessors.get(previous)??reject("Canonical");validateCasState(state);
-  if(!equal(signingDigest("heddle-import-job-cas-state-v1",api.ImportJobCasStateV1Schema,state),old.stateDigest))reject("StaleContext");
-  return verifyImportRenewal(signed,old.previous,state.committedManifest!,state.authorityEpoch,member,e);
 }
 
 /** Validate discovery metadata only; a well-shaped selector grants no authority. */
@@ -564,88 +520,14 @@ export function validateImportJobStateRequest(request:api.GetImportJobStateReque
   initialImportOperationId(request.logicalJobId,false);
   if(!request.destination||!/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.test(request.destination.id)||!request.destination.id.replaceAll("-", "").split("").some(c=>c!=="0"))reject("Scope");
 }
-function ownerReference(b:api.ImportPublicProofBundleV1,id:api.ImportIdentityV1|undefined):void {
-  identity(id);
-  if(!b.ownerHistories.some(h=>equal(h.stateHash,id.ownerStateHash)&&h.root?.root&&equal(h.root.root.ownerId,id.ownerId)&&equal(h.root.root.accountUuid,id.ownerAccountUuid)))reject("Root");
-}
-function retainedProof(state:api.ImportJobCasStateV1,b:api.ImportPublicProofBundleV1):void {
-  validateCasState(state);
-  if(!state.activePredecessor||!state.committedManifest)reject("Canonical");
-  const last=b.delegations.at(-1);
-  if(!last||!equal(toBinary(api.SignedImportJobDelegationV1Schema,last),toBinary(api.SignedImportJobDelegationV1Schema,state.activePredecessor))||!b.terminalManifest||!equal(toBinary(api.ImportResultManifestV1Schema,b.terminalManifest),toBinary(api.ImportResultManifestV1Schema,state.committedManifest)))reject("StaleContext");
-  validateBundle(b,state.committedManifest.slots.length>0);
-  const active=state.activePredecessor.body??reject("Canonical"),id=active.identity??reject("Canonical");
-  if(!b.ownerGenesis?.genesis||!equal(b.ownerGenesis.genesis.spoolUuid,id.spoolUuid)||!b.ownerChain||!equal(ownerChainDigest(b.ownerChain),active.ownerChainDigest)||!equal(b.ownerChain.spoolGenesisDigest,id.spoolGenesisDigest))reject("Root");
-  for(const {body:d} of b.delegations){if(!d)reject("Canonical");if(!equal(d.logicalJobId,state.logicalJobId)||!equal(d.retryLineageId,state.retryLineageId))reject("Scope");ownerReference(b,d.identity);}
-  for(const g of b.genesisAuthorities)ownerReference(b,g.body?.identity);
-}
+
 /** Supply the authenticated response, never an incoming state assertion. */
 export function validateImportJobStateResponse(request:api.GetImportJobStateRequest,response:api.GetImportJobStateResponse):void {
   validateImportJobStateRequest(request);
-  if(toBinary(api.GetImportJobStateResponseSchema,response).length>2*MAX_BUNDLE_BYTES)reject("Bounds");
-  const state=response.state??reject("Canonical"),proof=response.retainedProof??reject("Canonical");
-  retainedProof(state,proof);
-  const id=state.activePredecessor?.body?.identity??reject("Canonical");
-  if(!equal(state.logicalJobId,request.logicalJobId)||request.destination?.id!==initialImportOperationId(id.spoolUuid,false))reject("Scope");
-  const selector=response.retainedSource??reject("SourceSelection");
-  for(const d of proof.delegations)validateRetainedImportSource(selector,d.body?.scope??reject("Canonical"));
-}
-/** A changed snapshot requires recomputation and another exact Prepare before signing. */
-export function validateRenewalPreparationFromRead(request:api.PrepareImportJobRequest,response:api.PrepareImportJobResponse,read:api.GetImportJobStateResponse):void {
-  validateImportPreparationResponse(request,response);
-  validateImportJobStateResponse(create(api.GetImportJobStateRequestSchema,{destination:request.destination,logicalJobId:request.renewLogicalJobId}),read);
-  if(!request.source||!read.retainedSource||!sameSourceSelection(request.source,read.retainedSource))reject("SourceSelection");
-  if(!read.state||!response.renewalState||!equal(toBinary(api.ImportJobCasStateV1Schema,read.state),toBinary(api.ImportJobCasStateV1Schema,response.renewalState)))reject("StaleContext");
-}
-/** Composition/references only. Independently verify owner/policy and witnessed
- * accepted history. The authenticated read supplies exact retained evidence.
- * logicalJobTerminal is independently selected under the host transaction. */
-export function validateImportRenewRequest(request:api.RenewImportJobRequest,read:api.GetImportJobStateResponse,logicalJobTerminal:boolean,originalAdmitted:boolean,now:bigint):void {
-  if(toBinary(api.RenewImportJobRequestSchema,request).length>2*MAX_BUNDLE_BYTES)reject("Bounds");
-  if(typeof logicalJobTerminal!=="boolean")reject("Canonical");
-  if(logicalJobTerminal)reject("Transition");
-  if(!request.clientOperationId||utf8.encode(request.clientOperationId).length>128)reject("Canonical");
-  const r=request.renewal?.body??reject("Canonical"),d=r.replacement?.body??reject("Canonical");
-  validateImportJobStateResponse(create(api.GetImportJobStateRequestSchema,{destination:request.destination,logicalJobId:d.logicalJobId}),read);
-  const state=read.state!,retained=read.retainedProof!,b=request.proof??reject("Canonical");
-  checkOriginalImportWindow({original:retained.delegations[0]??reject("Canonical"),admitted:originalAdmitted,nowUnixSeconds:now});
-  // Validate bounds and retained closure without applying export-only admissions
-  // to a zero-publication submission. Every pending field is compared below.
-  validateBundleBounds(b);
-  if(!equal(r.predecessorDelegationDigest,signedDelegationDigest(state.activePredecessor!))||r.expectedAuthorityEpoch!==state.authorityEpoch)reject("StaleContext");
-  if(!equal(r.committedManifestDigest,manifestDigest(state.committedManifest!)))reject("StaleManifest");
-  const parent=resolveBundlePermission(b,d.parentPermissionDigest),permissions=[...retained.memberPermissions];
-  if(parent&&!permissions.some(p=>equal(toBinary(api.SignedImportMemberPermissionV1Schema,p),toBinary(api.SignedImportMemberPermissionV1Schema,parent))))permissions.push(parent);
-  permissions.sort((a,b)=>compare(signedPermissionDigest(a),signedPermissionDigest(b)));
-  if(permissions.length!==b.memberPermissions.length||permissions.some((p,i)=>!equal(toBinary(api.SignedImportMemberPermissionV1Schema,p),toBinary(api.SignedImportMemberPermissionV1Schema,b.memberPermissions[i]!))))reject("ImportPermission");
-  if(b.memberPermission&&(!parent||!equal(toBinary(api.SignedImportMemberPermissionV1Schema,b.memberPermission),toBinary(api.SignedImportMemberPermissionV1Schema,parent))))reject("ImportPermission");
-  const normalized=clone(api.ImportPublicProofBundleV1Schema,b);
-  if(!retained.ownerHistories.every(h=>b.ownerHistories.some(v=>equal(toBinary(OwnerHistorySchema,h),toBinary(OwnerHistorySchema,v))))
-    ||!retained.ownershipTransfers.every((t,i)=>b.ownershipTransfers[i]&&equal(toBinary(ResourceTransferAuditRecordSchema,t),toBinary(ResourceTransferAuditRecordSchema,b.ownershipTransfers[i]!)))
-    ||!retained.policies.every(p=>b.policies.some(v=>equal(toBinary(SignedSpoolPolicyRecordSchema,p),toBinary(SignedSpoolPolicyRecordSchema,v)))))reject("Root");
-  ownerReference(b,d.identity);
-  if(!b.ownerChain||!d.identity||!equal(ownerChainDigest(b.ownerChain),d.ownerChainDigest)||!equal(b.ownerChain.spoolGenesisDigest,d.identity.spoolGenesisDigest))reject("Root");
-  normalized.memberPermissions=retained.memberPermissions;normalized.memberPermission=retained.memberPermission;
-  normalized.ownerHistories=retained.ownerHistories;normalized.ownershipTransfers=retained.ownershipTransfers;
-  normalized.policies=retained.policies;normalized.ownerChain=retained.ownerChain;
-  if(!equal(toBinary(api.ImportPublicProofBundleV1Schema,normalized),toBinary(api.ImportPublicProofBundleV1Schema,retained)))reject("Scope");
-  const initial=retained.delegations[0]?.body??reject("Canonical");
-  for(const branch of d.branchManifest)if(!initial.branchManifest.some(b=>equal(b.genesisAuthorityDigest,branch.genesisAuthorityDigest)&&b.limit&&branch.limit&&equal(b.limit.genesisDigest,branch.limit.genesisDigest)&&b.limit.refName===branch.limit.refName&&b.limit.slotId===branch.limit.slotId))reject("GenesisBinding");
-}
-/** Separate independently authenticated historical and current owner contexts.
- * Host transaction gates and accepted evidence verification remain mandatory. */
-export async function verifyImportRenewSubmission(request:api.RenewImportJobRequest,read:api.GetImportJobStateResponse,predecessorOwner:ImportOwnerExpectation,currentOwner:ImportOwnerExpectation,logicalJobTerminal:boolean,originalAdmitted:boolean):Promise<VerifiedImportDelegation> {
-  request=clone(api.RenewImportJobRequestSchema,request);read=clone(api.GetImportJobStateResponseSchema,read);
-  predecessorOwner=snapshotExpectation(predecessorOwner);currentOwner=snapshotExpectation(currentOwner);
-  validateImportRenewRequest(request,read,logicalJobTerminal,originalAdmitted,currentOwner.nowUnixSeconds);
-  const state=read.state!,active=state.activePredecessor!.body!,r=request.renewal!,d=r.body!.replacement!.body!;
-  const old=await verifyImportRenewalPredecessor(state,resolveBundlePermission(read.retainedProof!,active.parentPermissionDigest),predecessorOwner);
-  return verifyImportRenewalFromState(r,old,state,resolveBundlePermission(request.proof!,d.parentPermissionDigest),currentOwner);
-}
-/** Compare exact frozen raw request bytes before replay CAS/expiry checks. */
-export function checkImportRenewReplay(requestBytes:Uint8Array,storedBytes:Uint8Array):void {
-  if(requestBytes.length>2*MAX_BUNDLE_BYTES)reject("Bounds");
-  if(!equal(requestBytes,storedBytes))reject("OperationIdReused");
+  if(toBinary(api.GetImportJobStateResponseSchema,response).length>4096)reject("Bounds");
+  if(response.status<1||response.status>5||response.authorityEpoch===0n)reject("Canonical");
+  width(response.activeCancellationId,32);width(response.activeDelegationDigest,32);
+  validateRetryAvailability(response,request.destination??reject("Scope"));
 }
 
 /** Supply the independently verified EFFECTIVE state at the selected time. */
@@ -660,15 +542,22 @@ export interface ImportWitnessSnapshot {
   jobAssociations:{key:Uint8Array;logicalJobId:Uint8Array}[];acceptedHistory:api.ImportPublicProofBundleV1[];
 }
 export type ImportBundleOwnerExpectation=Omit<ImportOwnerExpectation,"nowUnixSeconds"> & {effectiveFromUnixSeconds:bigint;effectiveUntilUnixSeconds:bigint|undefined};
-export type ImportBundleOwnerResolver=(delegationIndex:number,time:bigint|undefined)=>ImportBundleOwnerExpectation|Promise<ImportBundleOwnerExpectation>;
+export type ImportBundleOwnerResolver=(time:bigint|undefined)=>ImportBundleOwnerExpectation|Promise<ImportBundleOwnerExpectation>;
 export interface VerifiedImportBundleWitnesses {
-  evidence:"recovery"|"witnessed";acceptedHistory:api.ImportJobCasStateV1;
+  evidence:"recovery"|"witnessed";acceptedHistory:api.ImportResultManifestV1;
   snapshot:ImportWitnessSnapshot|undefined;snapshotAdvanced:boolean;
-  ownerCheckTimesUnixSeconds:(bigint|undefined)[];
+  ownerCheckTimeUnixSeconds:bigint|undefined;
 }
-/** After authenticating the state RPC, supply independently verified historical
+/** Consistency of the host's signed transaction assertion; atomic visibility is host-owned. */
+export function checkImportGenesisPublicationPair(delegation:VerifiedImportDelegation,admission:HostedWitnessStatementV1,publication:HostedWitnessStatementV1):void {
+  const d=read(delegation).body;
+  interval(d.notBeforeUnixSeconds,d.expiresAtUnixSeconds,admission.observedAtUnixMillis/1000n);
+  if(admission.purpose!==1||publication.purpose!==3||admission.observedAtUnixMillis!==publication.observedAtUnixMillis||!equal(admission.hostTransactionId,publication.hostTransactionId)||!equal(admission.executorId,publication.executorId)||admission.admissionOrder>=publication.admissionOrder)reject("Transition");
+}
+
+/** For public Fetch/export evidence, supply independently verified historical
  * effective owner facts via the mandatory resolver at each selected time. The verifier selects the
- * first authenticated publication (else initial admission) time internally.
+ * first authenticated publication time of the sole delegation internally.
  * Unwitnessed certificates are recovery only.
  * The mandatory hook receives undefined for time-free policy closure when there
  * are no statements, and otherwise authenticates each
@@ -703,17 +592,26 @@ export async function verifyImportBundleWitnesses(
     await verifyPolicy(clone(api.ImportPublicProofBundleV1Schema,bundle),clone(HostedWitnessStatementV1Schema,s));resolved.push({context,proof});
   }
   if(!bundle.statements.length)await verifyPolicy(clone(api.ImportPublicProofBundleV1Schema,bundle),undefined);
+  // Exactly the P3 consumed by each progressive prefix, never array-first matching.
+  const prefix=clone(api.ImportResultManifestV1Schema,terminal);prefix.slots=[];
+  const selectedPublications:SignedHostedWitnessStatementV1[]=[];
+  for(const o of bundle.operations){const digest=signedOperationDigest(o),slot=terminal.slots.find(s=>equal(s.signedOperationDigest,digest))??reject("Scope");prefix.slots.push(slot);prefix.slots.sort((a,b)=>a.refName<b.refName?-1:a.refName>b.refName?1:a.slotId<b.slotId?-1:a.slotId>b.slotId?1:0);
+    const payload=canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,prefix));
+    const matches=bundle.statements.filter(s=>s.body?.purpose===3&&equal(s.body.canonicalPayload,payload));
+    if(matches.length!==1)reject("Transition");selectedPublications.push(matches[0]??reject("Canonical"));
+  }
+  if(bundle.statements.some(s=>s.body?.purpose===3&&!selectedPublications.some(p=>equal(toBinary(SignedHostedWitnessStatementV1Schema,p),toBinary(SignedHostedWitnessStatementV1Schema,s)))))reject("Transition");
+  const admittedGeneses=new Set<string>();
   const times:({order:bigint;time:bigint}|undefined)[]=bundle.delegations.map(()=>undefined);
   const publications=new Map<SignedHostedWitnessStatementV1,{o:api.SignedDelegatedImportOperationV1;m:api.ImportResultManifestV1;index:number}>();
-  for(const signed of bundle.statements){const s=signed.body!;if(s.purpose!==3)continue;
+  for(const signed of bundle.statements){const s=signed.body??reject("Canonical");if(s.purpose!==3)continue;
     const pair=bundle.operations.flatMap(o=>bundle.manifests.map(m=>({o,m}))).find(({o,m})=>equal(canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,m)),s.canonicalPayload))??reject("Scope");
     const index=bundle.delegations.findIndex(d=>equal(signedDelegationDigest(d),pair.o.body!.delegationDigest));if(index<0)reject("Scope");
     if(!times[index]||s.admissionOrder<times[index]!.order)times[index]={order:s.admissionOrder,time:s.observedAtUnixMillis/1000n};
     publications.set(signed,{...pair,index});
   }
-  if(!times[0]){const admissions=bundle.statements.map(s=>s.body!).filter(s=>s.purpose===1).sort((a,b)=>a.observedAtUnixMillis<b.observedAtUnixMillis?-1:a.observedAtUnixMillis>b.observedAtUnixMillis?1:a.admissionOrder<b.admissionOrder?-1:a.admissionOrder>b.admissionOrder?1:0);if(admissions[0])times[0]={order:admissions[0].admissionOrder,time:admissions[0].observedAtUnixMillis/1000n};}
-  const resolveOwner=async(index:number,time:bigint|undefined):Promise<ImportOwnerExpectation>=>{
-    const facts=await ownerAt(index,time);
+  const resolveOwner=async(time:bigint|undefined):Promise<ImportOwnerExpectation>=>{
+    const facts=await ownerAt(time);
     if(typeof facts.effectiveFromUnixSeconds!=="bigint"||facts.effectiveFromUnixSeconds<0n
       ||(facts.effectiveUntilUnixSeconds!==undefined&&facts.effectiveUntilUnixSeconds<=facts.effectiveFromUnixSeconds)
       ||(time!==undefined&&(time<facts.effectiveFromUnixSeconds||(facts.effectiveUntilUnixSeconds!==undefined&&time>=facts.effectiveUntilUnixSeconds))))reject("Scope");
@@ -723,8 +621,8 @@ export async function verifyImportBundleWitnesses(
     return {...owner,knownJobAssociations:associations};
   };
   const verified:VerifiedImportDelegation[]=[];
-  for(let i=0;i<bundle.delegations.length;i++){const d=bundle.delegations[i]!,b=d.body??reject("Canonical"),parent=resolveBundlePermission(bundle,b.parentPermissionDigest),owner=await resolveOwner(i,times[i]?.time);
-    verified.push(i===0?await verifyDelegationInner(d,parent,owner,!!times[i]):await verifyRenewalInner(bundle.renewals[i-1]!,verified[i-1]!,resolveBundleManifest(bundle,bundle.renewals[i-1]!.body!.committedManifestDigest),BigInt(i),parent,owner,!!times[i]));
+  for(let i=0;i<bundle.delegations.length;i++){const d=bundle.delegations[i]!,b=d.body??reject("Canonical"),parent=resolveBundlePermission(bundle,b.parentPermissionDigest),owner=await resolveOwner(times[i]?.time);
+    verified.push(await verifyDelegationInner(d,parent,owner,!!times[i]));
   }
   const initial=read(verified[0]??reject("Canonical")).body;
   for(const branch of initial.branchManifest){const limit=branch.limit??reject("Canonical"),binding=bundle.genesisAuthorities.find(g=>equal(signedGenesisDigest(g),branch.genesisAuthorityDigest))??reject("Scope"),g=binding.body??reject("Canonical");
@@ -733,32 +631,35 @@ export async function verifyImportBundleWitnesses(
   }
   for(let i=0;i<bundle.statements.length;i++){const signed=bundle.statements[i]!,s=signed.body!,{context,proof}=resolved[i]!;
     if(!verified.some(d=>{const id=read(d).body.identity!;return equal(s.spoolUuid,id.spoolUuid)&&equal(s.spoolGenesisDigest,id.spoolGenesisDigest)&&equal(s.ownerId,id.ownerId)&&equal(s.ownerStateHash,id.ownerStateHash)&&s.ownershipTransferSequence===id.ownershipTransferSequence;}))reject("Scope");
-    if(s.purpose===1){await verifyImportDelegation(bundle.delegations[0]!,resolveBundlePermission(bundle,initial.parentPermissionDigest),await resolveOwner(0,s.observedAtUnixMillis/1000n));await verifyWitnessPayload(s,{kind:'genesis',payload:bundle.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope")});}
+    if(s.purpose===1){await verifyImportDelegation(bundle.delegations[0]!,resolveBundlePermission(bundle,initial.parentPermissionDigest),await resolveOwner(s.observedAtUnixMillis/1000n));const payload=bundle.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");
+      const genesis=(payload.binding?.body??reject("Canonical")).genesisDigest,key=Array.from(genesis).join(",");
+      if(admittedGeneses.has(key))reject("Transition");admittedGeneses.add(key);
+      const operationIndex=bundle.operations.findIndex(o=>equal((o.body??reject("Canonical")).genesisDigest,genesis));
+      const publication=selectedPublications[operationIndex]?.body??reject("Transition");
+      checkImportGenesisPublicationPair(verified[0]??reject("Canonical"),s,publication);await verifyWitnessPayload(s,{kind:'genesis',payload:bundle.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope")});}
     else if(s.purpose===2)await verifyWitnessPayload(s,{kind:'authority',payload:bundle.authorityWitnesses.find(p=>equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))??reject("Scope")});
     else if(s.purpose===4)await verifyWitnessPayload(s,{kind:'landing',payload:bundle.landingWitnesses.find(p=>equal(canonicalHybridV1(api.HostedLandingWitnessV1Schema,p),s.canonicalPayload))??reject("Scope")});
-    else if(s.purpose===3){const {o,m,index}=publications.get(signed)??reject("Scope"),d=bundle.delegations[index]!;const delegation=await verifyImportDelegation(d,resolveBundlePermission(bundle,d.body!.parentPermissionDigest),await resolveOwner(index,s.observedAtUnixMillis/1000n));await verifyImportPublication(o,delegation,m,signed,set??reject("Canonical"),proof,now);}
+    else if(s.purpose===3){const {o,m,index}=publications.get(signed)??reject("Scope"),d=bundle.delegations[index]!;const delegation=await verifyImportDelegation(d,resolveBundlePermission(bundle,d.body!.parentPermissionDigest),await resolveOwner(s.observedAtUnixMillis/1000n));await verifyImportPublication(o,delegation,m,signed,set??reject("Canonical"),proof,now);}
     else reject("Version");recheckWitnessContext(context,set??reject("Canonical"),signed,now);
   }
-  const progressive=clone(api.ImportResultManifestV1Schema,terminal);progressive.slots=[];let order=0n,observed=0n,activeIndex=0,totalBytes=0n;const consumed=new Map<string,{operations:number;bytes:bigint}>();
-  for(const o of bundle.operations){const before=manifestDigest(progressive),digest=signedOperationDigest(o),slot=terminal.slots.find(s=>equal(s.signedOperationDigest,digest))??reject("Scope");progressive.slots.push(slot);progressive.slots.sort((a,b)=>a.refName<b.refName?-1:a.refName>b.refName?1:a.slotId<b.slotId?-1:a.slotId>b.slotId?1:0);const payload=canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,progressive)),s=bundle.statements.find(s=>s.body?.purpose===3&&equal(s.body.canonicalPayload,payload))?.body??reject("Transition");if(s.admissionOrder<=order||s.observedAtUnixMillis<observed)reject("Transition");order=s.admissionOrder;observed=s.observedAtUnixMillis;
-    const index=verified.findIndex(d=>equal(d.digest,o.body!.delegationDigest));if(index<0)reject("Scope");if(index<activeIndex)reject("Transition");
+  const progressive=clone(api.ImportResultManifestV1Schema,terminal);progressive.slots=[];let order=0n,observed=0n,totalBytes=0n;const consumed=new Map<string,{operations:number;bytes:bigint}>();
+  for(const o of bundle.operations){const digest=signedOperationDigest(o),slot=terminal.slots.find(s=>equal(s.signedOperationDigest,digest))??reject("Scope");progressive.slots.push(slot);progressive.slots.sort((a,b)=>a.refName<b.refName?-1:a.refName>b.refName?1:a.slotId<b.slotId?-1:a.slotId>b.slotId?1:0);const payload=canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,progressive)),s=bundle.statements.find(s=>s.body?.purpose===3&&equal(s.body.canonicalPayload,payload))?.body??reject("Transition");if(s.admissionOrder<=order||s.observedAtUnixMillis<observed)reject("Transition");order=s.admissionOrder;observed=s.observedAtUnixMillis;
+    const index=verified.findIndex(d=>equal(d.digest,o.body!.delegationDigest));if(index<0)reject("Scope");
     totalBytes+=o.body!.resultBytes;if(totalBytes>=(1n<<64n))reject("Bounds");const originalScope=initial.scope!;
     if(totalBytes>originalScope.maxResultBytes||progressive.slots.length>originalScope.maxOperations)reject("Scope");
     const committedBefore=clone(api.ImportResultManifestV1Schema,progressive);committedBefore.slots=committedBefore.slots.filter(s=>!equal(s.signedOperationDigest,digest));await checkImportPublicationBudget(o,verified[index]!,committedBefore);
     const delegation=read(verified[index]!),budgets:{digest:Uint8Array;scope:api.ImportPermissionScopeV1}[]=[{digest:delegation.digest,scope:delegation.body.scope!}];
     if(delegation.member)budgets.push({digest:delegation.body.parentPermissionDigest,scope:delegation.member.body!.scope!});
     for(const {digest,scope} of budgets){const key=Array.from(digest).join(",")+":"+Array.from(delegation.body.logicalJobId).join(","),count=consumed.get(key)??{operations:0,bytes:0n};count.operations++;count.bytes+=o.body!.resultBytes;if(count.bytes>=(1n<<64n))reject("Bounds");consumed.set(key,count);if(count.operations>scope.maxOperations||count.bytes>scope.maxResultBytes)reject("Scope");}
-    while(activeIndex<index){if(!equal(bundle.renewals[activeIndex]!.body!.committedManifestDigest,before))reject("StaleManifest");activeIndex++;}
   }
   if(!equal(toBinary(api.ImportResultManifestV1Schema,progressive),toBinary(api.ImportResultManifestV1Schema,terminal)))reject("Scope");
-  const finalDigest=manifestDigest(progressive);for(const r of bundle.renewals.slice(activeIndex))if(!equal(r.body!.committedManifestDigest,finalDigest))reject("StaleManifest");
   const history=snapshot?.acceptedHistory.slice()??[],index=history.findIndex(b=>equal(b.terminalManifest!.logicalJobId,terminal.logicalJobId)&&equal(b.delegations[0]!.body!.identity!.spoolUuid,bundle.delegations[0]!.body!.identity!.spoolUuid));
-  if(index>=0){const old=history[index]!;if(!old.delegations.every((d,i)=>bundle.delegations[i]&&equal(toBinary(api.SignedImportJobDelegationV1Schema,d),toBinary(api.SignedImportJobDelegationV1Schema,bundle.delegations[i]!)))||!old.renewals.every((r,i)=>bundle.renewals[i]&&equal(toBinary(api.SignedImportJobRenewalV1Schema,r),toBinary(api.SignedImportJobRenewalV1Schema,bundle.renewals[i]!)))||!old.operations.every((o,i)=>bundle.operations[i]&&equal(toBinary(api.SignedDelegatedImportOperationV1Schema,o),toBinary(api.SignedDelegatedImportOperationV1Schema,bundle.operations[i]!))))reject("HighWater");
+  if(index>=0){const old=history[index]!;if(!old.delegations.every((d,i)=>bundle.delegations[i]&&equal(toBinary(api.SignedImportJobDelegationV1Schema,d),toBinary(api.SignedImportJobDelegationV1Schema,bundle.delegations[i]!)))||!old.operations.every((o,i)=>bundle.operations[i]&&equal(toBinary(api.SignedDelegatedImportOperationV1Schema,o),toBinary(api.SignedDelegatedImportOperationV1Schema,bundle.operations[i]!))))reject("HighWater");
     const contains=<T extends import("@bufbuild/protobuf").Message>(schema:import("@bufbuild/protobuf").DescMessage,newValues:T[],oldValues:T[])=>oldValues.every(v=>newValues.some(n=>equal(toBinary(schema,n),toBinary(schema,v))));
     if(Boolean(old.ownerGenesis)!==Boolean(bundle.ownerGenesis)||(old.ownerGenesis&&bundle.ownerGenesis&&!equal(toBinary(SignedSpoolOwnerGenesisSchema,old.ownerGenesis),toBinary(SignedSpoolOwnerGenesisSchema,bundle.ownerGenesis)))
       ||!contains(OwnerHistorySchema,bundle.ownerHistories,old.ownerHistories)
       ||!old.ownershipTransfers.every((v,i)=>bundle.ownershipTransfers[i]&&equal(toBinary(ResourceTransferAuditRecordSchema,v),toBinary(ResourceTransferAuditRecordSchema,bundle.ownershipTransfers[i]!)))
-      ||!contains(api.SignedImportMemberPermissionV1Schema,bundle.memberPermissions,old.memberPermissions)
+      ||Boolean(old.memberPermission)!==Boolean(bundle.memberPermission)||(old.memberPermission&&bundle.memberPermission&&!equal(toBinary(api.SignedImportMemberPermissionV1Schema,old.memberPermission),toBinary(api.SignedImportMemberPermissionV1Schema,bundle.memberPermission)))
       ||!contains(api.SignedImportGenesisAuthorityV1Schema,bundle.genesisAuthorities,old.genesisAuthorities)
       ||!contains(SignedRecordSchema,bundle.originalGeneses,old.originalGeneses)
       ||!old.creatorAuthorityEnvelopes.every(v=>bundle.creatorAuthorityEnvelopes.some(n=>equal(v,n)))
@@ -771,7 +672,6 @@ export async function verifyImportBundleWitnesses(
     history[index]=bundle;}else history.push(bundle);
   const witnessed=times.every(t=>t!==undefined);
   const witnessedPrefix=times.findIndex(t=>t===undefined)<0?times.length:times.findIndex(t=>t===undefined);
-  if(witnessedPrefix>0&&!witnessed){const prefix=clone(api.ImportPublicProofBundleV1Schema,bundle);prefix.delegations=prefix.delegations.slice(0,witnessedPrefix);prefix.renewals=prefix.renewals.slice(0,witnessedPrefix-1);history[index>=0?index:history.length-1]=prefix;}
   let persisted=snapshot;
   if(witnessedPrefix>0||newSet){
     const persistedAssociations=snapshot?.jobAssociations.map(a=>({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()}))??[];
@@ -779,7 +679,7 @@ export async function verifyImportBundleWitnesses(
     persisted=cloneImportWitnessSnapshot({root:pin,witnessSet:carried??reject("Canonical"),clockFloorUnixMillis:now,jobAssociations:persistedAssociations,acceptedHistory:witnessedPrefix>0?history:snapshot?.acceptedHistory??[]});
   }
   const snapshotAdvanced=!!persisted&&(!snapshot||persisted.clockFloorUnixMillis!==snapshot.clockFloorUnixMillis||persisted.root.rootId!==snapshot.root.rootId||persisted.root.epoch!==snapshot.root.epoch||!equal(persisted.root.publicKey,snapshot.root.publicKey)||!equal(toBinary(SignedHostedWitnessSetV1Schema,persisted.witnessSet),toBinary(SignedHostedWitnessSetV1Schema,snapshot.witnessSet))||persisted.acceptedHistory.length!==snapshot.acceptedHistory.length||persisted.acceptedHistory.some((b,i)=>!snapshot!.acceptedHistory[i]||!equal(toBinary(api.ImportPublicProofBundleV1Schema,b),toBinary(api.ImportPublicProofBundleV1Schema,snapshot!.acceptedHistory[i]!)))||persisted.jobAssociations.length!==snapshot.jobAssociations.length||persisted.jobAssociations.some((a,i)=>!equal(a.key,snapshot!.jobAssociations[i]!.key)||!equal(a.logicalJobId,snapshot!.jobAssociations[i]!.logicalJobId)));
-  return {evidence:witnessed?"witnessed":"recovery",snapshotAdvanced,ownerCheckTimesUnixSeconds:times.map(t=>t?.time),acceptedHistory:create(api.ImportJobCasStateV1Schema,{formatVersion:1,logicalJobId:terminal.logicalJobId,retryLineageId:terminal.retryLineageId,activePredecessor:bundle.delegations.at(-1),authorityEpoch:BigInt(bundle.delegations.length),committedManifest:terminal}),snapshot:persisted};
+  return {evidence:witnessed?"witnessed":"recovery",acceptedHistory:clone(api.ImportResultManifestV1Schema,terminal),snapshot:persisted,snapshotAdvanced,ownerCheckTimeUnixSeconds:times[0]?.time};
 }
 function cloneImportWitnessSnapshot(s:ImportWitnessSnapshot):ImportWitnessSnapshot{return {root:{...s.root,publicKey:s.root.publicKey.slice()},witnessSet:clone(SignedHostedWitnessSetV1Schema,s.witnessSet),clockFloorUnixMillis:s.clockFloorUnixMillis,jobAssociations:s.jobAssociations.map(a=>({key:a.key.slice(),logicalJobId:a.logicalJobId.slice()})),acceptedHistory:s.acceptedHistory.map(b=>clone(api.ImportPublicProofBundleV1Schema,b))};}
 
@@ -787,20 +687,14 @@ function cloneImportWitnessSnapshot(s:ImportWitnessSnapshot):ImportWitnessSnapsh
 export function validateImportCommitRequestBounds(request:CommitImportJobRequest):void {
   if(toBinary(CommitImportJobRequestSchema,request).length>MAX_COMMIT_REQUEST_BYTES||toBinary(api.ImportPublicProofBundleV1Schema,request.proof??reject("Canonical")).length>MAX_BUNDLE_BYTES)reject("Bounds");
 }
-/** Independently authenticated CURRENT host facts, never caller-supplied claims. */
-/** Independently retained original authority and actual native admission only. */
-export function originalImportRetryUnavailable(original:api.SignedImportJobDelegationV1,admitted:boolean,now:bigint):api.ImportRetryUnavailableReason|undefined {
-  if(typeof admitted!=="boolean"||typeof now!=="bigint")reject("Canonical");
-  const b=original.body??reject("Canonical");if(b.notBeforeUnixSeconds<0n||b.expiresAtUnixSeconds<=b.notBeforeUnixSeconds||now<0n)reject("Semantic");
-  return !admitted&&now>=b.expiresAtUnixSeconds?api.ImportRetryUnavailableReason.ORIGINAL_WINDOW_ENDED:undefined;
-}
+
 export interface ImportControlCaller {
   authenticatedPop:boolean; destinationWriter:boolean; callerAccount:string;
   connectionOwnerAccount?:string; authorizedSource?:api.ImportSourceSelectionV1;
   exactGrantsCurrent:boolean; selectedCommitsAvailable:boolean;
 }
-export type ImportControlAction="Cancel"|"Retry"|"Renew";
-/** Cancel requires destination control only; Retry/Renew fetch via this exact custody. */
+export type ImportControlAction="Cancel"|"Retry";
+/** Cancel requires destination control only; Retry fetch via this exact custody. */
 export function checkImportControlCaller(action:ImportControlAction,retained:api.ImportSourceSelectionV1,scope:api.ImportPermissionScopeV1,caller:ImportControlCaller):void {
   if(!caller.authenticatedPop||!caller.destinationWriter||!caller.callerAccount)reject("Scope");
   if(action==="Cancel")return;
@@ -808,37 +702,8 @@ export function checkImportControlCaller(action:ImportControlAction,retained:api
   if(retained.connection&&(caller.connectionOwnerAccount!==caller.callerAccount||!caller.authorizedSource||!sameSourceSelection(caller.authorizedSource,retained)||!caller.exactGrantsCurrent))reject("SourceSelection");
   if(!caller.selectedCommitsAvailable)reject("SourceSelection");
 }
-/** Current host facts read under the same fence as the writer-only response. */
-export interface ImportControlAvailabilityContext {
-  read:api.GetImportJobStateResponse;logicalJobTerminal:boolean;
-  originalAdmitted:boolean;nowUnixSeconds:bigint;
-}
-/** Caller-relative advice only. The admission checks remain authoritative. */
-export function importJobControlAvailability(context:ImportControlAvailabilityContext,caller:ImportControlCaller):api.ImportJobControlAvailabilityV1 {
-  if(!caller.authenticatedPop||!caller.destinationWriter||!caller.callerAccount)reject("Scope");
-  const read=context.read,active=read.state?.activePredecessor?.body??reject("Canonical"),scope=active.scope??reject("Canonical"),retained=read.retainedSource??reject("SourceSelection");
-  validateRetainedImportSource(retained,scope);
-  const original=read.retainedProof?.delegations[0]??reject("Canonical"),windowEnded=originalImportRetryUnavailable(original,context.originalAdmitted,context.nowUnixSeconds)!==undefined,R=api.ImportControlUnavailableReason;
-  const sourceReason=retained.connection&&caller.connectionOwnerAccount!==caller.callerAccount?R.NOT_CONNECTION_OWNER:
-    retained.connection&&(!caller.authorizedSource||!sameSourceSelection(caller.authorizedSource,retained)||!caller.exactGrantsCurrent)?R.GRANT_MISSING:
-    !caller.selectedCommitsAvailable?R.COMMIT_UNAVAILABLE:undefined;
-  const shared=context.logicalJobTerminal?R.TERMINAL:windowEnded?R.ORIGINAL_WINDOW_ENDED:sourceReason;
-  const retryReason=shared??(read.retryAvailability.case!=="eligibleRetryTarget"?R.NO_RETRY_TARGET:context.nowUnixSeconds>=active.expiresAtUnixSeconds?R.AUTHORITY_EXPIRED:context.nowUnixSeconds<active.notBeforeUnixSeconds?R.AUTHORITY_NOT_YET_VALID:undefined);
-  const availability=(reason:api.ImportControlUnavailableReason|undefined)=>create(api.ImportControlAvailabilityV1Schema,{availability:reason===undefined?{case:"available",value:true}:{case:"unavailable",value:reason}});
-  return create(api.ImportJobControlAvailabilityV1Schema,{retry:availability(retryReason),renew:availability(shared),cancel:availability(context.logicalJobTerminal?R.TERMINAL:undefined)});
-}
-/** Validate required current controls; historical frozen carriers use the older validators. */
-export function validateImportControlStateResponse(request:api.GetImportJobStateRequest,response:api.GetImportJobStateResponse):void {
-  validateImportRetryStateResponse(request,response);
-  const controls=response.controlAvailability??reject("Canonical");
-  for(const control of [controls.retry,controls.renew,controls.cancel]){
-    const a=control?.availability??reject("Canonical");
-    if(a.case==="available"&&a.value===true)continue;
-    if(a.case==="unavailable"&&a.value>=1&&a.value<=8)continue;
-    reject("Canonical");
-  }
-}
 
+function sameRecordRef(a:RecordRef|undefined,b:RecordRef|undefined):boolean {return !a&&!b||!!a&&!!b&&equal(toBinary(RecordRefSchema,a),toBinary(RecordRefSchema,b));}
 function sameSpool(a:SpoolRef|undefined,b:SpoolRef|undefined):boolean {return !!a&&!!b&&equal(toBinary(SpoolRefSchema,a),toBinary(SpoolRefSchema,b));}
 function canonicalOperationId(id:string):void {
   const compact=id.replaceAll("-","");
@@ -847,40 +712,41 @@ function canonicalOperationId(id:string):void {
 function validateRetryAvailability(response:api.GetImportJobStateResponse,destination:SpoolRef):void {
   const availability=response.retryAvailability;
   if(availability.case==="eligibleRetryTarget"){
+    if(response.status!==1)reject("Canonical");
     const target=availability.value,op=target.operationRef??reject("Canonical");canonicalOperationId(op.id);
     if(!sameSpool(op.spool,destination))reject("Scope");
     if(!target.operationVersion.length||target.operationVersion.length>256)reject("Bounds");
-  }else if(availability.case!=="retryUnavailable"||availability.value<1||availability.value>7)reject("Canonical");
+  }else if(availability.case!=="retryUnavailable"||!(response.status===1?[1,2,6]:response.status===2?[3]:response.status===3?[4]:response.status===4?[5]:response.status===5?[7]:[]).includes(availability.value))reject("Canonical");
 }
-/** New writer disclosure validation; historical frozen recovery carriers lack this addition. */
+/** Validate the minimal writer snapshot and its retry target. */
 export function validateImportRetryStateResponse(request:api.GetImportJobStateRequest,response:api.GetImportJobStateResponse):void {
   validateImportJobStateResponse(request,response);validateRetryAvailability(response,request.destination??reject("Scope"));
 }
 /** Receiver-owned facts read under the same job/operation/source admission fence. */
 export interface ImportRetryAdmission {
   read:api.GetImportJobStateResponse; original:OperationRecord; retryLineageId:Uint8Array;
-  logicalJobTerminal:boolean; originalAdmitted:boolean; nowUnixSeconds:bigint;
+  logicalJobTerminal:boolean;retainedSource:api.ImportSourceSelectionV1;committedManifest:api.ImportResultManifestV1;nowUnixSeconds:bigint;
 }
 /** Replay lookup precedes this check; owner/policy/revocation/lease checks remain host gates. */
 export function checkImportRetryAdmission(request:RetryImportSourceRequest,context:ImportRetryAdmission,active:VerifiedImportDelegation,caller:ImportControlCaller):void {
   const readRequest=create(api.GetImportJobStateRequestSchema,{destination:request.originalOperation?.spool,logicalJobId:request.logicalJobId});
   validateImportRetryStateResponse(readRequest,context.read);
   if(!request.clientOperationId||utf8.encode(request.clientOperationId).length>128)reject("Canonical");
-  if(context.logicalJobTerminal)reject("Revoked");
-  checkOriginalImportWindow({original:context.read.retainedProof?.delegations[0]??reject("Canonical"),admitted:context.originalAdmitted,nowUnixSeconds:context.nowUnixSeconds});
+  if(context.logicalJobTerminal||context.read.status!==1)reject("Revoked");
   const availability=context.read.retryAvailability;
   if(availability.case!=="eligibleRetryTarget")reject("StaleContext");
   const target=availability.value,targetRef=target.operationRef??reject("Canonical"),originalRef=context.original.ref??reject("Scope"),d=read(active);
   const operationRead=importJobStateRequestFromOperation(context.original);
   if(!request.originalOperation||!equal(toBinary(RecordRefSchema,request.originalOperation),toBinary(RecordRefSchema,originalRef))||!sameSpool(originalRef.spool,targetRef.spool)||originalRef.id!==targetRef.id||!equal(context.retryLineageId,d.body.retryLineageId)||!operationRead||!equal(toBinary(api.GetImportJobStateRequestSchema,operationRead),toBinary(api.GetImportJobStateRequestSchema,readRequest)))reject("Scope");
   if(!equal(request.expectedOperationVersion,target.operationVersion)||!equal(context.original.version,target.operationVersion)||context.original.supersededBy||![4,5].includes(context.original.state))reject("StaleContext");
-  const state=context.read.state??reject("Canonical");
-  if(!equal(signedDelegationDigest(state.activePredecessor??reject("Canonical")),d.digest))reject("StaleContext");
+  const state=context.read;
+  if(!equal(state.activeDelegationDigest,d.digest)||!equal(state.activeCancellationId,d.body.cancellationId))reject("StaleContext");
   checkImportJobFence(request.logicalJobId,request.activeDelegationDigest,request.expectedAuthorityEpoch,active,state.authorityEpoch);
   interval(d.body.notBeforeUnixSeconds,d.body.expiresAtUnixSeconds,context.nowUnixSeconds);
-  const manifest=state.committedManifest??reject("Canonical"),scope=d.body.scope??reject("Canonical");
+  const manifest=context.committedManifest,scope=d.body.scope??reject("Canonical");
+  validateImportManifest(manifest);if(!equal(manifest.logicalJobId,d.body.logicalJobId)||!equal(manifest.retryLineageId,d.body.retryLineageId))reject("Scope");
   if(!scope.branches.some(b=>!manifest.slots.some(s=>s.refName===b.refName&&s.slotId===b.slotId)))reject("StaleContext");
-  checkImportControlCaller("Retry",context.read.retainedSource??reject("SourceSelection"),scope,caller);
+  checkImportControlCaller("Retry",context.retainedSource,scope,caller);
 }
 /** Complete prior attempt set is host-owned; UUID allocation/links/receipt persist together. */
 export function validateImportRetryResponse(request:RetryImportSourceRequest,response:MutationResponse,priorAttemptIds:readonly string[]):void {
@@ -890,31 +756,15 @@ export function validateImportRetryResponse(request:RetryImportSourceRequest,res
   try{canonicalOperationId(operation.id);}catch{reject("PendingOperation");}
   if(!request.clientOperationId||receipt.clientOperationId!==request.clientOperationId||!sameSpool(operation.spool,original.spool)||operation.id===original.id||operation.id===request.clientOperationId||priorAttemptIds.includes(operation.id))reject("PendingOperation");
 }
-/** Applied may carry an empty version list; Renew creates no physical attempt. */
-export function validateImportRenewResponse(request:api.RenewImportJobRequest,response:MutationResponse):void {
-  const receipt=response.receipt??reject("Semantic");
-  if(!request.clientOperationId||receipt.clientOperationId!==request.clientOperationId||receipt.outcome.case!=="applied")reject("Semantic");
-}
-export function checkImportRetryReplay(requestBytes:Uint8Array,storedBytes:Uint8Array):void {checkImportRenewReplay(requestBytes,storedBytes);}
+
+export function checkImportRetryReplay(requestBytes:Uint8Array,storedBytes:Uint8Array):void {if(requestBytes.length>2*MAX_BUNDLE_BYTES)reject("Bounds");if(!equal(requestBytes,storedBytes))reject("OperationIdReused");}
 
 /** Complete receiver-owned manifest, under the publication transaction. */
 export async function checkImportPublicationBudget(signed:api.SignedDelegatedImportOperationV1,active:VerifiedImportDelegation,committedBefore:api.ImportResultManifestV1):Promise<void>{
   signed=clone(api.SignedDelegatedImportOperationV1Schema,signed);committedBefore=clone(api.ImportResultManifestV1Schema,committedBefore);
   await verifyDelegatedImportOperation(signed,active);
-  let remaining:api.ImportPermissionScopeV1;
-  try{remaining=remainingImportScope(read(active).body.scope!,committedBefore);}catch(e){if(e instanceof HybridContractError&&e.reason==="RenewalFork")reject("Scope");throw e;}
+  if(!equal(committedBefore.logicalJobId,read(active).body.logicalJobId)||!equal(committedBefore.retryLineageId,read(active).body.retryLineageId))reject("Scope");
+  const remaining=remainingImportScope(read(active).body.scope!,committedBefore);
   if(checkImportSlotReplay(committedBefore,signed))return;
   if(remaining.maxOperations===0||signed.body!.resultBytes>remaining.maxResultBytes)reject("Scope");
-}
-export interface ImportOriginalAdmission {original:api.SignedImportJobDelegationV1;admitted:boolean;nowUnixSeconds:bigint;}
-export function checkOriginalImportWindow(facts:ImportOriginalAdmission):void {
-  if(typeof facts.admitted!=="boolean")reject("Canonical");
-  if(originalImportRetryUnavailable(facts.original,facts.admitted,facts.nowUnixSeconds)!==undefined)reject("OriginalWindowEnded");
-}
-/** Call under the inventory lock before reserving a replacement logical job. */
-export function releaseEndedImportReservations(spoolUuid:Uint8Array,logicalJobId:Uint8Array,facts:ImportOriginalAdmission,reservations:readonly ImportSpoolReservation[]):ImportSpoolReservation[]{
-  initialImportOperationId(spoolUuid,false);initialImportOperationId(logicalJobId,false);
-  const b=facts.original.body??reject("Canonical");if(!equal(b.logicalJobId,logicalJobId)||!equal(b.identity!.spoolUuid,spoolUuid))reject("Scope");
-  if(originalImportRetryUnavailable(facts.original,facts.admitted,facts.nowUnixSeconds)===undefined)return [...reservations];
-  return reservations.filter(r=>!equal(r.spoolUuid,spoolUuid)||!equal(r.logicalJobId,logicalJobId));
 }

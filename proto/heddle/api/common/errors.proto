@@ -58,6 +58,9 @@ enum ErrorReason {
   ERROR_REASON_VERSION_CONFLICT = 502;
   ERROR_REASON_ALREADY_EXISTS = 503;
   ERROR_REASON_IMPORT_SOURCE_REQUIRES_COMMIT = 504;
+  // CommitImportJob: a sibling holds a selected full ref/target/genesis.
+  // ALREADY_EXISTS; destroys prepared key custody; not replay-frozen.
+  ERROR_REASON_IMPORT_DESTINATION_CONFLICT = 505;
 
   // Flow control (6xx). RATE_LIMITED / QUOTA_EXCEEDED are retryable;
   // CURSOR_INVALID is a client-fix (restart from a valid cursor), not retryable.

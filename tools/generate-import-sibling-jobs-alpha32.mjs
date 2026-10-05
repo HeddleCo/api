@@ -27,7 +27,7 @@ wire('identity',api.ImportIdentityV1Schema,v('identity'));
 f.current_destination_hex=hex(v('scope').destinationVersion);
 f.changed_destination_hex=hex(raw(0x42));
 const initial=v('commit_request'),original=initial.proof;
-for(const [name,index,id,key,total,changed] of [['a',0,0xa1,'job',1000n,false],['b',1,0xb1,'renew_job',1500n,false],['fresh',1,0xc1,'direct_job',1500n,true]]){
+for(const [name,index,id,key,total,changed] of [['a',0,0xa1,'job',1000n,false],['b',1,0xb1,'sibling_job',1500n,false],['fresh',1,0xc1,'direct_job',1500n,true],['duplicate',0,0xd1,'direct_job',1000n,false]]){
  const scope=v('scope');scope.branches=[scope.branches[index]];scope.maxOperations=1;scope.maxResultBytes=total;if(changed)scope.destinationVersion=raw(0x42);
  wire('scope_'+name,api.ImportPermissionScopeV1Schema,scope);
  const parent=v('permission').body;parent.logicalJobId=raw(id,16);parent.retryLineageId=raw(id+1,16);parent.scope=scope;parent.nonce=raw(id+2);parent.cancellationId=raw(id+3);
@@ -41,7 +41,7 @@ for(const [name,index,id,key,total,changed] of [['a',0,0xa1,'job',1000n,false],[
  wire('prepared_'+name,api.PrepareImportJobResponseSchema,prepared);
  const request=v('prepare_request');request.clientOperationId='sibling-prepare-'+name;request.retryLineageId=d.retryLineageId;request.proposedScope=scope;
  wire('prepare_'+name,api.PrepareImportJobRequestSchema,request);
- const proof=clone(api.ImportPublicProofBundleV1Schema,original);proof.memberPermission=permission;proof.memberPermissions=[permission];proof.delegations=[delegation];proof.genesisAuthorities=[binding];proof.originalGeneses=[original.originalGeneses[index]];proof.creatorAuthorityEnvelopes=[envelope];
+ const proof=clone(api.ImportPublicProofBundleV1Schema,original);proof.memberPermission=permission;proof.delegations=[delegation];proof.genesisAuthorities=[binding];proof.originalGeneses=[original.originalGeneses[index]];proof.creatorAuthorityEnvelopes=[envelope];
  const commit=clone(api.CommitImportJobRequestSchema,initial);commit.clientOperationId='sibling-commit-'+name;commit.proof=proof;
  wire('commit_'+name,api.CommitImportJobRequestSchema,commit);
  const operation=v(index===0?'operation_dev':'operation_main').body;operation.logicalJobId=d.logicalJobId;operation.retryLineageId=d.retryLineageId;operation.physicalOperationId=d.retryLineageId;operation.delegationDigest=a.signedDelegationDigest(delegation);
@@ -52,7 +52,7 @@ const duplicate=fromBinary(api.ImportPermissionScopeV1Schema,bytes(f.wire_vector
 wire('duplicate_ref',api.ImportPermissionScopeV1Schema,duplicate);
 const other=clone(api.ImportPermissionScopeV1Schema,duplicate);other.sourceUrl='https://github.com/heddleco/other.git';wire('duplicate_other_source',api.ImportPermissionScopeV1Schema,other);
 const changedSlot=v('scope');changedSlot.branches=[changedSlot.branches[0]];changedSlot.maxOperations=1;changedSlot.maxResultBytes=1000n;changedSlot.branches[0].slotId=7n;wire('changed_slot',api.ImportPermissionScopeV1Schema,changedSlot);
-const boundary=v('scope');boundary.maxOperations=256;boundary.maxResultBytes=1500n;boundary.branches=Array.from({length:256},(_,i)=>{const b=clone(api.ImportBranchLimitV1Schema,boundary.branches[0]);b.refName='refs/heads/b'+String(i).padStart(3,'0');return b;});wire('scope_256',api.ImportPermissionScopeV1Schema,boundary);
+const boundary=v('scope');boundary.maxOperations=256;boundary.maxResultBytes=1500n;boundary.branches=Array.from({length:256},(_,i)=>{const b=clone(api.ImportBranchLimitV1Schema,boundary.branches[0]);b.refName='refs/heads/b'+String(i).padStart(3,'0');b.genesisDigest=raw(i,32);b.targetThreadId=raw(i,32);return b;});wire('scope_256',api.ImportPermissionScopeV1Schema,boundary);
 const oversized=clone(api.ImportPermissionScopeV1Schema,boundary);const last=clone(api.ImportBranchLimitV1Schema,boundary.branches[0]);last.refName='refs/heads/b256';oversized.branches.push(last);wire('scope_257',api.ImportPermissionScopeV1Schema,oversized);
 const overBudget=v('scope');overBudget.branches=[overBudget.branches[1]];overBudget.maxOperations=1;overBudget.maxResultBytes=1501n;wire('scope_over_host_budget',api.ImportPermissionScopeV1Schema,overBudget);
 for(const [name,field] of [['duplicate','proposed_scope.branches.ref_name'],['slot','proposed_scope.branches.slot_id'],['stale','proposed_scope.destination_version']])wire('refusal_'+name,api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{refusal:{reason:5,field}}));

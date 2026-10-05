@@ -26,7 +26,7 @@ const str=s=>utf8.encode(s);
 const key=n=>raw(f.keys[n].public_key_hex);
 const sig=(n,input)=>new Uint8Array(sign(null,input,createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),raw(f.keys[n].seed_hex)]),format:'der',type:'pkcs8'})));
 const load=(n,s)=>fromBinary(s,raw((f.wire_vectors[n]??f.signed_vectors[n]??f.commitment_vectors[n]).wire_hex));
-const oldBundle=load('complete_renewed_export',imp.ImportPublicProofBundleV1Schema);
+const oldBundle=load('complete_export',imp.ImportPublicProofBundleV1Schema);
 const identity=load('identity',imp.ImportIdentityV1Schema),chain=load('owner_chain',imp.ImportOwnerChainV1Schema);
 const envelope=raw(f.native_authority.wire_hex);
 const fixture={format_version:1,keys:f.keys,wire_vectors:{},canonical_vectors:{},positive:[],negative:[]};
@@ -96,7 +96,7 @@ sortBundle(cases.post_landing_capture);
 // Different bindings select exact retained chains; no binding is rewritten on export.
 // Rotate before the second admission; retain both the original keyring endpoint
 // and the advanced accepted owner endpoint (the normative endpoint algorithm).
-const rotatedHistory=load('renew_rotated_owner_history',OwnerHistorySchema);
+const rotatedHistory=load('rotated_owner_history',OwnerHistorySchema);
 const rotation=rotatedHistory.acceptedTransitions[0].transition;
 rotation.validFromUnixSeconds=1050n;rotation.previousKeyValidUntilUnixSeconds=1050n;
 const encodedKey=k=>join(u32(k.algorithm),sized(k.publicKey));
@@ -270,7 +270,7 @@ negative('missing_native_authority_dependency','native_metadata',b=>{b.authority
 negative('boundary_receipt_substitution','boundary_acceptance',b=>{b.genesisWitnesses[0].boundaryAcceptance.originalReceipts[0]=oldBoundary.originalReceipts[0];b.statements[0].body.canonicalPayload=canonicalHybridV1(api.NativeGenesisWitnessV1Schema,b.genesisWitnesses[0]);b.statements[0].signature=sig('witness',statementSigningDigest(b.statements[0].body));},'BoundaryAcceptance');
 negative('retired_proof_missing','retired_start_thread',b=>b.historyProofs=[],'Proof','witness');
 negative('retired_proof_substitution','retired_start_thread',b=>b.historyProofs[0].siblings[0][0]^=1,'Proof','witness');
-const malformedImport=clone(imp.ImportPublicProofBundleV1Schema,oldBundle);malformedImport.delegations=[];wire('import_without_delegation',imp.ImportPublicProofBundleV1Schema,malformedImport);fixture.negative.push({id:'import_without_delegation',control:'import_complete',expected:'Canonical',gate:'import'});wire('import_complete',imp.ImportPublicProofBundleV1Schema,oldBundle);
+const malformedImport=clone(imp.ImportPublicProofBundleV1Schema,oldBundle);malformedImport.delegations=[];wire('import_without_delegation',imp.ImportPublicProofBundleV1Schema,malformedImport);fixture.negative.push({id:'import_without_delegation',control:'import_complete',expected:'Bounds',gate:'import'});wire('import_complete',imp.ImportPublicProofBundleV1Schema,oldBundle);
 fixture.negative.push({id:'dual_carriers',control:'start_thread',expected:'Protocol',gate:'dispatch'});
 writeFileSync('tests/fixtures/native-host-witness-v1.json',JSON.stringify(fixture,null,2)+'\n');
 console.log(`generated ${fixture.positive.length} native positives, ${fixture.negative.length} portable negatives, ${fixture.native_negative.length} native authority negatives`);

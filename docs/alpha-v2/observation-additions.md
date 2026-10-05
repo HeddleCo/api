@@ -29,15 +29,14 @@ import case.
 Alpha.26 adds `ImportOperationSubject.hybrid_job = 4`, a typed
 `HybridImportJobSelector { logical_job_id = 1 }`. Its ID is exactly 16 bytes and
 not all zero, scoped to destination `OperationRecord.ref.spool`. Populate it from
-the durable association for every physical HYBRID attempt (initial, retry and
-renewal), preserving the same destination/job pair even on historical or terminal
+the durable association for every physical HYBRID attempt (initial and retry), preserving the same destination/job pair even on historical or terminal
 attempts. Non-HYBRID imports and attempts before association omit it; absent or
 unknown subjects likewise mean unavailable. Never infer a job selector from
 physical operation IDs, retry links, client operation IDs or lineage.
 
 It follows operation visibility and may remain visible when source details are
 hidden. It grants no control authority: the existing `GetImportJobState` remains
-destination-writer-only, and Cancel/Retry/Renew retain their authorization and
+destination-writer-only, and Cancel/Retry retain their authorization and
 signed-request requirements. See the [HYBRID discovery profile](import-authority-host-witness.md)
 for request projection helpers and unavailable semantics. This adds no inventory RPC.
 

@@ -1292,7 +1292,7 @@ bindings, not a production Fetch/storage implementation.
 
 `require_policy_history` (Rust) / `requirePolicyHistory` (TS) recomputes
 `SHA-256("heddle-spool-signed-policy-v2" || canonical fields 1–10)` for **every
-selected chain record**, requires both the record body and its `policy`, and
+carried policy record, before any zero-head shortcut**, requires both the record body and its `policy`, and
 rejects duplicate or reordered carrier records. Carrier policies are ascending
 by raw `(spool_uuid, sequence)`. Each successor's `revoked_key_ids` must be a
 superset of its predecessor's: subtraction rejects even if the new body has a

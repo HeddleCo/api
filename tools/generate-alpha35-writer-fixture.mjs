@@ -121,10 +121,11 @@ const badSignature=clone(own.SignedOwnerMintRootAttachmentSchema,certificate);ba
 for(const [id,expected] of [['actor_publisher_revoked','Revoked'],['actor_mint_revoked','Revoked'],['attachment_before_recover','Root'],['forged_old_owner_certificate','Root'],['unknown_issuer','Root'],['invalid_old_owner_signature','Signature']])fixture.negative.push({id,gate:id.startsWith('actor_')?'keys':'retained',control:id.startsWith('actor_')?'cowriter_envelope':'paired_after_rotate',expected});
 // Exercise the policy cut at both real public-bundle entry points, with exact
 // owner-signed policy bytes and freshly signed, policy-bound witness statements.
+function policyCanonical(b){const revoked=b.policy.revokedKeyIds;return join(u32(1),sized(b.spoolUuid),sized(b.expectedHead.stateHash),integer(b.expectedHead.sequence),integer(b.sequence),u32(0),u32(revoked.length),...revoked.map(sized),Uint8Array.of(b.policy.maxAudience===undefined?0:1),...(b.policy.maxAudience===undefined?[]:[u32(b.policy.maxAudience)]),u32(2),sized(utf8.encode('max_audience')),u32(1),sized(utf8.encode('revoked_key_ids')),u32(2),sized(b.ownerId),sized(b.ownerStateHash),integer(b.ownershipTransferSequence));}
 function cutPolicy(template,revoked){
  const policy=clone(own.SignedSpoolPolicyRecordSchema,template),b=policy.body;
  b.policy.revokedKeyIds=revoked;
- const body=join(u32(1),sized(b.spoolUuid),sized(b.expectedHead.stateHash),integer(b.expectedHead.sequence),integer(b.sequence),u32(0),u32(revoked.length),...revoked.map(sized),Uint8Array.of(b.policy.maxAudience===undefined?0:1),...(b.policy.maxAudience===undefined?[]:[u32(b.policy.maxAudience)]),u32(2),sized(utf8.encode('max_audience')),u32(1),sized(utf8.encode('revoked_key_ids')),u32(2),sized(b.ownerId),sized(b.ownerStateHash),integer(b.ownershipTransferSequence));
+ const body=policyCanonical(b);
  b.policyStateHash=hash(utf8.encode('heddle-spool-signed-policy-v2'),body);
  policy.ownerSignature=auth('owner',hash(utf8.encode('heddle-spool-signed-policy-signature-v2'),join(body,sized(b.policyStateHash))));return policy;
 }
@@ -182,6 +183,12 @@ for(const [prefix,schema,bundle] of [['native',api.NativePublicProofBundleV1Sche
   wire(prefix+'_policy_'+mode,schema,b);
  }
 }
+// The no-policy sentinel must not allow an unchecked matching carrier record.
+const noPolicy=clone(api.NativePublicProofBundleV1Schema,cowriterBundle);noPolicy.policies=[];
+for(const signed of noPolicy.statements){signed.body.policySequence=0n;signed.body.policyStateHash=fill(0);signed.signature=sig('witness',statementSigningDigest(signed.body));}
+wire('zero_head_control',api.NativePublicProofBundleV1Schema,noPolicy);
+const uncommitted=clone(api.NativePublicProofBundleV1Schema,noPolicy),bogus=clone(own.SignedSpoolPolicyRecordSchema,cowriterBundle.policies[0]);bogus.body.sequence=0n;bogus.body.policyStateHash=fill(0);bogus.ownerSignature=auth('owner',hash(utf8.encode('heddle-spool-signed-policy-signature-v2'),join(policyCanonical(bogus.body),sized(bogus.body.policyStateHash))));uncommitted.policies=[bogus];
+wire('zero_head_uncommitted_policy',api.NativePublicProofBundleV1Schema,uncommitted);
 // Claim and resolution counterparties need the same policy key cut as publisher.
 const resolutionBundle=load(native,'ownership_resolution',api.NativePublicProofBundleV1Schema);
 wire('ownership_counterparty_control',api.NativePublicProofBundleV1Schema,resolutionBundle);

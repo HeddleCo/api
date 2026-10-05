@@ -484,6 +484,7 @@ function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolea
 export function requirePolicyHistory(policies:import("./owner_records_pb.js").SignedSpoolPolicyRecord[],spool:Uint8Array,sequence:bigint,stateHash:Uint8Array):void{
   for(let i=0;i<policies.length;i++){
     const p=policies[i]!.body??reject("Canonical");
+    const digest=policyStateDigest(p);if(!equal(digest,p.policyStateHash))reject("Canonical");
     if(i){const prev=policies[i-1]!.body!;if(compare(prev.spoolUuid,p.spoolUuid)>0||(equal(prev.spoolUuid,p.spoolUuid)&&prev.sequence>=p.sequence))reject("Canonical");}
   }
   let successorRevoked:readonly Uint8Array[]|undefined;
@@ -491,7 +492,6 @@ export function requirePolicyHistory(policies:import("./owner_records_pb.js").Si
     width(stateHash,32);if(sequence===0n){if(stateHash.some(Boolean))reject("Scope");return;}
     const matches=policies.filter(p=>p.body&&equal(p.body.spoolUuid,spool)&&p.body.sequence===sequence&&equal(p.body.policyStateHash,stateHash));
     if(!matches.length)reject("Scope");const p=matches[0]!.body!;
-    const digest=policyStateDigest(p);if(!equal(digest,p.policyStateHash))reject("Canonical");
     const revoked=p.policy?.revokedKeyIds??[];
     if(successorRevoked&&revoked.some(id=>!successorRevoked!.some(next=>equal(id,next))))reject("Scope");
     successorRevoked=revoked;

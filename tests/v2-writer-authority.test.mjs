@@ -76,6 +76,7 @@ test('policy history REJECT then PASS',async()=>{
   await assert.rejects(()=>validatePublicNativeBundle(wire('native_policy_'+mode,NativePublicProofBundleV1Schema)),{reason});await validatePublicNativeBundle(wire('native_policy_chain',NativePublicProofBundleV1Schema));
   assert.throws(()=>validatePublicBundle(wire('import_policy_'+mode,ImportPublicProofBundleV1Schema)),{reason});validatePublicBundle(wire('import_policy_chain',ImportPublicProofBundleV1Schema));
  }
+ await assert.rejects(()=>validatePublicNativeBundle(wire('zero_head_uncommitted_policy',NativePublicProofBundleV1Schema)),{reason:'Canonical'});await validatePublicNativeBundle(wire('zero_head_control',NativePublicProofBundleV1Schema));
  const native=wire('native_actor_key_revoked',NativePublicProofBundleV1Schema);native.policies[0].body.policy.revokedKeyIds=[];
  await assert.rejects(()=>validatePublicNativeBundle(native),{reason:'Canonical'});await validatePublicNativeBundle(wire('cowriter_start_bundle',NativePublicProofBundleV1Schema));
  const imported=wire('import_actor_key_revoked',ImportPublicProofBundleV1Schema);imported.policies[0].body.policy.revokedKeyIds=[];

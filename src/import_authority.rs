@@ -2598,7 +2598,9 @@ fn validate_bundle_history(
     Ok(())
 }
 /// Authenticate policy contents against their committed hashes and enforce the
-/// governance contract's grow-only revocations. Native verification still
+/// governance contract's grow-only revocations. All carried bodies are checked
+/// before the zero-head shortcut, so no writer lookup can read unchecked data.
+/// Native verification still
 /// authenticates owner signatures/context and the receipt observation time.
 pub(crate) fn require_policy_history(
     policies: &[SignedSpoolPolicyRecord],
@@ -2608,8 +2610,12 @@ pub(crate) fn require_policy_history(
 ) -> Result<(), Reject> {
     let mut previous: Option<(&[u8], u64)> = None;
     for signed in policies {
-        let p = signed.body.as_ref().ok_or(Reject::Canonical)?;
-        let current = (p.spool_uuid.as_slice(), p.sequence);
+        let policy = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        let digest = policy_state_digest(policy)?;
+        if digest != policy.policy_state_hash {
+            return Err(Reject::Canonical);
+        }
+        let current = (policy.spool_uuid.as_slice(), policy.sequence);
         if previous.is_some_and(|prev| prev >= current) {
             return Err(Reject::Canonical);
         }
@@ -2630,10 +2636,6 @@ pub(crate) fn require_policy_history(
             p.spool_uuid == spool && p.sequence == sequence && p.policy_state_hash == state_hash
         });
         let policy = matches.next().ok_or(Reject::Scope)?;
-        let digest = policy_state_digest(policy)?;
-        if digest != policy.policy_state_hash {
-            return Err(Reject::Canonical);
-        }
         // policy_state_digest above already requires an authenticated body.
         let revoked = policy
             .policy

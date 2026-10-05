@@ -344,6 +344,12 @@ fn policy_history_reject_then_pass() {
         import::validate_public_bundle(&wire(&f, "import_policy_chain"))
             .expect("import chain control");
     }
+    assert_eq!(
+        native_witness::validate_public_bundle(&wire(&f, "zero_head_uncommitted_policy")),
+        Err(codec::Reject::Canonical)
+    );
+    native_witness::validate_public_bundle(&wire(&f, "zero_head_control"))
+        .expect("empty policy sentinel control");
     let mut native: api::NativePublicProofBundleV1 = wire(&f, "native_actor_key_revoked");
     native.policies[0]
         .body

@@ -4,12 +4,15 @@ This is the api#296 contract, revised in place by api#318 and api#321, for [weft
 8d427f8c1](https://github.com/HeddleCo/weft/pull/2479/changes/8d427f8c12006c63c5cad43cce260fd91a5e77a5).
 The build decision is [weft#2469](https://github.com/HeddleCo/weft/issues/2469).
 The undeployed v1 preparation schema is revised in place; its semantics require a coordinated incompatible-peer
-gate. Package versions and tags do not change in this PR. The delivery order is
+gate. Alpha.32 makes the explicit hard cut documented in
+[the breaking notice](../../breaking/0.31.0-alpha.32.md). The delivery order is
 **api → heddle → weft → tapestry**. This contract neither deploys that cascade
 nor establishes that the original runtime defect is fixed.
 
-The single source of conformance bytes is
+The core conformance bytes are frozen in
 [import-authority-host-witness-v1.json](../../tests/fixtures/import-authority-host-witness-v1.json).
+Whole-repository scenarios add the separate
+[sibling-job corpus](../../tests/fixtures/import-sibling-jobs-alpha32.json).
 Its frozen descriptors identify every new message and field number/type. Rust
 and TypeScript read its original bytes, digests and signatures, including the
 negative records; they never generate expected signatures during a test. The
@@ -39,7 +42,7 @@ and Ed25519 public keys are 32; signatures are 64. Encodings include default
 values; there are no omitted signed fields, protobuf tags, hex strings, JSON
 numbers, optional-presence ambiguities or protobuf serialization in signatures.
 Signed wrappers flatten their body followed by AuthorizationSignature (counted
-signer ID, counted signature). These widths and layouts are frozen for v1. api#318 revises the undeployed v1
+signer ID, counted signature). These widths and layouts are frozen for v1. api#318 and alpha.32 revise the undeployed v1
 layout in place; no old layout or compatibility reader is retained. After first
 deployment a new signed layout needs a new version/domain and new identities.
 
@@ -114,6 +117,24 @@ coverage/PageInfo semantics, default 128 and max 512 per page; the whole respons
 is at most 1 MiB. Cursors bind caller, exact custody/URL/repository identity,
 accepted bounds and provider snapshot. Unknown/unauthorized connected sources
 use uniform NOT_FOUND. No credential is returned or acquired by public discovery.
+
+Discovery also carries `ProviderRepository.size_estimate_state` and
+`git_size_kib`. `AVAILABLE` reports approximate **Git repository storage** in
+KiB (one KiB = 1024 bytes), including zero for an empty repository. Connected
+GitHub adapters use the repository API's size observation. `UNKNOWN` is an
+explicit state and MUST carry zero; unknown enum values refuse. Public HTTPS
+Git reports UNKNOWN because no cheap estimate is available. No branch estimate
+is exposed: shared Git objects and provider repository size do not offer a cheap
+independent branch measurement. Hosts need not fetch/count objects for discovery.
+
+The estimate is advisory, can be stale, is not converted result bytes, and grants
+nothing. Clients calculate the total as the size estimate × converter-appropriate
+headroom (including the KiB-to-byte conversion and rounding up using checked or
+widened arithmetic), capped at `GetImportConfiguration.limits.max_result_bytes`.
+For UNKNOWN, clients use the current advertised host maximum. Users never set
+this total. The client passes it exactly to Prepare; hosts never fill it from
+the estimate.
+The estimate is outside all signed import scope/authority layouts.
 
 Resolve accepts a selected source **unchanged or refuses it**. The result must
 preserve the exact `clone_url`, connection (including absence), repository ID,
@@ -221,19 +242,26 @@ ordinary Developer/Admin role, mint-root attachment and KeyBinding self-PoP
 cannot satisfy this permission. Existing capability versions/domains do not
 change. Authority from an online role is still checked separately for RPC access.
 
-Permission budgets are explicitly **one logical import**, at most **256 branches,
-256 converted operations/slots, 1 GiB of committed result bytes**. Branch limits
+Permission bounds are explicitly **one logical import**, at most **256 branches
+and 256 converted operations/slots**. Branch limits
 are sorted unique full refs, with one stable slot per branch in this first format.
-Each branch byte budget is positive; their sum is at most the total. Certificate
-scope can select a subset and reduce budgets, never add a ref/slot/genesis/target,
+There are **no per-branch byte budgets**. `max_result_bytes` is ONE positive
+u64 result-byte total, and `max_operations` is the operation total. This signed
+bound authorizes how much a server-held job key may write under the user's
+delegation, limiting the blast radius of a compromised or buggy worker. It is
+not a storage quota; repository storage may grow beyond it and is billed
+separately. The protocol imposes no fixed byte ceiling. Stable branch/ref/slot
+identities remain exact. Certificate scope can select a subset and reduce the total and operation count, never add a ref/slot/genesis/target,
 change initial frontier/source/options/converter/destination version, or expand
 a parent's time window. The parent cannot outlive its verified issuing authority.
 The owner grants permission over branch limits BEFORE genesis authorization
 proofs are produced; only the child manifest adds their signed proof digests.
 This prevents a cyclic permission/genesis/delegation digest dependency.
 
-The host accounts by `(permission digest, logical job)` and by
-`(logical job, full ref, slot_id)`; total budgets never reset on another key,
+The host accounts result bytes and operations by `(permission digest, logical job)`,
+with durable original logical-job totals across all reissued parents.
+`(logical job, full ref, slot_id)` records identity, uniqueness and exact replay,
+without a branch byte counter. Total budgets never reset on another key,
 delegation or retry row. Reissuing permission for the same logical job cannot
 reset its durable original limits. Only the direct active owner can issue the
 member permission; a member cannot turn its own delegation into another parent.
@@ -244,6 +272,17 @@ and result-byte budgets. It may contain a narrower replacement child, but MUST
 NOT regrant the original full scope. Durable original job limits continue to
 apply across all parents. Retain the original signed parent/envelope for genesis
 verification; never rewrite those originals to match a renewal.
+
+`remaining_import_scope` / `remainingImportScope` compute the exact remaining
+slots, operations and total: **remaining bytes = previous total − bytes consumed
+in slots still covered by that previous scope**. Previously removed historical
+slots are not charged twice. A replacement may choose a smaller total, never a
+larger one; reissued parents obey the same bound. A zero/empty completed result
+cannot pass new-scope validation. Hosts retain the complete cumulative manifest,
+original totals and permission-digest/job accounting under the same transaction
+fence across every renewal, signing key, delegation and physical retry. Bundle
+witness composition enforces the cumulative original total and each signed
+certificate/permission total against authenticated accepted publication order.
 
 At first issuance, generate `cancellation_id` using a CSPRNG as 32 random bytes
 in `heddle-import-cancel-v1`; persist it for the same logical-job/retry-lineage/
@@ -294,32 +333,42 @@ certificate digest, ref/slot, observed Git OID AND hash algorithm, original gene
 target and expected/result frontiers, content digest/byte count, options/converter.
 PINNED_COMMIT authorizes the exact raw 20-byte SHA1 or 32-byte SHA256 commit;
 **Whenever the exact selected commit OID is known, the caller MUST pin it.**
-Failed pinning, stale observations and empty OIDs never authorize a silent
-downgrade. OBSERVE_AT_EXECUTION is only an explicit fallback when the caller
-cannot obtain the OID. Before signing, disclose this fixed promise:
+The client MUST use OBSERVE_AT_EXECUTION only for genuinely unknown OIDs and
+MUST never downgrade a known OID. A branch whose OID was known but became
+unavailable MUST be excluded, not observed. Failed pinning, stale observations
+and empty OIDs never authorize a silent downgrade. The signed `ref_disclosure`
+for OBSERVE_AT_EXECUTION authorizes this fixed promise:
 
 > The exact commit is unavailable. This branch may move before execution. The
 > import will convert the commit observed when the job executes, which may differ
 > from the commit you saw when selecting the branch.
 
-The caller must explicitly select and sign that fallback. Each observe branch
+OBSERVE requires the SIGNED `ref_disclosure` field: the signature is the explicit
+authorization, recorded in the authorization as the audit trail. Presentation
+to a human is client product policy, not a protocol requirement. A client may
+automatically include genuinely unknown-OID branches and set and sign the
+disclosure on the user's behalf as part of a one-click repository import,
+without branch selection or authorization screens and without showing the
+disclosure to the user. The client MUST never sign a scope wider than the user's
+action and MUST pin every known OID. Each observe branch
 has an empty `pinned_commit_oid`, an explicit hash algorithm and
 `ref_disclosure = IMPORT_REF_DISCLOSURE_OBSERVE_AT_EXECUTION (1)`.
-Pinned branches require `ref_disclosure = UNSPECIFIED (0)`. Field 10 of
-`ImportBranchLimitV1` appends **u32be(ref_disclosure)** to its canonical layout;
+Pinned branches require `ref_disclosure = UNSPECIFIED (0)`. Alpha.32 removes/reserves field 9 `max_result_bytes` from
+`ImportBranchLimitV1` and its canonical u64be encoding. Field 10 appends **u32be(ref_disclosure)** to its canonical layout;
 the parent scope, prepared scope and signed manifest all bind it. A genuine
 delegation signature without the marker still rejects with `RefDisclosure`.
 The result retains its exact observed OID and algorithm.
 
 `validate_ref_selection` / `validateImportRefSelection` additionally take an
 independently known OID available when choosing the scope. They reject observe
-mode or a different pin with `RefPinning`; None/undefined supplies no consent
-and never changes the mode. A receiver cannot prove UI consent or discover an
+mode or a different pin with `RefPinning`; None/undefined supplies no
+authorization and never changes the mode. A receiver cannot discover an
 undisclosed locally known OID from signed bytes alone. It verifies the explicit
-marker, signatures and mode; authoring clients and hosts with that independent
-knowledge must enforce exact pinning. No implicit mutable-ref authorization
-exists. A URL/ref signature does
-not prove deterministic Git conversion or original Git authorship; those require
+signed marker and mode; authoring clients and hosts with that independent
+knowledge MUST enforce exact pinning. No implicit mutable-ref authorization
+exists: unsigned or missing disclosure and silent downgrades always refuse.
+A URL/ref signature does not prove deterministic Git conversion or original
+Git authorship; those require
 retained objects and a mapping verifier, or the disclosed trust in the converter.
 
 Owner → typed parent (or direct owner) → delegation → job operation signatures
@@ -380,11 +429,21 @@ the first or latest-looking version. Alternatives remain explicitly selectable.
 The selected entry's exact `default_options` octets retain their existing digest
 rules; this marker does not change any signed HYBRID layout or domain.
 
-Positive host limits cover branches, logical-job operations, total result bytes
-and per-branch result bytes. They cannot exceed 256 branches/operations or 1 GiB
-total, and per-branch bytes cannot exceed the host total. The caller chooses
+Positive host limits cover branches, logical-job operations and ONE total result
+byte authorization limit. Branches/operations cannot exceed 256. The advertised
+byte maximum is an operator-configurable positive u64 and may be very large;
+it is the only admission ceiling on a job total. Prepare and Commit MUST refuse
+a total above the CURRENT advertised maximum, including when that maximum
+was lowered after Prepare, for an initial activation. Once activated, a job's
+signed total retains the byte maximum in effect at its original Prepare; renewal
+preparation and activation MUST NOT apply a later host byte maximum. Renewal
+still narrows against the authenticated predecessor remainder. Changes to the
+advertised byte maximum MUST NOT advance `destination_version`; other effective
+configuration, owner and policy changes still do. Historical signed authority
+and durable consumption are never enlarged or reset by a configuration change.
+`ImportBudgetLimitsV1.max_branch_result_bytes` (tag 4) is removed/reserved. The caller chooses
 **every** scope field: provider/URL, exact ordered branches and ref disclosure,
-converter/options, stable slot IDs, per-branch and total budgets, targets and
+converter/options, stable slot IDs, the total byte limit and operation count, targets and
 explicit Thread-specific frontier commitments. There are no omitted-field
 defaults or host-allocated slots. Prepare accepts these choices byte-for-byte
 or refuses; even budget reductions or equivalent normalization are forbidden.
@@ -411,6 +470,125 @@ failures retain ordinary CallFailure handling without leaking policy details.
 the request and response before signing and reject changed choices with
 `PreparedFields`. Configuration changes require a fresh Prepare/client operation
 ID, never a changed response to an idempotent prepared reservation.
+
+### Whole-repository sibling jobs in one spool (api#351)
+
+Tapestry MUST split one whole-repository import action into multiple independent
+logical jobs in the **same spool**, with disjoint full-ref selections. Each job
+has at most the current host `max_branches` (never more than 256), its own logical
+job ID, first-attempt/retry-lineage UUID, reserved key, cancellation ID, prepared
+proposal, signed parent/delegation, manifest and receipts. A spool has no aggregate
+256-thread or 256-branch limit. The 256 bound is per logical job: the canonical
+signed body remains at most 64 KiB, the proof bundle at most 1 MiB and Commit at
+most 2 MiB. Existing size bounds still apply even below 256 branches.
+
+**Sibling jobs MAY be Prepared, Committed and executed concurrently.**
+`destination_version` MUST fence the destination's effective configuration,
+ownership and policy: converter/options/provider support and branch/operation limits, accepted
+owner state/transfer, and effective destination authorization/policy changes.
+The host MUST advance this opaque token whenever those facts change, and MUST
+read/compare it in the Prepare/activation transaction. Imports alone, including
+reservation, Commit, publication, completion, renewal, retry and cancellation,
+MUST NOT advance it. It does not fence other jobs, witness-set generation,
+Thread frontiers, per-job authority epochs or per-job manifest digests. Independent
+current source custody, revocation, permission and frontier checks still apply.
+
+This preserves the existing invariants: [renewal/publication CAS](#preparation-renewal-and-the-existing-retry-route-p2-2)
+is per job, and the [renewal checks](../../src/import_authority.rs) compare the
+exact job/lineage, predecessor, epoch and manifest. [Cumulative accounting](#owner-authorized-genesis-and-delegation-p2-1)
+is by permission digest and logical job, never by spool. [Witness verification](../../src/witness_trust.rs)
+checks authenticated statement admission order and monotonic set generation;
+hosts serialize individual witness append/set updates atomically, without
+requiring one entire job to finish before another starts. Concurrent publications
+can interleave in that authenticated order. Receivers MUST merge accepted job
+histories under their existing trust lock, using a fresh current witness set as
+needed; sibling activity never authorizes accepting an older set or stale witness
+context. Each target retains its existing Thread frontier CAS and lease checks.
+
+Prepare MUST atomically check and reserve **all** selected full refs and slots
+with the job/key/first-attempt UUID; a refusal reserves nothing. The host MUST
+maintain a complete per-spool inventory for all non-terminal logical jobs,
+including unexpired Prepared reservations and admitted jobs with paused, failed,
+canceled or expired physical attempts that can still Renew/Retry. Keep the
+original job's entire ref selection reserved through partial publication and
+scope narrowing. A physical-attempt terminal state is not logical termination.
+Commit MUST compare the current token and prove that its unexpired reservation
+still owns every exact ref/slot before activation, in one transaction. The
+reservation helper's mandatory `activation=true` checks ownership; Prepare uses
+`activation=false`. An empty inventory cannot authorize Commit. Full refs,
+`target_thread_id` and `genesis_digest` MUST each be unique within a job and
+exclusive across jobs in the same spool, even when refs differ. Renewal
+keeps those identities and cannot reserve a different branch under the same job.
+Exact stored request replay is resolved first and reserves/activates nothing again.
+
+The unique active ref key is `(spool_uuid, full_ref)` regardless of source URL or
+provider. The unique active slot key is `(spool_uuid, full_ref, slot_id)`; `slot_id`
+alone is not a global counter (different refs may both use zero). This preserves
+the signed [branch layout](../../proto/heddle/api/v1alpha2/import_authority.proto)
+and existing `(logical_job_id, full_ref, slot_id)` replay/accounting identity.
+A duplicate full ref across sibling **or any other non-terminal** job MUST refuse
+Prepare with `ImportPreparationRefusalReason.DESTINATION_CONFLICT (5)` and
+`field = "proposed_scope.branches.ref_name"`, even with a different slot, source
+or target. Rebinding a same-job reserved slot/branch identity MUST refuse the same
+reason with `field = "proposed_scope.branches.slot_id"`. These conflicts MUST
+NOT silently merge, allocate replacement slots or consume budget. No other
+job's identity or hidden details are disclosed.
+
+Release active reservations atomically on `ORIGINAL_WINDOW_ENDED` without native
+admission, or on definitive logical completion,
+cancellation, revocation or expiry of an uncommitted Prepare, after fencing any
+in-flight activation/work. Retain durable receipts, manifests and replay history.
+Admitted authority expiry alone does not release recoverable job reservations.
+A later new job may reserve released keys but still needs current authorization,
+an explicitly reviewed target/genesis and frontier; completion never resets the
+old job's budgets or permits its revival. An unexpired reservation is not invalidated
+merely because a sibling finishes.
+
+The browser MAY Prepare all siblings against one unchanged token and Commit them
+in either order; it MAY instead Prepare/Commit them sequentially, including
+preparing the next after the previous completes. It MUST use separate operation
+IDs and signatures per job. No token refresh or re-Prepare is required solely
+because a sibling committed/completed. An empty proposed token obtains the
+current token for each fresh Prepare. A stale explicit token refuses Prepare with
+`DESTINATION_CONFLICT (5)`, `field = "proposed_scope.destination_version"`.
+Staleness at Commit/activation refuses with `StaleContext` (CallFailure
+`VERSION_CONFLICT`); it activates nothing. The browser MUST refresh configuration
+and owner/policy state, review and re-Prepare affected uncommitted jobs with fresh
+request IDs and signatures, rather than patch signed tokens. Renewal still cannot
+change a predecessor's signed destination token around non-amplification checks;
+a changed token requires a new logical job for remaining work and terminally
+fencing/releasing conflicting old reservations.
+
+`max_result_bytes` and `max_operations` apply **per logical job** across its own
+renewals/retries. They do not pool automatically across siblings. To plan headroom,
+the client may compute `H = ceil(git_size_kib × 1024 × headroom)` with checked or
+widened arithmetic, then allocate positive totals `B_i` over the
+actual ref partitions. For example, H = 600 MiB can be reviewed as two 300 MiB
+jobs when each host cap permits it. Each `B_i` MUST be at most the current host
+`max_result_bytes`; total planned headroom may exceed a single job's
+cap. If allocation hits a cap, the client must repartition or use the host maximum
+without claiming the original headroom. Branch counts
+are an advisory allocation weight only: shared Git objects give no per-branch
+result estimate. For UNKNOWN the client uses the current host maximum per job;
+users never set totals. Sibling completion or unused allowance cannot enlarge another signed job; byte insufficiency needs
+new reviewed authority within its durable original job bounds, or a new job.
+
+Rust/TS `check_import_spool_reservations` / `checkImportSpoolReservations` consume
+the independently retained complete non-terminal inventory **after**
+`prepare_import_source_scope` / `prepareImportSourceScope`; use the reservation's
+host-selected logical job ID, not a caller-proposed alias. They enforce per-spool
+ref exclusion and exact same-job branch identity. `check_import_destination_version`
+/ `checkImportDestinationVersion` compare the current token at activation and
+return `StaleContext`. Hosts MUST compose these gates with Commit/Renew validation
+and current authorization under their storage transaction. The portable helpers
+do not persist reservations, establish logical terminality or implement locking.
+
+The frozen [sibling vectors](../../tests/fixtures/import-sibling-jobs-alpha32.json)
+cover sequential Commit, concurrent Prepare and reverse-order Commit, a sibling
+after completion, duplicate ref/slot identity, stale Prepare and stale activation,
+and independent budgets. Rust and TS run identical scenarios against the original
+signed Prepare/Commit carriers. Every negative has a succeeding control; all
+pre-existing fixtures remain byte-for-byte unchanged from the alpha.32 PR head.
 
 The caller generates and persists a fresh non-nil UUID with a CSPRNG (for example
 `crypto.randomUUID()`), encodes its 16 raw bytes as `retry_lineage_id`, and uses
@@ -1497,8 +1675,8 @@ in place. No v2 encoding or compatibility path is introduced.
 `verify_import_bundle_witnesses` / `verifyImportBundleWitnesses` accept the retained
 `ImportPublicProofBundleV1`, an independently installed descriptor pin (authority,
 root ID, public key, epoch), the receiver's durable snapshot, actual verification
-clock, independently verified historical owner contexts in delegation order, and
-a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
+clock, a mandatory resolver for effective owner facts at internally selected
+authenticated times, and a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
 its response/retained closure, independently verify owner histories and original
 native authority/causal/landing context with heddle, then call this composition
 before reviewing or computing remaining scope. The hook receives each exact
@@ -1511,15 +1689,33 @@ When there are zero statements the hook MUST still run once with `None` (Rust) /
 historical timestamp or admission claim. TS MUST reject an undefined/non-function
 hook at runtime, including on this recovery path.
 
-For each delegation with publications, the supplied owner-check time MUST equal
-floor(observed_at_unix_millis / 1000) of its first authenticated publication in
-accepted admission order. For the initial delegation with admissions but no
-publication, use its earliest authenticated genesis admission. A mismatch rejects
-`Root`; neither receiver time nor a signed author's timestamp selects historical
-owner state. Each genesis admission and publication is additionally rechecked at
-its own authenticated observation. The policy hook MUST independently select and
-verify the effective owner/native/policy context for every statement at that
-observation, including when different events fall across an owner transition.
+For each delegation with publications, the verifier MUST derive its owner-check
+time internally as floor(observed_at_unix_millis / 1000) of its first
+authenticated publication in accepted admission order. For the initial delegation
+with admissions but no publication, it MUST use its earliest authenticated
+genesis admission. The mandatory `owner_at(delegation_index, Option<i64>)`
+(Rust) / `ownerAt(delegationIndex, bigint | undefined)` (TS) resolver receives
+that authenticated time and MUST return the independently verified EFFECTIVE
+owner identity, key, chain digest and authority expiry at that time. It is called
+again for each purpose-1/3 statement's own observation. Facts MUST include their
+half-open effective interval (`effective_from_unix_seconds`,
+`effective_until_unix_seconds` / `effectiveFromUnixSeconds`,
+`effectiveUntilUnixSeconds`); an absent end means unbounded. The verifier refuses
+`Scope` if the selected time falls outside it. A claim accepted after an earlier
+deferred observation cannot substitute current unbounded owner facts for the
+then-effective deferred deadline. Neither the resolver nor policy hook has a
+default. The removed `From<ImportOwnerExpectation>` conversion must be replaced
+by explicit historical resolution. `None` / `undefined` requests time-free
+recovery closure and asserts no admission. The resolver MUST NOT authenticate
+owner history from unverified input claims.
+
+The verifier returns `owner_check_times_unix_seconds` (Rust) /
+`ownerCheckTimesUnixSeconds` (TS), with absent times for unwitnessed delegations.
+Consumers MUST NOT reimplement receipt-time selection; they MUST implement
+owner-state resolution for the selected time using independently verified owner
+history. Neither receiver time nor a signed author's timestamp selects historical
+owner state. The policy hook still verifies native/policy context at each
+statement's observation, including across owner transitions.
 Every statement's Spool UUID, Spool genesis digest, owner ID, owner state hash and
 ownership-transfer sequence MUST match a verified delegation identity. Initial
 genesis bindings MUST match the original delegation, creator, parent permission,
@@ -1527,8 +1723,8 @@ owner chain and exact branch genesis, even before admission exists.
 
 Unwitnessed delegations/renewal activations have no authenticated observation:
 verify their original signatures, owner references, window shape, parent
-containment, scope and budget accounting time-free. Their supplied `now` is unused
-for interval checks. This is recovery evidence only, establishing no historical
+containment, scope and budget accounting time-free. There is no historical
+owner-check time or interval check for those certificates. This is recovery evidence only, establishing no historical
 or executable authority; it permits a state read before N or after expiry. Do
 not invent an in-window clock or a witness for Commit/Renew activation.
 
@@ -1542,9 +1738,43 @@ remaining renewal MUST commit the terminal manifest. These checks preserve
 owner-signed cumulative operation/byte budgets and scope narrowing across all
 renewals. Before any publication, absent admission statements confer no historical admission claim.
 It returns the authenticated committed manifest, active predecessor, authority
-epoch and an updated snapshot. Compare these with the authenticated read state.
-Persist the result atomically under the receiver's trust/mutation lock; failures
-return no snapshot and cannot advance trust. Never source a persisted snapshot,
+epoch, an optional durable snapshot, `snapshot_advanced` (Rust) /
+`snapshotAdvanced` (TS), the derived owner-check times, and the typed `evidence`
+discriminator:
+Rust `ImportBundleEvidence::{Recovery,Witnessed}` / TS `"recovery" | "witnessed"`.
+Witnessed requires an authenticated admission/publication observation for **every**
+accepted delegation. An unwitnessed activation tail returns Recovery even if
+earlier retained history is witnessed. Recovery grants no historical admission
+for that tail and no current executable authority. Witnessed also requires all
+current execution checks before any new work. Native genesis binding selects the
+signature whose public key equals the exact signed `creator_public_key`; another
+valid earlier signature neither substitutes for the creator nor causes rejection. Compare these with the authenticated read state.
+The returned snapshot MAY be persisted atomically under the receiver's
+trust/mutation lock, including for a zero-admission recovery read. Its witness-set
+high-water mark, root pin and clock floor MUST advance ONLY from a set actually
+authenticated under the independently installed pin. If Recovery has no witnessed prefix and authenticates
+**no new set** (no carried set, or the same exact set and pin as the input), the
+verifier MUST return the input snapshot unchanged and `snapshot_advanced=false` /
+`snapshotAdvanced=false`. With no input snapshot this returns `None` / `undefined`:
+persisting is a harmless no-op. No carried set is permitted only with zero
+statements; statements without a set reject `Canonical`. A carried set MUST still
+pass signature, root/epoch, freshness, generation, seal/tombstone and clock checks;
+an invalid set MUST NOT silently fall back to recovery.
+
+A new authenticated set MAY advance the set high-water mark and clock floor even
+when `evidence=Recovery`, with `snapshot_advanced=true` / `snapshotAdvanced=true`.
+Recovery preserves the input accepted history and job-key associations and MUST
+also persist any newly authenticated contiguous delegation prefix, with its
+statements, operations and key associations. Truncate unwitnessed delegations
+and their renewal tail before persistence. A fresh receiver accepting a witnessed
+prefix with an unwitnessed renewal tail MUST reject a later view that discards
+that prefix with `HighWater`. Purely unwitnessed recovery adds no admitted
+history. Existing history rollback checks apply regardless of the evidence kind. `accepted_history` / `acceptedHistory` in
+the result is the verified read's CAS state for review, independent of the durable
+snapshot's admitted history. Witnessed reads may extend authenticated history
+under an unchanged set. The boolean reports actual snapshot change, including
+history or clock-floor changes, independently of the evidence discriminator.
+Failures return no result and cannot advance trust. Never source a persisted snapshot,
 owner context or descriptor pin from the incoming bundle. Snapshot copies in TS
 prevent asynchronous hook mutation from changing verification inputs.
 
@@ -1599,11 +1829,23 @@ attempt cancellation does not mean logical-job cancellation. Queued, running,
 waiting, paused, completed, already superseded and complete-job attempts are
 ineligible. The job must remain executable under all current authority, policy,
 revocation, budget, frontier and lease checks. In-window eligible retries need
-no new signature. On expired authority, the required flow is authenticated state
+no new signature. For a job with original native admission, on expired authority the required flow is authenticated state
 read -> compute/review remaining scope -> exact Prepare -> sign replacement
 permission/delegation and renewal -> Renew -> state read -> Retry with a **NEW
 request ID**, the active replacement digest/epoch and eligible operation CAS.
 Renew's request ID MUST NOT be reused for Retry.
+
+A job whose original native admission never occurred before the original
+exclusive window ended MUST return retry-unavailable
+`ORIGINAL_WINDOW_ENDED (7)`. Renew/Retry cannot restore admission by replacing
+that original genesis authority; the caller must prepare/sign a **new logical
+job**. `original_import_retry_unavailable` / `originalImportRetryUnavailable`
+classify the independently retained original delegation, durable native admission
+fact and actual host clock. Hosts apply this gate before renewal preparation,
+renewal activation and retry admission, including when an active replacement has
+a later window. Commit acceptance alone is not native admission. A genuine
+original admission remains recoverable and can follow Renew → Retry for remaining
+work. Exact stored receipt replay remains an acknowledgement, as before.
 
 Every admitted Retry MUST allocate a fresh **host-generated physical UUID**,
 distinct from every prior attempt (including the first lineage UUID) and
@@ -1624,8 +1866,8 @@ contains one canonical non-nil physical UUID, the exact destination and a
 attempt selected from the durable job/lineage association, read transactionally
 with state, retained proof and retained source. The existing 2 MiB response
 bound includes it. Reasons distinguish no terminal attempt, attempt in progress,
-complete job, logical-job cancellation, logical-job revocation and an already
-superseded target. Authority expiry or lack of source custody alone does not
+complete job, logical-job cancellation, logical-job revocation, an already
+superseded target and an original window that ended without native admission. Authority expiry or lack of source custody alone does not
 hide an otherwise eligible physical target: Renew/custody checks still gate
 admission. If the durable association cannot be read, refuse UNAVAILABLE after
 writer authorization; never guess from IDs or return partial state.
@@ -1638,6 +1880,36 @@ remain unchanged. In ONE admission transaction, Retry MUST bind this current
 target to the exact destination, logical job, transitive retry lineage, operation
 CAS, active certificate digest/epoch and current authorization. A stale target
 or concurrent replacement refuses; a target alone grants no execution authority.
+
+Every successful current writer-only state read MUST also include
+`control_availability = 6` (`controlAvailability` in TS), computed from cached
+or derived host state without per-read provider API calls, containing required
+`retry`, `renew` and `cancel` `ImportControlAvailabilityV1` values. Each has exactly
+one `available=true` or `unavailable=ImportControlUnavailableReason`; false,
+missing, unspecified or unknown values reject `Canonical`. The host MUST compute
+these for the authenticated caller in the SAME transactional read snapshot.
+They are **advisory** and confer no admission authority. Hosts MUST recheck every
+current authority, policy, PoP, custody, grant, commit, CAS and terminal condition
+at admission even when the read says available.
+
+`import_job_control_availability` / `importJobControlAvailability` classify
+receiver-owned host facts. A terminal logical job makes all controls `TERMINAL`.
+For non-terminal Retry/Renew, a never-admitted original past its exclusive expiry
+is `ORIGINAL_WINDOW_ENDED`; connected non-owners get `NOT_CONNECTION_OWNER`, an
+owner without the exact current grant gets `GRANT_MISSING`, and missing selected
+commits give `COMMIT_UNAVAILABLE`. Retry additionally reports `NO_RETRY_TARGET`,
+`AUTHORITY_EXPIRED` (Renew first), or `AUTHORITY_NOT_YET_VALID`. Renew does not
+require a retry target or a currently unexpired predecessor. Cancel depends only
+on current destination write/PoP and logical terminal state, even after loss of
+source access or expiry. A public-git co-writer needs no connection ownership or
+provider grant. Priority is terminal, original window ended, caller's own source
+relationship, then retry target and active interval. The availability message
+contains only booleans and typed reasons: it MUST NEVER disclose another account's
+identity, connection inventory, grant details or source accessibility. The host's
+internal owner-account comparison is never returned. Unknown/unauthorized reads
+retain uniform `NOT_FOUND`. `validate_control_state_response` /
+`validateImportControlStateResponse` validates current required disclosures;
+older frozen recovery carriers use the existing validators.
 
 Any current destination writer may Cancel with authenticated PoP, exact
 job/destination, the active cancellation ID and expected epoch. Cancel requires
@@ -1674,3 +1946,39 @@ hosts MUST populate the new disclosure on current successful reads.
 and Commit size helpers validate the portable receipt/size requirements. Hosts
 own the authorization lookup, transaction, allocation, credential binding and
 worker fences; API helpers are not a storage or execution implementation.
+
+
+### alpha.32 review fixes: publication and control transaction gates
+
+Every publication MUST refuse when the SUM of newly committed result bytes
+would exceed the signed logical-job total, across operations and delegations.
+`check_import_publication_budget` / `checkImportPublicationBudget` verifies the
+operation, validates the complete cumulative receiver-owned pre-operation
+manifest, handles exact replay, and compares the new bytes and operation count
+with `remaining_import_scope` / `remainingImportScope`. It runs under the same
+lock/transaction as manifest installation, unique-slot insertion and frontier
+CAS. Hosts MUST retain the original manifest/budgets and activate only renewals
+narrowed to the predecessor remainder. An empty or partial invented manifest
+cannot replace host-durable consumption. `verify_new_operation` /
+`verifyNewImportOperation` now requires that manifest. `verify_publication` /
+`verifyImportPublication` reconstructs the pre-operation view from its exact
+post-operation manifest and performs the same check. Bundle composition performs
+both publication checks and cumulative original/certificate/permission accounting.
+An arithmetic u64 overflow refuses `Bounds` in both languages; a representable
+budget excess refuses `Scope` (renewal subtraction excess remains `RenewalFork`).
+
+Retry admission, renewal request validation/activation, and retained-source
+renewal Prepare MUST use independently retained `original_admitted` facts and
+the current host time, and MUST refuse `OriginalWindowEnded` if no original
+native admission occurred before the original certificate's exclusive expiry.
+Exact stored replay is resolved before these gates. Under the inventory lock,
+hosts MUST call `release_ended_import_reservations` /
+`releaseEndedImportReservations` and durably release that job's refs/threads/
+geneses before preparing a new logical job. Keep other jobs' reservations and
+all old replay/accounting records. Already admitted originals retain recoverable
+reservations through authority expiry.
+
+`control_availability` MUST be computed from host state, without per-read
+provider API calls. Cache or derive grant/custody and selected-commit facts;
+refresh separately as needed. The disclosure remains advisory: Retry/Renew
+admission independently rechecks current source access and commit availability.

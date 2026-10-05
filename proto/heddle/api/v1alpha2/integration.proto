@@ -18,6 +18,11 @@ message ProviderConnection {
   bool revoked = 7;
   // This record contains no provider token or OAuth authorization code.
 }
+// Advisory Git storage estimate, never converted result bytes or authority.
+enum ProviderRepositorySizeEstimateState {
+  PROVIDER_REPOSITORY_SIZE_ESTIMATE_STATE_UNKNOWN = 0;
+  PROVIDER_REPOSITORY_SIZE_ESTIMATE_STATE_AVAILABLE = 1;
+}
 message ProviderRepository {
   RecordRef connection = 1;
   string provider_repository_id = 2;
@@ -47,6 +52,14 @@ message ProviderRepository {
   // infer SHA-1. Unknown blocks Prepare/signing; retry discovery. Every known
   // OID and ProviderRef algorithm MUST agree with this repository format.
   ImportGitHashAlgorithm hash_algorithm = 11;
+  // Connected GitHub reports repository API size in KiB (1024 bytes). Public
+  // HTTPS Git has no cheap estimate and returns UNKNOWN with git_size_kib=0.
+  // AVAILABLE may be zero for an empty repository. Unknown enum values refuse.
+  ProviderRepositorySizeEstimateState size_estimate_state = 12;
+  // Clients calculate estimate × headroom, capped by GetImportConfiguration
+  // limits; UNKNOWN uses the host maximum. Users never set the total.
+  // Advisory only: Prepare requires the exact client-selected total.
+  uint64 git_size_kib = 13;
 }
 
 message ProviderRef {

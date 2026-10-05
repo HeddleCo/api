@@ -48,6 +48,8 @@ message ImportOwnerChainV1 {
 }
 // One authorized result slot. First release permits one result per branch;
 // slot_id is stable across physical retries, certificates and signing keys.
+// Reservation identity is (spool UUID, full ref, slot_id), not slot_id alone.
+// Full refs are exclusive across all non-terminal jobs in the same spool.
 message ImportBranchLimitV1 {
   string ref_name = 1; // Full refs/heads/...; sorted unique UTF-8 bytes.
   ImportGitHashAlgorithm hash_algorithm = 2;
@@ -57,7 +59,8 @@ message ImportBranchLimitV1 {
   bytes target_thread_id = 6;
   bytes expected_frontier_digest = 7; // ImportFrontierV1 commitment.
   uint64 slot_id = 8;
-  uint64 max_result_bytes = 9;
+  reserved 9;
+  reserved "max_result_bytes";
   ImportRefDisclosure ref_disclosure = 10; // OBSERVE requires 1; PINNED requires 0.
 }
 message ImportPermissionScopeV1 {
@@ -68,17 +71,21 @@ message ImportPermissionScopeV1 {
   // exactly 32 bytes requires that current CAS or typed DESTINATION_CONFLICT.
   // Success: always 32 opaque host-issued bytes. Never an overview version or
   // zero32 sentinel. All other proposed scope fields MUST remain unchanged.
+  // Fences destination configuration, ownership and policy. Other imports do
+  // not advance it; disjoint sibling jobs may Prepare/Commit concurrently.
   bytes destination_version = 4;
   bytes options_digest = 5;
   string converter_version = 6;
   uint32 max_operations = 7; // Logical-job total; never reset by renewal/retry.
-  uint64 max_result_bytes = 8; // Logical-job total.
+  // ONE positive u64 logical-job authorization total; narrow-only, never reset.
+  // Bounds server-held job-key writes under delegation; not a storage quota.
+  uint64 max_result_bytes = 8;
 }
 // P2 #1: NEW direct owner -> device permission, unrelated to PURGE, timeline,
 // self-PoP or online Developer/Admin grants. Exactly one logical job/lineage;
 // grants genesis binding and bounded IMPORT_CONVERSION delegation, no device
 // subdelegation. Durable accounting is (permission digest, logical job) and
-// (logical job, branch, slot), never certificate/key/retry-row counters.
+// slot identity is (logical job, branch, slot); byte totals never reset by key/retry.
 message ImportMemberPermissionV1 {
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
@@ -305,6 +312,8 @@ enum ImportPreparationRefusalReason {
   IMPORT_PREPARATION_REFUSAL_REASON_UNSUPPORTED_CONVERTER = 2;
   IMPORT_PREPARATION_REFUSAL_REASON_UNSUPPORTED_OPTIONS = 3;
   IMPORT_PREPARATION_REFUSAL_REASON_BUDGET_EXCEEDED = 4;
+  // Stale destination configuration/ownership/policy CAS, or a full ref/slot
+  // reserved by a non-terminal job in this spool. See refusal.field.
   IMPORT_PREPARATION_REFUSAL_REASON_DESTINATION_CONFLICT = 5;
   IMPORT_PREPARATION_REFUSAL_REASON_POLICY_DENIED = 6;
 }
@@ -313,7 +322,8 @@ message ImportPreparationRefusalV1 {
   string field = 2; // Bounded request field path; never hidden resource details.
 }
 // An authenticated finite read, separate from provider inventory observation.
-// Configuration is advice, never authority; Prepare rechecks current support.
+// Configuration is advice, never authority; Prepare and Commit recheck current
+// support and refuse totals above the current advertised host maximum.
 message GetImportConfigurationRequest {
   SpoolRef destination = 1;
 }
@@ -328,8 +338,10 @@ message ImportConverterConfigurationV1 {
 message ImportBudgetLimitsV1 {
   uint32 max_branches = 1; // Positive, <=256.
   uint32 max_operations = 2; // Positive, <=256; total per logical job.
-  uint64 max_result_bytes = 3; // Positive, <=1 GiB; total per logical job.
-  uint64 max_branch_result_bytes = 4; // Positive, <=max_result_bytes.
+  // Operator-configurable positive u64 maximum per logical job; no protocol cap.
+  uint64 max_result_bytes = 3;
+  reserved 4;
+  reserved "max_branch_result_bytes";
 }
 enum ImportSourceMode {
   IMPORT_SOURCE_MODE_UNSPECIFIED = 0;
@@ -375,6 +387,33 @@ enum ImportRetryUnavailableReason {
   IMPORT_RETRY_UNAVAILABLE_REASON_JOB_CANCELLED = 4;
   IMPORT_RETRY_UNAVAILABLE_REASON_JOB_REVOKED = 5;
   IMPORT_RETRY_UNAVAILABLE_REASON_ALREADY_SUPERSEDED = 6;
+  // No original native admission before the original exclusive expiry.
+  // Renewal cannot replace original genesis authority; start a new logical job.
+  IMPORT_RETRY_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED = 7;
+}
+// Caller-relative advisory state, computed from authenticated host facts at read
+// time. Never conveys another account's source/connection/grant details.
+enum ImportControlUnavailableReason {
+  IMPORT_CONTROL_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_NOT_CONNECTION_OWNER = 1;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_GRANT_MISSING = 2;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_TERMINAL = 3;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED = 4;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_NO_RETRY_TARGET = 5;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_COMMIT_UNAVAILABLE = 6;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_AUTHORITY_EXPIRED = 7;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_AUTHORITY_NOT_YET_VALID = 8;
+}
+message ImportControlAvailabilityV1 {
+  oneof availability {
+    bool available = 1; // MUST be true; presence is required.
+    ImportControlUnavailableReason unavailable = 2; // Known nonzero reason.
+  }
+}
+message ImportJobControlAvailabilityV1 {
+  ImportControlAvailabilityV1 retry = 1;
+  ImportControlAvailabilityV1 renew = 2;
+  ImportControlAvailabilityV1 cancel = 3;
 }
 message GetImportJobStateResponse {
   // One transactional snapshot, including an explicit empty manifest before
@@ -407,6 +446,12 @@ message GetImportJobStateResponse {
     ImportEligibleRetryTargetV1 eligible_retry_target = 4;
     ImportRetryUnavailableReason retry_unavailable = 5; // Known nonzero reason.
   }
+  // Required on success. Caller-relative Retry/Renew/Cancel availability in the
+  // SAME read snapshot. Advisory only: admission still rechecks all authority,
+  // policy, PoP, custody, grants, commit availability, CAS and terminal state.
+  // Cancel needs destination write only; connected Retry/Renew require ownership
+  // of the EXACT retained connection. Public-git requires no connection owner.
+  ImportJobControlAvailabilityV1 control_availability = 6;
 }
 // Authority activation ONLY: successful receipt.applied uses this request's ID;
 // empty resulting_versions is valid. Creates NO physical attempt. Recover the

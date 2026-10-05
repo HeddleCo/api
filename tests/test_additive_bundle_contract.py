@@ -93,6 +93,8 @@ class AdditiveBundleContractTest(unittest.TestCase):
                 ("refs", 9),
                 ("refs_status", 10),
                 ("hash_algorithm", 11),
+                ("size_estimate_state", 12),
+                ("git_size_kib", 13),
             ],
         )
         connection = body(INTEGRATION, "message", "ProviderConnection")

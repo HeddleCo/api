@@ -1,13 +1,15 @@
+import { blake3 } from "@noble/hashes/blake3.js";
+import { ForeignReferences } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./native_witness_pb.js";
-import { ImportIdentityV1Schema, ImportOwnerChainV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type ImportPublicProofBundleV1 } from "./import_authority_pb.js";
+import { ForeignDependencyOrigin, ImportIdentityV1Schema, ImportOwnerChainV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type ImportPublicProofBundleV1 } from "./import_authority_pb.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
 import type { HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
-import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, reject, strictDecode, HybridContractError, verifySignature } from "./_hybrid-codec.js";
+import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, reject, strictDecode, HybridContractError, verifySignature, join } from "./_hybrid-codec.js";
 import { ThreadControlAuthoritySchema } from "./identity_pb.js";
 import { threadGenesisId, type ThreadGenesisSigner } from "./thread-genesis.js";
 import { decode, type Value } from "./_collaboration-msgpack.js";
-import { verifyNativeRecord, originalSignaturesDigest, ownerChainDigest, matchWitnessBoundary, requireBoundaryOriginal, verifyWitnessPayload, validatePublicBundle, requirePolicyHistory } from "./import-authority.js";
+import { verifyLandingKeyRoles, verifyNativeRecord, originalSignaturesDigest, ownerChainDigest, matchWitnessBoundary, requireBoundaryOriginal, verifyWitnessPayload, validatePublicBundle, requirePolicyHistory } from "./import-authority.js";
 import { resolveWitnessStatement, verifyWitnessInclusion, leafDigest, statementSigningDigest, type VerifiedWitnessSet } from "./witness-trust.js";
 
 export const NATIVE_GENESIS_DOMAIN = "heddle-native-genesis-authority-v1";
@@ -88,6 +90,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   b=clone(api.NativePublicProofBundleV1Schema,b);
   if(b.formatVersion!==1)reject("Version");
   if(toBinary(api.NativePublicProofBundleV1Schema,b).length>1048576||b.ownerHistories.length>64||b.ownershipTransfers.length>64||!b.ownerChains.length||b.ownerChains.length>64||b.policies.length>256||!b.genesisWitnesses.length||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256||b.statements.length>1024||b.historyProofs.length>1024)reject("Bounds");
+  const foreign=new ForeignReferences(b.foreignDependencies,ForeignDependencyOrigin.NATIVE);
   const owner=b.ownerGenesis?.genesis??reject("Canonical"),chain=b.ownerChains[0]??reject("Canonical");
   sorted(b.ownerChains,ownerChainDigest);
   if(!b.witnessSet)reject("Canonical");
@@ -97,6 +100,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   const requireStatement=(purpose:number,payload:Uint8Array)=>{if(b.statements.filter(s=>s.body?.purpose===purpose&&equal(s.body.canonicalPayload,payload)).length!==1)reject("Scope");};
   const exact=(a:SignedRecord|undefined,r:SignedRecord)=>!!a&&equal(toBinary(SignedRecordSchema,a),toBinary(SignedRecordSchema,r));
   const requireNativeDependency=async(original:SignedRecord)=>{
+    if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(original)))){await foreign.verify(original);return;}
     if(requiresAuthority(original)){
       const p=b.authorityWitnesses.find(p=>exact(p.original,original))??reject("Scope");
       requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
@@ -123,10 +127,12 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   for(const p of b.authorityWitnesses){
     requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
     if(!requiresAuthority(p.original??reject("Canonical")))reject("Scope");
+    const subjectThread=thread(p.original??reject("Canonical"));
+    if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),subjectThread)))reject("Scope");
     for(const original of [...(p.original?[p.original]:[]),...p.dependencies]){
       if(["heddle-thread-genesis-v1","heddle-thread-operation-v1","heddle-thread-ownership-claim-v1","heddle-thread-ownership-resolution-v1"].includes(original.format)){
         const t=thread(original);
-        if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),t)))reject("Scope");
+        if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),t))){await foreign.verify(original);continue;}
         if(original.format==="heddle-thread-genesis-v1"&&!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(toBinary(SignedRecordSchema,g.originalGenesis),toBinary(SignedRecordSchema,original))))reject("Scope");
         if(original.format!=="heddle-thread-genesis-v1"&&original!==p.original)await requireNativeDependency(original);
       }else if(!["heddle-original-boundary-acceptance-v1","heddle-thread-genesis-admission-v2","heddle-thread-authority-admission-v3"].includes(original.format))reject("Version");
@@ -138,7 +144,6 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     if(execution.format!=="heddle-thread-operation-v1"||map(selectors(execution).body).kind!=="integration")reject("Scope");
     if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(execution))))reject("Scope");
     for(const original of [...(p.sourceOperation?[p.sourceOperation]:[]),...p.reviewEvidence]){
-      if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(original))))reject("Scope");
       await requireNativeDependency(original);
     }
   }
@@ -151,10 +156,12 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     else if(s.purpose===4){const p=b.landingWitnesses.find(p=>equal(canonicalHybridV1(HostedLandingWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"landing",payload:p});}
     else reject("Version");
   }
+  foreign.finish();
 }
 /** All statements resolve separately, including exact retirement proofs. */
-export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint):Promise<void> {
+export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint,forbiddenLandingKeys:Uint8Array[]=[]):Promise<void> {
   b=clone(api.NativePublicProofBundleV1Schema,b);await validatePublicNativeBundle(b);
+  for(const p of b.landingWitnesses)verifyLandingKeyRoles(p,set.knownJobKeys,forbiddenLandingKeys);
   // The opaque verified snapshot, rather than the carrier, selects trust.
   if(!b.witnessSet?.body||!equal(b.witnessSet.bodyDigest,set.digest)||!equal(signingDigest("heddle-hosted-witness-set-v1\0",(await import("../common/hosted_witness_pb.js")).HostedWitnessSetV1Schema,b.witnessSet.body),set.digest))reject("StaleContext");
   for(const signed of b.statements){
@@ -165,6 +172,28 @@ export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV
     const proof=b.historyProofs.find(p=>{if(p.purpose!==s.purpose)return false;try{verifyWitnessInclusion(leaf,p,entry);return true;}catch{return false;}})??reject("Proof");
     await resolveWitnessStatement(set,signed,proof,false,now);
   }
+}
+/** Select a LocalKey proof cutoff from independently verified native history.
+ * Native causal/owner checks remain required; the order comes from the exact
+ * authenticated dependent statement. */
+export function localWorkCutoff(b:api.NativePublicProofBundleV1,original:SignedRecord,dependentAdmissionOrder:bigint):bigint {
+  const subject=thread(original),orders:bigint[]=[],claims:Uint8Array[]=[],resolutions:SignedRecord[]=[];
+  let genesisCount=0;
+  for(const signed of b.statements){
+    const s=signed.body??reject("Canonical");
+    if(s.admissionOrder>dependentAdmissionOrder)continue;
+    if(s.purpose===1){for(const p of b.genesisWitnesses){const binding=p.binding?.body??reject("Canonical");if(equal(binding.genesisDigest,subject)&&equal(s.canonicalPayload,canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p))){if(binding.ownerKind!==2)reject("Scope");genesisCount++;orders.push(s.admissionOrder);}}}
+    else if(s.purpose===2){for(const p of b.authorityWitnesses){if(![2,3].includes(p.kind)||!equal(s.canonicalPayload,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p)))continue;const r=p.original??reject("Canonical");if(!equal(thread(r),subject))continue;orders.push(s.admissionOrder);if(p.kind===2)claims.push(nativeOriginalId(r));else resolutions.push(r);}}
+  }
+  if(genesisCount!==1)reject("Scope");
+  if(resolutions.length===0){if(claims.length!==1)reject("Scope");}
+  else if(resolutions.length===1){const r=selectors(resolutions[0]!);claims.sort(compare);const conflicts=r.conflicting_claims;if(!Array.isArray(conflicts)||claims.length!==conflicts.length||claims.some((c,i)=>!equal(c,octets(conflicts[i],32)))||!claims.some(c=>equal(c,octets(r.winning_claim,32))))reject("Scope");}
+  else reject("Scope");
+  const cutoff=orders.reduce((a,b)=>a>b?a:b,0n);if(cutoff===0n)reject("Scope");return cutoff;
+}
+function nativeOriginalId(r:SignedRecord):Uint8Array {
+  const size=new Uint8Array(8);new DataView(size.buffer).setBigUint64(0,BigInt(r.canonicalRecord.length),true);
+  return blake3(join(new TextEncoder().encode(r.format),size,Uint8Array.of(0),r.canonicalRecord));
 }
 /** Explicit transport arms, never delegation-less fallback. */
 export async function validateNativeWitnessCarriers(imported:ImportPublicProofBundleV1|undefined,native:api.NativePublicProofBundleV1|undefined):Promise<void> {

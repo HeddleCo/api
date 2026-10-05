@@ -206,6 +206,20 @@ message ImportPublicationWitnessV1 {
   bytes resulting_frontier_digest = 12;
   bytes terminal_manifest_digest = 13;
 }
+// References to originals already durably installed through their own carrier.
+// Origin is immutable per Thread; foreign entries never grant permission.
+enum ForeignDependencyOrigin {
+  FOREIGN_DEPENDENCY_ORIGIN_UNSPECIFIED = 0;
+  FOREIGN_DEPENDENCY_ORIGIN_IMPORT = 1;
+  FOREIGN_DEPENDENCY_ORIGIN_NATIVE = 2;
+}
+message ForeignDependencyV1 {
+  uint32 format_version = 1; // Exactly 1.
+  ForeignDependencyOrigin origin = 2; // Must differ from the enclosing carrier.
+  bytes thread_genesis_digest = 3; // 32 bytes; exact original Thread.
+  bytes signed_native_digest = 4; // 32 bytes; commits to original signature bytes.
+  uint64 prefix_admission_order = 5; // Positive own-origin admission cutoff; see normative prefix rules.
+}
 // Owner verification belongs to heddle capability-verifier: independently
 // select the immutable lineage, verify owner histories/handoffs and current or
 // witnessed historical authority. This public carrier cannot enroll its owner.
@@ -234,6 +248,8 @@ message ImportPublicProofBundleV1 {
   repeated ImportGenesisWitnessV1 genesis_witnesses = 20;
   repeated ImportAuthorityWitnessV1 authority_witnesses = 21;
   repeated HostedLandingWitnessV1 landing_witnesses = 22;
+  // Strictly digest-sorted unique, all referenced; bounded by carrier bytes. Foreign prefixes first.
+  repeated ForeignDependencyV1 foreign_dependencies = 23;
 }
 // Explicit custody selector. The URL is proposed_scope.source_url. The host
 // resolves this selector for the authenticated caller at Prepare and Commit;

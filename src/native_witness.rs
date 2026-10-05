@@ -1,6 +1,7 @@
 //! Job-free native witness closure. This layer checks transport commitments and
 //! signatures; callers still verify native models, independently selected owner
 //! authority, policy, causal closure and boundary intent before durable mutation.
+use crate::foreign_dependencies::thread;
 use crate::heddle::api::{common as host, v1alpha2 as api};
 use crate::hybrid_codec::{Reject, canonical, field, hash, key_id, record, signing_digest, width};
 use crate::import_authority as import;
@@ -30,10 +31,6 @@ struct GenesisSelectors {
     spool: String,
     creator: [u8; 32],
     owner: NativeOwner,
-}
-#[derive(serde::Deserialize)]
-struct ThreadSelector {
-    thread: [u8; 32],
 }
 fn spool_uuid(text: &str) -> Result<Vec<u8>, Reject> {
     if text.len() != 36
@@ -171,14 +168,6 @@ fn sorted<T>(values: &[T], digest: impl Fn(&T) -> Result<Vec<u8>, Reject>) -> Re
 fn authority_payload_digest(p: &api::ImportAuthorityWitnessV1) -> Result<Vec<u8>, Reject> {
     signing_digest("heddle-import-authority-witness-payload-v1", p)
 }
-fn thread(record: &api::SignedRecord) -> Result<Vec<u8>, Reject> {
-    if record.format == "heddle-thread-genesis-v1" {
-        return Ok(import::native_id(record));
-    }
-    let value: ThreadSelector =
-        rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Canonical)?;
-    Ok(value.thread.to_vec())
-}
 /// Reference completeness, including a statement for every sidecar, a witnessed
 /// genesis for every original/dependency and an explicit claim for LocalKey.
 /// Presence is never permission. Call verify_bundle_witnesses with a
@@ -202,6 +191,10 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     {
         return Err(Reject::Bounds);
     }
+    let mut foreign = crate::foreign_dependencies::References::new(
+        &b.foreign_dependencies,
+        api::ForeignDependencyOrigin::Native,
+    )?;
     let owner = b
         .owner_genesis
         .as_ref()
@@ -279,6 +272,14 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
         if !requires_authority(p.original.as_ref().ok_or(Reject::Canonical)?)? {
             return Err(Reject::Scope);
         }
+        let subject_thread = thread(p.original.as_ref().ok_or(Reject::Canonical)?)?;
+        if !b.genesis_witnesses.iter().any(|g| {
+            g.original_genesis
+                .as_ref()
+                .is_some_and(|g| import::native_id(g) == subject_thread)
+        }) {
+            return Err(Reject::Scope);
+        }
         for original in p.original.iter().chain(p.dependencies.iter()) {
             if [
                 "heddle-thread-genesis-v1",
@@ -294,7 +295,8 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                         .as_ref()
                         .is_some_and(|o| import::native_id(o) == t)
                 }) {
-                    return Err(Reject::Scope);
+                    foreign.require(original)?;
+                    continue;
                 }
                 if original.format == "heddle-thread-genesis-v1"
                     && !b
@@ -307,7 +309,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                 if original.format != "heddle-thread-genesis-v1"
                     && p.original.as_ref() != Some(original)
                 {
-                    require_native_dependency(b, original)?;
+                    require_native_dependency(b, original, &mut foreign)?;
                 }
             } else if ![
                 "heddle-original-boundary-acceptance-v1",
@@ -336,15 +338,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
             return Err(Reject::Scope);
         }
         for original in p.source_operation.iter().chain(p.review_evidence.iter()) {
-            let t = thread(original)?;
-            if !b.genesis_witnesses.iter().any(|g| {
-                g.original_genesis
-                    .as_ref()
-                    .is_some_and(|o| import::native_id(o) == t)
-            }) {
-                return Err(Reject::Scope);
-            }
-            require_native_dependency(b, original)?;
+            require_native_dependency(b, original, &mut foreign)?;
         }
     }
     for signed in &b.statements {
@@ -396,7 +390,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
             _ => return Err(Reject::Version),
         }
     }
-    Ok(())
+    foreign.finish()
 }
 #[derive(serde::Deserialize)]
 struct OperationSelectors {
@@ -454,7 +448,16 @@ fn requires_authority(record: &api::SignedRecord) -> Result<bool, Reject> {
 fn require_native_dependency(
     b: &api::NativePublicProofBundleV1,
     original: &api::SignedRecord,
+    foreign: &mut crate::foreign_dependencies::References<'_>,
 ) -> Result<(), Reject> {
+    let t = thread(original)?;
+    if !b.genesis_witnesses.iter().any(|g| {
+        g.original_genesis
+            .as_ref()
+            .is_some_and(|o| import::native_id(o) == t)
+    }) {
+        return foreign.require(original);
+    }
     if requires_authority(original)? {
         let p = b
             .authority_witnesses
@@ -516,8 +519,12 @@ pub fn verify_bundle_witnesses(
     b: &api::NativePublicProofBundleV1,
     set: &crate::witness_trust::VerifiedWitnessSet,
     now_ms: i64,
+    forbidden_landing_keys: &[Vec<u8>],
 ) -> Result<(), Reject> {
     validate_public_bundle(b)?;
+    for p in &b.landing_witnesses {
+        import::verify_landing_key_roles(p, set.known_job_keys(), forbidden_landing_keys)?;
+    }
     let carried = b.witness_set.as_ref().ok_or(Reject::Canonical)?;
     if carried.body.as_ref() != Some(set.body()) || carried.body_digest != set.digest() {
         return Err(Reject::StaleContext);
@@ -553,6 +560,84 @@ pub fn verify_bundle_witnesses(
         crate::witness_trust::resolve_statement(set, signed, Some(proof), false, now_ms)?;
     }
     Ok(())
+}
+/// Select a LocalKey original's own-origin proof cutoff from an independently
+/// verified native carrier. Native causal/owner verification remains required.
+/// The caller supplies the dependent statement's authenticated admission order.
+/// Later admissions are ignored for both conflict selection and the maximum.
+pub fn local_work_cutoff(
+    b: &api::NativePublicProofBundleV1,
+    original: &api::SignedRecord,
+    dependent_admission_order: u64,
+) -> Result<u64, Reject> {
+    let subject = thread(original)?;
+    let mut genesis_count = 0;
+    let mut orders = Vec::new();
+    let mut claims = Vec::new();
+    let mut resolutions = Vec::new();
+    for signed in &b.statements {
+        let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        if s.admission_order > dependent_admission_order {
+            continue;
+        }
+        if s.purpose == 1 {
+            for p in &b.genesis_witnesses {
+                let binding = p
+                    .binding
+                    .as_ref()
+                    .and_then(|v| v.body.as_ref())
+                    .ok_or(Reject::Canonical)?;
+                if binding.genesis_digest == subject && s.canonical_payload == canonical(p)? {
+                    if binding.owner_kind != 2 {
+                        return Err(Reject::Scope);
+                    }
+                    genesis_count += 1;
+                    orders.push(s.admission_order);
+                }
+            }
+        } else if s.purpose == 2 {
+            for p in &b.authority_witnesses {
+                if ![2, 3].contains(&p.kind) || s.canonical_payload != canonical(p)? {
+                    continue;
+                }
+                let r = p.original.as_ref().ok_or(Reject::Canonical)?;
+                if thread(r)? != subject {
+                    continue;
+                }
+                orders.push(s.admission_order);
+                if p.kind == 2 {
+                    claims.push(import::native_id(r));
+                } else {
+                    resolutions.push(r);
+                }
+            }
+        }
+    }
+    if genesis_count != 1 {
+        return Err(Reject::Scope);
+    }
+    match resolutions.as_slice() {
+        [] if claims.len() == 1 => (),
+        [r] => {
+            #[derive(serde::Deserialize)]
+            struct Resolution {
+                winning_claim: Vec<u8>,
+                conflicting_claims: Vec<Vec<u8>>,
+            }
+            let r: Resolution =
+                rmp_serde::from_slice(&r.canonical_record).map_err(|_| Reject::Canonical)?;
+            claims.sort();
+            if claims != r.conflicting_claims || !claims.contains(&r.winning_claim) {
+                return Err(Reject::Scope);
+            }
+        }
+        _ => return Err(Reject::Scope),
+    }
+    orders
+        .into_iter()
+        .max()
+        .filter(|v| *v > 0)
+        .ok_or(Reject::Scope)
 }
 /// Transport dispatch is explicit and rejects dual arms before staging. Missing
 /// import delegation remains an import rejection, never native fallback.

@@ -1,0 +1,40 @@
+// Append admission-time ownership vectors without rewriting any existing signed bytes.
+import {readFileSync,writeFileSync} from 'node:fs';
+import {createPrivateKey,sign} from 'node:crypto';
+import {fromBinary,toBinary,clone,create} from '@bufbuild/protobuf';
+import * as nat from '../packages/typescript/dist/v1alpha2/native_witness_pb.js';
+import * as imp from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
+import * as host from '../packages/typescript/dist/common/hosted_witness_pb.js';
+import {SignedRecordSchema} from '../packages/typescript/dist/v1alpha2/common_pb.js';
+import {canonicalHybridV1,compare} from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
+import {signedNativeDigest,originalSignaturesDigest} from '../packages/typescript/dist/v1alpha2/import-authority.js';
+import {statementSigningDigest} from '../packages/typescript/dist/v1alpha2/witness-trust.js';
+import {decode} from '../packages/typescript/dist/v1alpha2/_collaboration-msgpack.js';
+const path='tests/fixtures/foreign-dependencies-alpha34.json',f=JSON.parse(readFileSync(path)),n=JSON.parse(readFileSync('tests/fixtures/native-host-witness-v1.json'));
+const bytes=h=>new Uint8Array(Buffer.from(h,'hex')),hex=b=>Buffer.from(b).toString('hex');
+const read=(fixture,name,schema)=>fromBinary(schema,bytes(fixture.wire_vectors[name].wire_hex));
+const wire=(name,schema,value)=>f.wire_vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,value))};
+const secret=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),bytes(f.keys.witness.seed_hex)]),format:'der',type:'pkcs8'});
+const signStatement=s=>{s.body.observedAtUnixMillis=1200000n;s.signature=new Uint8Array(sign(null,statementSigningDigest(s.body),secret));return s;};
+const sort=b=>b.statements.sort((a,b)=>compare(statementSigningDigest(a.body),statementSigningDigest(b.body)));
+const prefix=read(n,'local_adopt_push',nat.NativePublicProofBundleV1Schema),full=read(n,'ownership_resolution',nat.NativePublicProofBundleV1Schema);
+const claimA=prefix.authorityWitnesses[0],original=claimA.dependencies.find(r=>r.format==='heddle-thread-operation-v1');
+const mixed=read(f,'mixed_set',host.SignedHostedWitnessSetV1Schema);
+prefix.witnessSet=mixed;prefix.statements.forEach(signStatement);sort(prefix);
+full.witnessSet=mixed;
+for(const s of full.statements){
+ if(s.body.purpose===1)continue;
+ const p=full.authorityWitnesses.find(p=>hex(canonicalHybridV1(imp.ImportAuthorityWitnessV1Schema,p))===hex(s.body.canonicalPayload));
+ s.body.admissionOrder=p.kind===3?238n:hex(signedNativeDigest(p.original))===hex(signedNativeDigest(claimA.original))?205n:237n;
+ signStatement(s);
+}
+full.statements.filter(s=>s.body.purpose===1).forEach(signStatement);sort(full);
+const dependent=read(f,'import_stage',imp.ImportPublicProofBundleV1Schema),p=dependent.authorityWitnesses[0];
+p.dependencies=[original];
+const s=dependent.statements.find(s=>s.body.purpose===2);
+s.body.canonicalPayload=canonicalHybridV1(imp.ImportAuthorityWitnessV1Schema,p);
+s.body.originalSignaturesDigest=originalSignaturesDigest([p.original,...p.dependencies]);signStatement(s);sort(dependent);
+dependent.foreignDependencies=[create(imp.ForeignDependencyV1Schema,{formatVersion:1,origin:imp.ForeignDependencyOrigin.NATIVE,threadGenesisDigest:new Uint8Array(decode(original.canonicalRecord).thread),signedNativeDigest:signedNativeDigest(original),prefixAdmissionOrder:205n})];
+wire('local_cutoff_prefix',nat.NativePublicProofBundleV1Schema,prefix);wire('local_cutoff_history',nat.NativePublicProofBundleV1Schema,full);wire('local_cutoff_dependent',imp.ImportPublicProofBundleV1Schema,dependent);wire('local_cutoff_original',SignedRecordSchema,original);
+f.local_cutoff={prefix:'local_cutoff_prefix',history:'local_cutoff_history',dependent:'local_cutoff_dependent',original:'local_cutoff_original',dependent_admission_order:'236',expected_cutoff:'205',later_conflict_cutoff:'238'};
+writeFileSync(path,JSON.stringify(f,null,2)+'\n');

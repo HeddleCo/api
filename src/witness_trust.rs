@@ -93,8 +93,12 @@ pub struct VerifiedWitnessSet {
     body: HostedWitnessSetV1,
     digest: Vec<u8>,
     root_epoch: u64,
+    known_job_keys: Vec<Vec<u8>>,
 }
 impl VerifiedWitnessSet {
+    pub fn known_job_keys(&self) -> &[Vec<u8>] {
+        &self.known_job_keys
+    }
     pub fn body(&self) -> &HostedWitnessSetV1 {
         &self.body
     }
@@ -270,6 +274,7 @@ pub fn verify_set(
         body: body.clone(),
         digest,
         root_epoch: expected.root_epoch,
+        known_job_keys: expected.known_job_keys.to_vec(),
     })
 }
 

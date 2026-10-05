@@ -2,6 +2,7 @@
 
 pub mod descriptor_trust;
 mod failure;
+mod foreign_dependencies;
 pub mod framing;
 pub mod hybrid_codec;
 pub mod import_authority;

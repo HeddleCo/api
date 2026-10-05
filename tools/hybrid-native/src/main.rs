@@ -1,5 +1,7 @@
 //! Maintenance codec and fixed-vector native gate. No expected bytes are
 //! generated during verification. All codecs come from the newest compatible published pair.
+mod foreign;
+
 use anyhow::{Context, Result, bail, ensure};
 use contract::{
     heddle::api::{common as host, v1alpha2 as wire},
@@ -1410,7 +1412,7 @@ fn verify_native_witness_vectors(f: &Value) -> Result<()> {
             },
             None,
         )?;
-        contract::native_witness::verify_bundle_witnesses(&b, &set, now)?;
+        contract::native_witness::verify_bundle_witnesses(&b, &set, now, &[])?;
         let mut geneses = BTreeMap::new();
         for p in &b.genesis_witnesses {
             let g = genesis(p.original_genesis.as_ref().context("original")?)?;
@@ -1801,6 +1803,18 @@ fn main() -> Result<()> {
                 })
             );
         }
+        Some("git-root-state") => {
+            let mut state = State::decode_current_msgpack(&input()?)?;
+            state.parents.clear();
+            state.intent = Some("Converted Git root".into());
+            println!(
+                "{}",
+                serde_json::json!({
+                    "id_hex": hex::encode(state.id().as_bytes()),
+                    "state_hex": hex::encode(state.encode_current_msgpack()?),
+                })
+            );
+        }
         Some("child-state" | "descendant-state") => {
             let mut state = State::decode_current_msgpack(&input()?)?;
             ensure!(
@@ -1835,6 +1849,7 @@ fn main() -> Result<()> {
             verify_boundaries(&f)?;
             verify_export(&f, &record(&f, "complete_export")?)?;
         }
+        Some("verify-foreign") => foreign::verify()?,
         Some("verify-native-witness") => verify_native_witness_fixture()?,
         Some("verify-capture") => {
             verify_old_capture(&read_json(args.get(2).context("old vector path")?)?)?
@@ -2254,6 +2269,10 @@ mod tests {
     #[test]
     fn boundary_native_published_codec_vectors() {
         verify_boundaries(&fixture()).expect("native boundary basis, membership and authority");
+    }
+    #[test]
+    fn staged_foreign_closure_and_landing_roles() {
+        foreign::verify().expect("staged origins and source roles");
     }
     #[test]
     fn fixed_native_vectors_and_complete_historical_export() {

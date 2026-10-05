@@ -254,3 +254,17 @@ clients re-clone or deliberately reinitialize. There is no proof conversion,
 re-witnessing, endpoint trust or backward-compatible bridge. Alpha.28 only owns
 the API seam; native install/storage/CLI/browser implementations and their real
 StartThread → publish → fresh Fetch tests remain downstream work.
+
+## Imported Git roots
+
+The [IMPORT-only parentless exception](import-authority-host-witness.md#review-round-1-historical-closure-and-frozen-purpose-payloads)
+(owner decision, 2026-10-05) is selected by the operation's authenticated signed
+content, never caller context. Delegated native IMPORT originals preserve
+converter/Git parent order without duplicates: State parents exactly equal the
+source States of the complete causal operation parents and never include the
+genesis base. Empty State parents are valid if and only if causal parents are
+empty, including later disjoint Git roots. The signed genesis still binds the
+canonical synthetic empty base. Ordinary native Captures still require a child
+State, and the frozen old parentless capture negative still rejects.
+Conformance vectors follow after the next heddle release because
+`tools/hybrid-native` pins published heddle.

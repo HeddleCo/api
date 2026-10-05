@@ -1264,10 +1264,28 @@ The ID is native `ContentHash::compute_typed("weft-hosted-landing-request-proof-
 `BLAKE3(UTF8(domain) || u64_le(len(P)) || 0x00 || P)`. Both the domain and the
 signature's inclusion are mandatory. A witness signature cannot replace `S`.
 Never compute State IDs by hashing MessagePack: State's existing versioned
-field hash remains unchanged. An original capture must contain a child State;
-its declared State parents, after excluding the signed genesis base, must equal
-the States selected by its complete causal operation parents. The synthetic
-initial State is a genesis base only and cannot be reused as a source capture.
+field hash remains unchanged. Ordinary native Captures must contain a child
+State; their declared State parents, after excluding the signed genesis base,
+must equal the States selected by their complete causal operation parents.
+The frozen "old parentless capture" negative still rejects.
+
+**Owner decision (2026-10-05): delegated native IMPORT originals are an
+IMPORT-only parentless exception.** Select this exception only from the
+operation's authenticated signed content, never from caller context. Their
+State parents MUST exactly equal the source States of their complete causal
+operation parents, with no duplicates and with converter/Git parent order
+preserved. The genesis base MUST NOT appear among those State parents. Empty
+State parents are valid if and only if the causal operation parents are empty;
+this covers both the first Git root and later disjoint roots in multi-root
+histories. Adding the seed would change the converted State ID and invent a Git
+parent. The synthetic initial State remains the canonical synthetic empty
+genesis base, bound by the signed genesis, and cannot be reused as a source
+capture. Native framing does not redefine State IDs or converter correctness.
+
+Conformance vectors for this IMPORT-only exception follow after the next
+heddle release, because `tools/hybrid-native` pins published heddle. This
+docs-only decision does not change the frozen vectors or ordinary native
+Capture validation.
 
 For account-native originals, `authority_envelope` is exact canonical protobuf
 `ThreadControlAuthority` format 1 from `identity.proto`, including its verified

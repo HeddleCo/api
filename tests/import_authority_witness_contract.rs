@@ -1854,3 +1854,186 @@ fn alpha33_minimal_state_retry_and_cancel() {
         Err(codec::Reject::OperationIdReused)
     );
 }
+
+#[test]
+fn alpha33_direct_publication_budget_remainder() {
+    let f = fixture();
+    let c = Context::new(&f);
+    for (name, passes) in [("aggregate_over", false), ("aggregate_at", true)] {
+        let b: api::ImportPublicProofBundleV1 = record(&f, name);
+        let active = import::verify_delegation(
+            &b.delegations[0],
+            b.member_permission.as_ref(),
+            &c.owner(1100),
+        )
+        .expect("signed budget");
+        let mut committed = b.terminal_manifest.expect("manifest");
+        let digest = import::signed_operation_digest(&b.operations[0]).expect("op1 digest");
+        committed
+            .slots
+            .retain(|s| s.signed_operation_digest == digest);
+        assert_eq!(committed.slots.len(), 1);
+        let remaining = import::remaining_import_scope(
+            active.body().scope.as_ref().expect("scope"),
+            &committed,
+        )
+        .expect("remainder");
+        assert_eq!(remaining.max_operations, 1);
+        assert_eq!(
+            b.operations[1].body.as_ref().expect("op2").result_bytes,
+            remaining.max_result_bytes + u64::from(!passes)
+        );
+        let result = import::check_import_publication_budget(&b.operations[1], &active, &committed);
+        assert_eq!(
+            result,
+            if passes {
+                Ok(())
+            } else {
+                Err(codec::Reject::Scope)
+            }
+        );
+    }
+}
+
+#[test]
+fn alpha33_direct_p1_pair_outside_window() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let active = delegation(&f, &c);
+    let bad: api::ImportPublicProofBundleV1 = record(&f, "p1_p3_outside_window");
+    let good: api::ImportPublicProofBundleV1 = record(&f, "current_export");
+    let p1 = bad.statements[0].body.as_ref().expect("P1");
+    let p3 = bad.statements[2].body.as_ref().expect("P3");
+    assert_eq!(p1.observed_at_unix_millis, p3.observed_at_unix_millis);
+    assert_eq!(p1.host_transaction_id, p3.host_transaction_id);
+    assert_eq!(p1.executor_id, p3.executor_id);
+    assert!(p1.admission_order < p3.admission_order);
+    assert_eq!(
+        import::check_import_genesis_publication_pair(&active, p1, p3),
+        Err(codec::Reject::Expired)
+    );
+    import::check_import_genesis_publication_pair(
+        &active,
+        good.statements[0].body.as_ref().expect("P1"),
+        good.statements[2].body.as_ref().expect("P3"),
+    )
+    .expect("pair control");
+}
+
+#[test]
+fn alpha33_window_ceiling_and_preflight() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let mut e = c.owner(1100);
+    e.authority_expires_at_seconds = i64::MAX;
+    let geneses = [
+        record(&f, "direct_genesis_0"),
+        record(&f, "direct_genesis_1"),
+    ];
+    for name in ["window_7d", "window_24h"] {
+        import::verify_delegation(&record(&f, name), None, &e).expect("bounded signed window");
+    }
+    for name in ["window_over_7d", "window_extreme"] {
+        assert_eq!(
+            import::verify_delegation(&record(&f, name), None, &e).err(),
+            Some(codec::Reject::ValidityBounds)
+        );
+    }
+    let d = record(&f, "window_24h");
+    let mut p: api::PrepareImportJobResponse = record(&f, "window_24h_preparation");
+    p.max_validity_duration_seconds = import::MAX_DELEGATION_WINDOW_SECONDS;
+    import::verify_prepared_delegation(&p, &d, None, &geneses, &e).expect("ceiling host control");
+    import::preflight_prepared_delegation(&p, &d, None, &geneses, &e).expect("browser control");
+    p.max_validity_duration_seconds += 1;
+    assert_eq!(
+        import::verify_prepared_delegation(&p, &d, None, &geneses, &e).err(),
+        Some(codec::Reject::ValidityBounds)
+    );
+    assert_eq!(
+        import::preflight_prepared_delegation(&p, &d, None, &geneses, &e),
+        Err(codec::Reject::ValidityBounds)
+    );
+}
+
+#[test]
+fn alpha33_status_retry_reason_agreement() {
+    let f = fixture();
+    let request = record(&f, "job_state_request");
+    for status in 1..=5 {
+        for reason in 1..=7 {
+            let mut state: api::GetImportJobStateResponse = record(&f, "job_state");
+            state.status = status;
+            state.retry_availability = Some(
+                api::get_import_job_state_response::RetryAvailability::RetryUnavailable(reason),
+            );
+            let agrees = matches!(
+                (status, reason),
+                (1, 1 | 2 | 6) | (2, 3) | (3, 4) | (4, 5) | (5, 7)
+            );
+            assert_eq!(
+                import::validate_retry_state_response(&request, &state),
+                if agrees {
+                    Ok(())
+                } else {
+                    Err(codec::Reject::Canonical)
+                },
+                "status {status}, reason {reason}"
+            );
+        }
+    }
+}
+
+#[test]
+fn alpha33_commit_conflict_wire_encoding() {
+    let f = fixture();
+    for (name, reject) in [
+        (
+            "commit_destination_conflict",
+            codec::Reject::PreparationRefused(
+                api::ImportPreparationRefusalReason::DestinationConflict,
+            ),
+        ),
+        ("commit_stale_destination", codec::Reject::StaleContext),
+    ] {
+        let failure: host::CallFailure = record(&f, name);
+        assert_eq!(
+            import::import_commit_conflict_failure(&reject),
+            Some(failure)
+        );
+    }
+    assert!(import::import_commit_conflict_failure(&codec::Reject::Scope).is_none());
+}
+
+#[test]
+fn alpha33_hostile_missing_operation_body_is_typed() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let mut b: api::ImportPublicProofBundleV1 = record(&f, "current_export");
+    b.operations[1].body = None;
+    assert_eq!(
+        import::verify_import_bundle_witnesses(
+            &b,
+            &import::ImportWitnessRootPin {
+                authority: "https://weft.example.test".into(),
+                root_id: "descriptor-root-1".into(),
+                public_key: c.root.clone(),
+                epoch: 1
+            },
+            None,
+            1_200_000,
+            |_| Ok(import::ImportBundleOwnerExpectation {
+                identity: &c.identity,
+                owner_public_key: &c.owner,
+                owner_chain_digest: &c.chain,
+                authority_expires_at_seconds: 2000,
+                effective_from_unix_seconds: 0,
+                effective_until_unix_seconds: None,
+                forbidden_job_keys: &c.forbidden,
+                known_job_associations: &[]
+            }),
+            |_, _| Ok(()),
+        )
+        .err(),
+        Some(codec::Reject::Canonical)
+    );
+}

@@ -81,6 +81,9 @@ test('npm public import-authority export includes alpha33 one-shot helpers', asy
   assert.equal(typeof runtime.effectiveOwnerAuthorityExpiry, 'function');
   assert.equal(typeof runtime.remainingImportScope, 'function');
   assert.equal(typeof runtime.checkImportRetryAdmission, 'function');
+  assert.equal(typeof runtime.importCommitConflictFailure, 'function');
+  assert.equal(typeof runtime.checkImportGenesisPublicationPair, 'function');
+  assert.equal(runtime.MAX_DELEGATION_WINDOW_SECONDS, 604800n);
   assert.equal(runtime.originalImportRetryUnavailable, undefined);
   assert.equal(runtime.verifyImportRenewal, undefined);
   assert.equal(runtime.signImportRenewal, undefined);

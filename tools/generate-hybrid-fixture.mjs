@@ -16,6 +16,7 @@ import { delegationPreparation, frontierDigest, contentDigest, boundaryOctetsDig
 import * as api from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
 import { RetryImportSourceRequestSchema, CommitImportJobRequestSchema, ImportSourceRequestSchema, ProviderRepositorySchema, ProviderRefSchema, ResolveImportSourceRequestSchema, ResolveImportSourceResponseSchema } from '../packages/typescript/dist/v1alpha2/integration_pb.js';
 import { MutationResponseSchema, OperationRecordSchema } from '../packages/typescript/dist/v1alpha2/common_pb.js';
+import * as errors from "../packages/typescript/dist/common/errors_pb.js";
 import * as common from '../packages/typescript/dist/common/hosted_witness_pb.js';
 import { canonicalThreadGenesis, threadGenesisId } from '../packages/typescript/dist/v1alpha2/thread-genesis.js';
 import { IntegrationService, SyncService } from "../packages/typescript/dist/v1alpha2/services_pb.js";
@@ -574,11 +575,17 @@ artifact.bundle_vectors={positive:['complete_export'],negative:[
  bundleNegative('missing_manifest',b=>b.manifests=[],'StaleManifest'),
 ]};
 // Re-sign intentional semantic negatives with the current witness and use its current set.
-function currentBundle(name,mutate){const b=clone(api.ImportPublicProofBundleV1Schema,exportBundle);b.witnessSet=currentSet;b.historyProofs=[];mutate(b);for(const s of b.statements)s.signature=sig('witness',statementSigningDigest(s.body));wire(name,api.ImportPublicProofBundleV1Schema,b);return b;}
+const equalExecutor=id=>hex(id)===hex(witnessId(keys.next_witness.publicKey))?'next_witness':'witness';
+function currentBundle(name,mutate){const b=clone(api.ImportPublicProofBundleV1Schema,exportBundle);b.witnessSet=currentSet;b.historyProofs=[];mutate(b);for(const s of b.statements)s.signature=sig(equalExecutor(s.body.executorId),statementSigningDigest(s.body));wire(name,api.ImportPublicProofBundleV1Schema,b);return b;}
 currentBundle('current_export',()=>{});
 for(const [name,mutate,expected] of [
  ['p1_outside_window',b=>b.statements[0].body.observedAtUnixMillis=999000n,'Expired'],
  ['p1_at_expiry',b=>b.statements[0].body.observedAtUnixMillis=delegationBody.expiresAtUnixSeconds*1000n,'Expired'],
+ ['p1_p3_outside_window',b=>{b.statements[0].body.observedAtUnixMillis=999000n;b.statements[2].body.observedAtUnixMillis=999000n;},'Expired'],
+ ['duplicate_p1',b=>b.statements.push(clone(common.SignedHostedWitnessStatementV1Schema,b.statements[0])),'Transition'],
+ ['duplicate_p3',b=>b.statements.push(clone(common.SignedHostedWitnessStatementV1Schema,b.statements[2])),'Transition'],
+ ['unconsumed_p3',b=>{const extra=clone(common.SignedHostedWitnessStatementV1Schema,b.statements[2]);extra.body.canonicalPayload=canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(b.operations[0],terminalManifest));b.statements.unshift(extra);},'Transition'],
+ ['executor_mismatch',b=>{const set=clone(common.HostedWitnessSetV1Schema,setBody),entry=member('next_witness',2);entry.activeFromUnixMillis=0n;entry.activeUntilUnixMillis=1200000n;set.issuedAtUnixMillis=1200000n;const p1=b.statements[0];p1.body.executorId=witnessId(keys.next_witness.publicKey);p1.signature=sig('next_witness',statementSigningDigest(p1.body));const leaf=leafDigest(1,canonicalHybridV1(common.HostedWitnessStatementV1Schema,p1.body),p1.signature);entry.archiveRoot=merkleRoot([leaf]);entry.archiveLeafCount=1n;set.entries.push(entry);set.entries.sort((a,b)=>compare(a.executorId,b.executorId));b.witnessSet=signedSet('pair_executor_set',set);b.historyProofs=[create(common.HostedWitnessHistoryProofV1Schema,{executorId:p1.body.executorId,purpose:1,leafIndex:0n,leafCount:1n})];},'Transition'],
  ['p1_time_mismatch',b=>b.statements[0].body.observedAtUnixMillis=1099000n,'Transition'],
  ['p1_order_after_p3',b=>b.statements[0].body.admissionOrder=101n,'Transition'],
  ['p1_foreign_transaction',b=>b.statements[0].body.hostTransactionId=raw(0xa9,16),'Transition'],
@@ -592,6 +599,12 @@ for(const [name,total] of [['over',operations.main.body.resultBytes*2n-1n],['at'
 const dayBody=clone(api.ImportJobDelegationV1Schema,directBody);dayBody.expiresAtUnixSeconds=dayBody.notBeforeUnixSeconds+86400n;
 const day=signed('window_24h',api.ImportJobDelegationV1Schema,dayBody,api.SignedImportJobDelegationV1Schema,'delegatingSignature','owner','heddle-import-job-delegation-v1');
 wire('window_24h_preparation',api.PrepareImportJobResponseSchema,create(api.PrepareImportJobResponseSchema,{...preparation,proposal:delegationPreparation(dayBody),maxValidityDurationSeconds:86400n}));
+for(const [name,start,duration] of [['window_7d',1000n,604800n],['window_over_7d',1000n,604801n],['window_extreme',0n,9223372036854775807n]]){
+ const body=clone(api.ImportJobDelegationV1Schema,directBody);body.notBeforeUnixSeconds=start;body.expiresAtUnixSeconds=start+duration;
+ signed(name,api.ImportJobDelegationV1Schema,body,api.SignedImportJobDelegationV1Schema,'delegatingSignature','owner','heddle-import-job-delegation-v1');
+}
+wire('commit_destination_conflict',errors.CallFailureSchema,create(errors.CallFailureSchema,{code:errors.CallFailureCode.ALREADY_EXISTS,error:{reason:errors.ErrorReason.IMPORT_DESTINATION_CONFLICT}}));
+wire('commit_stale_destination',errors.CallFailureSchema,create(errors.CallFailureSchema,{code:errors.CallFailureCode.ABORTED,error:{reason:errors.ErrorReason.VERSION_CONFLICT}}));
 wire('job_state_request',api.GetImportJobStateRequestSchema,create(api.GetImportJobStateRequestSchema,{destination,logicalJobId}));
 wire('job_state',api.GetImportJobStateResponseSchema,create(api.GetImportJobStateResponseSchema,{status:1,activeCancellationId:delegationBody.cancellationId,authorityEpoch:1n,activeDelegationDigest:signedDelegationDigest(delegation),retryAvailability:{case:'eligibleRetryTarget',value:{operationRef:{spool:destination,id:'25252525-2525-2525-2525-252525252525'},operationVersion:raw(0x99)}}}));
 wire('retry_request',RetryImportSourceRequestSchema,create(RetryImportSourceRequestSchema,{clientOperationId:'retry-alpha33',originalOperation:{spool:destination,id:'25252525-2525-2525-2525-252525252525'},expectedOperationVersion:raw(0x99),logicalJobId,activeDelegationDigest:signedDelegationDigest(delegation),expectedAuthorityEpoch:1n}));

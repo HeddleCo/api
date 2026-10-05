@@ -408,3 +408,54 @@ test('alpha33 parent and delegation revocation are independent',()=>{
 });
 
 function emptyFor(o){return create(api.ImportResultManifestV1Schema,{formatVersion:1,logicalJobId:o.body.logicalJobId,retryLineageId:o.body.retryLineageId});}
+
+test('alpha33 direct publication budget remainder',async()=>{
+ for(const [name,passes] of [['aggregate_over',false],['aggregate_at',true]]){
+  const b=vector(name),active=await authority.verifyImportDelegation(b.delegations[0],b.memberPermission,ownerContext());
+  const committed=b.terminalManifest,digest=authority.signedOperationDigest(b.operations[0]);
+  committed.slots=committed.slots.filter(s=>Buffer.from(s.signedOperationDigest).equals(Buffer.from(digest)));
+  assert.equal(committed.slots.length,1);
+  const remaining=authority.remainingImportScope(active.body.scope,committed);
+  assert.equal(remaining.maxOperations,1);assert.equal(b.operations[1].body.resultBytes,remaining.maxResultBytes+(passes?0n:1n));
+  if(passes)await authority.checkImportPublicationBudget(b.operations[1],active,committed);
+  else await assert.rejects(authority.checkImportPublicationBudget(b.operations[1],active,committed),expected('Scope'));
+ }
+});
+test('alpha33 direct P1 pair outside window',async()=>{
+ const active=await authority.verifyImportDelegation(vector('delegation'),vector('permission'),ownerContext()),bad=vector('p1_p3_outside_window'),good=vector('current_export');
+ const p1=bad.statements[0].body,p3=bad.statements[2].body;
+ assert.equal(p1.observedAtUnixMillis,p3.observedAtUnixMillis);assert.deepEqual(p1.hostTransactionId,p3.hostTransactionId);assert.deepEqual(p1.executorId,p3.executorId);assert.ok(p1.admissionOrder<p3.admissionOrder);
+ assert.throws(()=>authority.checkImportGenesisPublicationPair(active,p1,p3),expected('Expired'));
+ authority.checkImportGenesisPublicationPair(active,good.statements[0].body,good.statements[2].body);
+});
+test('alpha33 signed window ceiling',async()=>{
+ const e={...ownerContext(),authorityExpiresAtSeconds:9223372036854775807n};
+ for(const name of ['window_7d','window_24h'])await authority.verifyImportDelegation(vector(name),undefined,e);
+ for(const name of ['window_over_7d','window_extreme'])await assert.rejects(authority.verifyImportDelegation(vector(name),undefined,e),expected('ValidityBounds'));
+});
+test('alpha33 host window ceiling and browser preflight',async()=>{
+ const e={...ownerContext(),authorityExpiresAtSeconds:9223372036854775807n},d=vector('window_24h'),geneses=[0,1].map(i=>vector('direct_genesis_'+i)),p=vector('window_24h_preparation');
+ p.maxValidityDurationSeconds=authority.MAX_DELEGATION_WINDOW_SECONDS;
+ for(const verify of [authority.verifyPreparedImportDelegation,authority.preflightPreparedImportDelegation])await verify(p,d,undefined,geneses,e);
+ p.maxValidityDurationSeconds++;
+ for(const verify of [authority.verifyPreparedImportDelegation,authority.preflightPreparedImportDelegation])await assert.rejects(verify(p,d,undefined,geneses,e),expected('ValidityBounds'));
+});
+test('alpha33 hostile missing operation body gives HybridContractError',async()=>{
+ const b=vector('current_export');b.operations[1].body=undefined;
+ await assert.rejects(authority.verifyImportBundleWitnesses(b,rootPin(),undefined,1200000n,ownerAt,()=>{}),expected('Canonical'));
+});
+test('alpha33 status retry reason agreement',()=>{
+ const request=vector('job_state_request');
+ for(let status=1;status<=5;status++)for(let reason=1;reason<=7;reason++){
+  const state=vector('job_state');state.status=status;state.retryAvailability={case:'retryUnavailable',value:reason};
+  const agrees=(status===1?[1,2,6]:status===2?[3]:status===3?[4]:status===4?[5]:[7]).includes(reason);
+  if(agrees)authority.validateImportRetryStateResponse(request,state);
+  else assert.throws(()=>authority.validateImportRetryStateResponse(request,state),expected('Canonical'));
+ }
+});
+test('alpha33 Commit conflict wire encoding',()=>{
+ const conflict=new authority.HybridContractError('PreparationRefused',api.ImportPreparationRefusalReason.DESTINATION_CONFLICT);
+ assert.deepEqual(authority.importCommitConflictFailure(conflict),vector('commit_destination_conflict'));
+ assert.deepEqual(authority.importCommitConflictFailure(new authority.HybridContractError('StaleContext')),vector('commit_stale_destination'));
+ assert.equal(authority.importCommitConflictFailure(new authority.HybridContractError('Scope')),undefined);
+});

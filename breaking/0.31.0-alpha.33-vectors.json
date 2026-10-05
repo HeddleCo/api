@@ -156,13 +156,17 @@
           ],
           "added": [
             "dev_publication_statement",
+            "pair_executor_set",
             "aggregate_over_delegation",
             "aggregate_over_operation_0",
             "aggregate_over_operation_1",
             "aggregate_at_delegation",
             "aggregate_at_operation_0",
             "aggregate_at_operation_1",
-            "window_24h"
+            "window_24h",
+            "window_7d",
+            "window_over_7d",
+            "window_extreme"
           ],
           "retired": [
             "renewed_permission",
@@ -387,13 +391,17 @@
             "alpha31_expiry_historical_before_claim": "59795fc711fc526ed7312b4215176f3434d4b7668adcbfbe6d70fa51b9d5b502",
             "alpha31_expiry_historical_after_claim": "ed4ecc7cbae2670d49d3e47ccc3617de3ca0e9358414711a7fb13eb4ea326000",
             "dev_publication_statement": "6ae7641020e0f860434be3f7cf5d55b55099493d7ecb6570779bbc75ac7fda55",
+            "pair_executor_set": "50d8994d6e4e0f8953a9ce407d22da4dbfa497cb5fe9e977794cc19f53edb786",
             "aggregate_over_delegation": "5f4753e36f9dcff053930f402a8a8b1ad879f25030e39f70131eaf94317f37cb",
             "aggregate_over_operation_0": "7d5b68459246a089ca07309307af28b8dd05fc645409be0d20fd5fc8830d829e",
             "aggregate_over_operation_1": "9d805f5b1c3f821c3851fbcfa12f17002ee1f25894c7ef0d88660169089886c3",
             "aggregate_at_delegation": "c45537ad4c7cdb179049d65c60c33b2dc3f1eadaa1367bdc1fac520de24c1334",
             "aggregate_at_operation_0": "a117b5c8b6fbd680433360898d8a948375c9c8c2678fb2a719f6aa874e387832",
             "aggregate_at_operation_1": "4f42c6545b5620ed0bf6262c904c6fb1d3284a1f4d65a16347fe81af56d21ce4",
-            "window_24h": "5bb7f0a0f26e20cd51b078973bc196068cac720c57053e9ca71b29a41a80b11d"
+            "window_24h": "5bb7f0a0f26e20cd51b078973bc196068cac720c57053e9ca71b29a41a80b11d",
+            "window_7d": "07104a55d0ed131dd4b667d2b266c60aee803b03f896bccbfe0c3d1aaf4579f2",
+            "window_over_7d": "f39ed64be7a785174df1303d9285ab12bf2f1f9d656be29bddc1b6f04baff25e",
+            "window_extreme": "21ae4cb19b9feb9dbd2417832e42fdb990644470c4b7896e7542a54cb1282ee7"
           }
         },
         "wire_vectors": {
@@ -494,6 +502,11 @@
             "current_export",
             "p1_outside_window",
             "p1_at_expiry",
+            "p1_p3_outside_window",
+            "duplicate_p1",
+            "duplicate_p3",
+            "unconsumed_p3",
+            "executor_mismatch",
             "p1_time_mismatch",
             "p1_order_after_p3",
             "p1_foreign_transaction",
@@ -501,6 +514,8 @@
             "aggregate_over",
             "aggregate_at",
             "window_24h_preparation",
+            "commit_destination_conflict",
+            "commit_stale_destination",
             "job_state",
             "retry_request",
             "retry_original"
@@ -929,6 +944,11 @@
             "current_export": "e959fab95c177fd9da5770bba0f3c66b901ebbe478f537a2ba714ff7bdb206e5",
             "p1_outside_window": "95d1f8ee01be8cab0de0ce9a9e821e61833133198d213c30c53716cee4f5d371",
             "p1_at_expiry": "d603bde110f10b7174d1cb5c6026454c0ef2c7cea06b3cbfd69817a003fb0bb1",
+            "p1_p3_outside_window": "288ebdfc5700fb2ded20ade1dfa00f933826396f6164446577a119c33ca4f0c6",
+            "duplicate_p1": "8a49a154b9d0684b2a9c419901eaee7d3b0e05e79a2e4f5e4b8a86124fd6d5a4",
+            "duplicate_p3": "876761fde1d99c6756d8d458f42b83b2473496815d4b2bd2580f3ca2cddb5b30",
+            "unconsumed_p3": "c36bd974ba01bd8c9afde374e28a1a8ef0f43b5be01c314d07f6607f1c0c9d1f",
+            "executor_mismatch": "49360f1c6ed14f154a7eb18f0798222efeec86255494272439f3ccc8568c05fc",
             "p1_time_mismatch": "35a96078d75399363f8662d63a540fe35b5e2f85dd8108b518f73186843583a9",
             "p1_order_after_p3": "4ff2afc29b8fe666a51f08e98305f9ace05effc4bdd3f742ece9287eaa72d32c",
             "p1_foreign_transaction": "9d23cebe53fcdccee7e4f8f4d7656adaa009318a0da25a03b28a7b926fcc729b",
@@ -936,6 +956,8 @@
             "aggregate_over": "db049648e19147f8a48a0ecb3c92fa98b667837db170d03ca57dc8d3df0b6d51",
             "aggregate_at": "10181d3affc1a583090089eb95f82f8f1592df3f451f787ec853e348a6f7a947",
             "window_24h_preparation": "aee22d2b9775e1a1ba19e305b6e14a41d7a3f2a22a93245a65f661183c0d5fb0",
+            "commit_destination_conflict": "0d76bcef70155fdade4d7ebb93fb0bc8e2f072d300e0fc24977e3fe84cfc9356",
+            "commit_stale_destination": "85d89a75569654b2ed89222af278792f60c8d98e22c3f94d1281f727287dcbb6",
             "job_state": "7a3f894dc07283cf26b7dfa00b673f3e7962880bfaeab40b573cfea2160d0c60",
             "retry_request": "03353a2dc87c61707aa5a075eb9ef0acd1a814a267685ee9f1cc689c360375ed",
             "retry_original": "ee60266615aeff79380eb856447c412040360df10c9d5cdbfe649c66478a1b75"
@@ -1033,7 +1055,10 @@
             "signed_aggregate_at_delegation",
             "signed_aggregate_at_operation_0",
             "signed_aggregate_at_operation_1",
-            "signed_window_24h"
+            "signed_window_24h",
+            "signed_window_7d",
+            "signed_window_over_7d",
+            "signed_window_extreme"
           ],
           "retired": [
             "signed_renewed_permission",
@@ -1195,7 +1220,10 @@
             "signed_aggregate_at_delegation": "24a227870077fe9308d4ada397d7771f6f5853076f1104f6358a1829ed194262",
             "signed_aggregate_at_operation_0": "e7889e552dfd31f1f4c07601d1cf78138c0fac327991f839965bca74a84dfe68",
             "signed_aggregate_at_operation_1": "689cb7621f4837cc9bad0195d632090aa07e22d6cf4e5480bf1d9e1878dbc282",
-            "signed_window_24h": "a7267cf60aee50a45273ecc35d6256380ec6caa8b47a152192fce91f80de4101"
+            "signed_window_24h": "a7267cf60aee50a45273ecc35d6256380ec6caa8b47a152192fce91f80de4101",
+            "signed_window_7d": "0c84d4a6f55f7355adc677d88c929667bb241361100bc81614a1bc071f57c2f2",
+            "signed_window_over_7d": "f7918b06521ab27d28c9f62de5104fc6ad284909d895037876bd8103b6dcbea7",
+            "signed_window_extreme": "9be40649242405f1640a064e820ca31e205fa5a1963f0d0d0bd100aded4ea69a"
           }
         },
         "raw_commitment_vectors": {
@@ -1249,7 +1277,7 @@
         "unrelated_permissions": "b1ca47a51a195635e4d7ca7daf398c2bc6cc7b9559639593d291eb2b8212e26a",
         "effective_owner_expiry_vectors": "2c1121b5be237063f7cd3cee93496027f0e65a909609afd37d5838a2a3b2cc76"
       },
-      "sha256": "577e05df3b9da1ea3ed4081ee4c4811290ade808b8c7244114cfe4792bc7d1fb"
+      "sha256": "c89381fd9d5bc963a04b484d386307f828d50caeaa21c0bcdc79a84918b87647"
     },
     "tests/fixtures/import-sibling-jobs-alpha32.json": {
       "groups": {

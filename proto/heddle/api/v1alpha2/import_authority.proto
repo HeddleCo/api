@@ -96,8 +96,8 @@ message ImportMemberPermissionV1 {
   ImportPermissionScopeV1 scope = 7;
   int64 not_before_unix_seconds = 8;
   int64 expires_at_unix_seconds = 9;
-  // CSPRNG 32 bytes at lineage start; stable across grants for the same
-  // logical-job/retry-lineage/grantee. Namespace heddle-import-cancel-v1.
+  // CSPRNG 32 bytes for this job's sole member permission; retries preserve it.
+  // The delegation has a separate ID. Namespace heddle-import-cancel-v1.
   bytes cancellation_id = 10;
   bytes owner_chain_digest = 11; // Exact independently verified public chain digest.
   // Fresh CSPRNG 32 bytes per new grant. Byte-identical replay preserves it.
@@ -130,6 +130,7 @@ message ImportBranchManifestV1 {
 // the complete body. Prepare supplies no placeholders for these fields.
 message ImportJobDelegationV1 {
   reserved 17;
+  reserved "predecessor_delegation_digest";
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
   bytes delegation_id = 3; // Unique random 16 bytes.
@@ -210,6 +211,7 @@ message ImportPublicationWitnessV1 {
 // witnessed historical authority. This public carrier cannot enroll its owner.
 message ImportPublicProofBundleV1 {
   reserved 8, 18;
+  reserved "renewals", "member_permissions";
   uint32 format_version = 1;
   SignedSpoolOwnerGenesis owner_genesis = 2;
   repeated OwnerHistory owner_histories = 3;
@@ -245,6 +247,7 @@ message ImportSourceSelectionV1 {
 }
 message PrepareImportJobRequest {
   reserved 6;
+  reserved "renew_logical_job_id";
   string client_operation_id = 1;
   SpoolRef destination = 2;
   ImportIdentityV1 identity = 3;
@@ -263,6 +266,7 @@ message PrepareImportJobRequest {
 // compare this projection byte-for-byte with the stored reservation.
 message ImportJobPreparationV1 {
   reserved 12;
+  reserved "predecessor_delegation_digest";
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
   bytes delegation_id = 3;
@@ -277,10 +281,11 @@ message ImportJobPreparationV1 {
 }
 message PrepareImportJobResponse {
   reserved 3;
+  reserved "renewal_state";
   ImportJobPreparationV1 proposal = 1;
   int64 reservation_expires_at_unix_seconds = 2; // Prepare time + 3600, exclusive.
   // Bounds from one authorized transaction with proposal, never stale reads.
-  // Positive host-advertised duration; no protocol cap. 86400 seconds is supported.
+  // Positive host duration, at most 604800 seconds (7 days); 86400 is supported.
   uint64 max_validity_duration_seconds = 4;
   uint64 clock_skew_allowance_seconds = 5; // No grace after exclusive expiry.
   int64 prepared_at_unix_seconds = 6; // Host clock; reservation expiry = this + 3600.
@@ -361,6 +366,7 @@ message ImportEligibleRetryTargetV1 {
   bytes operation_version = 2; // Opaque CAS token, 1..256 bytes.
 }
 enum ImportRetryUnavailableReason {
+  reserved "IMPORT_RETRY_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED";
   IMPORT_RETRY_UNAVAILABLE_REASON_UNSPECIFIED = 0;
   IMPORT_RETRY_UNAVAILABLE_REASON_NO_TERMINAL_ATTEMPT = 1;
   IMPORT_RETRY_UNAVAILABLE_REASON_ATTEMPT_IN_PROGRESS = 2;
@@ -382,6 +388,7 @@ enum ImportJobStatus {
   IMPORT_JOB_STATUS_EXPIRED = 5;
 }
 message GetImportJobStateResponse {
+  reserved "state", "retained_proof", "retained_source", "control_availability";
   ImportJobStatus status = 1; // Required, known nonzero; expiry is terminal.
   bytes active_cancellation_id = 2; // 32 bytes, used by Cancel.
   uint64 authority_epoch = 3; // Positive; fences Cancel/Retry against terminal transitions.

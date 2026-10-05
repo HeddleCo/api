@@ -85,3 +85,21 @@ test('alpha33 duplicate sibling ref refuses at Commit with activation exclusivit
  assert.throws(()=>a.checkImportSpoolReservations(identity.spoolUuid,record('delegation_duplicate').body.logicalJobId,record('scope_duplicate'),[held]),e=>expected(e)==='DESTINATION_CONFLICT');
  a.checkImportSpoolReservations(identity.spoolUuid,record('delegation_b').body.logicalJobId,record('scope_b'),[held]);await verify('b');
 });
+
+test('alpha33 sibling target identity excludes target and genesis collisions',()=>{
+ const identity=record('identity'),sa=record('scope_a'),sb=record('scope_b'),job=record('delegation_b').body.logicalJobId;
+ const held={spoolUuid:identity.spoolUuid,logicalJobId:record('delegation_a').body.logicalJobId,branches:sa.branches};
+ for(const field of ['targetThreadId','genesisDigest']){
+  const selected=record('scope_b');selected.branches[0][field]=sa.branches[0][field];
+  assert.throws(()=>a.checkImportSpoolReservations(identity.spoolUuid,job,selected,[held]),e=>expected(e)==='DESTINATION_CONFLICT');
+  a.checkImportSpoolReservations(identity.spoolUuid,job,sb,[held]);
+ }
+});
+
+test('alpha33 direct sibling full ref conflict',()=>{
+ const id=record('identity').spoolUuid,sa=record('scope_a'),selected=record('scope_b'),job=record('delegation_b').body.logicalJobId;
+ const held=[{spoolUuid:id,logicalJobId:record('delegation_a').body.logicalJobId,branches:sa.branches}];
+ a.checkImportSpoolReservations(id,job,selected,held);
+ selected.branches[0].refName=sa.branches[0].refName;
+ assert.throws(()=>a.checkImportSpoolReservations(id,job,selected,held),e=>expected(e)==='DESTINATION_CONFLICT');
+});

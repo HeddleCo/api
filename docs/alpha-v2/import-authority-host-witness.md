@@ -493,7 +493,7 @@ not-before `N` and exclusive expiry `E` MUST satisfy:
 ```text
 0 <= A <= T < R = A + 3600
 0 <= N; A - S <= N <= T + S
-N < E; T < E; E - N <= D
+N < E; T < E; E - N <= D <= 604800
 ```
 
 Skew permits clock differences at not-before, never grace after expiry or an
@@ -916,7 +916,6 @@ eligibility. Genuine witness statements with a missing owner signature, and a
 genuine witness signature substituted for a job/request signature, fail the
 original-evidence check. No legacy HostedImport fallback exists.
 
-
 ## One-shot job lifecycle (alpha.33)
 
 Exactly ONE user-signed delegation authorizes one logical job. Retry creates a fresh
@@ -953,11 +952,15 @@ requires its own explicit scoped authority and cannot reuse an expired certifica
 For each branch, issue its first P1 admission in the SAME host transaction as its
 P3 publication, after all eligibility checks and before making either visible.
 Require exactly equal `observed_at_unix_millis` and `host_transaction_id` on the
-branch's P1/P3, with `P1.admission_order < P3.admission_order`. This authenticated
+branch's P1/P3 and equal `executor_id`, with `P1.admission_order < P3.admission_order`.
+“Same transaction” is the host's signed assertion. Receivers check its consistency;
+they cannot prove atomicity. The host MUST make the pair visible atomically. This authenticated
 order permits other statements in the transaction. Conversion start is not an
 admission event. There is no admitted-but-unpublished state and no genesis-only
 Thread. Retaining a signed original for an unpublished branch grants no testimony.
-Every carried P1 must have a matching branch publication. Every published branch
+Pair each P1 with the P3 consumed by that operation's progressive manifest prefix,
+independent of statement array order. Refuse unconsumed or duplicate P3s and more
+than one P1 per genesis. Every carried P1 must have a matching branch publication. Every published branch
 must retain its exact original, creator envelope, P1 sidecar and P1/P3 receipts.
 
 The witnessed time must lie in the exact half-open delegation interval [N,E).
@@ -970,9 +973,12 @@ Clients set not-before approximately now. There is no scheduled-Commit admission
 semantics: Commit retains originals and queues work; publication supplies P1/P3.
 The existing skew allowance permits a small future N at Commit, but no execution
 or testimony occurs before N. The Prepare reservation is still exactly 3600 seconds.
-It is independent of delegation duration: D is any positive advertised u64 maximum,
-with no protocol duration cap; the signed nonnegative i64 endpoints and the effective
-owner/parent expiry bound the interval. Hosts MUST support advertising 86400 seconds
+Delegation duration has an absolute protocol ceiling of 604800 seconds (7 days).
+Refuse host-advertised D above that ceiling, even for a shorter signed window, and
+refuse every signed E-N above it, including direct-owner and recovery certificates.
+The ceiling bounds unattended server-held signing authority to one week; effective
+owner/parent expiry may shorten it. Rust/TS Commit verification and browser signing
+preflight enforce the same bound. Hosts MUST support advertising 86400 seconds
 (24 h); the verifier accepts E-N=86400 when D and owner/parent authority permit it.
 
 ### Sibling jobs and host ref exclusivity
@@ -995,6 +1001,42 @@ remain unique within the job and exclusive among active jobs. Same-job branch
 rebinding also refuses DESTINATION_CONFLICT. Hosts release refs on definitive
 completion, Cancel, revocation or certificate expiry after fencing in-flight work.
 
+Commit sibling conflicts have ONE transport encoding: `CallFailure.code =
+ALREADY_EXISTS (6)`, `ErrorDetail.reason = IMPORT_DESTINATION_CONFLICT (505)`.
+The Rust `import_commit_conflict_failure` / TS `importCommitConflictFailure` helper
+maps the reservation gate's internal DESTINATION_CONFLICT refusal to this envelope.
+Stale destination CAS instead encodes `ABORTED (10)` / `VERSION_CONFLICT (502)`,
+so clients can distinguish waiting for a sibling from re-Preparing stale state.
+Neither admission refusal is replay-frozen under `client_operation_id`: no activation
+or mutation receipt exists to freeze. Hosts MUST invalidate the failed preparation,
+destroy its prepared key custody and release its reservations atomically. A client
+may re-Prepare after resolving the conflict, then submit fresh prepared bytes under
+the same unaccepted Commit ID. Accepted Commit receipts remain replay-frozen.
+No full ref or hidden sibling metadata needs to be disclosed in the error.
+
+### Learning the already-committed set
+
+Before offering “Import remaining branches” as a NEW job, read GetImportJobState
+and require a terminal status. Then start a fresh, complete destination sync/Fetch
+after that read (not a previously cached or in-flight Fetch). The terminal fence
+prevents further publication by that job. Use the existing `TransferReady.import_authority`
+and Fetch/export proof carriers, and verify each selected job's
+`ImportPublicProofBundleV1` with `verify_import_bundle_witnesses` /
+`verifyImportBundleWitnesses`. Select the old job by the bundle's signed logical
+job/lineage and destination identity; retain the verified cumulative
+`accepted_history` / `acceptedHistory` manifest. Its `slots` identify committed
+`(ref_name, slot_id)` values and their signed operation digests. Subtract these
+from that job's exact signed original branch scope, then refresh destination refs
+and frontiers through sync before preparing the new scope with fresh target
+identities. Destination ref presence alone does not prove that this job committed
+a branch. GetImportJobState supplies the terminal status/epoch but no manifest.
+
+Wait for a synchronized destination snapshot after the terminal fence: all
+accepted P3 publications must be included before selecting remaining branches.
+An incomplete/unverified proof or a stale cached prefix must not be treated as
+proof that a branch is uncommitted; finish Fetch/sync first. These existing public
+carriers provide the manifest; no new job-state field or RPC is required.
+
 ### Minimal state and Retry admission
 
 GetImportJobState returns one authenticated destination-writer snapshot, bounded to
@@ -1008,7 +1050,11 @@ Fetch/export supplies ImportPublicProofBundleV1 through its own existing carrier
 
 Eligible retry target names the unsuperseded FAILED/CANCELED physical attempt and
 its opaque operation CAS. Otherwise return a known retry reason, including
-AUTHORITY_EXPIRED (7). This advice grants no authority. Host Retry admission receives
+AUTHORITY_EXPIRED (7). Status and reason MUST agree: ACTIVE permits only
+NO_TERMINAL_ATTEMPT (1), ATTEMPT_IN_PROGRESS (2), ALREADY_SUPERSEDED (6), or an
+eligible target; COMPLETE requires COMPLETE (3), CANCELLED requires JOB_CANCELLED
+(4), REVOKED requires JOB_REVOKED (5), and EXPIRED requires AUTHORITY_EXPIRED (7).
+This advice grants no authority. Host Retry admission receives
 the durable source association and complete cumulative manifest as separate
 receiver-owned context inputs. Connected Retry requires the current caller to own
 that exact connection and its exact repository/installation grant; public Git

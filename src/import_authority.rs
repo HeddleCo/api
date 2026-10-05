@@ -15,6 +15,7 @@ pub const PUBLICATION_DOMAIN: &str = "heddle-import-publication-payload-v1";
 pub const MAX_BRANCHES: usize = 256;
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub const MAX_BUNDLE_BYTES: usize = 1024 * 1024;
+pub const MAX_DELEGATION_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
 pub const MAX_COMMIT_REQUEST_BYTES: usize = 2 * MAX_BUNDLE_BYTES;
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
 
@@ -647,6 +648,30 @@ pub fn check_import_spool_reservations(
     Ok(())
 }
 
+/// Commit-only wire mapping for reservation conflicts and stale destination CAS.
+/// These admission failures destroy prepared custody and do not freeze a receipt.
+pub fn import_commit_conflict_failure(
+    rejection: &Reject,
+) -> Option<crate::heddle::api::common::CallFailure> {
+    use crate::heddle::api::common::{CallFailure, CallFailureCode, ErrorDetail, ErrorReason};
+    let (code, reason) = match rejection {
+        Reject::PreparationRefused(ImportPreparationRefusalReason::DestinationConflict) => (
+            CallFailureCode::AlreadyExists,
+            ErrorReason::ImportDestinationConflict,
+        ),
+        Reject::StaleContext => (CallFailureCode::Aborted, ErrorReason::VersionConflict),
+        _ => return None,
+    };
+    Some(CallFailure {
+        code: code as i32,
+        message: String::new(),
+        error: Some(ErrorDetail {
+            reason: reason as i32,
+            ..Default::default()
+        }),
+    })
+}
+
 /// Current destination configuration/ownership/policy CAS at activation. Other
 /// imports do not advance this token. Exact stored replay is resolved first.
 pub fn check_import_destination_version(
@@ -1152,6 +1177,11 @@ fn verify_delegation_inner(
             return Err(Reject::Scope);
         }
     }
+    if i128::from(d.expires_at_unix_seconds) - i128::from(d.not_before_unix_seconds)
+        > i128::from(MAX_DELEGATION_WINDOW_SECONDS)
+    {
+        return Err(Reject::ValidityBounds);
+    }
     validity(
         d.not_before_unix_seconds,
         d.expires_at_unix_seconds,
@@ -1274,6 +1304,7 @@ fn verify_prepared_inner(
         return Err(Reject::Expired);
     }
     if prepared.max_validity_duration_seconds == 0
+        || prepared.max_validity_duration_seconds > MAX_DELEGATION_WINDOW_SECONDS
         || start < 0
         || start < at - skew
         || start > now + skew
@@ -2231,6 +2262,11 @@ fn validate_bundle_history(
         }
         Ok(())
     }
+    for operation in &bundle.operations {
+        if operation.body.is_none() {
+            return Err(Reject::Canonical);
+        }
+    }
     for statement in &bundle.statements {
         let s = statement.body.as_ref().ok_or(Reject::Canonical)?;
         validate_statement_boundary(s)?;
@@ -2653,6 +2689,31 @@ pub struct VerifiedImportBundleWitnesses {
     pub snapshot_advanced: bool,
     pub owner_check_time_unix_seconds: Option<i64>,
 }
+/// Check the host's signed same-transaction assertion for a P1 and its consumed P3.
+/// Receivers verify consistency; only the issuing host can ensure atomic visibility.
+pub fn check_import_genesis_publication_pair(
+    delegation: &VerifiedImportDelegation,
+    admission: &crate::heddle::api::common::HostedWitnessStatementV1,
+    publication: &crate::heddle::api::common::HostedWitnessStatementV1,
+) -> Result<(), Reject> {
+    validity(
+        delegation.body.not_before_unix_seconds,
+        delegation.body.expires_at_unix_seconds,
+        admission.observed_at_unix_millis / 1000,
+        true,
+    )?;
+    if admission.purpose != 1
+        || publication.purpose != 3
+        || admission.observed_at_unix_millis != publication.observed_at_unix_millis
+        || admission.host_transaction_id != publication.host_transaction_id
+        || admission.executor_id != publication.executor_id
+        || admission.admission_order >= publication.admission_order
+    {
+        return Err(Reject::Transition);
+    }
+    Ok(())
+}
+
 /// Verify public Fetch/export evidence. Owner contexts
 /// are resolved independently at each authenticated time. The verifier derives times
 /// from the first authenticated publication of the sole delegation.
@@ -2784,6 +2845,49 @@ pub fn verify_import_bundle_witnesses<'a>(
     }
     // Derive owner-selection times only from authenticated receipts. Prefer the
     // first publication for each delegation; initial admissions stand alone too.
+    // Select precisely the P3 each progressive prefix consumes, independent of
+    // statement array order. Every carried P3 must be consumed exactly once.
+    let mut prefix = ImportResultManifestV1 {
+        slots: vec![],
+        ..terminal.clone()
+    };
+    let mut selected_publications = Vec::new();
+    for operation in &bundle.operations {
+        let digest = signed_operation_digest(operation)?;
+        let slot = terminal
+            .slots
+            .iter()
+            .find(|slot| slot.signed_operation_digest == digest)
+            .ok_or(Reject::Scope)?;
+        prefix.slots.push(slot.clone());
+        prefix
+            .slots
+            .sort_by(|a, b| (&a.ref_name, a.slot_id).cmp(&(&b.ref_name, b.slot_id)));
+        let payload = canonical(&publication_payload(operation, &prefix)?)?;
+        let matches = bundle
+            .statements
+            .iter()
+            .filter(|signed| {
+                signed
+                    .body
+                    .as_ref()
+                    .is_some_and(|s| s.purpose == 3 && s.canonical_payload == payload)
+            })
+            .collect::<Vec<_>>();
+        if matches.len() != 1 {
+            return Err(Reject::Transition);
+        }
+        selected_publications.push(matches[0]);
+    }
+    if bundle.statements.iter().any(|signed| {
+        signed
+            .body
+            .as_ref()
+            .is_some_and(|s| s.purpose == 3 && !selected_publications.contains(&signed))
+    }) {
+        return Err(Reject::Transition);
+    }
+    let mut admitted_geneses = std::collections::BTreeSet::<Vec<u8>>::new();
     let mut times = vec![None; bundle.delegations.len()];
     let mut publications = Vec::new();
     for signed in &bundle.statements {
@@ -2938,21 +3042,21 @@ pub fn verify_import_bundle_witnesses<'a>(
                     .and_then(|g| g.body.as_ref())
                     .ok_or(Reject::Canonical)?
                     .genesis_digest;
-                let publication = publications
+                if !admitted_geneses.insert(genesis.clone()) {
+                    return Err(Reject::Transition);
+                }
+                let publication = bundle
+                    .operations
                     .iter()
-                    .find(|(_, o, _, _)| {
+                    .zip(&selected_publications)
+                    .find(|(o, _)| {
                         o.body
                             .as_ref()
                             .is_some_and(|o| &o.genesis_digest == genesis)
                     })
-                    .and_then(|(s, _, _, _)| s.body.as_ref())
+                    .and_then(|(_, s)| s.body.as_ref())
                     .ok_or(Reject::Transition)?;
-                if s.observed_at_unix_millis != publication.observed_at_unix_millis
-                    || s.host_transaction_id != publication.host_transaction_id
-                    || s.admission_order >= publication.admission_order
-                {
-                    return Err(Reject::Transition);
-                }
+                check_import_genesis_publication_pair(initial, s, publication)?;
                 verify_witness_payload(
                     s,
                     WitnessPayload::Genesis(
@@ -3274,7 +3378,10 @@ fn validate_retry_availability(
             }
         }
         RetryAvailability::RetryUnavailable(reason) => {
-            if !(1..=7).contains(reason) {
+            if !matches!(
+                (response.status, *reason),
+                (1, 1 | 2 | 6) | (2, 3) | (3, 4) | (4, 5) | (5, 7)
+            ) {
                 return Err(Reject::Canonical);
             }
         }

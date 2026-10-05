@@ -393,3 +393,29 @@ fn alpha33_duplicate_sibling_ref_refuses_at_commit() {
     )
     .expect("disjoint Commit");
 }
+
+#[test]
+fn alpha33_direct_sibling_ref_conflict() {
+    let f = fixture();
+    let identity: api::ImportIdentityV1 = record(&f, "identity");
+    let a: api::ImportPermissionScopeV1 = record(&f, "scope_a");
+    let mut selected: api::ImportPermissionScopeV1 = record(&f, "scope_b");
+    let da: api::SignedImportJobDelegationV1 = record(&f, "delegation_a");
+    let db: api::SignedImportJobDelegationV1 = record(&f, "delegation_b");
+    let held = [import::ImportSpoolReservation {
+        spool_uuid: &identity.spool_uuid,
+        logical_job_id: &da.body.as_ref().expect("a").logical_job_id,
+        branches: &a.branches,
+    }];
+    let job = &db.body.as_ref().expect("b").logical_job_id;
+    import::check_import_spool_reservations(&identity.spool_uuid, job, &selected, &held)
+        .expect("disjoint control");
+    // Only the full ref collides; target and genesis remain independently distinct.
+    selected.branches[0].ref_name = a.branches[0].ref_name.clone();
+    assert_eq!(
+        import::check_import_spool_reservations(&identity.spool_uuid, job, &selected, &held),
+        Err(codec::Reject::PreparationRefused(
+            api::ImportPreparationRefusalReason::DestinationConflict
+        ))
+    );
+}

@@ -36,7 +36,7 @@ export function validateWitnessLookup(request:{executorId:Uint8Array;statementLe
  * Authenticate the response only with the new pin before exposing any context. */
 export async function verifyWitnessSetAfterRootReplacement(signed:common.SignedHostedWitnessSetV1,e:WitnessSetExpectation,previous:VerifiedWitnessSet):Promise<VerifiedWitnessSet> {
   const epoch=e.rootEpoch;
-  const old=read(previous);if(epoch!==old.rootEpoch+1n)reject("StaleContext");
+  const old=read(previous);if(old.body.deploymentAuthority!==e.authority)reject("Root");if(epoch>0xffffffffffffffffn||epoch!==old.rootEpoch+1n)reject("StaleContext");
   const result={get body(){return clone(common.HostedWitnessSetV1Schema,old.body);},get digest(){return old.digest.slice();},rootEpoch:epoch};
   sets.set(result,{...old,rootEpoch:epoch});return verifyWitnessSet(signed,e,result);
 }

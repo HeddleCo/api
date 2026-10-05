@@ -1012,11 +1012,17 @@ pub struct ImportOwnerExpectation<'a> {
 }
 /// Inputs MUST come from the selected, independently verified effective state.
 /// Historical verification selects the state at its authenticated observation.
-pub fn effective_owner_authority_expiry(deferred_human: bool, claimable_until: i64) -> i64 {
-    if deferred_human && claimable_until > 0 {
-        claimable_until
+pub fn effective_owner_authority_expiry(
+    deferred_human: bool,
+    claimable_until: i64,
+) -> Result<i64, Reject> {
+    if deferred_human {
+        if claimable_until <= 0 {
+            return Err(Reject::Scope);
+        }
+        Ok(claimable_until)
     } else {
-        i64::MAX
+        Ok(i64::MAX)
     }
 }
 pub fn verify_member_permission(
@@ -1485,6 +1491,25 @@ pub fn verify_renewal(
     member: Option<&SignedImportMemberPermissionV1>,
     expected: &ImportOwnerExpectation<'_>,
 ) -> Result<VerifiedImportDelegation, Reject> {
+    verify_renewal_inner(
+        signed,
+        previous,
+        committed,
+        authority_epoch,
+        member,
+        expected,
+        true,
+    )
+}
+fn verify_renewal_inner(
+    signed: &SignedImportJobRenewalV1,
+    previous: &VerifiedImportDelegation,
+    committed: &ImportResultManifestV1,
+    authority_epoch: u64,
+    member: Option<&SignedImportMemberPermissionV1>,
+    expected: &ImportOwnerExpectation<'_>,
+    current: bool,
+) -> Result<VerifiedImportDelegation, Reject> {
     let r = signed.body.as_ref().ok_or(Reject::Canonical)?;
     if r.format_version != 1 {
         return Err(Reject::Version);
@@ -1500,7 +1525,7 @@ pub fn verify_renewal(
         return Err(Reject::StaleManifest);
     }
     let signed_next = r.replacement.as_ref().ok_or(Reject::Canonical)?;
-    let next = verify_delegation(signed_next, member, expected)?;
+    let next = verify_delegation_inner(signed_next, member, expected, current)?;
     let before = &previous.body;
     let after = &next.body;
     let before_id = before.identity.as_ref().ok_or(Reject::Canonical)?;
@@ -2992,13 +3017,18 @@ pub fn validate_renewal_preparation_from_read(
 /// Composition/reference validation only. Independently verify owner histories,
 /// policies, accepted admissions/publications and the current owner head before
 /// using them. The authenticated read supplies exact retained evidence.
+/// logical_job_terminal is independently selected under the host transaction.
 pub fn validate_renew_request(
     request: &RenewImportJobRequest,
     read: &GetImportJobStateResponse,
+    logical_job_terminal: bool,
 ) -> Result<(), Reject> {
     use prost::Message;
     if request.encoded_len() > 2 * MAX_BUNDLE_BYTES {
         return Err(Reject::Bounds);
+    }
+    if logical_job_terminal {
+        return Err(Reject::Transition);
     }
     if request.client_operation_id.is_empty() || request.client_operation_id.len() > 128 {
         return Err(Reject::Canonical);
@@ -3117,8 +3147,9 @@ pub fn verify_renew_submission(
     read: &GetImportJobStateResponse,
     predecessor_owner: &ImportOwnerExpectation<'_>,
     current_owner: &ImportOwnerExpectation<'_>,
+    logical_job_terminal: bool,
 ) -> Result<VerifiedImportDelegation, Reject> {
-    validate_renew_request(request, read)?;
+    validate_renew_request(request, read, logical_job_terminal)?;
     let state = read.state.as_ref().ok_or(Reject::Canonical)?;
     let retained = read.retained_proof.as_ref().ok_or(Reject::Canonical)?;
     let active = state
@@ -3186,9 +3217,12 @@ pub struct VerifiedImportBundleWitnesses {
     pub snapshot: ImportWitnessSnapshot,
 }
 /// Verify retained evidence after authenticating the state RPC. Owner contexts
-/// are independently verified at each historical activation, in delegation order.
+/// are independently verified in delegation order at the first authenticated
+/// publication time, or the initial admission time if no publication exists.
+/// Unwitnessed certificates are time-free recovery only.
 /// The mandatory hook verifies the selected policy chain and owner/native context
 /// at each authenticated statement time (heddle capability-verifier / WASM).
+/// With no statements it receives None and verifies time-free policy closure.
 /// No snapshot is returned on any failure. Persist the result under the trust lock.
 pub fn verify_import_bundle_witnesses(
     bundle: &ImportPublicProofBundleV1,
@@ -3198,7 +3232,7 @@ pub fn verify_import_bundle_witnesses(
     owners: &[ImportOwnerExpectation<'_>],
     mut verify_policy: impl FnMut(
         &ImportPublicProofBundleV1,
-        &crate::heddle::api::common::HostedWitnessStatementV1,
+        Option<&crate::heddle::api::common::HostedWitnessStatementV1>,
     ) -> Result<(), Reject>,
 ) -> Result<VerifiedImportBundleWitnesses, Reject> {
     use crate::witness_trust as trust;
@@ -3263,26 +3297,26 @@ pub fn verify_import_bundle_witnesses(
             &s.witness_set,
             &expectation(&s.root, 0, now_ms, &job_keys),
         )?;
-        if s.root == *pin {
-            Some(restored)
-        } else {
-            // Only an explicit independently installed epoch+1 pin replaces trust.
-            Some(restored.replace_epoch(pin.epoch)?)
-        }
+        Some(restored)
     } else {
         None
     };
     let carried = bundle.witness_set.as_ref().ok_or(Reject::Canonical)?;
-    let set = trust::verify_set(
-        carried,
-        &expectation(
-            pin,
-            snapshot.map_or(0, |s| s.clock_floor_unix_millis),
-            now_ms,
-            &job_keys,
-        ),
-        previous.as_ref(),
-    )?;
+    let selected = expectation(
+        pin,
+        snapshot.map_or(0, |s| s.clock_floor_unix_millis),
+        now_ms,
+        &job_keys,
+    );
+    let set = if snapshot.is_some_and(|s| s.root != *pin) {
+        trust::verify_set_after_root_replacement(
+            carried,
+            &selected,
+            previous.as_ref().ok_or(Reject::StaleContext)?,
+        )?
+    } else {
+        trust::verify_set(carried, &selected, previous.as_ref())?
+    };
     // Authenticate statements before using their observation times or policies.
     let mut resolved = Vec::new();
     for signed in &bundle.statements {
@@ -3302,8 +3336,57 @@ pub fn verify_import_bundle_witnesses(
             None
         };
         let context = trust::resolve_statement(&set, signed, proof, false, now_ms)?;
-        verify_policy(bundle, s)?;
+        verify_policy(bundle, Some(s))?;
         resolved.push((context, proof));
+    }
+    if bundle.statements.is_empty() {
+        // Time-free policy/owner/native closure; this asserts no admission event.
+        verify_policy(bundle, None)?;
+    }
+    // Derive owner-selection times only from authenticated receipts. Prefer the
+    // first publication for each delegation; initial admissions stand alone too.
+    let mut times = vec![None; bundle.delegations.len()];
+    let mut publications = Vec::new();
+    for signed in &bundle.statements {
+        let statement = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        if statement.purpose != 3 {
+            continue;
+        }
+        let (operation, manifest) = bundle
+            .operations
+            .iter()
+            .flat_map(|o| bundle.manifests.iter().map(move |m| (o, m)))
+            .find(|(o, m)| {
+                publication_payload(o, m)
+                    .and_then(|p| canonical(&p))
+                    .is_ok_and(|b| b == statement.canonical_payload)
+            })
+            .ok_or(Reject::Scope)?;
+        let digest = &operation
+            .body
+            .as_ref()
+            .ok_or(Reject::Canonical)?
+            .delegation_digest;
+        let index = bundle
+            .delegations
+            .iter()
+            .position(|d| signed_delegation_digest(d).is_ok_and(|h| h == *digest))
+            .ok_or(Reject::Scope)?;
+        let time = statement.observed_at_unix_millis / 1000;
+        // First means accepted publication order, independent of array order.
+        if times[index].is_none_or(|(order, _)| statement.admission_order < order) {
+            times[index] = Some((statement.admission_order, time));
+        }
+        publications.push((signed, operation, manifest, index));
+    }
+    if times[0].is_none() {
+        times[0] = bundle
+            .statements
+            .iter()
+            .filter_map(|s| s.body.as_ref())
+            .filter(|s| s.purpose == 1)
+            .min_by_key(|s| (s.observed_at_unix_millis, s.admission_order))
+            .map(|s| (s.admission_order, s.observed_at_unix_millis / 1000));
     }
     let mut verified = Vec::new();
     for (i, d) in bundle.delegations.iter().enumerate() {
@@ -3313,36 +3396,92 @@ pub fn verify_import_bundle_witnesses(
             known_job_associations: &associations,
             ..owners[i]
         };
-        // The independently selected historical time is not an author timestamp.
+        if times[i].is_some_and(|(_, time)| owner.now_unix_seconds != time) {
+            return Err(Reject::Root);
+        }
         let token = if i == 0 {
-            verify_delegation(d, parent, &owner)?
+            verify_delegation_inner(d, parent, &owner, times[i].is_some())?
         } else {
             let renewal = &bundle.renewals[i - 1];
             let r = renewal.body.as_ref().ok_or(Reject::Canonical)?;
-            verify_renewal(
+            verify_renewal_inner(
                 renewal,
                 &verified[i - 1],
                 resolve_bundle_manifest(bundle, &r.committed_manifest_digest)?,
                 i as u64,
                 parent,
                 &owner,
+                times[i].is_some(),
             )?
         };
         verified.push(token);
     }
+    let initial = verified.first().ok_or(Reject::Canonical)?;
+    for branch in &initial.body.branch_manifest {
+        let limit = branch.limit.as_ref().ok_or(Reject::Canonical)?;
+        let binding = bundle
+            .genesis_authorities
+            .iter()
+            .find(|g| signed_genesis_digest(g).is_ok_and(|h| h == branch.genesis_authority_digest))
+            .ok_or(Reject::Scope)?;
+        let original = bundle
+            .original_geneses
+            .iter()
+            .find(|o| native_id(o) == limit.genesis_digest)
+            .ok_or(Reject::Scope)?;
+        let g = binding.body.as_ref().ok_or(Reject::Canonical)?;
+        let envelope = bundle
+            .creator_authority_envelopes
+            .iter()
+            .find(|e| hash(&[e]) == g.creator_authority_envelope_digest)
+            .ok_or(Reject::Scope)?;
+        verify_native(original, "heddle-thread-genesis-v1")?;
+        let signature = original.signatures.first().ok_or(Reject::Signature)?;
+        verify_genesis_authority(
+            binding,
+            initial,
+            &limit.genesis_digest,
+            &signature.signature,
+            &hash(&[envelope]),
+        )?;
+    }
     for ((context, proof), signed) in resolved.iter().zip(&bundle.statements) {
         let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        if !verified.iter().any(|d| {
+            d.body.identity.as_ref().is_some_and(|id| {
+                s.spool_uuid == id.spool_uuid
+                    && s.spool_genesis_digest == id.spool_genesis_digest
+                    && s.owner_id == id.owner_id
+                    && s.owner_state_hash == id.owner_state_hash
+                    && s.ownership_transfer_sequence == id.ownership_transfer_sequence
+            })
+        }) {
+            return Err(Reject::Scope);
+        }
         match s.purpose {
-            1 => verify_witness_payload(
-                s,
-                WitnessPayload::Genesis(
-                    bundle
-                        .genesis_witnesses
-                        .iter()
-                        .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
-                        .ok_or(Reject::Scope)?,
-                ),
-            )?,
+            1 => {
+                // Every original admission must independently satisfy [N,E).
+                let owner = ImportOwnerExpectation {
+                    now_unix_seconds: s.observed_at_unix_millis / 1000,
+                    known_job_associations: &associations,
+                    ..owners[0]
+                };
+                verify_delegation(
+                    &bundle.delegations[0],
+                    resolve_bundle_permission(bundle, &initial.body.parent_permission_digest)?,
+                    &owner,
+                )?;
+                verify_witness_payload(
+                    s,
+                    WitnessPayload::Genesis(
+                        bundle
+                            .genesis_witnesses
+                            .iter()
+                            .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                            .ok_or(Reject::Scope)?,
+                    ),
+                )?;
+            }
             2 => verify_witness_payload(
                 s,
                 WitnessPayload::Authority(
@@ -3364,27 +3503,30 @@ pub fn verify_import_bundle_witnesses(
                 ),
             )?,
             3 => {
-                let (operation, manifest) = bundle
-                    .operations
+                let (_, operation, manifest, index) = publications
                     .iter()
-                    .flat_map(|o| bundle.manifests.iter().map(move |m| (o, m)))
-                    .find(|(o, m)| {
-                        publication_payload(o, m)
-                            .and_then(|p| canonical(&p))
-                            .is_ok_and(|b| b == s.canonical_payload)
-                    })
+                    .find(|(statement, _, _, _)| *statement == signed)
                     .ok_or(Reject::Scope)?;
-                let delegation = verified
-                    .iter()
-                    .find(|d| {
-                        operation
-                            .body
-                            .as_ref()
-                            .is_some_and(|o| o.delegation_digest == d.digest)
-                    })
-                    .ok_or(Reject::Scope)?;
+                let d = &bundle.delegations[*index];
+                let body = d.body.as_ref().ok_or(Reject::Canonical)?;
+                let owner = ImportOwnerExpectation {
+                    now_unix_seconds: s.observed_at_unix_millis / 1000,
+                    known_job_associations: &associations,
+                    ..owners[*index]
+                };
+                let delegation = verify_delegation(
+                    d,
+                    resolve_bundle_permission(bundle, &body.parent_permission_digest)?,
+                    &owner,
+                )?;
                 verify_publication(
-                    operation, delegation, manifest, signed, &set, *proof, now_ms,
+                    operation,
+                    &delegation,
+                    manifest,
+                    signed,
+                    &set,
+                    *proof,
+                    now_ms,
                 )?;
             }
             _ => return Err(Reject::Version),
@@ -3398,7 +3540,9 @@ pub fn verify_import_bundle_witnesses(
     };
     let mut order = 0;
     let mut observed = 0;
+    let mut active_index = 0usize;
     for o in &bundle.operations {
+        let before = manifest_digest(&progressive)?;
         let digest = signed_operation_digest(o)?;
         let slot = terminal
             .slots
@@ -3421,9 +3565,39 @@ pub fn verify_import_bundle_witnesses(
         }
         order = s.admission_order;
         observed = s.observed_at_unix_millis;
+        let digest = &o.body.as_ref().ok_or(Reject::Canonical)?.delegation_digest;
+        let index = verified
+            .iter()
+            .position(|d| d.digest == *digest)
+            .ok_or(Reject::Scope)?;
+        if index < active_index {
+            return Err(Reject::Transition);
+        }
+        while active_index < index {
+            let renewal = bundle.renewals[active_index]
+                .body
+                .as_ref()
+                .ok_or(Reject::Canonical)?;
+            if renewal.committed_manifest_digest != before {
+                return Err(Reject::StaleManifest);
+            }
+            active_index += 1;
+        }
     }
     if progressive != *terminal {
         return Err(Reject::Scope);
+    }
+    let final_digest = manifest_digest(&progressive)?;
+    for renewal in &bundle.renewals[active_index..] {
+        if renewal
+            .body
+            .as_ref()
+            .ok_or(Reject::Canonical)?
+            .committed_manifest_digest
+            != final_digest
+        {
+            return Err(Reject::StaleManifest);
+        }
     }
     let mut history = snapshot.map_or_else(Vec::new, |s| s.accepted_history.clone());
     if let Some(old) = history.iter_mut().find(|b| {

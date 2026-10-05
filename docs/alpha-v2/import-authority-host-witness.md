@@ -449,11 +449,27 @@ equals the base in **every** original genesis. If absent, the exact base closure
 must already be hosted. Nonempty closures use SyncService publication.
 
 Under one authorization/destination/reservation transaction, Commit persists
-source/base and verified authority, installs epoch 1, creates the initial
-physical operation whose ID equals `retry_lineage_id` and makes it runnable. Its successful
-`MutationResponse.receipt` MUST contain `pending_operation` for that created
+source/base and verified authority, retains the originals pending native
+admission, installs epoch 1, and creates the initial physical operation whose ID
+equals `retry_lineage_id`. It queues that operation behind its signed not-before
+N. Its successful `MutationResponse.receipt` MUST contain `pending_operation` for that created
 operation in the destination Spool, never an `applied` acknowledgement. Failure
 leaves no activated job, operation or partial branch publication.
+
+A scheduled Commit accepted at T < N activates the logical job and returns the
+required `pending_operation` receipt, but MUST issue NO purpose-1 genesis admission
+or purpose-3 publication witness. The receipt acknowledges retained submission;
+it is not native admission testimony. At actual execution start U, the host MUST
+recheck the independently selected effective owner, original genesis parent,
+policy, revocation, source custody and authority under the admission transaction,
+require N <= U < E, and issue the first purpose-1 witness atomically with actual
+native admission at U. Each subsequent publication issues its own purpose-3
+witness at its actual publication time. Delayed start at U >= E, an intervening
+revocation, or any other failed gate MUST refuse without issuing testimony.
+Renewal MUST NOT replace the originals' genesis parent. Existing first testimony
+is preserved unchanged. Every native admission and publication MUST independently
+be valid at its own authenticated observation; later receiver time, Commit time,
+and a future claim cannot supply historical authority.
 
 Commit's caller-scoped `client_operation_id` is its own idempotency key, distinct
 from Prepare's. Persist the exact request and receipt with activation. Exact
@@ -535,7 +551,9 @@ authority is unbounded (`2^63 - 1` seconds), including after the original claim
 deadline. Historical verification MUST use the effective state at that historical
 time: a future claim cannot make earlier unclaimed authority unbounded.
 `effective_owner_authority_expiry` / `effectiveOwnerAuthorityExpiry` take only
-independently verified effective-state inputs. Signed parent and child validity
+independently verified effective-state inputs. A deferred owner with a deadline
+<= 0 is inconsistent and MUST reject `Scope`; the Rust helper now returns
+`Result<i64, Reject>` and the TS helper throws. Signed parent and child validity
 windows still apply. This matches heddle's `authority_expires_at_seconds`.
 Use checked/widened
 integer arithmetic, including extreme uint64 duration/skew advertisements.
@@ -1449,8 +1467,12 @@ The exact `RenewImportJobRequest.proof` profile is based on that retained proof:
   select and carry the explicit empty manifest; operations and publication
   receipts are absent. Preserve real genesis admissions if present.
 
-`validate_renew_request` / `validateImportRenewRequest` check this request-level
-composition against the authenticated read. `verify_renew_submission` /
+`validate_renew_request` / `validateImportRenewRequest` require an explicit
+independently authenticated `logical_job_terminal` / `logicalJobTerminal` flag,
+selected under the host transaction. True MUST reject `Transition` before a
+renewal can revive a cancelled/revoked job; exact stored receipt replay remains a
+separate acknowledgement path. The submission composition requires this flag too.
+These helpers check this request-level composition against the authenticated read. `verify_renew_submission` /
 `verifyImportRenewSubmission` additionally run the existing time-free predecessor
 verification with its resolved old parent/context, then current replacement and
 renewal verification with the exact new parent/context. Accepted owner histories,
@@ -1480,16 +1502,45 @@ a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
 its response/retained closure, independently verify owner histories and original
 native authority/causal/landing context with heddle, then call this composition
 before reviewing or computing remaining scope. The hook receives each exact
-statement only after witness signature and inclusion verification; use heddle's
-`verifySignedPolicyChain` WASM to verify the selected chain, owner context and
+statement (`Some(statement)` in Rust) only after witness signature and inclusion
+verification; use heddle's `verifySignedPolicyChain` WASM to verify the selected chain, owner context and
 historical observation time. A carried policy hash alone is never verification.
 API verifies policy reference completeness, not heddle's policy signatures.
+When there are zero statements the hook MUST still run once with `None` (Rust) /
+`undefined` (TS), verifying the retained policy/owner/native closure without a
+historical timestamp or admission claim. TS MUST reject an undefined/non-function
+hook at runtime, including on this recovery path.
+
+For each delegation with publications, the supplied owner-check time MUST equal
+floor(observed_at_unix_millis / 1000) of its first authenticated publication in
+accepted admission order. For the initial delegation with admissions but no
+publication, use its earliest authenticated genesis admission. A mismatch rejects
+`Root`; neither receiver time nor a signed author's timestamp selects historical
+owner state. Each genesis admission and publication is additionally rechecked at
+its own authenticated observation. The policy hook MUST independently select and
+verify the effective owner/native/policy context for every statement at that
+observation, including when different events fall across an owner transition.
+Every statement's Spool UUID, Spool genesis digest, owner ID, owner state hash and
+ownership-transfer sequence MUST match a verified delegation identity. Initial
+genesis bindings MUST match the original delegation, creator, parent permission,
+owner chain and exact branch genesis, even before admission exists.
+
+Unwitnessed delegations/renewal activations have no authenticated observation:
+verify their original signatures, owner references, window shape, parent
+containment, scope and budget accounting time-free. Their supplied `now` is unused
+for interval checks. This is recovery evidence only, establishing no historical
+or executable authority; it permits a state read before N or after expiry. Do
+not invent an in-window clock or a witness for Commit/Renew activation.
 
 The composition verifies the root signature and complete witness history,
 monotonic generation and clock floor, every statement and retirement inclusion,
 exact admission/authority/publication/landing payloads and original signatures,
-signed delegation/renewal history and accepted publication order. Before any
-publication, absent admission statements confer no historical admission claim.
+signed delegation/renewal history and accepted publication order. Every renewal
+MUST commit the progressive manifest current before the first publication under
+its replacement; no publication may return to a superseded delegation. Any
+remaining renewal MUST commit the terminal manifest. These checks preserve
+owner-signed cumulative operation/byte budgets and scope narrowing across all
+renewals. Before any publication, absent admission statements confer no historical admission claim.
 It returns the authenticated committed manifest, active predecessor, authority
 epoch and an updated snapshot. Compare these with the authenticated read state.
 Persist the result atomically under the receiver's trust/mutation lock; failures
@@ -1497,7 +1548,10 @@ return no snapshot and cannot advance trust. Never source a persisted snapshot,
 owner context or descriptor pin from the incoming bundle. Snapshot copies in TS
 prevent asynchronous hook mutation from changing verification inputs.
 
-A newer independently installed pin performs an explicit epoch+1 replacement.
+Both Rust `verify_set_after_root_replacement` and TS
+`verifyWitnessSetAfterRootReplacement` are public and require the same deployment
+authority plus exactly epoch+1. A newer independently installed pin performs an
+explicit epoch+1 replacement.
 The previous pin in receiver-owned storage is used solely to restore previously
 accepted history, never to authenticate the response. New response signatures
 must verify under the installed pin, and all old context epochs remain stale.
@@ -1510,11 +1564,22 @@ The signed `StaleManifest` renewal-refusal vectors freeze a request at S, retain
 an accepted publication producing S′ at the same authority epoch, and classify
 the definitive refusal against the fresh read as `StaleManifest`. Replaying the
 refused bytes cannot settle the candidate: it is absent from accepted history.
-Revalidating it against S′ refuses again. The positive rereads S′, recomputes
+Its bytes MUST fail accepted-request replay matching with `OperationIdReused`;
+this gate is distinct from revalidating the old candidate against S′, which
+refuses `StaleManifest` again. The positive rereads S′, recomputes
 remaining scope and budget, selects a new job key/delegation ID, and obtains new
 parent, delegation and renewal signatures. Its candidate remains outside the
 retained accepted history until successful activation. No wire or refusal
 semantics change is introduced by this vector set.
+
+The durable snapshot retains each job's complete accepted bundle (up to 1 MiB
+per job) for the life of that receiver's history. Its total size grows with the
+number of jobs; snapshot copies and accepted-history searches also grow with
+that retained history. Purpose-3 payload matching remains O(statements ×
+operations × manifests), with up to 1024 statements, 256 operations and 320
+manifests per bundle; structural validation and composition both perform this
+matching. The interleaving check itself is O(operations + renewals), excluding
+manifest digest construction. These costs are not reduced by this fix.
 
 ## Import job control (alpha.31 owner decisions, 2026-10-04)
 

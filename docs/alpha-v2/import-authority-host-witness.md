@@ -1264,10 +1264,46 @@ The ID is native `ContentHash::compute_typed("weft-hosted-landing-request-proof-
 `BLAKE3(UTF8(domain) || u64_le(len(P)) || 0x00 || P)`. Both the domain and the
 signature's inclusion are mandatory. A witness signature cannot replace `S`.
 Never compute State IDs by hashing MessagePack: State's existing versioned
-field hash remains unchanged. An original capture must contain a child State;
-its declared State parents, after excluding the signed genesis base, must equal
-the States selected by its complete causal operation parents. The synthetic
-initial State is a genesis base only and cannot be reused as a source capture.
+field hash remains unchanged. Ordinary native Captures must contain a child
+State; their declared State parents, after excluding the signed genesis base,
+must equal the States selected by their complete causal operation parents.
+The frozen "old parentless capture" negative still rejects.
+
+**Owner decision (2026-10-05): delegated native IMPORT parent rules.**
+
+An import produces **one native operation per branch result slot**; v1's one
+slot and fixed frontier are unchanged. Git ancestors are not native operations:
+they are State objects in the tip State's parent closure, transferred and
+verified as content.
+
+The import rule is selected **only by the separately authenticated IMPORT
+carrier**: the verified import delegation and signed import operation that bind
+this exact operation's operation ID, Thread/genesis, causal frontier and
+delegation scope. Caller context never selects it. A carrier for another
+operation or frontier does not unlock it. Every path that admits or verifies an
+imported Capture MUST verify its carrier. The signed `ThreadOperation` has no
+import field; imported Captures use `SourceAuthor::LocalKey`. There is no signing
+or wire-format change.
+
+With an **empty causal frontier (first import)**, the State carries its converted
+Git parents unchanged: none for a root commit, or the tip's ordered Git parents,
+including merges and multi-root histories. These State parents are not compared
+with the operation's causal parents. The genesis base (synthetic seed) MUST never
+appear among them; the signed genesis binds the canonical synthetic empty base.
+Git-parent fidelity is attested by the shared converter and the host witness's
+signed conversion. This is the same trust basis used by the retired
+`HostedImport` receipt, not new trust.
+
+With a **non-empty causal frontier**, State parents MUST strictly equal the
+source States of the complete causal operation parents, with the seed excluded.
+
+Standalone operation validation without its verified carrier keeps the strict
+ordinary rule. Ordinary native Captures are unchanged: they still require a
+child State, and the frozen "old parentless capture" negative still rejects.
+Conformance vectors follow after the next heddle release because
+`tools/hybrid-native` pins published heddle.
+This docs-only decision does not change the frozen vectors, State IDs or
+converter correctness.
 
 For account-native originals, `authority_envelope` is exact canonical protobuf
 `ThreadControlAuthority` format 1 from `identity.proto`, including its verified

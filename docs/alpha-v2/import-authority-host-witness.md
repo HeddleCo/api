@@ -1338,7 +1338,12 @@ The receiver (heddle) MUST perform these checks before accepting P1/P2/P4:
    the history and rejects any subsequent Recover; Rotate preserves retention.
    Use `admitted_owner_mint_root_attachment` / `admittedOwnerMintRootAttachment`
    with an authenticated statement and its exact P1/P2/P4 payload. It verifies
-   commitments/original signatures and extracts the attested attachment; caller
+   commitments and original/acceptance signatures. Basis 1 extracts the original
+   party's attested attachment from the creator/authority envelope. Basis 2
+   extracts the accepting party's attachment from the signed `accepting_author`
+   envelope in the exact witness-bound acceptance, with exactly one signature by
+   its signed `accepting_publisher` and the statement's `signed_acceptance_digest`.
+   The admission and writer-policy checks share this selection. Caller
    inventories cannot create prior admission. Feed both opaque results into
    `verify_retained_writer_attachment` / `verifyRetainedWriterAttachment` with
    raw certificate bytes and the independently verified mint key and time.

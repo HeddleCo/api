@@ -38,19 +38,7 @@ export function checkWitnessWriter(s:HostedWitnessStatementV1,envelope:Uint8Arra
     // Preserve original provenance bindings; only the signed acceptor is cut.
     // P1 retains its existing genesis provenance verifier (import: delegated).
     if(s.purpose!==1){const original=decodeWriterAuthority(envelope);verifyWriterAccountBinding(original,original.owner?.root?.root?.accountUuid??reject("Root"),spoolAccount,s.ownerId);}
-    const e=boundary??reject("BoundaryAcceptance"),binding=e.binding??reject("BoundaryAcceptance"),selected=s.boundaryAcceptance??reject("BoundaryAcceptance");
-    if(!equal(canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,binding),canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,selected)))reject("BoundaryAcceptance");
-    const signed=e.signedAcceptance??reject("BoundaryAcceptance");
-    if(signed.format!=="heddle-original-boundary-acceptance-v1")reject("Version");
-    if(!signed.canonicalRecord.length||signed.canonicalRecord.length>65536)reject("Bounds");
-    if(!equal(acceptingId(signed.format,signed.canonicalRecord),binding.acceptanceId)||!equal(signedNativeDigest(signed),binding.signedAcceptanceDigest))reject("BoundaryAcceptance");
-    const acceptance=acceptingSelectors(signed.canonicalRecord),publisher=acceptingOctets(acceptance.accepting_publisher,32);
-    if(signed.signatures.length!==1||!equal(signed.signatures[0]!.publicKey,publisher))reject("Signature");
-    const author=acceptingMap(acceptance.accepting_author),actor=acceptingMap(author.actor);
-    if(author.kind!=="account"||!equal(acceptingOctets(author.spool,16),s.spoolUuid))reject("Scope");
-    const authority=acceptingOctets(author.authority),digest=acceptingOctets(author.authority_digest,32);
-    if(!equal(acceptingId("heddle-thread-control-authority-v1",authority),digest))reject("GenesisBinding");
-    const current=decodeWriterAuthority(authority);
+    const {current,actor,publisher}=boundaryWriter(s,boundary);
     verifyWriterAccountBinding(current,acceptingOctets(actor.principal_id,16),spoolAccount,s.ownerId);
     checkWriterKeys(current,keyId(publisher),revoked);return;
   }
@@ -61,6 +49,27 @@ export function checkWitnessWriter(s:HostedWitnessStatementV1,envelope:Uint8Arra
   checkWriterKeys(a,s.publisherKeyId,revoked);
 }
 
+/** Shared selection for policy cuts and opaque attachment admission. Complete
+ * payload/boundary signature verification is mandatory before admission. */
+function boundaryWriter(s:HostedWitnessStatementV1,boundary?:ImportBoundaryAcceptanceV1):{current:ThreadControlAuthority;actor:{[key:string]:Value};publisher:Uint8Array} {
+  const e=boundary??reject("BoundaryAcceptance"),binding=e.binding??reject("BoundaryAcceptance"),selected=s.boundaryAcceptance??reject("BoundaryAcceptance");
+  if(s.basis!==2||!equal(canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,binding),canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,selected)))reject("BoundaryAcceptance");
+  const signed=e.signedAcceptance??reject("BoundaryAcceptance");
+  if(signed.format!=="heddle-original-boundary-acceptance-v1")reject("Version");
+  if(!signed.canonicalRecord.length||signed.canonicalRecord.length>65536)reject("Bounds");
+  if(!equal(acceptingId(signed.format,signed.canonicalRecord),binding.acceptanceId)||!equal(signedNativeDigest(signed),binding.signedAcceptanceDigest))reject("BoundaryAcceptance");
+  const acceptance=acceptingSelectors(signed.canonicalRecord),publisher=acceptingFixedOctets(acceptance.accepting_publisher);
+  if(signed.signatures.length!==1||!equal(signed.signatures[0]!.publicKey,publisher))reject("Signature");
+  const author=acceptingMap(acceptance.accepting_author),actor=acceptingMap(author.actor);
+  if(author.kind!=="account"||!equal(acceptingOctets(author.spool,16),s.spoolUuid))reject("Scope");
+  const authority=acceptingOctets(author.authority),digest=acceptingFixedOctets(author.authority_digest);
+  if(!equal(acceptingId("heddle-thread-control-authority-v1",authority),digest))reject("GenesisBinding");
+  return {current:decodeWriterAuthority(authority),actor,publisher};
+}
+function acceptingFixedOctets(v:Value|undefined):Uint8Array {
+  if(!Array.isArray(v)||v.length!==32)reject("Canonical");
+  return acceptingOctets(v,32);
+}
 function acceptingId(format:string,bytes:Uint8Array):Uint8Array {
   const n=new Uint8Array(8);new DataView(n.buffer).setBigUint64(0,BigInt(bytes.length),true);
   return blake3(join(utf8.encode(format),n,Uint8Array.of(0),bytes));
@@ -118,14 +127,16 @@ export function retainedMintRootIssuer(verifiedHistory:OwnerHistory,stateHash:Ui
 export interface AdmittedMintRootAttachment { readonly kind:"admitted-mint-root-attachment" }
 const admissions=new WeakMap<AdmittedMintRootAttachment,SignedOwnerMintRootAttachment>();
 /** Resolve witness trust/signature/retirement BEFORE calling. This helper matches
- * payload commitments and verifies original signatures, then extracts the bytes. */
+ * payload commitments and verifies original/acceptance signatures. Basis 1
+ * admits the original attachment; basis 2 admits the signed acceptor's. */
 export async function admittedOwnerMintRootAttachment(authenticatedStatement:HostedWitnessStatementV1,payload:WitnessPayload|{kind:"native-genesis";payload:NativeGenesisWitnessV1}):Promise<AdmittedMintRootAttachment> {
   authenticatedStatement=clone(HostedWitnessStatementV1Schema,authenticatedStatement);
   payload=payload.kind==="native-genesis"?{kind:payload.kind,payload:clone(NativeGenesisWitnessV1Schema,payload.payload)}:payload.kind==="genesis"?{kind:payload.kind,payload:clone(ImportGenesisWitnessV1Schema,payload.payload)}:payload.kind==="authority"?{kind:payload.kind,payload:clone(ImportAuthorityWitnessV1Schema,payload.payload)}:{kind:payload.kind,payload:clone(HostedLandingWitnessV1Schema,payload.payload)};
   const envelope=payload.kind==="native-genesis"?payload.payload.creatorAuthorityEnvelope:payload.kind==="genesis"?payload.payload.creatorAuthorityEnvelope:payload.payload.authorityEnvelope;
-  // Snapshot the attachment before asynchronous verification can yield.
-  const a=decodeWriterAuthority(envelope),association=a.mintRootAssociation;
+  const boundary=payload.kind==="native-genesis"||payload.kind==="genesis"?payload.payload.boundaryAcceptance:payload.kind==="authority"?payload.payload.boundaryAcceptances.find(e=>e.binding&&authenticatedStatement.boundaryAcceptance&&equal(canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,e.binding),canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,authenticatedStatement.boundaryAcceptance))):undefined;
+  const a=authenticatedStatement.basis===2?boundaryWriter(authenticatedStatement,boundary).current:decodeWriterAuthority(envelope),association=a.mintRootAssociation;
   if(association.case!=="ownerMintRootAttachment")reject("Root");
+  // The complete statement and payload were snapshotted before any await.
   const signed=clone(SignedOwnerMintRootAttachmentSchema,association.value);
   if(payload.kind==="native-genesis")await verifyNativeGenesisPayload(authenticatedStatement,payload.payload);
   else await verifyWitnessPayload(authenticatedStatement,payload);

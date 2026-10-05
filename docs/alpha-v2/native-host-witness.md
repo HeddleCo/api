@@ -202,6 +202,12 @@ restore recovered or unknown authority. In the API's
 facts from a verified OwnerHistory and exact state/sequence, rejecting a later
 Recover. `admitted_owner_mint_root_attachment` / `admittedOwnerMintRootAttachment`
 extracts the attachment from an authenticated statement and matched payload.
+For basis 1, it admits the original party's creator/authority-envelope attachment.
+For basis 2 (P1/P2), it admits the accepting party's attachment from the signed
+`accepting_author` envelope in the exact witness-bound acceptance. That acceptance
+must have exactly one signature by its signed `accepting_publisher`, bound by the
+statement's `signed_acceptance_digest`. Admission and writer-policy checks share
+the same selector. The original party's attachment cannot substitute for it.
 Both return opaque results. Receivers MUST supply these to
 `verify_retained_writer_attachment` / `verifyRetainedWriterAttachment`, with
 raw certificate bytes, independently verified mint key and observation time.

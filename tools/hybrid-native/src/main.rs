@@ -2374,9 +2374,10 @@ mod tests {
             .expect("policy")
             .max_audience = Some(1);
         let error = verify_export(&f, &changed).expect_err("policy body mutation");
-        assert!(
-            error.to_string().contains("policy state preimage"),
-            "{error:#}"
+        assert_eq!(
+            error.downcast_ref::<codec::Reject>(),
+            Some(&codec::Reject::Canonical),
+            "the shared policy walker must reject the changed committed body first: {error:#}"
         );
         let mut changed = b;
         changed.policies[0]
@@ -2449,10 +2450,10 @@ mod tests {
         let initial = capability_verifier::verify_owner_root(&native_root).expect("verified root");
         verify_owner_history(&rotated, 1100).expect("native accepted Rotate");
         verify_owner_history(&recovered, 1100).expect("native accepted Recover");
-        let issuer = writer::retained_mint_root_issuer(&rotated, initial.state_hash(), 0)
+        let issuer = writer::retained_mint_root_issuer(&rotated, &initial.state_hash(), 0)
             .expect("derived verified issuer");
         assert!(matches!(
-            writer::retained_mint_root_issuer(&recovered, initial.state_hash(), 0),
+            writer::retained_mint_root_issuer(&recovered, &initial.state_hash(), 0),
             Err(codec::Reject::Root)
         ));
         let p = wire::ImportAuthorityWitnessV1::decode(

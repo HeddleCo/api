@@ -48,6 +48,8 @@ message ImportOwnerChainV1 {
 }
 // One authorized result slot. First release permits one result per branch;
 // slot_id is stable across physical retries, certificates and signing keys.
+// Reservation identity is (spool UUID, full ref, slot_id), not slot_id alone.
+// Full refs are exclusive across all non-terminal jobs in the same spool.
 message ImportBranchLimitV1 {
   string ref_name = 1; // Full refs/heads/...; sorted unique UTF-8 bytes.
   ImportGitHashAlgorithm hash_algorithm = 2;
@@ -69,6 +71,8 @@ message ImportPermissionScopeV1 {
   // exactly 32 bytes requires that current CAS or typed DESTINATION_CONFLICT.
   // Success: always 32 opaque host-issued bytes. Never an overview version or
   // zero32 sentinel. All other proposed scope fields MUST remain unchanged.
+  // Fences destination configuration, ownership and policy. Other imports do
+  // not advance it; disjoint sibling jobs may Prepare/Commit concurrently.
   bytes destination_version = 4;
   bytes options_digest = 5;
   string converter_version = 6;
@@ -306,6 +310,8 @@ enum ImportPreparationRefusalReason {
   IMPORT_PREPARATION_REFUSAL_REASON_UNSUPPORTED_CONVERTER = 2;
   IMPORT_PREPARATION_REFUSAL_REASON_UNSUPPORTED_OPTIONS = 3;
   IMPORT_PREPARATION_REFUSAL_REASON_BUDGET_EXCEEDED = 4;
+  // Stale destination configuration/ownership/policy CAS, or a full ref/slot
+  // reserved by a non-terminal job in this spool. See refusal.field.
   IMPORT_PREPARATION_REFUSAL_REASON_DESTINATION_CONFLICT = 5;
   IMPORT_PREPARATION_REFUSAL_REASON_POLICY_DENIED = 6;
 }

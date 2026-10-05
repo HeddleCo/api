@@ -9,8 +9,10 @@ gate. Alpha.32 makes the explicit hard cut documented in
 **api → heddle → weft → tapestry**. This contract neither deploys that cascade
 nor establishes that the original runtime defect is fixed.
 
-The single source of conformance bytes is
+The core conformance bytes are frozen in
 [import-authority-host-witness-v1.json](../../tests/fixtures/import-authority-host-witness-v1.json).
+Whole-repository scenarios add the separate
+[sibling-job corpus](../../tests/fixtures/import-sibling-jobs-alpha32.json).
 Its frozen descriptors identify every new message and field number/type. Rust
 and TypeScript read its original bytes, digests and signatures, including the
 negative records; they never generate expected signatures during a test. The
@@ -445,6 +447,120 @@ failures retain ordinary CallFailure handling without leaking policy details.
 the request and response before signing and reject changed choices with
 `PreparedFields`. Configuration changes require a fresh Prepare/client operation
 ID, never a changed response to an idempotent prepared reservation.
+
+### Whole-repository sibling jobs in one spool (api#351)
+
+Tapestry MUST split one whole-repository import action into multiple independent
+logical jobs in the **same spool**, with disjoint full-ref selections. Each job
+has at most the current host `max_branches` (never more than 256), its own logical
+job ID, first-attempt/retry-lineage UUID, reserved key, cancellation ID, prepared
+proposal, signed parent/delegation, manifest and receipts. A spool has no aggregate
+256-thread or 256-branch limit. The 256 bound is per logical job: the canonical
+signed body remains at most 64 KiB, the proof bundle at most 1 MiB and Commit at
+most 2 MiB. Existing size bounds still apply even below 256 branches.
+
+**Sibling jobs MAY be Prepared, Committed and executed concurrently.**
+`destination_version` MUST fence the destination's effective configuration,
+ownership and policy: converter/options/provider support and limits, accepted
+owner state/transfer, and effective destination authorization/policy changes.
+The host MUST advance this opaque token whenever those facts change, and MUST
+read/compare it in the Prepare/activation transaction. Imports alone, including
+reservation, Commit, publication, completion, renewal, retry and cancellation,
+MUST NOT advance it. It does not fence other jobs, witness-set generation,
+Thread frontiers, per-job authority epochs or per-job manifest digests. Independent
+current source custody, revocation, permission and frontier checks still apply.
+
+This preserves the existing invariants: [renewal/publication CAS](#preparation-renewal-and-the-existing-retry-route-p2-2)
+is per job, and the [renewal checks](../../src/import_authority.rs) compare the
+exact job/lineage, predecessor, epoch and manifest. [Cumulative accounting](#owner-authorized-genesis-and-delegation-p2-1)
+is by permission digest and logical job, never by spool. [Witness verification](../../src/witness_trust.rs)
+checks authenticated statement admission order and monotonic set generation;
+hosts serialize individual witness append/set updates atomically, without
+requiring one entire job to finish before another starts. Concurrent publications
+can interleave in that authenticated order. Receivers MUST merge accepted job
+histories under their existing trust lock, using a fresh current witness set as
+needed; sibling activity never authorizes accepting an older set or stale witness
+context. Each target retains its existing Thread frontier CAS and lease checks.
+
+Prepare MUST atomically check and reserve **all** selected full refs and slots
+with the job/key/first-attempt UUID; a refusal reserves nothing. The host MUST
+maintain a complete per-spool inventory for all non-terminal logical jobs,
+including unexpired Prepared reservations and admitted jobs with paused, failed,
+canceled or expired physical attempts that can still Renew/Retry. Keep the
+original job's entire ref selection reserved through partial publication and
+scope narrowing. A physical-attempt terminal state is not logical termination.
+Commit MUST compare the current token and prove that its unexpired reservation
+still owns every exact ref/slot before activation, in one transaction. Renewal
+keeps those identities and cannot reserve a different branch under the same job.
+Exact stored request replay is resolved first and reserves/activates nothing again.
+
+The unique active ref key is `(spool_uuid, full_ref)` regardless of source URL or
+provider. The unique active slot key is `(spool_uuid, full_ref, slot_id)`; `slot_id`
+alone is not a global counter (different refs may both use zero). This preserves
+the signed [branch layout](../../proto/heddle/api/v1alpha2/import_authority.proto)
+and existing `(logical_job_id, full_ref, slot_id)` replay/accounting identity.
+A duplicate full ref across sibling **or any other non-terminal** job MUST refuse
+Prepare with `ImportPreparationRefusalReason.DESTINATION_CONFLICT (5)` and
+`field = "proposed_scope.branches.ref_name"`, even with a different slot, source
+or target. Rebinding a same-job reserved slot/branch identity MUST refuse the same
+reason with `field = "proposed_scope.branches.slot_id"`. These conflicts MUST
+NOT silently merge, allocate replacement slots or consume budget. No other
+job's identity or hidden details are disclosed.
+
+Release active reservations atomically only on definitive logical completion,
+cancellation, revocation or expiry of an uncommitted Prepare, after fencing any
+in-flight activation/work. Retain durable receipts, manifests and replay history.
+Admitted authority expiry alone does not release recoverable job reservations.
+A later new job may reserve released keys but still needs current authorization,
+an explicitly reviewed target/genesis and frontier; completion never resets the
+old job's budgets or permits its revival. An unexpired reservation is not invalidated
+merely because a sibling finishes.
+
+The browser MAY Prepare all siblings against one unchanged token and Commit them
+in either order; it MAY instead Prepare/Commit them sequentially, including
+preparing the next after the previous completes. It MUST use separate operation
+IDs and signatures per job. No token refresh or re-Prepare is required solely
+because a sibling committed/completed. An empty proposed token obtains the
+current token for each fresh Prepare. A stale explicit token refuses Prepare with
+`DESTINATION_CONFLICT (5)`, `field = "proposed_scope.destination_version"`.
+Staleness at Commit/activation refuses with `StaleContext` (CallFailure
+`VERSION_CONFLICT`); it activates nothing. The browser MUST refresh configuration
+and owner/policy state, review and re-Prepare affected uncommitted jobs with fresh
+request IDs and signatures, rather than patch signed tokens. Renewal still cannot
+change a predecessor's signed destination token around non-amplification checks;
+a changed token requires a new logical job for remaining work and terminally
+fencing/releasing conflicting old reservations.
+
+`max_result_bytes` and `max_operations` apply **per logical job** across its own
+renewals/retries. They do not pool automatically across siblings. To plan headroom,
+the client may compute `H = ceil(git_size_kib × 1024 × headroom)` with checked or
+widened arithmetic, then explicitly allocate positive totals `B_i` over the
+actual ref partitions. For example, H = 600 MiB can be reviewed as two 300 MiB
+jobs when each host cap permits it. Each `B_i` MUST be at most the current host
+`max_result_bytes` and 1 GiB; total planned headroom may exceed a single job's
+cap. If allocation hits a cap, the browser must repartition or explicitly review
+a smaller total rather than silently claim the original headroom. Branch counts
+are an advisory allocation weight only: shared Git objects give no per-branch
+result estimate. UNKNOWN requires explicit budget choices. Sibling completion or
+unused allowance cannot enlarge another signed job; byte insufficiency needs
+new reviewed authority within its durable original job bounds, or a new job.
+
+Rust/TS `check_import_spool_reservations` / `checkImportSpoolReservations` consume
+the independently retained complete non-terminal inventory **after**
+`prepare_import_source_scope` / `prepareImportSourceScope`; use the reservation's
+host-selected logical job ID, not a caller-proposed alias. They enforce per-spool
+ref exclusion and exact same-job branch identity. `check_import_destination_version`
+/ `checkImportDestinationVersion` compare the current token at activation and
+return `StaleContext`. Hosts MUST compose these gates with Commit/Renew validation
+and current authorization under their storage transaction. The portable helpers
+do not persist reservations, establish logical terminality or implement locking.
+
+The frozen [sibling vectors](../../tests/fixtures/import-sibling-jobs-alpha32.json)
+cover sequential Commit, concurrent Prepare and reverse-order Commit, a sibling
+after completion, duplicate ref/slot identity, stale Prepare and stale activation,
+and independent budgets. Rust and TS run identical scenarios against the original
+signed Prepare/Commit carriers. Every negative has a succeeding control; all
+pre-existing fixtures remain byte-for-byte unchanged from the alpha.32 PR head.
 
 The caller generates and persists a fresh non-nil UUID with a CSPRNG (for example
 `crypto.randomUUID()`), encodes its 16 raw bytes as `retry_lineage_id`, and uses

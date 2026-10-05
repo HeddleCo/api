@@ -650,6 +650,68 @@ pub fn prepare_scope(
     Ok(selected)
 }
 
+/// Independently retained refs/slots for one non-terminal logical job. Include
+/// Prepared jobs and all original refs until logical termination, not just the
+/// current certificate's remaining scope. Hosts provide the complete inventory
+/// under the same transaction that reserves/activates; this helper stores nothing.
+pub struct ImportSpoolReservation<'a> {
+    pub spool_uuid: &'a [u8],
+    pub logical_job_id: &'a [u8],
+    pub branches: &'a [ImportBranchLimitV1],
+}
+
+/// Per-spool full refs and (full ref, slot_id) keys are exclusive across jobs,
+/// regardless of provider/source. Same-job renewals retain exact branch identity.
+/// Run after scope negotiation and before atomically reserving every ref/slot.
+pub fn check_import_spool_reservations(
+    spool_uuid: &[u8],
+    logical_job_id: &[u8],
+    scope: &ImportPermissionScopeV1,
+    reservations: &[ImportSpoolReservation<'_>],
+) -> Result<(), Reject> {
+    initial_operation_id(spool_uuid, false)?;
+    initial_operation_id(logical_job_id, false)?;
+    validate_scope(scope)?;
+    for reservation in reservations {
+        initial_operation_id(reservation.spool_uuid, false)?;
+        initial_operation_id(reservation.logical_job_id, false)?;
+        if reservation.spool_uuid != spool_uuid {
+            continue;
+        }
+        let same_job = reservation.logical_job_id == logical_job_id;
+        for selected in &scope.branches {
+            let conflict = if same_job {
+                !reservation.branches.contains(selected)
+            } else {
+                reservation
+                    .branches
+                    .iter()
+                    .any(|held| held.ref_name == selected.ref_name)
+            };
+            if conflict {
+                return Err(Reject::PreparationRefused(
+                    ImportPreparationRefusalReason::DestinationConflict,
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Current destination configuration/ownership/policy CAS at activation. Other
+/// imports do not advance this token. Exact stored replay is resolved first.
+pub fn check_import_destination_version(
+    scope: &ImportPermissionScopeV1,
+    current_destination_version: &[u8],
+) -> Result<(), Reject> {
+    width(&scope.destination_version, 32)?;
+    width(current_destination_version, 32)?;
+    if scope.destination_version != current_destination_version {
+        return Err(Reject::StaleContext);
+    }
+    Ok(())
+}
+
 /// Browser-side comparison before signing. A host cannot silently negotiate.
 pub fn validate_preparation_response(
     request: &PrepareImportJobRequest,

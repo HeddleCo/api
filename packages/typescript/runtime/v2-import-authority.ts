@@ -174,6 +174,37 @@ export function prepareImportScope(proposed:api.ImportPermissionScopeV1, configu
   return selected;
 }
 
+/** Complete independently retained original refs/slots for a non-terminal job.
+ * Hosts read this inventory under the reservation/activation transaction. */
+export interface ImportSpoolReservation {
+  readonly spoolUuid: Uint8Array;
+  readonly logicalJobId: Uint8Array;
+  readonly branches: readonly api.ImportBranchLimitV1[];
+}
+
+/** Full refs and (full ref, slot_id) keys are exclusive per spool across jobs,
+ * regardless of source. Same-job renewal keeps the original branch identity.
+ * This check stores nothing; hosts atomically reserve the entire selection. */
+export function checkImportSpoolReservations(spoolUuid:Uint8Array,logicalJobId:Uint8Array,scope:api.ImportPermissionScopeV1,reservations:readonly ImportSpoolReservation[]):void {
+  initialImportOperationId(spoolUuid,false);initialImportOperationId(logicalJobId,false);validateImportScope(scope);
+  for(const held of reservations){
+    initialImportOperationId(held.spoolUuid,false);initialImportOperationId(held.logicalJobId,false);
+    if(!equal(held.spoolUuid,spoolUuid))continue;
+    const sameJob=equal(held.logicalJobId,logicalJobId);
+    for(const selected of scope.branches){
+      const conflict=sameJob?!held.branches.some(b=>branchSubset(selected,b)):held.branches.some(b=>b.refName===selected.refName);
+      if(conflict)throw new HybridContractError("PreparationRefused",api.ImportPreparationRefusalReason.DESTINATION_CONFLICT);
+    }
+  }
+}
+
+/** Configuration/ownership/policy CAS at activation; other imports do not
+ * advance it. Resolve exact stored receipt replay before calling this gate. */
+export function checkImportDestinationVersion(scope:api.ImportPermissionScopeV1,currentDestinationVersion:Uint8Array):void {
+  width(scope.destinationVersion,32);width(currentDestinationVersion,32);
+  if(!equal(scope.destinationVersion,currentDestinationVersion))reject("StaleContext");
+}
+
 /** Caller comparison before signing; no silent negotiation, including reductions. */
 export function validateImportPreparationResponse(request:api.PrepareImportJobRequest, response:api.PrepareImportJobResponse):void {
   const r=response.refusal;

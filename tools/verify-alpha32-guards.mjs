@@ -15,8 +15,12 @@ const cases=[
  ['original_window','alpha32 original window',[['availability.value > 7','availability.value > 6']]],
  ['creator_selection','alpha32 creator selection',[['original.signatures.find(s => equal(s.publicKey, g.creatorPublicKey))','original.signatures[0]']]],
  ['evidence_discriminant','alpha32 creator selection',[['times.every(t => t !== undefined)','true']]],
+ ['sibling_ref','alpha32 sibling duplicate',[['held.branches.some(b => b.refName === selected.refName)','false']],'tests/v2-import-sibling-jobs.test.mjs'],
+ ['sibling_slot','alpha32 sibling same_job_slot',[['!held.branches.some(b => branchSubset(selected, b))','false']],'tests/v2-import-sibling-jobs.test.mjs'],
+ ['sibling_destination','alpha32 sibling stale_activation',[['if (!equal(scope.destinationVersion, currentDestinationVersion))','if (false)']],'tests/v2-import-sibling-jobs.test.mjs'],
+ ['sibling_prepare_destination','alpha32 sibling stale_prepare',[['if (proposed.destinationVersion.length && !equal(proposed.destinationVersion, currentDestinationVersion))','if (false)']],'tests/v2-import-sibling-jobs.test.mjs'],
 ];
-const run=(name,pattern,stage)=>{const result=spawnSync('node',['--test','--test-name-pattern='+pattern,'tests/v2-import-authority-witness.test.mjs'],{encoding:'utf8'});writeFileSync(`${directory}/${name}-${stage}.log`,result.stdout+result.stderr);return result.status;};
+const run=(name,pattern,stage,file)=>{const result=spawnSync('node',['--test','--test-name-pattern='+pattern,file??'tests/v2-import-authority-witness.test.mjs'],{encoding:'utf8'});writeFileSync(`${directory}/${name}-${stage}.log`,result.stdout+result.stderr);return result.status;};
 try {
- for(const [name,pattern,replacements] of cases){let mutated=original;for(const [from,to] of replacements){if(!mutated.includes(from))throw Error('missing mutation: '+from);mutated=mutated.replace(from,to);}writeFileSync(path,mutated);const red=run(name,pattern,'red');writeFileSync(path,original);const green=run(name,pattern,'green');console.log(`${name}: disabled guard exit ${red}; restored guard exit ${green}`);if(red!==1||green!==0)throw Error(`${name}: guard was not demonstrated`);}
+ for(const [name,pattern,replacements,file] of cases){let mutated=original;for(const [from,to] of replacements){if(!mutated.includes(from))throw Error('missing mutation: '+from);mutated=mutated.replace(from,to);}writeFileSync(path,mutated);const red=run(name,pattern,'red',file);writeFileSync(path,original);const green=run(name,pattern,'green',file);console.log(`${name}: disabled guard exit ${red}; restored guard exit ${green}`);if(red!==1||green!==0)throw Error(`${name}: guard was not demonstrated`);}
 } finally {writeFileSync(path,original);}

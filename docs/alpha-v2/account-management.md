@@ -8,6 +8,11 @@ for those implementation issues; it does not assert that weft already implements
 the new commands. All existing field numbers, field types, and methods survive.
 Package versions stay at 0.31.0-alpha.18.
 
+The alpha.39 [creator-only invitation code contract](invitation-codes.md) adds
+`GetSignupInvitationCode` and `GetInvitationCode` without putting secrets in
+account or spool projections. It defines encrypted host storage, destruction,
+read authorization, rate limits and audit.
+
 ## Signed commands and receipts
 
 `IdentityService.RemovePasskey`, `SetDisplayName`, `SetPrimaryHandle`, and

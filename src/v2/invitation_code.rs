@@ -25,17 +25,58 @@ pub struct InvitationCodeReadContext<'a> {
 }
 
 pub fn validate_signup_invitation_code_response(
-    _response: &GetSignupInvitationCodeResponse,
-    _invitation: &SignupInvitation,
-    _context: &InvitationCodeReadContext<'_>,
+    response: &GetSignupInvitationCodeResponse,
+    invitation: &SignupInvitation,
+    context: &InvitationCodeReadContext<'_>,
 ) -> Result<(), InvitationCodeError> {
-    Ok(())
+    validate_code_response(
+        &response.redemption_secret,
+        invitation.redeemed,
+        invitation.revoked,
+        invitation.expires_at.as_ref(),
+        context,
+    )
 }
 
 pub fn validate_invitation_code_response(
-    _response: &GetInvitationCodeResponse,
-    _invitation: &InvitationRecord,
-    _context: &InvitationCodeReadContext<'_>,
+    response: &GetInvitationCodeResponse,
+    invitation: &InvitationRecord,
+    context: &InvitationCodeReadContext<'_>,
 ) -> Result<(), InvitationCodeError> {
+    validate_code_response(
+        &response.redemption_secret,
+        invitation.redeemed,
+        invitation.revoked,
+        invitation.expires_at.as_ref(),
+        context,
+    )
+}
+
+fn valid_timestamp(time: &Timestamp) -> bool {
+    (-62_135_596_800..=253_402_300_799).contains(&time.seconds)
+        && (0..1_000_000_000).contains(&time.nanos)
+}
+
+fn validate_code_response(
+    secret: &[u8],
+    redeemed: bool,
+    revoked: bool,
+    expires_at: Option<&Timestamp>,
+    context: &InvitationCodeReadContext<'_>,
+) -> Result<(), InvitationCodeError> {
+    if context.caller_subject.is_empty()
+        || context.creator_subject.is_empty()
+        || context.caller_subject != context.creator_subject
+    {
+        return Err(InvitationCodeError::Creator);
+    }
+    let expiry = expires_at.ok_or(InvitationCodeError::Expiry)?;
+    if !valid_timestamp(expiry) || !valid_timestamp(context.now) {
+        return Err(InvitationCodeError::Expiry);
+    }
+    let expired = (context.now.seconds, context.now.nanos) >= (expiry.seconds, expiry.nanos);
+    if !secret.is_empty() && (redeemed || revoked || expired) {
+        return Err(InvitationCodeError::NotPending);
+    }
     Ok(())
 }

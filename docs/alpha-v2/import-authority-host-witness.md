@@ -1287,3 +1287,66 @@ those installed-state checks. Multiple import jobs on one Thread are explicitly
 DEFERRED: `delegations.len() == 1` remains enforced; no implicit multi-job reader.
 The generated fresh-receiver models demonstrate prefix scheduling and exact
 bindings, not a production Fetch/storage implementation.
+
+## alpha.35 fix-round receiver requirements
+
+`require_policy_history` (Rust) / `requirePolicyHistory` (TS) recomputes
+`SHA-256("heddle-spool-signed-policy-v2" || canonical fields 1–10)` for **every
+selected chain record**, requires both the record body and its `policy`, and
+rejects duplicate or reordered carrier records. Carrier policies are ascending
+by raw `(spool_uuid, sequence)`. Each successor's `revoked_key_ids` must be a
+superset of its predecessor's: subtraction rejects even if the new body has a
+valid hash and owner signature. This implements the existing governance
+`GROW_ONLY_SET_UNION` contract in `owner_records.proto`; checking the selected
+tip's set therefore covers every predecessor revocation. The policy hash binds
+contents; the native verifier still MUST verify each owner's signature and the
+Spool/owner/transfer context before admission. An absent policy is not an empty
+revocation set. This strengthening applies to alpha.33/34 import/native callers
+as well as new alpha.35 writers.
+
+The receiver (heddle) MUST perform these checks before accepting P1/P2/P4:
+
+1. Independently verify Spool genesis, current/historical owner chains and
+   transfer signatures; reject duplicate `owner_histories.state_hash` entries.
+   Select the Spool account from authenticated signed identity or signed transfer
+   context, never `owner_histories.find`. Validate every selected policy hash,
+   owner signature, predecessor and cumulative revocation set.
+2. Resolve witness trust, statement signature, purpose, lifetime/retirement proof
+   and payload commitments. Verify the native originals, authority histories,
+   mint associations, sealed token signature/caveats, request proof, ancestry,
+   method, policy, role fencing and boundary evidence independently.
+3. For P4, use `verify_landing_actor_binding` / `verifyLandingActorBinding` with
+   the account **and public key from the VERIFIED token subject**, plus the
+   independently verified request-proof key. The helper requires that key to
+   equal both the token's subject key and the P4 proof's public key, and binds
+   the envelope root to the subject account. A receiver MUST NOT take the
+   subject account from the envelope root or the Spool owner. For P2, use
+   `verify_authority_actor_binding` / `verifyAuthorityActorBinding` with the
+   account resolved from the verified operation author (Capture/local Integration
+   author or ThreadControl actor) or claim/resolution acceptance account. The
+   author must not be selected from the envelope root. These helpers are required
+   in addition to portable bundle validation, whose envelope-root lookup only
+   enforces the equal-account exact-owner rule.
+4. Apply Spool publisher and mint-root cuts. P2 kinds 2/3 also check **both**
+   original signature keys, including the counterparty. P4 `review_evidence`
+   accepts only signed ThreadOperations with `body.kind = metadata` containing
+   ThreadControl `control.kind = review`. P2 dependencies retain their separate
+   general original/boundary-evidence rules.
+5. For retained paired devices, use `retained_mint_root_issuer` /
+   `retainedMintRootIssuer` with an independently verified complete OwnerHistory
+   and exact issuer `(state_hash, sequence)`. It resolves the authority key from
+   the history and rejects any subsequent Recover; Rotate preserves retention.
+   Use `admitted_owner_mint_root_attachment` / `admittedOwnerMintRootAttachment`
+   with an authenticated statement and its exact P1/P2/P4 payload. It verifies
+   commitments/original signatures and extracts the attested attachment; caller
+   inventories cannot create prior admission. Feed both opaque results into
+   `verify_retained_writer_attachment` / `verifyRetainedWriterAttachment` with
+   raw certificate bytes and the independently verified mint key and time.
+   Unknown issuer states, pre-Recover certificates and newly forged old-owner
+   certificates reject. The raw retained function is internal.
+
+Host (weft) issuance MUST perform the same actor/token/owner/policy checks and
+required landing-policy/CI checks atomically at admission. Witness testimony
+cannot waive receiver checks. These API helpers neither authenticate their
+verified-input preconditions nor replace heddle's native verifier; callers MUST
+complete native verification first. No alpha.33/34 compatibility bypass exists.

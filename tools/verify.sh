@@ -31,6 +31,7 @@ npm run typecheck
 node tools/verify-alpha34-vector-continuity.mjs
 node tools/verify-alpha33-guards.mjs
 node tools/verify-alpha34-guards.mjs
+python3 tools/verify-alpha35-guards.py rust
 python3 tools/verify-alpha35-guards.py ts
 node tests/review-probe.mjs
 node tools/verify-owner-authz-cutover.mjs

@@ -6,7 +6,7 @@ import { ForeignDependencyOrigin, ImportIdentityV1Schema, ImportOwnerChainV1Sche
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
 import type { HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
 import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, reject, HybridContractError, verifySignature, join } from "./_hybrid-codec.js";
-import { decodeWriterAuthority, verifyWriterAccountBinding, checkWitnessWriter } from "./writer-authority.js";
+import { decodeWriterAuthority, verifyWriterAccountBinding, checkWitnessWriter, validateOwnerHistories, spoolAccountForStatement } from "./writer-authority.js";
 import { threadGenesisId, type ThreadGenesisSigner } from "./thread-genesis.js";
 import { decode, type Value } from "./_collaboration-msgpack.js";
 import { verifyLandingKeyRoles, verifyNativeRecord, originalSignaturesDigest, ownerChainDigest, matchWitnessBoundary, requireBoundaryOriginal, verifyWitnessPayload, validatePublicBundle, requirePolicyHistory } from "./import-authority.js";
@@ -91,6 +91,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   if(b.formatVersion!==1)reject("Version");
   if(toBinary(api.NativePublicProofBundleV1Schema,b).length>1048576||b.ownerHistories.length>64||b.ownershipTransfers.length>64||!b.ownerChains.length||b.ownerChains.length>64||b.policies.length>256||!b.genesisWitnesses.length||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256||b.statements.length>1024||b.historyProofs.length>1024)reject("Bounds");
   const foreign=new ForeignReferences(b.foreignDependencies,ForeignDependencyOrigin.NATIVE);
+  validateOwnerHistories(b.ownerHistories);
   const owner=b.ownerGenesis?.genesis??reject("Canonical"),chain=b.ownerChains[0]??reject("Canonical");
   sorted(b.ownerChains,ownerChainDigest);
   if(!b.witnessSet)reject("Canonical");
@@ -151,9 +152,9 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     const s=signed.body??reject("Canonical");
     if(!equal(s.spoolUuid,owner.spoolUuid)||!equal(s.spoolGenesisDigest,chain.spoolGenesisDigest)||!b.ownerHistories.some(h=>equal(h.stateHash,s.ownerStateHash)&&h.root?.root&&equal(h.root.root.ownerId,s.ownerId)))reject("Scope");
     requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);
-    if(s.purpose===1){const p=b.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyNativeGenesisPayload(s,p);checkWitnessWriter(s,p.creatorAuthorityEnvelope,b.ownerHistories,b.policies);}
-    else if(s.purpose===2){const p=b.authorityWitnesses.find(p=>equal(canonicalHybridV1(ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"authority",payload:p});checkWitnessWriter(s,p.authorityEnvelope,b.ownerHistories,b.policies);}
-    else if(s.purpose===4){const p=b.landingWitnesses.find(p=>equal(canonicalHybridV1(HostedLandingWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"landing",payload:p});checkWitnessWriter(s,p.authorityEnvelope,b.ownerHistories,b.policies);}
+    if(s.purpose===1){const p=b.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyNativeGenesisPayload(s,p);checkWitnessWriter(s,p.creatorAuthorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers));}
+    else if(s.purpose===2){const p=b.authorityWitnesses.find(p=>equal(canonicalHybridV1(ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"authority",payload:p});checkWitnessWriter(s,p.authorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers),p.kind===2||p.kind===3?p.original?.signatures:[]);}
+    else if(s.purpose===4){const p=b.landingWitnesses.find(p=>equal(canonicalHybridV1(HostedLandingWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"landing",payload:p});checkWitnessWriter(s,p.authorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers));}
     else reject("Version");
   }
   foreign.finish();

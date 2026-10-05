@@ -198,13 +198,15 @@ Then resolve the issuer by exact `(owner_state_hash, owner_sequence)` in the
 actor's independently verified owner history, with no Recover between that
 issuer and the selected actor state. An attested inventory member does not
 restore recovered or unknown authority. In the API's
-`verify_retained_owner_mint_root_attachment` /
-`verifyRetainedOwnerMintRootAttachment`, supply those verified issuer facts,
-`issuer_retained_mint_authority` / `issuerRetainedMintAuthority`, the exact
-`admitted_attachments` / `admittedAttachments` inventory, expected account/mint
-and statement observation time. These explicit inputs are checked for exact
-membership, issuer binding, interval and owner signature; the native owner
-verifier establishes their history/recovery provenance. The host MUST NOT use
+`retained_mint_root_issuer` / `retainedMintRootIssuer` helper derives issuer
+facts from a verified OwnerHistory and exact state/sequence, rejecting a later
+Recover. `admitted_owner_mint_root_attachment` / `admittedOwnerMintRootAttachment`
+extracts the attachment from an authenticated statement and matched payload.
+Both return opaque results. Receivers MUST supply these to
+`verify_retained_writer_attachment` / `verifyRetainedWriterAttachment`, with
+raw certificate bytes, independently verified mint key and observation time.
+The raw verifier is internal; caller-created issuer booleans and inventories
+cannot establish retention or admission. The host MUST NOT use
 receiver testimony as its issuance inventory. Fresh enrollment always requires
 current owner authority. Apply the same inventory path to P1 StartThread,
 P2 operations/claims/resolutions, P4 requesters and import-source genesis where

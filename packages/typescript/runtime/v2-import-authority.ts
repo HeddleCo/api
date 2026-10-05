@@ -1,7 +1,7 @@
 import { ForeignReferences, foreignThread } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
-import { checkWitnessWriter } from "./writer-authority.js";
+import { checkWitnessWriter, validateOwnerHistories, spoolAccountForStatement } from "./writer-authority.js";
 import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse, type RetryImportSourceRequest } from "./integration_pb.js";
 import { RecordRefSchema, SpoolRefSchema } from "./common_pb.js";
 import type { HybridImportJobSelector, MutationResponse, OperationRecord, SpoolRef, RecordRef } from "./common_pb.js";
@@ -10,7 +10,7 @@ import { CallFailureSchema, CallFailureCode, ErrorReason, type CallFailure } fro
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { SignedHostedWitnessSetV1Schema, HostedWitnessStatementV1Schema, SignedHostedWitnessStatementV1Schema, HostedWitnessHistoryProofV1Schema, type SignedHostedWitnessSetV1, type HostedWitnessStatementV1, type SignedHostedWitnessStatementV1, type HostedWitnessHistoryProofV1 } from "../common/hosted_witness_pb.js";
 import { resolveWitnessStatement, restoreWitnessHistorySnapshot, verifyWitnessSetAfterRootReplacement, verifyWitnessSet, verifyWitnessInclusion, leafDigest, recheckWitnessContext, type WitnessSetExpectation, type ResolvedWitnessStatement, type VerifiedWitnessSet } from "./witness-trust.js";
-import { canonicalHybridV1, signingDigest, equal, width, keyId, verifySignature, reject, canonicalHttps, hash, compare, sized, utf8, HybridContractError } from "./_hybrid-codec.js";
+import { canonicalHybridV1, signingDigest, equal, width, keyId, verifySignature, reject, canonicalHttps, hash, compare, sized, utf8, integer, HybridContractError } from "./_hybrid-codec.js";
 export const PERMISSION_DOMAIN="heddle-import-member-permission-v1",GENESIS_DOMAIN="heddle-import-genesis-authority-v1",DELEGATION_DOMAIN="heddle-import-job-delegation-v1",OPERATION_DOMAIN="heddle-delegated-import-operation-v1",MANIFEST_DOMAIN="heddle-import-result-manifest-v1";
 export { canonicalHybridV1, signingDigest, strictDecode, HybridContractError } from "./_hybrid-codec.js";
 
@@ -420,7 +420,15 @@ export function requireBoundaryOriginal(e:api.ImportBoundaryAcceptanceV1,origina
 }
 export async function matchWitnessBoundary(s:HostedWitnessStatementV1,evidence:api.ImportBoundaryAcceptanceV1[]):Promise<void>{validateStatementBoundary(s);for(let i=0;i<evidence.length;i++){const e=evidence[i]!;await verifyBoundaryAcceptance(e);if(i&&compare(evidence[i-1]!.binding!.acceptanceId,e.binding!.acceptanceId)>=0)reject("Canonical");}if(s.boundaryAcceptance&&!evidence.some(e=>equal(canonicalHybridV1(common.HostedWitnessBoundaryAcceptanceV1Schema,e.binding!),canonicalHybridV1(common.HostedWitnessBoundaryAcceptanceV1Schema,s.boundaryAcceptance!))))reject("BoundaryAcceptance");}
 import * as common from "../common/hosted_witness_pb.js";
-async function dependencies(records:SignedRecord[],evidence:api.ImportBoundaryAcceptanceV1[]=[]){if(records.length>128)reject("Bounds");for(let i=0;i<records.length;i++){const r=records[i]!;if(!["heddle-thread-genesis-v1","heddle-thread-operation-v1","heddle-thread-ownership-claim-v1","heddle-thread-ownership-resolution-v1"].includes(r.format)){if(!["heddle-original-boundary-acceptance-v1","heddle-thread-genesis-admission-v2","heddle-thread-authority-admission-v3"].includes(r.format))reject("Version");if(!evidence.some(e=>[e.signedAcceptance,...e.originalReceipts].some(v=>v&&equal(signedNativeDigest(v),signedNativeDigest(r)))))reject("BoundaryAcceptance");}await verifyNativeRecord(r,r.format);if(i&&compare(signedNativeDigest(records[i-1]!),signedNativeDigest(r))>=0)reject("Canonical");}}
+async function dependencies(records:SignedRecord[],evidence:api.ImportBoundaryAcceptanceV1[]=[],reviewsOnly=false){if(records.length>128)reject("Bounds");for(let i=0;i<records.length;i++){const r=records[i]!;if(reviewsOnly)requireReviewOperation(r);if(!["heddle-thread-genesis-v1","heddle-thread-operation-v1","heddle-thread-ownership-claim-v1","heddle-thread-ownership-resolution-v1"].includes(r.format)){if(!["heddle-original-boundary-acceptance-v1","heddle-thread-genesis-admission-v2","heddle-thread-authority-admission-v3"].includes(r.format))reject("Version");if(!evidence.some(e=>[e.signedAcceptance,...e.originalReceipts].some(v=>v&&equal(signedNativeDigest(v),signedNativeDigest(r)))))reject("BoundaryAcceptance");}await verifyNativeRecord(r,r.format);if(i&&compare(signedNativeDigest(records[i-1]!),signedNativeDigest(r))>=0)reject("Canonical");}}
+function requireReviewOperation(r:SignedRecord):void {
+  if(r.format!=="heddle-thread-operation-v1")reject("Semantic");
+  try {const op=decode(r.canonicalRecord) as {body:{kind:string;canonical:number[]}};
+    if(op.body.kind!=="metadata")reject("Semantic");
+    const control=decode(Uint8Array.from(op.body.canonical)) as {control:{kind:string}};
+    if(control.control.kind!=="review")reject("Semantic");
+  }catch{reject("Semantic");}
+}
 export function originalSignaturesDigest(records:SignedRecord[],extra:RecordSignature[]=[]):Uint8Array{const signatures=[...records.flatMap(r=>r.signatures),...extra];return hash(utf8.encode("heddle-hosted-original-signatures-v1"),u32(signatures.length),...signatures.flatMap(s=>[sized(s.publicKey),sized(s.signature)]));}
 export const authorityEnvelopeDigest=(e:Uint8Array)=>hash(utf8.encode("heddle-hosted-authority-envelope-v1"),sized(e));
 /** Portable request-role refusal using independently selected receiver role facts. */
@@ -436,7 +444,7 @@ export async function verifyWitnessPayload(s:import("../common/hosted_witness_pb
   let purpose:number,bytes:Uint8Array,authority:Uint8Array,signatures:Uint8Array,publisher=s.publisherKeyId;
   if(payload.kind==="genesis"){const p=clone(api.ImportGenesisWitnessV1Schema,payload.payload);if(p.formatVersion!==1)reject("Version");if(!p.binding?.body||!p.originalGenesis)reject("Canonical");const b=p.binding.body;await matchWitnessBoundary(s,p.boundaryAcceptance?[p.boundaryAcceptance]:[]);if((s.basis===2)!==!!p.boundaryAcceptance)reject("BoundaryAcceptance");if(p.boundaryAcceptance)requireBoundaryOriginal(p.boundaryAcceptance,p.originalGenesis);await verifyNativeRecord(p.originalGenesis,"heddle-thread-genesis-v1");if(!equal(threadGenesisId(p.originalGenesis.canonicalRecord),b.genesisDigest)||!b.identity||!equal(s.spoolUuid,b.identity.spoolUuid)||!equal(s.spoolGenesisDigest,b.identity.spoolGenesisDigest)||!equal(s.ownerId,b.identity.ownerId)||!equal(s.ownerStateHash,b.identity.ownerStateHash)||s.ownershipTransferSequence!==b.identity.ownershipTransferSequence)reject("Scope");const creator=p.originalGenesis.signatures.find(x=>equal(x.publicKey,b.creatorPublicKey));if(!creator)reject("Signature");if(!equal(b.originalCreatorSignature,creator.signature)||!equal(b.creatorAuthorityEnvelopeDigest,hash(p.creatorAuthorityEnvelope)))reject("Scope");await auth(b.creatorPublicKey,GENESIS_DOMAIN,api.ImportGenesisAuthorityV1Schema,b,p.binding.creatorSignature);purpose=1;bytes=canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p);authority=signedGenesisDigest(p.binding);signatures=originalSignaturesDigest([p.originalGenesis]);publisher=keyId(b.creatorPublicKey);}
   else if(payload.kind==="authority"){const p=clone(api.ImportAuthorityWitnessV1Schema,payload.payload);if(p.formatVersion!==1)reject("Version");if(!p.original)reject("Canonical");const format=["","heddle-thread-operation-v1","heddle-thread-ownership-claim-v1","heddle-thread-ownership-resolution-v1"][p.kind];if(!format)reject("Version");await verifyNativeRecord(p.original,format);if((p.kind===2||p.kind===3)&&p.original.signatures.length!==2)reject("Signature");if(!p.original.signatures.some(x=>equal(keyId(x.publicKey),s.publisherKeyId)))reject("Signature");if(!p.authorityEnvelope.length||p.authorityEnvelope.length>MAX_RECORD_BYTES)reject("Bounds");await matchWitnessBoundary(s,p.boundaryAcceptances);if(s.boundaryAcceptance){const e=p.boundaryAcceptances.find(e=>equal(e.binding!.acceptanceId,s.boundaryAcceptance!.acceptanceId))??reject("BoundaryAcceptance");requireBoundaryOriginal(e,p.original);}await dependencies(p.dependencies,p.boundaryAcceptances);purpose=2;bytes=canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p);authority=authorityEnvelopeDigest(p.authorityEnvelope);signatures=originalSignaturesDigest([p.original,...p.dependencies]);}
-  else{const p=clone(api.HostedLandingWitnessV1Schema,payload.payload);if(p.formatVersion!==1)reject("Version");if(!p.execution||!p.sourceOperation||!p.request?.signature)reject("Canonical");const r=p.request;if(r.formatVersion!==1||r.methodPath!=="/heddle.api.v1alpha2.ThreadService/LandThread")reject("Version");await verifyNativeRecord(p.execution,"heddle-thread-operation-v1");await verifyNativeRecord(p.sourceOperation,"heddle-thread-operation-v1");await matchWitnessBoundary(s,[]);await dependencies(p.reviewEvidence);if(r.signingIdentity!==`principal:device-key:${Array.from(r.signature!.publicKey,b=>b.toString(16).padStart(2,"0")).join("")}`)reject("Signature");width(r.nonce,16);if(r.timestampMillis<=0n||!r.requestBody.length||r.requestBody.length>MAX_RECORD_BYTES||!p.authorityEnvelope.length||p.authorityEnvelope.length>MAX_RECORD_BYTES)reject("Bounds");await verifySignature(r.signature!.publicKey,await unarySigningBytes(r.signingIdentity,r.methodPath,r.timestampMillis,r.nonce,r.requestBody),r.signature!.signature);purpose=4;bytes=canonicalHybridV1(api.HostedLandingWitnessV1Schema,p);authority=authorityEnvelopeDigest(p.authorityEnvelope);signatures=originalSignaturesDigest([p.execution,p.sourceOperation,...p.reviewEvidence],[r.signature!]);publisher=keyId(r.signature!.publicKey);}
+  else{const p=clone(api.HostedLandingWitnessV1Schema,payload.payload);if(p.formatVersion!==1)reject("Version");if(!p.execution||!p.sourceOperation||!p.request?.signature)reject("Canonical");const r=p.request;if(r.formatVersion!==1||r.methodPath!=="/heddle.api.v1alpha2.ThreadService/LandThread")reject("Version");await verifyNativeRecord(p.execution,"heddle-thread-operation-v1");await verifyNativeRecord(p.sourceOperation,"heddle-thread-operation-v1");await matchWitnessBoundary(s,[]);await dependencies(p.reviewEvidence,[],true);if(r.signingIdentity!==`principal:device-key:${Array.from(r.signature!.publicKey,b=>b.toString(16).padStart(2,"0")).join("")}`)reject("Signature");width(r.nonce,16);if(r.timestampMillis<=0n||!r.requestBody.length||r.requestBody.length>MAX_RECORD_BYTES||!p.authorityEnvelope.length||p.authorityEnvelope.length>MAX_RECORD_BYTES)reject("Bounds");await verifySignature(r.signature!.publicKey,await unarySigningBytes(r.signingIdentity,r.methodPath,r.timestampMillis,r.nonce,r.requestBody),r.signature!.signature);purpose=4;bytes=canonicalHybridV1(api.HostedLandingWitnessV1Schema,p);authority=authorityEnvelopeDigest(p.authorityEnvelope);signatures=originalSignaturesDigest([p.execution,p.sourceOperation,...p.reviewEvidence],[r.signature!]);publisher=keyId(r.signature!.publicKey);}
   if(bytes.length>MAX_RECORD_BYTES)reject("Bounds");if(s.purpose!==purpose||!equal(s.canonicalPayload,bytes)||!equal(s.authorityDigest,authority)||!equal(s.originalSignaturesDigest,signatures)||!equal(s.publisherKeyId,publisher))reject("Scope");
 }
 export function resolveBundlePermission(bundle:api.ImportPublicProofBundleV1,digest:Uint8Array):api.SignedImportMemberPermissionV1|undefined{width(digest,32);if(!digest.some(Boolean))return;return bundle.memberPermission&&equal(signedPermissionDigest(bundle.memberPermission),digest)?bundle.memberPermission:reject("ImportPermission");}
@@ -444,6 +452,7 @@ export function resolveBundleManifest(bundle:api.ImportPublicProofBundleV1,diges
 export function publicationPayload(operation:api.SignedDelegatedImportOperationV1,m:api.ImportResultManifestV1):api.ImportPublicationWitnessV1{const o=operation.body??reject("Canonical");return create(api.ImportPublicationWitnessV1Schema,{formatVersion:1,signedOperationDigest:signedOperationDigest(operation),delegationDigest:o.delegationDigest,logicalJobId:o.logicalJobId,retryLineageId:o.retryLineageId,physicalOperationId:o.physicalOperationId,refName:o.refName,slotId:o.slotId,hashAlgorithm:o.hashAlgorithm,observedCommitOid:o.observedCommitOid,expectedFrontierDigest:o.expectedFrontierDigest,resultingFrontierDigest:o.resultingFrontierDigest,terminalManifestDigest:manifestDigest(m)});}
 export function validatePublicBundle(b:api.ImportPublicProofBundleV1):void { validateBundle(b,true); }
 function validateBundleBounds(b:api.ImportPublicProofBundleV1):void {
+  validateOwnerHistories(b.ownerHistories);
   if(b.formatVersion!==1)reject("Version");if(toBinary(api.ImportPublicProofBundleV1Schema,b).length>MAX_BUNDLE_BYTES||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.delegations.length!==1||b.manifests.length>256||b.operations.length>256||b.genesisAuthorities.length>256||b.originalGeneses.length>256||b.creatorAuthorityEnvelopes.length>256||b.statements.length>1024||b.historyProofs.length>1024||b.policies.length>256||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256)reject("Bounds");
 }
 function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolean):void{
@@ -461,7 +470,7 @@ function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolea
   for(const {body:s} of b.statements){if(!s)reject("Canonical");validateStatementBoundary(s);requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);
     if(s.purpose===2||s.purpose===4){
       const envelope=s.purpose===2?b.authorityWitnesses.find(p=>equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope:b.landingWitnesses.find(p=>equal(canonicalHybridV1(api.HostedLandingWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope;
-      checkWitnessWriter(s,envelope??reject("Scope"),b.ownerHistories,b.policies);
+      checkWitnessWriter(s,envelope??reject("Scope"),b.ownerHistories,b.policies,spoolAccountForStatement(s,[...b.delegations.flatMap(d=>d.body?.identity?[d.body.identity]:[]),...b.genesisAuthorities.flatMap(g=>g.body?.identity?[g.body.identity]:[])],b.ownershipTransfers),b.authorityWitnesses.find(p=>(p.kind===2||p.kind===3)&&equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))?.original?.signatures??[]);
     }
   }
   for(const list of [b.manifests.map(manifestDigest)])for(let i=1;i<list.length;i++)if(compare(list[i-1]!,list[i]!)>=0)reject("Canonical");
@@ -471,14 +480,35 @@ function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolea
   for(const o of b.operations){if(!o.body||!b.delegations.some(d=>equal(signedDelegationDigest(d),o.body!.delegationDigest))||!checkImportSlotReplay(terminal,o)||!b.manifests.some(m=>checkImportSlotReplay(m,o)&&b.statements.some(s=>s.body?.purpose===3&&equal(s.body.canonicalPayload,canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,m))))))reject("Scope");}
   for(const {body:s} of b.statements){if(!s)reject("Canonical");const payloads=s.purpose===1?b.genesisWitnesses.map(p=>canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p)):s.purpose===2?b.authorityWitnesses.map(p=>canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p)):s.purpose===4?b.landingWitnesses.map(p=>canonicalHybridV1(api.HostedLandingWitnessV1Schema,p)):s.purpose===3?b.operations.flatMap(o=>b.manifests.map(m=>canonicalHybridV1(api.ImportPublicationWitnessV1Schema,publicationPayload(o,m)))):reject("Version");if(!payloads.some(p=>equal(p,s.canonicalPayload)))reject("Scope");}
 }
-// Reference completeness; native verification authenticates policy and owner context.
+// Hash commitments and grow-only revocations; native verification authenticates owner signatures/context.
 export function requirePolicyHistory(policies:import("./owner_records_pb.js").SignedSpoolPolicyRecord[],spool:Uint8Array,sequence:bigint,stateHash:Uint8Array):void{
+  for(let i=0;i<policies.length;i++){
+    const p=policies[i]!.body??reject("Canonical");
+    if(i){const prev=policies[i-1]!.body!;if(compare(prev.spoolUuid,p.spoolUuid)>0||(equal(prev.spoolUuid,p.spoolUuid)&&prev.sequence>=p.sequence))reject("Canonical");}
+  }
+  let successorRevoked:readonly Uint8Array[]|undefined;
   for(let i=0;i<=policies.length;i++){
     width(stateHash,32);if(sequence===0n){if(stateHash.some(Boolean))reject("Scope");return;}
     const matches=policies.filter(p=>p.body&&equal(p.body.spoolUuid,spool)&&p.body.sequence===sequence&&equal(p.body.policyStateHash,stateHash));
-    if(!matches.length)reject("Scope");if(matches.length!==1)reject("Canonical");const head=matches[0]!.body!.expectedHead??reject("Canonical");if(head.sequence+1n!==sequence)reject("Scope");sequence=head.sequence;stateHash=head.stateHash;
+    if(!matches.length)reject("Scope");const p=matches[0]!.body!;
+    const digest=policyStateDigest(p);if(!equal(digest,p.policyStateHash))reject("Canonical");
+    const revoked=p.policy?.revokedKeyIds??[];
+    if(successorRevoked&&revoked.some(id=>!successorRevoked!.some(next=>equal(id,next))))reject("Scope");
+    successorRevoked=revoked;
+    const head=p.expectedHead??reject("Canonical");if(head.sequence+1n!==sequence)reject("Scope");sequence=head.sequence;stateHash=head.stateHash;
   }
   reject("Scope");
+}
+
+/** Canonical SignedPolicyBody fields 1–10, matching owner_records.proto. */
+export function policyStateDigest(p:import("./owner_records_pb.js").SignedPolicyBody):Uint8Array {
+  if(p.formatVersion!==1||p.mergeParentStateHashes.length)reject("Version");
+  width(p.spoolUuid,16);width(p.ownerId,32);width(p.ownerStateHash,32);
+  const h=p.expectedHead??reject("Canonical"),policy=p.policy??reject("Canonical");width(h.stateHash,32);
+  if(p.mergePolicies.length!==2||p.mergePolicies[0]!.settingKey!=="max_audience"||p.mergePolicies[0]!.semantics!==1||p.mergePolicies[1]!.settingKey!=="revoked_key_ids"||p.mergePolicies[1]!.semantics!==2)reject("Canonical");
+  policy.revokedKeyIds.forEach((id,i)=>{width(id,32);if(i&&compare(policy.revokedKeyIds[i-1]!,id)>=0)reject("Canonical");});
+  if(policy.maxAudience!==undefined&&![1,2,3].includes(policy.maxAudience))reject("Canonical");
+  return hash(utf8.encode("heddle-spool-signed-policy-v2"),join(u32(p.formatVersion),sized(p.spoolUuid),sized(h.stateHash),integer(h.sequence),integer(p.sequence),u32(0),u32(policy.revokedKeyIds.length),...policy.revokedKeyIds.map(sized),Uint8Array.of(policy.maxAudience===undefined?0:1),...(policy.maxAudience===undefined?[]:[u32(policy.maxAudience)]),u32(2),...p.mergePolicies.flatMap(r=>[sized(utf8.encode(r.settingKey)),u32(r.semantics)]),sized(p.ownerId),sized(p.ownerStateHash),integer(p.ownershipTransferSequence)));
 }
 
 /** Caller-generated non-nil UUID, reserved as the first physical operation ID.

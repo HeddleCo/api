@@ -21,7 +21,7 @@ import { blake3 } from '@noble/hashes/blake3.js';
 const native=JSON.parse(readFileSync('tests/fixtures/native-host-witness-v1.json'));
 const imported=JSON.parse(readFileSync('tests/fixtures/import-authority-host-witness-v1.json'));
 const raw=h=>new Uint8Array(Buffer.from(h,'hex')),hex=b=>Buffer.from(b).toString('hex'),fill=(n,size=32)=>new Uint8Array(size).fill(n);
-for(const [name,seed] of [['cowriter_device',0x41],['cowriter_owner',0x42],['paired_leaf',0x43]]){
+for(const [name,seed] of [['cowriter_device',0x41],['cowriter_owner',0x42],['paired_leaf',0x43],['next_recovery_a',0x46],['next_recovery_b',0x47]]){
  const secret=fill(seed),privateKey=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),secret]),format:'der',type:'pkcs8'});
  native.keys[name]={seed_hex:hex(secret),public_key_hex:hex(new Uint8Array(createPublicKey(privateKey).export({format:'der',type:'spki'}).subarray(-32)))};
 }
@@ -68,7 +68,7 @@ function binding(account,env){
  p.binding.creatorSignature=auth('cowriter_device',signingDigest('heddle-native-genesis-authority-v1',api.NativeGenesisAuthorityV1Schema,b));return p;
 }
 const fixture={format_version:1,scope:'API transport/binding, policy key cut and retained-certificate checks; full native owner/Biscuit/causal authorization is downstream',keys:native.keys,context:{identity_wire_hex:hex(toBinary(imp.ImportIdentityV1Schema,identity)),account_hex:hex(account),publisher_key_id_hex:hex(keyId(key('paired_leaf'))),now_seconds:1100},vectors:{},positive:[],negative:[]};
-const wire=(name,schema,value)=>{fixture.vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,value))};return value;};
+const wire=(name,schema,value)=>{if(schema===api.NativePublicProofBundleV1Schema){value.authorityWitnesses.sort((a,b)=>compare(signingDigest('heddle-import-authority-witness-payload-v1',imp.ImportAuthorityWitnessV1Schema,a),signingDigest('heddle-import-authority-witness-payload-v1',imp.ImportAuthorityWitnessV1Schema,b)));value.landingWitnesses.sort((a,b)=>compare(signingDigest('heddle-hosted-landing-witness-payload-v1',imp.HostedLandingWitnessV1Schema,a),signingDigest('heddle-hosted-landing-witness-payload-v1',imp.HostedLandingWitnessV1Schema,b)));value.statements.sort((a,b)=>compare(statementSigningDigest(a.body),statementSigningDigest(b.body)));}fixture.vectors[name]={schema:schema.typeName,wire_hex:hex(toBinary(schema,value))};return value;};
 wire('cowriter_envelope',ThreadControlAuthoritySchema,envelope);wire('owner_envelope',ThreadControlAuthoritySchema,originalEnvelope);
 wire('cowriter_start_thread',api.NativeGenesisWitnessV1Schema,binding(account,envelopeBytes));fixture.positive.push('cowriter_start_thread');
 wire('account_mismatch',api.NativeGenesisWitnessV1Schema,binding(ownerAccount,envelopeBytes));fixture.negative.push({id:'account_mismatch',gate:'genesis',control:'cowriter_start_thread',expected:'GenesisBinding'});
@@ -124,7 +124,7 @@ for(const [id,expected] of [['actor_publisher_revoked','Revoked'],['actor_mint_r
 function cutPolicy(template,revoked){
  const policy=clone(own.SignedSpoolPolicyRecordSchema,template),b=policy.body;
  b.policy.revokedKeyIds=revoked;
- const body=join(u32(1),sized(b.spoolUuid),sized(b.expectedHead.stateHash),integer(b.expectedHead.sequence),integer(b.sequence),u32(0),u32(revoked.length),...revoked.map(sized),Uint8Array.of(0),u32(2),sized(utf8.encode('max_audience')),u32(1),sized(utf8.encode('revoked_key_ids')),u32(2),sized(b.ownerId),sized(b.ownerStateHash),integer(b.ownershipTransferSequence));
+ const body=join(u32(1),sized(b.spoolUuid),sized(b.expectedHead.stateHash),integer(b.expectedHead.sequence),integer(b.sequence),u32(0),u32(revoked.length),...revoked.map(sized),Uint8Array.of(b.policy.maxAudience===undefined?0:1),...(b.policy.maxAudience===undefined?[]:[u32(b.policy.maxAudience)]),u32(2),sized(utf8.encode('max_audience')),u32(1),sized(utf8.encode('revoked_key_ids')),u32(2),sized(b.ownerId),sized(b.ownerStateHash),integer(b.ownershipTransferSequence));
  b.policyStateHash=hash(utf8.encode('heddle-spool-signed-policy-v2'),body);
  policy.ownerSignature=auth('owner',hash(utf8.encode('heddle-spool-signed-policy-signature-v2'),join(body,sized(b.policyStateHash))));return policy;
 }
@@ -144,6 +144,80 @@ for(const [prefix,schema,bundle] of [['native',api.NativePublicProofBundleV1Sche
  const b=clone(schema,bundle),policy=cutPolicy(b.policies[0],[keyId(key('cowriter_device'))]);b.policies=[policy];
  for(const signed of b.statements){signed.body.policyStateHash=policy.body.policyStateHash;signed.signature=sig('witness',statementSigningDigest(signed.body));}
  wire(prefix+'_actor_key_revoked',schema,b);
+}
+
+// Fix-round helpers and fully rebound negative bundles.
+function rebound(schema,bundle,edit){
+ const b=clone(schema,bundle);
+ const references=b.statements.map(({body:s})=>s.purpose===2?b.authorityWitnesses.find(p=>hex(canonicalHybridV1(imp.ImportAuthorityWitnessV1Schema,p))===hex(s.canonicalPayload)):s.purpose===4?b.landingWitnesses.find(p=>hex(canonicalHybridV1(imp.HostedLandingWitnessV1Schema,p))===hex(s.canonicalPayload)):undefined);
+ edit(b);
+ for(const [i,signed] of b.statements.entries()){const s=signed.body,p=references[i];
+  if(p){s.canonicalPayload=canonicalHybridV1(s.purpose===2?imp.ImportAuthorityWitnessV1Schema:imp.HostedLandingWitnessV1Schema,p);s.authorityDigest=authorityEnvelopeDigest(p.authorityEnvelope);s.originalSignaturesDigest=s.purpose===2?originalSignaturesDigest([p.original,...p.dependencies]):originalSignaturesDigest([p.execution,p.sourceOperation,...p.reviewEvidence],[p.request.signature]);}
+  signed.signature=sig('witness',statementSigningDigest(s));
+ }
+ return b;
+}
+const p2Bundle=load(native,'native_metadata',api.NativePublicProofBundleV1Schema),p4Bundle=load(native,'native_landing',api.NativePublicProofBundleV1Schema);
+wire('p2_owner_bundle',api.NativePublicProofBundleV1Schema,p2Bundle);wire('p4_owner_bundle',api.NativePublicProofBundleV1Schema,p4Bundle);
+for(const [name,bundle] of [['p2',p2Bundle],['p4',p4Bundle]]){
+ const bad=rebound(api.NativePublicProofBundleV1Schema,bundle,b=>{if(name==='p2')b.authorityWitnesses[0].authorityEnvelope=toBinary(ThreadControlAuthoritySchema,fake);else b.landingWitnesses[0].authorityEnvelope=toBinary(ThreadControlAuthoritySchema,fake);});
+ wire(name+'_self_signed_owner_uuid',api.NativePublicProofBundleV1Schema,bad);
+ const poisoned=clone(api.NativePublicProofBundleV1Schema,bad),h=clone(own.OwnerHistorySchema,poisoned.ownerHistories[0]);h.root.root.accountUuid=account;poisoned.ownerHistories.unshift(h);
+ wire(name+'_duplicate_history_poisoning',api.NativePublicProofBundleV1Schema,poisoned);
+}
+const mismatchedP2=clone(imp.ImportAuthorityWitnessV1Schema,newP);mismatchedP2.authorityEnvelope=toBinary(ThreadControlAuthoritySchema,originalEnvelope);wire('p2_envelope_not_op_author',imp.ImportAuthorityWitnessV1Schema,mismatchedP2);
+const mismatchedP4=clone(imp.HostedLandingWitnessV1Schema,landing);mismatchedP4.authorityEnvelope=toBinary(ThreadControlAuthoritySchema,originalEnvelope);wire('requester_not_token_subject',imp.HostedLandingWitnessV1Schema,mismatchedP4);
+function bindPolicy(b,policies){b.policies=policies;const p=policies.at(-1).body;for(const signed of b.statements){signed.body.policyStateHash=p.policyStateHash;signed.body.policySequence=p.sequence;signed.signature=sig('witness',statementSigningDigest(signed.body));}return b;}
+for(const [prefix,schema,bundle] of [['native',api.NativePublicProofBundleV1Schema,cowriterBundle],['import',imp.ImportPublicProofBundleV1Schema,importBundle]]){
+ const first=cutPolicy(bundle.policies[0],[fill(0x90)]),second=clone(own.SignedSpoolPolicyRecordSchema,first);second.body.expectedHead=create(own.SignedPolicyHeadSchema,{stateHash:first.body.policyStateHash,sequence:1n});second.body.sequence=2n;
+ const tip=cutPolicy(second,[fill(0x90)]),chain=bindPolicy(clone(schema,bundle),[first,tip]);wire(prefix+'_policy_chain',schema,chain);
+ for(const mode of ['stripped','absent','reordered','duplicated','subtracted','predecessor_stripped']){
+  const b=clone(schema,chain);
+  if(mode==='stripped')b.policies[1].body.policy.revokedKeyIds=[];
+  if(mode==='absent'){bindPolicy(b,[cutPolicy(bundle.policies[0],[])]);b.policies[0].body.policy=undefined;}
+  if(mode==='reordered')b.policies.reverse();
+  if(mode==='duplicated')b.policies.push(clone(own.SignedSpoolPolicyRecordSchema,b.policies[1]));
+  if(mode==='subtracted')bindPolicy(b,[first,cutPolicy(second,[])]);
+  if(mode==='predecessor_stripped')b.policies[0].body.policy.revokedKeyIds=[];
+  wire(prefix+'_policy_'+mode,schema,b);
+ }
+}
+// Claim and resolution counterparties need the same policy key cut as publisher.
+const resolutionBundle=load(native,'ownership_resolution',api.NativePublicProofBundleV1Schema);
+wire('ownership_counterparty_control',api.NativePublicProofBundleV1Schema,resolutionBundle);
+for(const kind of [2,3]){
+ const b=clone(api.NativePublicProofBundleV1Schema,resolutionBundle),statement=b.statements.find(s=>s.body.purpose===2&&b.authorityWitnesses.some(p=>p.kind===kind&&hex(canonicalHybridV1(imp.ImportAuthorityWitnessV1Schema,p))===hex(s.body.canonicalPayload)));
+ const p=b.authorityWitnesses.find(p=>hex(canonicalHybridV1(imp.ImportAuthorityWitnessV1Schema,p))===hex(statement.body.canonicalPayload));
+ const counterparty=p.original.signatures.find(k=>hex(keyId(k.publicKey))!==hex(statement.body.publisherKeyId));
+ const first=b.policies[0],second=clone(own.SignedSpoolPolicyRecordSchema,first);second.body.expectedHead=create(own.SignedPolicyHeadSchema,{stateHash:first.body.policyStateHash,sequence:first.body.sequence});second.body.sequence=first.body.sequence+1n;
+ const cut=cutPolicy(second,[keyId(counterparty.publicKey)]);b.policies=[first,cut];
+ // Only this P2 testimony uses the introducing policy. Earlier P1 admissions
+ // retain their unrevoked policy, so no publisher guard masks the counterparty.
+ statement.body.policyStateHash=cut.body.policyStateHash;statement.body.policySequence=cut.body.sequence;statement.signature=sig('witness',statementSigningDigest(statement.body));
+ wire('kind_'+kind+'_counterparty_revoked',api.NativePublicProofBundleV1Schema,b);
+}
+// Replace a P4 Review with a valid signed non-Review original; recommit all bytes.
+const nonReview=rebound(api.NativePublicProofBundleV1Schema,p4Bundle,b=>{b.landingWitnesses[0].reviewEvidence=[b.landingWitnesses[0].sourceOperation];});wire('p4_non_review',api.NativePublicProofBundleV1Schema,nonReview);
+// Independently verified history endpoints for retained issuers.
+function transitioned(kind){
+ const h=clone(own.OwnerHistorySchema,ownHistory),root=h.root.root,recovery=clone(own.RecoveryPolicySchema,root.recoveryPolicy);
+ if(kind===2)recovery.guardians=[{kind:1,key:{algorithm:1,publicKey:key('next_recovery_a')}},{kind:1,key:{algorithm:1,publicKey:key('next_recovery_b')}}].map(g=>create(own.RecoveryGuardianSchema,g)).sort((a,b)=>compare(a.key.publicKey,b.key.publicKey));
+ const t=create(own.OwnerKeyTransitionSchema,{formatVersion:1,ownerId:root.ownerId,previousStateHash:h.stateHash,sequence:1n,kind,nextAuthorityKey:{algorithm:1,publicKey:key('rotated_owner')},nextRecoveryPolicy:recovery,validFromUnixSeconds:1050n,previousKeyValidUntilUnixSeconds:kind===2?0n:1050n,nonce:fill(0x48)});
+ const encodedKey=k=>join(u32(k.algorithm),sized(k.publicKey)),policy=join(u32(recovery.threshold),u32(recovery.guardians.length),...recovery.guardians.map(g=>join(u32(g.kind),encodedKey(g.key))),integer(recovery.windowSecs??604800n));
+ const canonical=join(u32(1),sized(t.ownerId),sized(t.previousStateHash),integer(t.sequence),u32(t.kind),encodedKey(t.nextAuthorityKey),policy,integer(t.validFromUnixSeconds,true),integer(t.previousKeyValidUntilUnixSeconds,true),sized(t.nonce)),digest=hash(utf8.encode('heddle-owner-key-transition-v1'),canonical);
+ const oldGuardians=root.recoveryPolicy.guardians.map(g=>Object.keys(native.keys).find(n=>hex(key(n))===hex(g.key.publicKey))),nextGuardians=recovery.guardians.map(g=>Object.keys(native.keys).find(n=>hex(key(n))===hex(g.key.publicKey)));
+ h.acceptedTransitions=[create(own.SignedOwnerKeyTransitionSchema,{transition:t,authorizations:(kind===2?oldGuardians:['cowriter_owner']).map(n=>auth(n,digest)),nextAuthorityKeyProof:auth('rotated_owner',digest),nextRecoveryKeyProofs:kind===2?nextGuardians.map(n=>auth(n,digest)):[]})];h.stateHash=digest;
+ const bytes=toBinary(own.OwnerHistorySchema,h);execFileSync(nativeCodec,['verify-owner-history','1100'],{input:hex(bytes),encoding:'utf8'});
+ fixture.context[kind===2?'recover_signing_digest_hex':'rotate_signing_digest_hex']=hex(digest);return h;
+}
+wire('verified_rotate_history',own.OwnerHistorySchema,transitioned(1));wire('verified_recover_history',own.OwnerHistorySchema,transitioned(2));
+fixture.context.issuer_state_hash_hex=hex(ownHistory.stateHash);fixture.context.issuer_sequence=0;
+fixture.context.owner_root_signing_digest_hex=hex(ownHistory.stateHash);
+for(const [name,attachment] of [['admitted_original',certificate],['admitted_unknown',unknown],['admitted_bad_signature',badSignature]]){
+ const e=clone(ThreadControlAuthoritySchema,envelope);e.mintRootAssociation.value=attachment;
+ const p=clone(imp.ImportAuthorityWitnessV1Schema,newP);p.authorityEnvelope=toBinary(ThreadControlAuthoritySchema,e);
+ const s=clone(host.HostedWitnessStatementV1Schema,importedStatement);s.canonicalPayload=canonicalHybridV1(imp.ImportAuthorityWitnessV1Schema,p);s.authorityDigest=authorityEnvelopeDigest(p.authorityEnvelope);
+ wire(name+'_payload',imp.ImportAuthorityWitnessV1Schema,p);wire(name+'_statement',host.SignedHostedWitnessStatementV1Schema,create(host.SignedHostedWitnessStatementV1Schema,{body:s,signature:sig('witness',statementSigningDigest(s))}));
 }
 writeFileSync('tests/fixtures/writer-authority-alpha35.json',JSON.stringify(fixture,null,2)+'\n');
 console.log('alpha.35 writer vectors:',fixture.positive.length,'positive,',fixture.negative.length,'negative');

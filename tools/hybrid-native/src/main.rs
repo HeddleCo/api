@@ -2423,4 +2423,66 @@ mod tests {
         changed.signature.as_mut().expect("signature").signature[0] ^= 1;
         assert!(request_binding(&changed, &integration).is_err());
     }
+    #[test]
+    fn alpha35_retained_facts_use_the_published_verified_history() {
+        use contract::writer_authority as writer;
+        let f: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/writer-authority-alpha35.json"
+        ))
+        .expect("writer fixture");
+        let wire_bytes =
+            |name: &str| hex_field(&f["vectors"][name]["wire_hex"]).expect("wire bytes");
+        let rotated = wire::OwnerHistory::decode(wire_bytes("verified_rotate_history").as_slice())
+            .expect("history");
+        let recovered =
+            wire::OwnerHistory::decode(wire_bytes("verified_recover_history").as_slice())
+                .expect("history");
+        let native_root = capability_verifier::wire::SignedOwnerRoot::decode(
+            rotated
+                .root
+                .as_ref()
+                .expect("root")
+                .encode_to_vec()
+                .as_slice(),
+        )
+        .expect("native root");
+        let initial = capability_verifier::verify_owner_root(&native_root).expect("verified root");
+        verify_owner_history(&rotated, 1100).expect("native accepted Rotate");
+        verify_owner_history(&recovered, 1100).expect("native accepted Recover");
+        let issuer = writer::retained_mint_root_issuer(&rotated, initial.state_hash(), 0)
+            .expect("derived verified issuer");
+        assert!(matches!(
+            writer::retained_mint_root_issuer(&recovered, initial.state_hash(), 0),
+            Err(codec::Reject::Root)
+        ));
+        let p = wire::ImportAuthorityWitnessV1::decode(
+            wire_bytes("admitted_original_payload").as_slice(),
+        )
+        .expect("payload");
+        let signed = host::SignedHostedWitnessStatementV1::decode(
+            wire_bytes("admitted_original_statement").as_slice(),
+        )
+        .expect("statement");
+        let statement = signed.body.as_ref().expect("body");
+        codec::verify(
+            &hex_field(&f["keys"]["witness"]["public_key_hex"]).expect("independent witness key"),
+            &witness::statement_signing_digest(statement).expect("digest"),
+            &signed.signature,
+        )
+        .expect("authenticated statement");
+        let admitted = writer::admitted_owner_mint_root_attachment(
+            statement,
+            writer::WriterWitnessPayload::Import(import::WitnessPayload::Authority(&p)),
+        )
+        .expect("derived admission");
+        writer::verify_retained_writer_attachment(
+            &wire_bytes("paired_after_rotate"),
+            &hex_field(&f["keys"]["cowriter_device"]["public_key_hex"])
+                .expect("independent mint key"),
+            &issuer,
+            &admitted,
+            1100,
+        )
+        .expect("retained certificate from verified history and admission");
+    }
 }

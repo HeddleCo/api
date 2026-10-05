@@ -173,6 +173,7 @@ fn authority_payload_digest(p: &api::ImportAuthorityWitnessV1) -> Result<Vec<u8>
 /// Presence is never permission. Call verify_bundle_witnesses with a
 /// separately authenticated fresh set, then native owner/model verification.
 pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), Reject> {
+    crate::writer_authority::validate_owner_histories(&b.owner_histories)?;
     if b.format_version != 1 {
         return Err(Reject::Version);
     }
@@ -375,6 +376,14 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                     &p.creator_authority_envelope,
                     &b.owner_histories,
                     &b.policies,
+                    crate::writer_authority::spool_account_for_statement(
+                        s,
+                        b.genesis_witnesses
+                            .iter()
+                            .filter_map(|p| p.binding.as_ref()?.body.as_ref()?.identity.as_ref()),
+                        &b.ownership_transfers,
+                    )?,
+                    &[],
                 )?;
             }
             2 => {
@@ -389,6 +398,18 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                     &p.authority_envelope,
                     &b.owner_histories,
                     &b.policies,
+                    crate::writer_authority::spool_account_for_statement(
+                        s,
+                        b.genesis_witnesses
+                            .iter()
+                            .filter_map(|p| p.binding.as_ref()?.body.as_ref()?.identity.as_ref()),
+                        &b.ownership_transfers,
+                    )?,
+                    p.original
+                        .as_ref()
+                        .filter(|_| p.kind == 2 || p.kind == 3)
+                        .map(|r| r.signatures.as_slice())
+                        .unwrap_or(&[]),
                 )?;
             }
             4 => {
@@ -403,6 +424,14 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                     &p.authority_envelope,
                     &b.owner_histories,
                     &b.policies,
+                    crate::writer_authority::spool_account_for_statement(
+                        s,
+                        b.genesis_witnesses
+                            .iter()
+                            .filter_map(|p| p.binding.as_ref()?.body.as_ref()?.identity.as_ref()),
+                        &b.ownership_transfers,
+                    )?,
+                    &[],
                 )?;
             }
             _ => return Err(Reject::Version),

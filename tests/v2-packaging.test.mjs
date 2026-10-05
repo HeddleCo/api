@@ -96,5 +96,6 @@ test('npm public writer-authority export exposes alpha35 verification helpers', 
   assert.equal(typeof runtime.decodeWriterAuthority, 'function');
   assert.equal(typeof runtime.verifyWriterAccountBinding, 'function');
   assert.equal(typeof runtime.checkWriterKeys, 'function');
-  assert.equal(typeof runtime.verifyRetainedOwnerMintRootAttachment, 'function');
+  for(const name of ['verifyLandingActorBinding','verifyAuthorityActorBinding','retainedMintRootIssuer','admittedOwnerMintRootAttachment','verifyRetainedWriterAttachment'])assert.equal(typeof runtime[name], 'function', name);
+  assert.equal(runtime.verifyRetainedOwnerMintRootAttachment, undefined);
 });

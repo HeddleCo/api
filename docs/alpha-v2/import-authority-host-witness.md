@@ -1269,31 +1269,41 @@ State; their declared State parents, after excluding the signed genesis base,
 must equal the States selected by their complete causal operation parents.
 The frozen "old parentless capture" negative still rejects.
 
-**Owner decision (2026-10-05): delegated native IMPORT originals are an
-IMPORT-only parentless exception.** Select this exception only from the
-separately authenticated IMPORT carrier: the verified import delegation and
-signed import operation that bind this exact operation's operation ID,
-Thread/genesis, causal frontier and delegation scope. Caller context never
-selects it. A carrier for a different operation, Thread or frontier does not
-unlock it. Standalone validation without the verified carrier keeps the strict
-ordinary rule, so a parentless Capture without its carrier rejects. Every path
-that admits or verifies an imported Capture MUST verify its carrier. The signed
-`ThreadOperation` carries no import discriminator; imported Captures use
-`SourceAuthor::LocalKey`. There is no signing or wire-format change. Their
-State parents MUST exactly equal the source States of their complete causal
-operation parents, with no duplicates and with converter/Git parent order
-preserved. The genesis base MUST NOT appear among those State parents. Empty
-State parents are valid if and only if the causal operation parents are empty;
-this covers both the first Git root and later disjoint roots in multi-root
-histories. Adding the seed would change the converted State ID and invent a Git
-parent. The synthetic initial State remains the canonical synthetic empty
-genesis base, bound by the signed genesis, and cannot be reused as a source
-capture. Native framing does not redefine State IDs or converter correctness.
+**Owner decision (2026-10-05): delegated native IMPORT parent rules.**
 
-Conformance vectors for this IMPORT-only exception follow after the next
-heddle release, because `tools/hybrid-native` pins published heddle. This
-docs-only decision does not change the frozen vectors or ordinary native
-Capture validation.
+An import produces **one native operation per branch result slot**; v1's one
+slot and fixed frontier are unchanged. Git ancestors are not native operations:
+they are State objects in the tip State's parent closure, transferred and
+verified as content.
+
+The import rule is selected **only by the separately authenticated IMPORT
+carrier**: the verified import delegation and signed import operation that bind
+this exact operation's operation ID, Thread/genesis, causal frontier and
+delegation scope. Caller context never selects it. A carrier for another
+operation or frontier does not unlock it. Every path that admits or verifies an
+imported Capture MUST verify its carrier. The signed `ThreadOperation` has no
+import field; imported Captures use `SourceAuthor::LocalKey`. There is no signing
+or wire-format change.
+
+With an **empty causal frontier (first import)**, the State carries its converted
+Git parents unchanged: none for a root commit, or the tip's ordered Git parents,
+including merges and multi-root histories. These State parents are not compared
+with the operation's causal parents. The genesis base (synthetic seed) MUST never
+appear among them; the signed genesis binds the canonical synthetic empty base.
+Git-parent fidelity is attested by the shared converter and the host witness's
+signed conversion. This is the same trust basis used by the retired
+`HostedImport` receipt, not new trust.
+
+With a **non-empty causal frontier**, State parents MUST strictly equal the
+source States of the complete causal operation parents, with the seed excluded.
+
+Standalone operation validation without its verified carrier keeps the strict
+ordinary rule. Ordinary native Captures are unchanged: they still require a
+child State, and the frozen "old parentless capture" negative still rejects.
+Conformance vectors follow after the next heddle release because
+`tools/hybrid-native` pins published heddle.
+This docs-only decision does not change the frozen vectors, State IDs or
+converter correctness.
 
 For account-native originals, `authority_envelope` is exact canonical protobuf
 `ThreadControlAuthority` format 1 from `identity.proto`, including its verified

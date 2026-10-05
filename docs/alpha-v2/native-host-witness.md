@@ -257,22 +257,37 @@ StartThread → publish → fresh Fetch tests remain downstream work.
 
 ## Imported Git roots
 
-The [IMPORT-only parentless exception](import-authority-host-witness.md#review-round-1-historical-closure-and-frozen-purpose-payloads)
-(owner decision, 2026-10-05) is selected only by the separately authenticated
-IMPORT carrier: the verified import delegation and signed import operation that
-bind this exact operation's operation ID, Thread/genesis, causal frontier and
-delegation scope. Caller context never selects it. A carrier for a different
-operation, Thread or frontier does not unlock it. Standalone validation without
-the verified carrier keeps the strict ordinary rule, so a parentless Capture
-without its carrier rejects. Every path that admits or verifies an imported
-Capture MUST verify its carrier. The signed `ThreadOperation` carries no import
-discriminator; imported Captures use `SourceAuthor::LocalKey`. There is no
-signing or wire-format change. Delegated native IMPORT originals preserve
-converter/Git parent order without duplicates: State parents exactly equal the
-source States of the complete causal operation parents and never include the
-genesis base. Empty State parents are valid if and only if causal parents are
-empty, including later disjoint Git roots. The signed genesis still binds the
-canonical synthetic empty base. Ordinary native Captures still require a child
-State, and the frozen old parentless capture negative still rejects.
+The [delegated native IMPORT parent rules](import-authority-host-witness.md#review-round-1-historical-closure-and-frozen-purpose-payloads)
+follow the owner decision of 2026-10-05.
+
+An import produces **one native operation per branch result slot**; v1's one
+slot and fixed frontier are unchanged. Git ancestors are not native operations:
+they are State objects in the tip State's parent closure, transferred and
+verified as content.
+
+The import rule is selected **only by the separately authenticated IMPORT
+carrier**: the verified import delegation and signed import operation that bind
+this exact operation's operation ID, Thread/genesis, causal frontier and
+delegation scope. Caller context never selects it. A carrier for another
+operation or frontier does not unlock it. Every path that admits or verifies an
+imported Capture MUST verify its carrier. The signed `ThreadOperation` has no
+import field; imported Captures use `SourceAuthor::LocalKey`. There is no signing
+or wire-format change.
+
+With an **empty causal frontier (first import)**, the State carries its converted
+Git parents unchanged: none for a root commit, or the tip's ordered Git parents,
+including merges and multi-root histories. These State parents are not compared
+with the operation's causal parents. The genesis base (synthetic seed) MUST never
+appear among them; the signed genesis binds the canonical synthetic empty base.
+Git-parent fidelity is attested by the shared converter and the host witness's
+signed conversion. This is the same trust basis used by the retired
+`HostedImport` receipt, not new trust.
+
+With a **non-empty causal frontier**, State parents MUST strictly equal the
+source States of the complete causal operation parents, with the seed excluded.
+
+Standalone operation validation without its verified carrier keeps the strict
+ordinary rule. Ordinary native Captures are unchanged: they still require a
+child State, and the frozen "old parentless capture" negative still rejects.
 Conformance vectors follow after the next heddle release because
 `tools/hybrid-native` pins published heddle.

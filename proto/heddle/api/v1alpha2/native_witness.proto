@@ -43,8 +43,8 @@ message NativeGenesisWitnessV1 {
   ImportBoundaryAcceptanceV1 boundary_acceptance = 6;
 }
 // Public closure for native history. No job/delegation/terminal manifest.
-// Original bytes are embedded in payloads; all dependencies must resolve inside
-// this carrier. Purpose 2 and 4 reuse their unchanged public native layouts.
+// Original bytes are embedded in payloads; foreign dependencies reference
+// separately installed import stages. Purpose 2 and 4 reuse their unchanged public native layouts.
 // This is reference/signature evidence, never owner enrollment or disclosure.
 message NativePublicProofBundleV1 {
   uint32 format_version = 1;
@@ -61,4 +61,6 @@ message NativePublicProofBundleV1 {
   heddle.api.common.SignedHostedWitnessSetV1 witness_set = 10;
   repeated heddle.api.common.SignedHostedWitnessStatementV1 statements = 11;
   repeated heddle.api.common.HostedWitnessHistoryProofV1 history_proofs = 12;
+  // Strictly digest-sorted unique, all referenced; at most 128. Import stages first.
+  repeated ForeignDependencyV1 foreign_dependencies = 13;
 }

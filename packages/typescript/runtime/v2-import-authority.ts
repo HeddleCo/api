@@ -1,3 +1,4 @@
+import { ForeignReferences, foreignThread } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
 import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse, type RetryImportSourceRequest } from "./integration_pb.js";
@@ -437,10 +438,19 @@ export function resolveBundleManifest(bundle:api.ImportPublicProofBundleV1,diges
 export function publicationPayload(operation:api.SignedDelegatedImportOperationV1,m:api.ImportResultManifestV1):api.ImportPublicationWitnessV1{const o=operation.body??reject("Canonical");return create(api.ImportPublicationWitnessV1Schema,{formatVersion:1,signedOperationDigest:signedOperationDigest(operation),delegationDigest:o.delegationDigest,logicalJobId:o.logicalJobId,retryLineageId:o.retryLineageId,physicalOperationId:o.physicalOperationId,refName:o.refName,slotId:o.slotId,hashAlgorithm:o.hashAlgorithm,observedCommitOid:o.observedCommitOid,expectedFrontierDigest:o.expectedFrontierDigest,resultingFrontierDigest:o.resultingFrontierDigest,terminalManifestDigest:manifestDigest(m)});}
 export function validatePublicBundle(b:api.ImportPublicProofBundleV1):void { validateBundle(b,true); }
 function validateBundleBounds(b:api.ImportPublicProofBundleV1):void {
-  if(b.formatVersion!==1)reject("Version");if(toBinary(api.ImportPublicProofBundleV1Schema,b).length>MAX_BUNDLE_BYTES||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.delegations.length!==1||b.manifests.length>256||b.operations.length>256||b.genesisAuthorities.length>256||b.originalGeneses.length>256||b.creatorAuthorityEnvelopes.length>256||b.statements.length>1024||b.historyProofs.length>1024||b.policies.length>256||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256)reject("Bounds");
+  if(b.formatVersion!==1)reject("Version");if(toBinary(api.ImportPublicProofBundleV1Schema,b).length>MAX_BUNDLE_BYTES||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.delegations.length!==1||b.manifests.length>256||b.operations.length>256||b.genesisAuthorities.length>256||b.originalGeneses.length>256||b.creatorAuthorityEnvelopes.length>256||b.statements.length>1024||b.historyProofs.length>1024||b.policies.length>256||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256||b.foreignDependencies.length>128)reject("Bounds");
 }
 function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolean):void{
   validateBundleBounds(b);
+  const foreign=new ForeignReferences(b.foreignDependencies,1);
+  for(const p of b.landingWitnesses){const execution=p.execution??reject("Canonical"),thread=foreignThread(execution);if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread)))reject("Scope");}
+  for(const original of [...b.authorityWitnesses.flatMap(p=>[...(p.original?[p.original]:[]),...p.dependencies]),...b.landingWitnesses.flatMap(p=>[...(p.execution?[p.execution]:[]),...(p.sourceOperation?[p.sourceOperation]:[]),...p.reviewEvidence])]){
+    if(["heddle-original-boundary-acceptance-v1","heddle-thread-genesis-admission-v2","heddle-thread-authority-admission-v3"].includes(original.format))continue;
+    const thread=foreignThread(original);
+    if(!b.genesisWitnesses.some(p=>p.originalGenesis&&equal(threadGenesisId(p.originalGenesis.canonicalRecord),thread)))foreign.require(original);
+    else if(original.format==="heddle-thread-genesis-v1"&&!b.genesisWitnesses.some(p=>p.originalGenesis&&equal(signedNativeDigest(p.originalGenesis),signedNativeDigest(original))))reject("Scope");
+  }
+  foreign.finish();
   for(const {body:s} of b.statements){if(!s)reject("Canonical");validateStatementBoundary(s);requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);}
   for(const list of [b.manifests.map(manifestDigest)])for(let i=1;i<list.length;i++)if(compare(list[i-1]!,list[i]!)>=0)reject("Canonical");
   if(b.memberPermission&&!equal(canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,resolveBundlePermission(b,signedPermissionDigest(b.memberPermission))!),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,b.memberPermission)))reject("ImportPermission");const terminal=b.terminalManifest??reject("Canonical");resolveBundleManifest(b,manifestDigest(terminal));if(b.delegations.length!==1)reject("Canonical");
@@ -668,7 +678,8 @@ export async function verifyImportBundleWitnesses(
       ||!contains(SignedSpoolPolicyRecordSchema,bundle.policies,old.policies)
       ||!contains(api.ImportGenesisWitnessV1Schema,bundle.genesisWitnesses,old.genesisWitnesses)
       ||!contains(api.ImportAuthorityWitnessV1Schema,bundle.authorityWitnesses,old.authorityWitnesses)
-      ||!contains(api.HostedLandingWitnessV1Schema,bundle.landingWitnesses,old.landingWitnesses))reject("HighWater");
+      ||!contains(api.HostedLandingWitnessV1Schema,bundle.landingWitnesses,old.landingWitnesses)
+      ||!contains(api.ForeignDependencyV1Schema,bundle.foreignDependencies,old.foreignDependencies))reject("HighWater");
     history[index]=bundle;}else history.push(bundle);
   const witnessed=times.every(t=>t!==undefined);
   const witnessedPrefix=times.findIndex(t=>t===undefined)<0?times.length:times.findIndex(t=>t===undefined);

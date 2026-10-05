@@ -1,4 +1,4 @@
-# Native host witnessing v1 (alpha.30)
+# Native host witnessing v1 (alpha.34)
 
 Normative companion to `import-authority-host-witness.md`; closes api#339 and api#343.
 The original native formats, import formats, witness statement/set formats,
@@ -143,8 +143,9 @@ reinterpreted from one basis to the other.
 `NativePublicProofBundleV1` contains public owner genesis, owner histories,
 accepted ownership transfers, digest-sorted exact owner-chain history, policies,
 native genesis payloads, native purpose-2 payloads, optional hosted landing
-payloads, the complete signed witness set, signed statements and per-statement
-retirement proofs. Originals and envelopes are embedded in their payloads.
+payloads, the complete signed witness set, signed statements, per-statement
+retirement proofs and foreign dependency references. Originals and envelopes
+are embedded in their payloads.
 It has no job, import permission, delegation, result slot or terminal
 manifest. Foreign evidence is verified against independently selected roots;
 carried owner roots and witness sets never enroll themselves.
@@ -165,7 +166,9 @@ one matching statement and every statement has exactly one complete sidecar.
 Multiple purposes may attest the same immutable native original; ambiguous or
 conflicting first admissions for one subject must reject at the native gate.
 
-Require a witnessed genesis for every selected native original/dependency,
+Require an in-carrier witnessed genesis for every same-origin original/dependency;
+other-origin dependencies use the exact foreign reference and installed stage
+below. Require
 byte-identical genesis dependencies, purpose-2 sidecars for every account
 source/control/claim/resolution dependency and an explicit witnessed claim for
 every hosted LocalKey genesis. A hosted integration dependency resolves through
@@ -196,7 +199,9 @@ embedded native `LocalIntegration.author`, not merely the outer body kind:
 an account-authored integration still requires its exact purpose-2 authority
 sidecar and cannot use the local-work exception.
 
-Retain the exact cross-Thread source operation and both witnessed geneses, the
+Retain the exact cross-Thread source operation and resolve both witnessed geneses
+through their own origin carriers, using foreign references where required.
+Retain the
 target's causal parents, and every dependency needed to verify source revision
 and result State ancestry. Resolve each source dependency by its own role
 (account source: purpose 2; LocalKey work: native proof plus its Thread's witnessed
@@ -234,8 +239,9 @@ ReplicationOperations, covering Fetch, PublishContent and ReplicateThread.
 `ThreadGenesisRecord.native_genesis_authority` retains the exact producer binding.
 Reject simultaneous native/import carriers **before staging**. Import carrier
 presence always dispatches to the import validator; missing delegation remains
-an import refusal. A job-signed operation or import purpose-1 payload cannot be
-smuggled into native history. Empty/present malformed carriers must reject.
+an import refusal. A job-signed original requires its own installed import stage
+and an exact foreign reference; an import purpose-1 payload cannot become a
+native genesis. Empty/present malformed carriers must reject.
 Never drop present evidence on export, relay or retry.
 
 Present native HYBRID evidence requires explicit protocol version 2 and
@@ -266,7 +272,8 @@ they are State objects in the tip State's parent closure, transferred and
 verified as content.
 
 The import rule is selected **only by the separately authenticated IMPORT
-carrier**: the verified import delegation and signed import operation that bind
+carrier**, including a durably installed foreign stage: the verified import
+delegation and signed import operation that bind
 this exact operation's operation ID, Thread/genesis, causal frontier and
 delegation scope. Caller context never selects it. A carrier for another
 operation or frontier does not unlock it. Every path that admits or verifies an
@@ -289,5 +296,78 @@ source States of the complete causal operation parents, with the seed excluded.
 Standalone operation validation without its verified carrier keeps the strict
 ordinary rule. Ordinary native Captures are unchanged: they still require a
 child State, and the frozen "old parentless capture" negative still rejects.
-Conformance vectors follow after the next heddle release because
-`tools/hybrid-native` pins published heddle.
+Alpha.34 adds generated mixed-origin conformance vectors and staged receiver
+models using the published native codecs. Production receiver installation and
+Fetch staging remain downstream work in heddle/weft.
+
+## Foreign dependencies (alpha.34 hard cut)
+
+A Thread has exactly one immutable origin carrier for life: IMPORT or NATIVE.
+A closure may reference originals from another Thread of the other origin.
+Both public bundles carry `foreign_dependencies`: references only, never nested
+proof bundles, permissions, owner enrollment or new trust anchors. Preserve and
+re-export the entries verbatim under the target Thread's own exclusive carrier.
+There is no alpha.33 compatibility reader, alias, shim or permissive fallback.
+
+`ForeignDependencyV1` has `format_version` = 1; `origin` = 1 IMPORT or 2 NATIVE,
+which MUST differ from the enclosing carrier; `thread_genesis_digest` = the
+original Thread's 32-byte genesis ID; and `signed_native_digest` = the 32-byte
+`heddle-signed-native-record-v1` commitment to the exact SignedRecord, including
+its original signature bytes. Entries MUST be strictly increasing in raw signed
+native digest order, unique by that digest, and at most 128. The existing 1 MiB
+bundle bound still applies. Unknown version/origin or wrong digest widths reject.
+
+For each selected original whose Thread has no genesis witness in this carrier,
+require exactly one foreign entry matching BOTH its signed native digest and its
+Thread genesis digest. This applies to authority dependencies (including genesis,
+source, control, claim and resolution originals), landing source/review closure,
+and native dependency resolution, symmetrically in import bundle history.
+Every entry MUST be referenced; unused, duplicate, unsorted, same-origin,
+missing or mismatched entries reject. A reference to an original already covered
+by an in-carrier genesis is unused and cannot replace that origin's authority.
+The target landing execution still belongs to the target's own origin carrier.
+Original signatures, P2/P4, owner/capability, causal and State checks remain
+mandatory according to each original's role; entries grant no permission.
+
+Before installing the dependent closure, the receiver MUST have ALREADY durably
+installed each foreign original through its OWN origin carrier. Fetch delivers
+foreign stages first, with one carrier per message. A missing stage rejects with
+`Scope` and leaves the dependent installation's state unchanged. There is no
+native-only retry, origin conversion or other fallback. Simultaneous import and
+native carriers on one message still reject with `Protocol` before staging;
+`validate_carriers` / `validateNativeWitnessCarriers` keep this rule unchanged.
+Bound stage traversal by the 128 references and reject unresolved/cyclic stages.
+
+Trust is selected from the receiver's own durable installed state under its
+mutation lock, never from a caller-supplied resolver, asserted origin, envelope
+or key. Recheck exact original bytes/signatures, immutable genesis, Spool and
+independent deployment authority. For IMPORT originals require the retained
+verified import carrier, delegation/job binding and the purpose-3 publication
+whose exact resulting frontier binds this original, plus its content binding.
+Native continuations in that same IMPORT Thread retain their own P2/P4.
+For NATIVE originals require their own retained native carrier and exact admission.
+Recheck every selected witness against the independently authenticated fresh
+witness set, including root epoch, generation and clock floors: CURRENT needs
+interval/signature, RETIRED needs its exact original leaf proof, REVOKED rejects.
+Commit dependent admission and retention atomically only after every check passes.
+
+Landing role selection follows the SOURCE, independently of the target carrier:
+
+- An Account source uses `native_authority`, including its exact original source
+  authority, owner/capability and P2 admission checks.
+- A LocalKey import source is accepted only when this exact original is bound to
+  its verified installed import carrier and its publisher is the bound job key.
+  Otherwise reject with `ImportPermission`. It does not satisfy the native
+  LocalKey ownership-claim exception and cannot acquire landing authority.
+- A hosted integration source requires its exact P4 and full native checks.
+- A landing request signed by a job key MUST reject (`KeyRole`), including a key
+  in the receiver's known job associations or forbidden job-role keys. The owner
+  request proof, exact method/body, source/target revisions, policy and reviews
+  remain mandatory. A source's publication permission cannot authorize a landing.
+
+Thus an imported tip can land into a native target (fast-forward or merge), and
+a native child can land back into an imported main whose causal frontier is the
+imported tip. Each original keeps its own previously installed origin and proof;
+neither target re-witnesses the foreign genesis or retains a second carrier.
+The API validators check portable reference completeness; durable storage,
+transactional staging and full native landing authorization are receiver duties.

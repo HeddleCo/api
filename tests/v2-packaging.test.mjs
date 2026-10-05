@@ -42,6 +42,7 @@ const barrelOnlyModules = new Set([
 ]);
 const internalModules = new Set([
   '_collaboration-msgpack.js', // Private canonical MessagePack codec.
+  '_foreign-dependencies.js', // Private mixed-origin reference completeness.
   '_hybrid-codec.js', // Private HYBRID signing/canonical-byte codec.
 ]);
 

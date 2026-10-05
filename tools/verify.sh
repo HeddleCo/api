@@ -28,8 +28,9 @@ cargo test --locked --manifest-path tools/hybrid-native/Cargo.toml -- --nocaptur
 cargo clippy --locked --manifest-path tools/hybrid-native/Cargo.toml --all-targets -- -D warnings
 npm run build
 npm run typecheck
-node tools/verify-alpha33-vector-continuity.mjs
+node tools/verify-alpha34-vector-continuity.mjs
 node tools/verify-alpha33-guards.mjs
+node tools/verify-alpha34-guards.mjs
 node tests/review-probe.mjs
 node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs

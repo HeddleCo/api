@@ -202,6 +202,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     {
         return Err(Reject::Bounds);
     }
+    let mut foreign = crate::foreign_dependencies::References::new(&b.foreign_dependencies, 2)?;
     let owner = b
         .owner_genesis
         .as_ref()
@@ -294,7 +295,8 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                         .as_ref()
                         .is_some_and(|o| import::native_id(o) == t)
                 }) {
-                    return Err(Reject::Scope);
+                    foreign.require(original)?;
+                    continue;
                 }
                 if original.format == "heddle-thread-genesis-v1"
                     && !b
@@ -307,7 +309,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                 if original.format != "heddle-thread-genesis-v1"
                     && p.original.as_ref() != Some(original)
                 {
-                    require_native_dependency(b, original)?;
+                    require_native_dependency(b, original, &mut foreign)?;
                 }
             } else if ![
                 "heddle-original-boundary-acceptance-v1",
@@ -336,15 +338,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
             return Err(Reject::Scope);
         }
         for original in p.source_operation.iter().chain(p.review_evidence.iter()) {
-            let t = thread(original)?;
-            if !b.genesis_witnesses.iter().any(|g| {
-                g.original_genesis
-                    .as_ref()
-                    .is_some_and(|o| import::native_id(o) == t)
-            }) {
-                return Err(Reject::Scope);
-            }
-            require_native_dependency(b, original)?;
+            require_native_dependency(b, original, &mut foreign)?;
         }
     }
     for signed in &b.statements {
@@ -396,7 +390,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
             _ => return Err(Reject::Version),
         }
     }
-    Ok(())
+    foreign.finish()
 }
 #[derive(serde::Deserialize)]
 struct OperationSelectors {
@@ -454,7 +448,16 @@ fn requires_authority(record: &api::SignedRecord) -> Result<bool, Reject> {
 fn require_native_dependency(
     b: &api::NativePublicProofBundleV1,
     original: &api::SignedRecord,
+    foreign: &mut crate::foreign_dependencies::References<'_>,
 ) -> Result<(), Reject> {
+    let t = thread(original)?;
+    if !b.genesis_witnesses.iter().any(|g| {
+        g.original_genesis
+            .as_ref()
+            .is_some_and(|o| import::native_id(o) == t)
+    }) {
+        return foreign.require(original);
+    }
     if requires_authority(original)? {
         let p = b
             .authority_witnesses

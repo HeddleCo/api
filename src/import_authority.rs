@@ -1660,6 +1660,7 @@ fn validate_bundle_bounds(bundle: &ImportPublicProofBundleV1) -> Result<(), Reje
         || bundle.genesis_witnesses.len() > 256
         || bundle.authority_witnesses.len() > 256
         || bundle.landing_witnesses.len() > 256
+        || bundle.foreign_dependencies.len() > 128
     {
         return Err(Reject::Bounds);
     }
@@ -2263,6 +2264,57 @@ fn validate_bundle_history(
         }
         Ok(())
     }
+    let mut foreign =
+        crate::foreign_dependencies::References::new(&bundle.foreign_dependencies, 1)?;
+    for p in &bundle.landing_witnesses {
+        let execution = p.execution.as_ref().ok_or(Reject::Canonical)?;
+        let thread = crate::foreign_dependencies::thread(execution)?;
+        if !bundle.genesis_witnesses.iter().any(|p| {
+            p.original_genesis
+                .as_ref()
+                .is_some_and(|g| native_id(g) == thread)
+        }) {
+            return Err(Reject::Scope);
+        }
+    }
+    // In-carrier genesis witnesses establish origin membership, never permission.
+    for original in bundle
+        .authority_witnesses
+        .iter()
+        .flat_map(|p| p.original.iter().chain(p.dependencies.iter()))
+        .chain(bundle.landing_witnesses.iter().flat_map(|p| {
+            p.execution
+                .iter()
+                .chain(p.source_operation.iter())
+                .chain(p.review_evidence.iter())
+        }))
+    {
+        if [
+            "heddle-original-boundary-acceptance-v1",
+            "heddle-thread-genesis-admission-v2",
+            "heddle-thread-authority-admission-v3",
+        ]
+        .contains(&original.format.as_str())
+        {
+            continue;
+        }
+        let thread = crate::foreign_dependencies::thread(original)?;
+        if !bundle.genesis_witnesses.iter().any(|p| {
+            p.original_genesis
+                .as_ref()
+                .is_some_and(|g| native_id(g) == thread)
+        }) {
+            foreign.require(original)?;
+        } else if original.format == "heddle-thread-genesis-v1"
+            && !bundle
+                .genesis_witnesses
+                .iter()
+                .any(|p| p.original_genesis.as_ref() == Some(original))
+        {
+            return Err(Reject::Scope);
+        }
+    }
+    foreign.finish()?;
     for operation in &bundle.operations {
         if operation.body.is_none() {
             return Err(Reject::Canonical);
@@ -3258,6 +3310,10 @@ pub fn verify_import_bundle_witnesses<'a>(
                 .landing_witnesses
                 .iter()
                 .all(|v| bundle.landing_witnesses.contains(v))
+            || !old
+                .foreign_dependencies
+                .iter()
+                .all(|v| bundle.foreign_dependencies.contains(v))
         {
             return Err(Reject::HighWater);
         }

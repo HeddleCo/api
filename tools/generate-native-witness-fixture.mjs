@@ -274,3 +274,6 @@ const malformedImport=clone(imp.ImportPublicProofBundleV1Schema,oldBundle);malfo
 fixture.negative.push({id:'dual_carriers',control:'start_thread',expected:'Protocol',gate:'dispatch'});
 writeFileSync('tests/fixtures/native-host-witness-v1.json',JSON.stringify(fixture,null,2)+'\n');
 console.log(`generated ${fixture.positive.length} native positives, ${fixture.negative.length} portable negatives, ${fixture.native_negative.length} native authority negatives`);
+
+// Shared maintenance primitives for the alpha.34 generator; never runtime APIs.
+export { raw,hex,fill,key,sig,load,nativeId,native,statement,genesis,bundle,sortBundle,authorityStatement,landingStatement,account,sourceTemplate,envelope,currentSet,codec };

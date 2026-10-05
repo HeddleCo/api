@@ -1,3 +1,4 @@
+import { ForeignReferences } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./native_witness_pb.js";
 import { ImportIdentityV1Schema, ImportOwnerChainV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type ImportPublicProofBundleV1 } from "./import_authority_pb.js";
@@ -88,6 +89,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   b=clone(api.NativePublicProofBundleV1Schema,b);
   if(b.formatVersion!==1)reject("Version");
   if(toBinary(api.NativePublicProofBundleV1Schema,b).length>1048576||b.ownerHistories.length>64||b.ownershipTransfers.length>64||!b.ownerChains.length||b.ownerChains.length>64||b.policies.length>256||!b.genesisWitnesses.length||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256||b.statements.length>1024||b.historyProofs.length>1024)reject("Bounds");
+  const foreign=new ForeignReferences(b.foreignDependencies,2);
   const owner=b.ownerGenesis?.genesis??reject("Canonical"),chain=b.ownerChains[0]??reject("Canonical");
   sorted(b.ownerChains,ownerChainDigest);
   if(!b.witnessSet)reject("Canonical");
@@ -97,6 +99,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   const requireStatement=(purpose:number,payload:Uint8Array)=>{if(b.statements.filter(s=>s.body?.purpose===purpose&&equal(s.body.canonicalPayload,payload)).length!==1)reject("Scope");};
   const exact=(a:SignedRecord|undefined,r:SignedRecord)=>!!a&&equal(toBinary(SignedRecordSchema,a),toBinary(SignedRecordSchema,r));
   const requireNativeDependency=async(original:SignedRecord)=>{
+    if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(original)))){await foreign.verify(original);return;}
     if(requiresAuthority(original)){
       const p=b.authorityWitnesses.find(p=>exact(p.original,original))??reject("Scope");
       requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
@@ -126,7 +129,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     for(const original of [...(p.original?[p.original]:[]),...p.dependencies]){
       if(["heddle-thread-genesis-v1","heddle-thread-operation-v1","heddle-thread-ownership-claim-v1","heddle-thread-ownership-resolution-v1"].includes(original.format)){
         const t=thread(original);
-        if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),t)))reject("Scope");
+        if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),t))){await foreign.verify(original);continue;}
         if(original.format==="heddle-thread-genesis-v1"&&!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(toBinary(SignedRecordSchema,g.originalGenesis),toBinary(SignedRecordSchema,original))))reject("Scope");
         if(original.format!=="heddle-thread-genesis-v1"&&original!==p.original)await requireNativeDependency(original);
       }else if(!["heddle-original-boundary-acceptance-v1","heddle-thread-genesis-admission-v2","heddle-thread-authority-admission-v3"].includes(original.format))reject("Version");
@@ -138,7 +141,6 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     if(execution.format!=="heddle-thread-operation-v1"||map(selectors(execution).body).kind!=="integration")reject("Scope");
     if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(execution))))reject("Scope");
     for(const original of [...(p.sourceOperation?[p.sourceOperation]:[]),...p.reviewEvidence]){
-      if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),thread(original))))reject("Scope");
       await requireNativeDependency(original);
     }
   }
@@ -151,6 +153,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     else if(s.purpose===4){const p=b.landingWitnesses.find(p=>equal(canonicalHybridV1(HostedLandingWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"landing",payload:p});}
     else reject("Version");
   }
+  foreign.finish();
 }
 /** All statements resolve separately, including exact retirement proofs. */
 export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint):Promise<void> {

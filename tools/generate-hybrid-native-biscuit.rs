@@ -25,6 +25,17 @@ fn main() -> Result<(), String> {
         &[root_seed; 32],
         Algorithm::Ed25519.into(),
     ))?;
+    // Optional distinct request-PoP key for boundary-acceptor guard vectors.
+    let publisher_seed = std::env::args()
+        .nth(4)
+        .map(|value| value.parse::<u8>())
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .unwrap_or(root_seed);
+    let publisher = fixture(KeyPair::from_bytes(
+        &[publisher_seed; 32],
+        Algorithm::Ed25519.into(),
+    ))?;
     let next = fixture(KeyPair::from_bytes(&[14; 32], Algorithm::Ed25519.into()))?;
     let mut builder = Biscuit::builder();
     for fact in [
@@ -34,7 +45,7 @@ fn main() -> Result<(), String> {
         format!("subject_user_uuid(\"{account}\")"),
         format!(
             "device_pop_key(\"{}\")",
-            hex::encode(root.public().to_bytes())
+            hex::encode(publisher.public().to_bytes())
         ),
         "right(\"spool\", \"example\", \"write\")".to_owned(),
         "issued_at(1970-01-01T00:16:40Z)".to_owned(),

@@ -69,13 +69,16 @@ fn boundary_acceptor_guards() {
             let prefix = format!("{kind}_p{purpose}");
             for (mode, reason) in [
                 ("acceptor_revoked", Reject::Revoked),
+                ("acceptor_mint_revoked", Reject::Revoked),
                 ("forged_acceptor", Reject::Signature),
                 ("account_mismatch", Reject::GenesisBinding),
                 ("owner_impersonation", Reject::Root),
                 ("ordinary_revoked", Reject::Revoked),
             ] {
                 if kind == "import" && purpose == 1 && mode == "ordinary_revoked" {
-                    continue; // Import P1 ordinary authority remains delegated.
+                    validate(kind, &format!("{prefix}_{mode}"))
+                        .expect("ordinary import P1 remains delegated");
+                    continue;
                 }
                 assert_eq!(
                     validate(kind, &format!("{prefix}_{mode}")),

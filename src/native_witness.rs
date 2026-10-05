@@ -384,6 +384,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                         &b.ownership_transfers,
                     )?,
                     &[],
+                    p.boundary_acceptance.as_ref(),
                 )?;
             }
             2 => {
@@ -410,6 +411,9 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                         .filter(|_| p.kind == 2 || p.kind == 3)
                         .map(|r| r.signatures.as_slice())
                         .unwrap_or(&[]),
+                    p.boundary_acceptances
+                        .iter()
+                        .find(|e| e.binding == s.boundary_acceptance),
                 )?;
             }
             4 => {
@@ -432,6 +436,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                         &b.ownership_transfers,
                     )?,
                     &[],
+                    None,
                 )?;
             }
             _ => return Err(Reject::Version),

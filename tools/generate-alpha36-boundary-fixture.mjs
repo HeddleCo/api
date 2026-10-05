@@ -44,10 +44,10 @@ function evidence(original,purpose){
  const manifest=nativeBytes('heddle-original-publication-manifest-v1',m);
  const a=decode(template.signedAcceptance.canonicalRecord);
  a.originals_manifest=Array.from(octetsId('heddle-original-publication-manifest-v1',manifest));
- a.kinds=purpose===1?['AccountGenesis']:['Source'];a.accepting_publisher=Array.from(key('cowriter_device'));
+ a.kinds=purpose===1?['AccountGenesis']:['Source'];a.accepting_publisher=Array.from(key('paired_leaf'));
  a.accepting_author.actor.principal_id=acceptor.owner.root.root.accountUuid;
  a.accepting_author.authority=envelope;a.accepting_author.authority_digest=Array.from(octetsId('heddle-thread-control-authority-v1',envelope));
- const signed=record('heddle-original-boundary-acceptance-v1',a,'cowriter_device');
+ const signed=record('heddle-original-boundary-acceptance-v1',a,'paired_leaf');
  const id=octetsId(signed.format,signed.canonicalRecord),r=decode(template.originalReceipts[0].canonicalRecord);
  r.thread=entry.thread;r.basis={BoundaryAcceptance:{acceptance:Array.from(id)}};
  let receipt;
@@ -77,20 +77,20 @@ for(const [kind,schema,f,name] of [['native',native.NativePublicProofBundleV1Sch
  cut.ownerSignature=create(own.AuthorizationSignatureSchema,{signerKeyId:keyId(key('owner')),signature:sig('owner',hash(utf8.encode('heddle-spool-signed-policy-signature-v2'),join(bytes,sized(body.policyStateHash))))});b.policies.push(cut);
  const target=b.statements.find(v=>v.body.purpose===purpose&&hex(v.body.hostTransactionId)===hex(s.hostTransactionId));target.body.policySequence=body.sequence;target.body.policyStateHash=body.policyStateHash;
  }
- for(const mode of ['control','original_revoked','acceptor_revoked','forged_acceptor','account_mismatch','owner_impersonation','ordinary_revoked']){
+ for(const mode of ['control','original_revoked','acceptor_revoked','acceptor_mint_revoked','forged_acceptor','account_mismatch','owner_impersonation','ordinary_revoked']){
   const b=clone(schema,base),target=b.statements.find(v=>v.body.purpose===purpose&&hex(v.body.hostTransactionId)===hex(s.hostTransactionId));
   const bp=(purpose===1?b.genesisWitnesses:b.authorityWitnesses).find(p=>hex(canonicalHybridV1(payloadSchema,p))===hex(target.body.canonicalPayload));
   if(mode==='ordinary_revoked'){target.body.basis=1;target.body.boundaryAcceptance=undefined;if(purpose===1)bp.boundaryAcceptance=undefined;else bp.boundaryAcceptances=[];}
   if(['forged_acceptor','account_mismatch','owner_impersonation'].includes(mode)){
    const be=purpose===1?bp.boundaryAcceptance:bp.boundaryAcceptances[0],value=decode(be.signedAcceptance.canonicalRecord);
-   if(mode==='forged_acceptor')value.accepting_publisher=Array.from(key('paired_leaf'));
+   if(mode==='forged_acceptor')value.accepting_publisher=Array.from(key('cowriter_owner'));
    if(mode==='account_mismatch'){value.accepting_author.actor.principal_id=acceptor.owner.root.root.accountUuid.slice();value.accepting_author.actor.principal_id[0]^=1;value.original_account=value.accepting_author.actor.principal_id;}
    if(mode==='owner_impersonation'){const bad=load(wf,'self_signed_owner_uuid',native.NativeGenesisWitnessV1Schema);value.accepting_author.actor.principal_id=base.genesisWitnesses[0].binding.body.identity.ownerAccountUuid;value.accepting_author.authority=bad.creatorAuthorityEnvelope;value.accepting_author.authority_digest=Array.from(octetsId('heddle-thread-control-authority-v1',bad.creatorAuthorityEnvelope));}
-   be.signedAcceptance=record(be.signedAcceptance.format,value,'cowriter_device');const id=octetsId(be.signedAcceptance.format,be.signedAcceptance.canonicalRecord);be.binding.acceptanceId=id;be.binding.signedAcceptanceDigest=signedNativeDigest(be.signedAcceptance);
+   be.signedAcceptance=record(be.signedAcceptance.format,value,'paired_leaf');const id=octetsId(be.signedAcceptance.format,be.signedAcceptance.canonicalRecord);be.binding.acceptanceId=id;be.binding.signedAcceptanceDigest=signedNativeDigest(be.signedAcceptance);
    be.originalReceipts=be.originalReceipts.map(r=>{const value=decode(r.canonicalRecord);value.basis={BoundaryAcceptance:{acceptance:Array.from(id)}};return record(r.format,value,'witness');});be.binding.originalReceiptDigests=be.originalReceipts.map(signedNativeDigest);target.body.boundaryAcceptance=be.binding;
   }
   target.body.canonicalPayload=canonicalHybridV1(payloadSchema,bp);
-  policyCut(b,mode==='original_revoked'||mode==='ordinary_revoked'?[keyId(key('device'))]:mode==='acceptor_revoked'?[keyId(key('cowriter_device'))]:[]);
+  policyCut(b,mode==='original_revoked'||mode==='ordinary_revoked'?[keyId(key('device'))]:mode==='acceptor_revoked'?[keyId(key('paired_leaf'))]:mode==='acceptor_mint_revoked'?[keyId(key('cowriter_device'))]:[]);
   for(const signed of b.statements)signed.signature=sig('witness',statementSigningDigest(signed.body));sort(b);wire(prefix+'_'+mode,schema,b);
  }
 }

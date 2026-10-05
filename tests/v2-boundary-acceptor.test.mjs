@@ -24,7 +24,7 @@ for(const kind of ['native','import'])for(const purpose of [1,2]){
  test(`${prefix} boundary original revoked accepts`,async()=>{
   await validate(kind,prefix+'_control');await validate(kind,prefix+'_original_revoked');
  });
- for(const [mode,reason] of [['acceptor_revoked','Revoked'],['forged_acceptor','Signature'],['account_mismatch','GenesisBinding'],['owner_impersonation','Root'],['ordinary_revoked','Revoked']])test(`${prefix} boundary guard ${mode}`,async()=>{
+ for(const [mode,reason] of [['acceptor_revoked','Revoked'],['acceptor_mint_revoked','Revoked'],['forged_acceptor','Signature'],['account_mismatch','GenesisBinding'],['owner_impersonation','Root'],['ordinary_revoked','Revoked']])test(`${prefix} ${kind==='import'&&purpose===1&&mode==='ordinary_revoked'?'ordinary delegated authority unchanged':'boundary guard '+mode}`,async()=>{
   if(kind==='import'&&purpose===1&&mode==='ordinary_revoked'){await validate(kind,prefix+'_'+mode);return;}
   await assert.rejects(()=>validate(kind,prefix+'_'+mode),{reason});await validate(kind,prefix+'_control');
  });

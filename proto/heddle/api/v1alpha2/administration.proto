@@ -5,6 +5,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/identity.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
 import "heddle/api/v1alpha2/stream.proto";
 
@@ -176,7 +177,30 @@ message ApprovalGroupRecord {
   bytes version = 2;
   string name = 3;
   string description = 4;
+  // Explicit extra members; write/storage only, never the people projection.
   repeated string principal_ids = 5;
+  // UNSPECIFIED adds no role members. Otherwise current effective spool role,
+  // including inheritance, must be >= this threshold. READER is refused with
+  // APPROVAL_ROLE_BELOW_ELIGIBILITY_FLOOR: WRITER (Developer) is the floor.
+  // Membership is re-resolved at landing evaluation, never snapshotted.
+  ResourceRole member_role = 6;
+}
+// ObserveSpool approval-groups snapshot/update projection. Field 5 is reserved
+// so an old principal_ids list can never be interpreted as public metadata.
+message ApprovalGroupView {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string name = 3;
+  string description = 4;
+  reserved 5;
+  reserved "principal_ids";
+  ResourceRole member_role = 6;
+  // Complete current union of explicit and role members, eligible humans only.
+  // Handles/display names; never account IDs. Uses section pagination for groups.
+  repeated SuggestedPrincipal resolved_members = 7;
+  // Subset supplied by member_role, letting UI label "Ada, Mara (admins) and
+  // jun" without exposing explicit principal_ids. Sorted canonical handles.
+  repeated string role_member_handles = 8;
 }
 message GroupRequirement {
   RecordRef group = 1;
@@ -189,6 +213,9 @@ message ReviewPolicyRecord {
   repeated ThreadRef targets = 4;
   repeated string target_name_patterns = 5;
   uint32 required_approvals = 6;
+  // UNSPECIFIED defaults to WRITER (Developer). PutReviewPolicy refuses
+  // READER with APPROVAL_ROLE_BELOW_ELIGIBILITY_FLOOR, rather than silently
+  // treating it as WRITER. Existing stored READER still evaluates as WRITER.
   ResourceRole minimum_role = 7;
   repeated string required_paths = 8;
   bool forbid_author_approval = 9;

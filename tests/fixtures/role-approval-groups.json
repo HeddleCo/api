@@ -1,0 +1,436 @@
+{
+  "principals": [
+    {
+      "subject": "ada-account-id",
+      "handle": "ada",
+      "display_name": "Ada",
+      "kind": 1,
+      "direct_role": 0,
+      "inherited_role": 3,
+      "is_agent": false
+    },
+    {
+      "subject": "mara-account-id",
+      "handle": "mara",
+      "display_name": "Mara",
+      "kind": 1,
+      "direct_role": 3,
+      "inherited_role": 0,
+      "is_agent": false
+    },
+    {
+      "subject": "jun-account-id",
+      "handle": "jun",
+      "display_name": "Jun",
+      "kind": 1,
+      "direct_role": 2,
+      "inherited_role": 0,
+      "is_agent": false
+    },
+    {
+      "subject": "bot-account-id",
+      "handle": "bot",
+      "display_name": "Bot",
+      "kind": 1,
+      "direct_role": 3,
+      "inherited_role": 0,
+      "is_agent": true
+    },
+    {
+      "subject": "reader-account-id",
+      "handle": "reader",
+      "display_name": "Reader",
+      "kind": 1,
+      "direct_role": 1,
+      "inherited_role": 0,
+      "is_agent": false
+    },
+    {
+      "subject": "writer-account-id",
+      "handle": "writer",
+      "display_name": "Writer",
+      "kind": 1,
+      "direct_role": 2,
+      "inherited_role": 0,
+      "is_agent": false
+    }
+  ],
+  "cases": [
+    {
+      "name": "role_group_member_counts_inherited_admin",
+      "member_role": 3,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [
+        "ada",
+        "jun",
+        "mara"
+      ],
+      "count": 3,
+      "error": null
+    },
+    {
+      "name": "demoted_member_drops_out",
+      "member_role": 3,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {
+        "ada": [
+          2,
+          0
+        ]
+      },
+      "extra": [],
+      "expected": [
+        "jun",
+        "mara"
+      ],
+      "count": 2,
+      "error": null
+    },
+    {
+      "name": "removed_member_drops_out",
+      "member_role": 3,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {
+        "mara": [
+          0,
+          0
+        ]
+      },
+      "extra": [],
+      "expected": [
+        "ada",
+        "jun"
+      ],
+      "count": 2,
+      "error": null
+    },
+    {
+      "name": "new_admin_counts_immediately",
+      "member_role": 3,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id",
+        "new-account-id"
+      ],
+      "overrides": {},
+      "extra": [
+        {
+          "subject": "new-account-id",
+          "handle": "new",
+          "display_name": "New",
+          "kind": 1,
+          "direct_role": 0,
+          "inherited_role": 3,
+          "is_agent": false
+        }
+      ],
+      "expected": [
+        "ada",
+        "jun",
+        "mara",
+        "new"
+      ],
+      "count": 4,
+      "error": null
+    },
+    {
+      "name": "agents_and_reader_extras_excluded",
+      "member_role": 3,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [
+        "ada",
+        "jun",
+        "mara"
+      ],
+      "count": 3,
+      "error": null
+    },
+    {
+      "name": "unspecified_is_explicit_only",
+      "member_role": 0,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [
+        "jun"
+      ],
+      "count": 1,
+      "error": null
+    },
+    {
+      "name": "writer_threshold",
+      "member_role": 2,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [
+        "ada",
+        "jun",
+        "mara",
+        "writer"
+      ],
+      "count": 4,
+      "error": null
+    },
+    {
+      "name": "policy_admin_floor",
+      "member_role": 3,
+      "minimum_role": 3,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [
+        "ada",
+        "jun",
+        "mara"
+      ],
+      "count": 2,
+      "error": null
+    },
+    {
+      "name": "legacy_reader_policy_evaluates_as_writer",
+      "member_role": 3,
+      "minimum_role": 1,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [
+        "ada",
+        "jun",
+        "mara"
+      ],
+      "count": 3,
+      "error": null
+    },
+    {
+      "name": "duplicate_approvals_count_once",
+      "member_role": 3,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id",
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [
+        "ada",
+        "jun",
+        "mara"
+      ],
+      "count": 3,
+      "error": null
+    },
+    {
+      "name": "explicit_member_loses_eligibility",
+      "member_role": 3,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {
+        "jun": [
+          1,
+          0
+        ]
+      },
+      "extra": [],
+      "expected": [
+        "ada",
+        "mara"
+      ],
+      "count": 2,
+      "error": null
+    },
+    {
+      "name": "reader_group_refused",
+      "member_role": 1,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [],
+      "count": 0,
+      "error": "RoleBelowEligibilityFloor"
+    },
+    {
+      "name": "unknown_group_role_refused",
+      "member_role": 99,
+      "minimum_role": 0,
+      "explicit": [
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id"
+      ],
+      "approvers": [
+        "ada-account-id",
+        "mara-account-id",
+        "jun-account-id",
+        "bot-account-id",
+        "reader-account-id",
+        "writer-account-id"
+      ],
+      "overrides": {},
+      "extra": [],
+      "expected": [],
+      "count": 0,
+      "error": "Role"
+    }
+  ],
+  "refused_policy_roles": [
+    1,
+    99
+  ]
+}

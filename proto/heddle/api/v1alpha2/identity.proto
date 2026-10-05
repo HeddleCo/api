@@ -1203,6 +1203,29 @@ message VetoRecoveryRequest {
     string email_secret = 4;
   }
 }
+// People rows contain presentation metadata only. Agents are delegations and
+// MUST NOT appear. kind uses the same handle namespace as ResolveHandles.
+message SuggestedPrincipal {
+  string handle = 1;
+  string display_name = 2;
+  HandleKind kind = 3;
+}
+
+// See docs/alpha-v2/people-and-approval-groups.md for normative privacy rules.
+message SuggestPrincipalsRequest {
+  // NFC then Unicode lowercase; 2..64 scalars and <=256 UTF-8 bytes.
+  string prefix = 1;
+  // Optional: restrict co-members to this spool. Caller MUST be a current
+  // member (inherited membership counts); public read access is insufficient.
+  SpoolRef spool = 2;
+}
+message SuggestPrincipalsResponse {
+  // At most 20, unique canonical handles, sorted by UTF-8 handle bytes.
+  // Prefix hits are current co-members plus at most one exact public-handle
+  // hit. No cursor, totals, principal/account IDs, or agent rows.
+  repeated SuggestedPrincipal principals = 1;
+}
+
 message ResolveHandlesRequest {
   repeated string handles = 1;
   ReadBudget budget = 2;

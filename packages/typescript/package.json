@@ -47,6 +47,8 @@
     "./v2/collaboration": "./dist/v1alpha2/collaboration.js",
     "./v2/source-targets": "./dist/v1alpha2/source-targets.js",
     "./v2/invitation": "./dist/v1alpha2/invitation.js",
+    "./v2/people": "./dist/v1alpha2/people.js",
+    "./v2/approval-groups": "./dist/v1alpha2/approval-groups.js",
     "./v2/invitation-code": "./dist/v1alpha2/invitation-code.js",
     "./v2/notifications": "./dist/v1alpha2/notifications.js",
     "./v2/passkey-label": "./dist/v1alpha2/passkey-label.js",

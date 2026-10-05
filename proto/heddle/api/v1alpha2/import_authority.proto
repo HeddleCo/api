@@ -57,7 +57,8 @@ message ImportBranchLimitV1 {
   bytes target_thread_id = 6;
   bytes expected_frontier_digest = 7; // ImportFrontierV1 commitment.
   uint64 slot_id = 8;
-  uint64 max_result_bytes = 9;
+  reserved 9;
+  reserved "max_result_bytes";
   ImportRefDisclosure ref_disclosure = 10; // OBSERVE requires 1; PINNED requires 0.
 }
 message ImportPermissionScopeV1 {
@@ -72,13 +73,13 @@ message ImportPermissionScopeV1 {
   bytes options_digest = 5;
   string converter_version = 6;
   uint32 max_operations = 7; // Logical-job total; never reset by renewal/retry.
-  uint64 max_result_bytes = 8; // Logical-job total.
+  uint64 max_result_bytes = 8; // ONE positive logical-job result total, <=1 GiB.
 }
 // P2 #1: NEW direct owner -> device permission, unrelated to PURGE, timeline,
 // self-PoP or online Developer/Admin grants. Exactly one logical job/lineage;
 // grants genesis binding and bounded IMPORT_CONVERSION delegation, no device
 // subdelegation. Durable accounting is (permission digest, logical job) and
-// (logical job, branch, slot), never certificate/key/retry-row counters.
+// slot identity is (logical job, branch, slot); byte totals never reset by key/retry.
 message ImportMemberPermissionV1 {
   uint32 format_version = 1;
   ImportIdentityV1 identity = 2;
@@ -329,7 +330,8 @@ message ImportBudgetLimitsV1 {
   uint32 max_branches = 1; // Positive, <=256.
   uint32 max_operations = 2; // Positive, <=256; total per logical job.
   uint64 max_result_bytes = 3; // Positive, <=1 GiB; total per logical job.
-  uint64 max_branch_result_bytes = 4; // Positive, <=max_result_bytes.
+  reserved 4;
+  reserved "max_branch_result_bytes";
 }
 enum ImportSourceMode {
   IMPORT_SOURCE_MODE_UNSPECIFIED = 0;
@@ -375,6 +377,9 @@ enum ImportRetryUnavailableReason {
   IMPORT_RETRY_UNAVAILABLE_REASON_JOB_CANCELLED = 4;
   IMPORT_RETRY_UNAVAILABLE_REASON_JOB_REVOKED = 5;
   IMPORT_RETRY_UNAVAILABLE_REASON_ALREADY_SUPERSEDED = 6;
+  // No original native admission before the original exclusive expiry.
+  // Renewal cannot replace original genesis authority; start a new logical job.
+  IMPORT_RETRY_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED = 7;
 }
 message GetImportJobStateResponse {
   // One transactional snapshot, including an explicit empty manifest before

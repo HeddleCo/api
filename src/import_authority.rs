@@ -35,7 +35,7 @@ record!(ImportIdentityV1, spool_uuid:b, spool_genesis_digest:b, owner_id:b,
     owner_account_uuid:b, owner_state_hash:b, ownership_transfer_sequence:u);
 record!(ImportOwnerChainV1, spool_genesis_digest:b, owner_state_hashes:q, transfer_audit_hashes:q);
 record!(ImportBranchLimitV1, ref_name:s, hash_algorithm:e, ref_mode:e, pinned_commit_oid:b,
-    genesis_digest:b, target_thread_id:b, expected_frontier_digest:b, slot_id:u, max_result_bytes:u, ref_disclosure:e);
+    genesis_digest:b, target_thread_id:b, expected_frontier_digest:b, slot_id:u, ref_disclosure:e);
 record!(ImportPermissionScopeV1, provider:s, source_url:s, branches:l, destination_version:b,
     options_digest:b, converter_version:s, max_operations:u, max_result_bytes:u);
 record!(ImportMemberPermissionV1, format_version:u, identity:m, logical_job_id:b,
@@ -238,9 +238,6 @@ fn branch(value: &ImportBranchLimitV1) -> Result<(), Reject> {
     ] {
         width(v, 32)?;
     }
-    if value.max_result_bytes == 0 || value.max_result_bytes > MAX_RESULT_BYTES {
-        return Err(Reject::Bounds);
-    }
     Ok(())
 }
 
@@ -323,6 +320,15 @@ pub fn resolve_import_provider(
     }
 }
 
+/// Advisory Git size in KiB. UNKNOWN is explicit and must carry zero.
+pub fn validate_repository_size_estimate(source: &ProviderRepository) -> Result<(), Reject> {
+    match source.size_estimate_state {
+        0 if source.git_size_kib == 0 => Ok(()),
+        1 if source.connection.is_some() => Ok(()),
+        _ => Err(Reject::Canonical),
+    }
+}
+
 /// Preserve selected identity exactly. Redirect/SSRF and current grants are host gates.
 pub fn validate_resolve_import_source_response(
     request: &ResolveImportSourceRequest,
@@ -347,6 +353,7 @@ pub fn validate_resolve_import_source_response(
     {
         return Err(Reject::SourceSelection);
     }
+    validate_repository_size_estimate(resolved)?;
     validate_repository_hash_algorithm(resolved, false)
 }
 
@@ -586,8 +593,6 @@ pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Resu
         || l.max_operations as usize > MAX_BRANCHES
         || l.max_result_bytes == 0
         || l.max_result_bytes > MAX_RESULT_BYTES
-        || l.max_branch_result_bytes == 0
-        || l.max_branch_result_bytes > l.max_result_bytes
     {
         return Err(Reject::Bounds);
     }
@@ -639,10 +644,6 @@ pub fn prepare_scope(
     if selected.branches.len() > limits.max_branches as usize
         || selected.max_operations > limits.max_operations
         || selected.max_result_bytes > limits.max_result_bytes
-        || selected
-            .branches
-            .iter()
-            .any(|b| b.max_result_bytes > limits.max_branch_result_bytes)
     {
         return Err(Reject::PreparationRefused(Reason::BudgetExceeded));
     }
@@ -844,9 +845,9 @@ pub fn validate_commit_request(
             || g.creator_authority_envelope_digest != hash(&[&proof.creator_authority_envelopes[i]])
             || proof.creator_authority_envelopes[i].is_empty()
             || proof.creator_authority_envelopes[i].len() > MAX_RECORD_BYTES
-            || original.signatures.len() != 1
-            || original.signatures[0].public_key != g.creator_public_key
-            || original.signatures[0].signature != g.original_creator_signature
+            || !original.signatures.iter().any(|s| {
+                s.public_key == g.creator_public_key && s.signature == g.original_creator_signature
+            })
         {
             return Err(Reject::GenesisBinding);
         }
@@ -964,18 +965,11 @@ pub fn validate_scope(value: &ImportPermissionScopeV1) -> Result<(), Reject> {
     if (value.max_operations as usize) < value.branches.len() {
         return Err(Reject::Scope);
     }
-    let mut total = 0_u64;
     for (i, b) in value.branches.iter().enumerate() {
         branch(b)?;
         if i > 0 && value.branches[i - 1].ref_name.as_bytes() >= b.ref_name.as_bytes() {
             return Err(Reject::Canonical);
         }
-        total = total
-            .checked_add(b.max_result_bytes)
-            .ok_or(Reject::Bounds)?;
-    }
-    if total > value.max_result_bytes {
-        return Err(Reject::Scope);
     }
     Ok(())
 }
@@ -987,13 +981,7 @@ fn scope_subset(child: &ImportPermissionScopeV1, parent: &ImportPermissionScopeV
         && child.converter_version == parent.converter_version
         && child.max_operations <= parent.max_operations
         && child.max_result_bytes <= parent.max_result_bytes
-        && child.branches.iter().all(|c| {
-            parent.branches.iter().any(|p| {
-                let mut limit = c.clone();
-                limit.max_result_bytes = p.max_result_bytes;
-                limit == *p && c.max_result_bytes <= p.max_result_bytes
-            })
-        })
+        && child.branches.iter().all(|c| parent.branches.contains(c))
 }
 
 /// Public context from the existing owner/keyring verifier, not from fields in
@@ -1431,7 +1419,7 @@ pub fn verify_operation(
         || o.genesis_digest != b.genesis_digest
         || o.target_thread_id != b.target_thread_id
         || o.expected_frontier_digest != b.expected_frontier_digest
-        || o.result_bytes > b.max_result_bytes
+        || o.result_bytes > scope.max_result_bytes
         || o.result_bytes == 0
         || o.options_digest != scope.options_digest
         || o.converter_version != scope.converter_version
@@ -1553,13 +1541,10 @@ fn verify_renewal_inner(
         // Old certificates may already omit previously committed slots. Only
         // charge all committed slots against the original logical-job budgets;
         // the host's initial manifest/limits remain durable across renewals.
-        if let Some(b) = old_slots
+        if old_slots
             .iter()
-            .find(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
+            .any(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
         {
-            if slot.result_bytes > b.max_result_bytes {
-                return Err(Reject::RenewalFork);
-            }
             consumed = consumed
                 .checked_add(slot.result_bytes)
                 .ok_or(Reject::Bounds)?;
@@ -2695,6 +2680,40 @@ pub fn check_import_revocations(
     Ok(())
 }
 
+/// Compute the exact remaining total and slots from an authenticated manifest.
+/// An empty result is completed work and cannot pass new-scope validation.
+pub fn remaining_import_scope(
+    scope: &ImportPermissionScopeV1,
+    committed: &ImportResultManifestV1,
+) -> Result<ImportPermissionScopeV1, Reject> {
+    validate_scope(scope)?;
+    validate_manifest(committed)?;
+    let mut remaining = scope.clone();
+    for slot in &committed.slots {
+        if scope
+            .branches
+            .iter()
+            .any(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
+        {
+            remaining.max_result_bytes = remaining
+                .max_result_bytes
+                .checked_sub(slot.result_bytes)
+                .ok_or(Reject::RenewalFork)?;
+            remaining.max_operations = remaining
+                .max_operations
+                .checked_sub(1)
+                .ok_or(Reject::RenewalFork)?;
+        }
+    }
+    remaining.branches.retain(|b| {
+        !committed
+            .slots
+            .iter()
+            .any(|s| s.ref_name == b.ref_name && s.slot_id == b.slot_id)
+    });
+    Ok(remaining)
+}
+
 fn remaining_scope(
     scope: &ImportPermissionScopeV1,
     old: &ImportPermissionScopeV1,
@@ -2706,14 +2725,11 @@ fn remaining_scope(
     let mut consumed = 0_u64;
     let mut removed = 0_u32;
     for slot in &committed.slots {
-        if let Some(branch) = old
+        if old
             .branches
             .iter()
-            .find(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
+            .any(|b| b.ref_name == slot.ref_name && b.slot_id == slot.slot_id)
         {
-            if slot.result_bytes > branch.max_result_bytes {
-                return Err(Reject::RenewalFork);
-            }
             consumed = consumed
                 .checked_add(slot.result_bytes)
                 .ok_or(Reject::Bounds)?;
@@ -3211,8 +3227,16 @@ pub struct ImportWitnessSnapshot {
     pub job_associations: Vec<(Vec<u8>, Vec<u8>)>,
     pub accepted_history: Vec<ImportPublicProofBundleV1>,
 }
+/// Witnessed requires an authenticated observation for every accepted delegation.
+/// Recovery can retain witnessed history but grants no admission for the active tail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportBundleEvidence {
+    Recovery,
+    Witnessed,
+}
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedImportBundleWitnesses {
+    pub evidence: ImportBundleEvidence,
     pub accepted_history: ImportJobCasStateV1,
     pub snapshot: ImportWitnessSnapshot,
 }
@@ -3436,7 +3460,11 @@ pub fn verify_import_bundle_witnesses(
             .find(|e| hash(&[e]) == g.creator_authority_envelope_digest)
             .ok_or(Reject::Scope)?;
         verify_native(original, "heddle-thread-genesis-v1")?;
-        let signature = original.signatures.first().ok_or(Reject::Signature)?;
+        let signature = original
+            .signatures
+            .iter()
+            .find(|s| s.public_key == g.creator_public_key)
+            .ok_or(Reject::Scope)?;
         verify_genesis_authority(
             binding,
             initial,
@@ -3541,6 +3569,8 @@ pub fn verify_import_bundle_witnesses(
     let mut order = 0;
     let mut observed = 0;
     let mut active_index = 0usize;
+    let mut consumed = std::collections::BTreeMap::<(Vec<u8>, Vec<u8>), (u32, u64)>::new();
+    let mut total_bytes = 0_u64;
     for o in &bundle.operations {
         let before = manifest_digest(&progressive)?;
         let digest = signed_operation_digest(o)?;
@@ -3572,6 +3602,39 @@ pub fn verify_import_bundle_witnesses(
             .ok_or(Reject::Scope)?;
         if index < active_index {
             return Err(Reject::Transition);
+        }
+        let result_bytes = o.body.as_ref().ok_or(Reject::Canonical)?.result_bytes;
+        total_bytes = total_bytes
+            .checked_add(result_bytes)
+            .ok_or(Reject::Bounds)?;
+        let original_scope = initial.body.scope.as_ref().ok_or(Reject::Canonical)?;
+        if total_bytes > original_scope.max_result_bytes
+            || progressive.slots.len() > original_scope.max_operations as usize
+        {
+            return Err(Reject::Scope);
+        }
+        let delegation = &verified[index];
+        let scope = delegation.body.scope.as_ref().ok_or(Reject::Canonical)?;
+        let mut budgets = vec![(&delegation.digest, scope)];
+        if let Some(parent) = &delegation.member {
+            budgets.push((
+                &delegation.body.parent_permission_digest,
+                parent
+                    .body
+                    .as_ref()
+                    .and_then(|p| p.scope.as_ref())
+                    .ok_or(Reject::Canonical)?,
+            ));
+        }
+        for (digest, scope) in budgets {
+            let (operations, bytes) = consumed
+                .entry((digest.clone(), delegation.body.logical_job_id.clone()))
+                .or_default();
+            *operations = operations.checked_add(1).ok_or(Reject::Bounds)?;
+            *bytes = bytes.checked_add(result_bytes).ok_or(Reject::Bounds)?;
+            if *operations > scope.max_operations || *bytes > scope.max_result_bytes {
+                return Err(Reject::Scope);
+            }
         }
         while active_index < index {
             let renewal = bundle.renewals[active_index]
@@ -3667,6 +3730,11 @@ pub fn verify_import_bundle_witnesses(
     }
     let active = bundle.delegations.last().ok_or(Reject::Canonical)?.clone();
     Ok(VerifiedImportBundleWitnesses {
+        evidence: if times.iter().all(Option::is_some) {
+            ImportBundleEvidence::Witnessed
+        } else {
+            ImportBundleEvidence::Recovery
+        },
         accepted_history: ImportJobCasStateV1 {
             format_version: 1,
             logical_job_id: terminal.logical_job_id.clone(),
@@ -3687,6 +3755,27 @@ pub fn verify_import_bundle_witnesses(
 
 /// These facts MUST come from current authenticated host state, never request
 /// claims. Retry/Renew fetches use this exact authorized source association.
+/// Classify independently retained original authority and actual native admission.
+/// A later certificate cannot reopen the originals' exclusive admission window.
+pub fn original_import_retry_unavailable(
+    original: &SignedImportJobDelegationV1,
+    admitted: bool,
+    now_unix_seconds: i64,
+) -> Result<Option<ImportRetryUnavailableReason>, Reject> {
+    let body = original.body.as_ref().ok_or(Reject::Canonical)?;
+    if body.not_before_unix_seconds < 0
+        || body.expires_at_unix_seconds <= body.not_before_unix_seconds
+        || now_unix_seconds < 0
+    {
+        return Err(Reject::Semantic);
+    }
+    Ok(
+        (!admitted && now_unix_seconds >= body.expires_at_unix_seconds)
+            .then_some(ImportRetryUnavailableReason::OriginalWindowEnded),
+    )
+}
+
+/// Independently authenticated current caller facts for source custody checks.
 pub struct ImportControlCaller<'a> {
     pub authenticated_pop: bool,
     pub destination_writer: bool,
@@ -3755,7 +3844,7 @@ fn validate_retry_availability(
             }
         }
         RetryAvailability::RetryUnavailable(reason) => {
-            if !(1..=6).contains(reason) {
+            if !(1..=7).contains(reason) {
                 return Err(Reject::Canonical);
             }
         }

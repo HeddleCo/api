@@ -235,10 +235,15 @@ def audit_message_and_enum_shapes(files: list[list[str]]) -> None:
                     re.MULTILINE,
                 ).group(1)
             )
-            assert first_number == 0 and first_name.endswith("_UNSPECIFIED"), (
-                block_name(enum_block, 4),
-                first_name,
+            enum_name = block_name(enum_block, 4)
+            # Discovery has an explicit UNKNOWN state, distinct from an empty
+            # repository with an AVAILABLE zero estimate (api#350).
+            valid_zero = (
+                first_name == "PROVIDER_REPOSITORY_SIZE_ESTIMATE_STATE_UNKNOWN"
+                if enum_name == "ProviderRepositorySizeEstimateState"
+                else first_name.endswith("_UNSPECIFIED")
             )
+            assert first_number == 0 and valid_zero, (enum_name, first_name)
 
 
 def audit_failure_shapes(decoded: str) -> None:

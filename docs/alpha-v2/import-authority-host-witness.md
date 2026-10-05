@@ -4,7 +4,8 @@ This is the api#296 contract, revised in place by api#318 and api#321, for [weft
 8d427f8c1](https://github.com/HeddleCo/weft/pull/2479/changes/8d427f8c12006c63c5cad43cce260fd91a5e77a5).
 The build decision is [weft#2469](https://github.com/HeddleCo/weft/issues/2469).
 The undeployed v1 preparation schema is revised in place; its semantics require a coordinated incompatible-peer
-gate. Package versions and tags do not change in this PR. The delivery order is
+gate. Alpha.32 makes the explicit hard cut documented in
+[the breaking notice](../../breaking/0.31.0-alpha.32.md). The delivery order is
 **api → heddle → weft → tapestry**. This contract neither deploys that cascade
 nor establishes that the original runtime defect is fixed.
 
@@ -39,7 +40,7 @@ and Ed25519 public keys are 32; signatures are 64. Encodings include default
 values; there are no omitted signed fields, protobuf tags, hex strings, JSON
 numbers, optional-presence ambiguities or protobuf serialization in signatures.
 Signed wrappers flatten their body followed by AuthorizationSignature (counted
-signer ID, counted signature). These widths and layouts are frozen for v1. api#318 revises the undeployed v1
+signer ID, counted signature). These widths and layouts are frozen for v1. api#318 and alpha.32 revise the undeployed v1
 layout in place; no old layout or compatibility reader is retained. After first
 deployment a new signed layout needs a new version/domain and new identities.
 
@@ -114,6 +115,24 @@ coverage/PageInfo semantics, default 128 and max 512 per page; the whole respons
 is at most 1 MiB. Cursors bind caller, exact custody/URL/repository identity,
 accepted bounds and provider snapshot. Unknown/unauthorized connected sources
 use uniform NOT_FOUND. No credential is returned or acquired by public discovery.
+
+Discovery also carries `ProviderRepository.size_estimate_state` and
+`git_size_kib`. `AVAILABLE` reports approximate **Git repository storage** in
+KiB (one KiB = 1024 bytes), including zero for an empty repository. Connected
+GitHub adapters use the repository API's size observation. `UNKNOWN` is an
+explicit state and MUST carry zero; unknown enum values refuse. Public HTTPS
+Git reports UNKNOWN because no cheap estimate is available. No branch estimate
+is exposed: shared Git objects and provider repository size do not offer a cheap
+independent branch measurement. Hosts need not fetch/count objects for discovery.
+
+The estimate is advisory, can be stale, is not converted result bytes, and grants
+nothing. Consumers apply converter-appropriate headroom (including the KiB-to-byte
+conversion using checked/widened arithmetic), capped at
+`GetImportConfiguration.limits.max_result_bytes` and the protocol 1 GiB maximum.
+UNKNOWN requires an explicit caller choice using the current host configuration;
+never treat it as an empty repository or an unlimited budget. The chosen total
+is reviewed and passed exactly to Prepare; hosts never fill it from the estimate.
+The estimate is outside all signed import scope/authority layouts.
 
 Resolve accepts a selected source **unchanged or refuses it**. The result must
 preserve the exact `clone_url`, connection (including absence), repository ID,
@@ -224,16 +243,20 @@ change. Authority from an online role is still checked separately for RPC access
 Permission budgets are explicitly **one logical import**, at most **256 branches,
 256 converted operations/slots, 1 GiB of committed result bytes**. Branch limits
 are sorted unique full refs, with one stable slot per branch in this first format.
-Each branch byte budget is positive; their sum is at most the total. Certificate
-scope can select a subset and reduce budgets, never add a ref/slot/genesis/target,
+There are **no per-branch byte budgets**. `max_result_bytes` is ONE positive
+result-byte total, at most 1073741824 bytes, and `max_operations` is the operation
+total. Stable branch/ref/slot identities remain exact. Certificate
+scope can select a subset and reduce the total and operation count, never add a ref/slot/genesis/target,
 change initial frontier/source/options/converter/destination version, or expand
 a parent's time window. The parent cannot outlive its verified issuing authority.
 The owner grants permission over branch limits BEFORE genesis authorization
 proofs are produced; only the child manifest adds their signed proof digests.
 This prevents a cyclic permission/genesis/delegation digest dependency.
 
-The host accounts by `(permission digest, logical job)` and by
-`(logical job, full ref, slot_id)`; total budgets never reset on another key,
+The host accounts result bytes and operations by `(permission digest, logical job)`,
+with durable original logical-job totals across all reissued parents.
+`(logical job, full ref, slot_id)` records identity, uniqueness and exact replay,
+without a branch byte counter. Total budgets never reset on another key,
 delegation or retry row. Reissuing permission for the same logical job cannot
 reset its durable original limits. Only the direct active owner can issue the
 member permission; a member cannot turn its own delegation into another parent.
@@ -244,6 +267,17 @@ and result-byte budgets. It may contain a narrower replacement child, but MUST
 NOT regrant the original full scope. Durable original job limits continue to
 apply across all parents. Retain the original signed parent/envelope for genesis
 verification; never rewrite those originals to match a renewal.
+
+`remaining_import_scope` / `remainingImportScope` compute the exact remaining
+slots, operations and total: **remaining bytes = previous total − bytes consumed
+in slots still covered by that previous scope**. Previously removed historical
+slots are not charged twice. A replacement may choose a smaller total, never a
+larger one; reissued parents obey the same bound. A zero/empty completed result
+cannot pass new-scope validation. Hosts retain the complete cumulative manifest,
+original totals and permission-digest/job accounting under the same transaction
+fence across every renewal, signing key, delegation and physical retry. Bundle
+witness composition enforces the cumulative original total and each signed
+certificate/permission total against authenticated accepted publication order.
 
 At first issuance, generate `cancellation_id` using a CSPRNG as 32 random bytes
 in `heddle-import-cancel-v1`; persist it for the same logical-job/retry-lineage/
@@ -305,8 +339,8 @@ cannot obtain the OID. Before signing, disclose this fixed promise:
 The caller must explicitly select and sign that fallback. Each observe branch
 has an empty `pinned_commit_oid`, an explicit hash algorithm and
 `ref_disclosure = IMPORT_REF_DISCLOSURE_OBSERVE_AT_EXECUTION (1)`.
-Pinned branches require `ref_disclosure = UNSPECIFIED (0)`. Field 10 of
-`ImportBranchLimitV1` appends **u32be(ref_disclosure)** to its canonical layout;
+Pinned branches require `ref_disclosure = UNSPECIFIED (0)`. Alpha.32 removes/reserves field 9 `max_result_bytes` from
+`ImportBranchLimitV1` and its canonical u64be encoding. Field 10 appends **u32be(ref_disclosure)** to its canonical layout;
 the parent scope, prepared scope and signed manifest all bind it. A genuine
 delegation signature without the marker still rejects with `RefDisclosure`.
 The result retains its exact observed OID and algorithm.
@@ -380,11 +414,11 @@ the first or latest-looking version. Alternatives remain explicitly selectable.
 The selected entry's exact `default_options` octets retain their existing digest
 rules; this marker does not change any signed HYBRID layout or domain.
 
-Positive host limits cover branches, logical-job operations, total result bytes
-and per-branch result bytes. They cannot exceed 256 branches/operations or 1 GiB
-total, and per-branch bytes cannot exceed the host total. The caller chooses
+Positive host limits cover branches, logical-job operations and ONE total result
+byte limit. They cannot exceed 256 branches/operations or 1 GiB total.
+`ImportBudgetLimitsV1.max_branch_result_bytes` (tag 4) is removed/reserved. The caller chooses
 **every** scope field: provider/URL, exact ordered branches and ref disclosure,
-converter/options, stable slot IDs, per-branch and total budgets, targets and
+converter/options, stable slot IDs, the total byte limit and operation count, targets and
 explicit Thread-specific frontier commitments. There are no omitted-field
 defaults or host-allocated slots. Prepare accepts these choices byte-for-byte
 or refuses; even budget reductions or equivalent normalization are forbidden.
@@ -1542,7 +1576,15 @@ remaining renewal MUST commit the terminal manifest. These checks preserve
 owner-signed cumulative operation/byte budgets and scope narrowing across all
 renewals. Before any publication, absent admission statements confer no historical admission claim.
 It returns the authenticated committed manifest, active predecessor, authority
-epoch and an updated snapshot. Compare these with the authenticated read state.
+epoch, an updated snapshot and the typed `evidence` discriminator:
+Rust `ImportBundleEvidence::{Recovery,Witnessed}` / TS `"recovery" | "witnessed"`.
+Witnessed requires an authenticated admission/publication observation for **every**
+accepted delegation. An unwitnessed activation tail returns Recovery even if
+earlier retained history is witnessed. Recovery grants no historical admission
+for that tail and no current executable authority. Witnessed also requires all
+current execution checks before any new work. Native genesis binding selects the
+signature whose public key equals the exact signed `creator_public_key`; another
+valid earlier signature neither substitutes for the creator nor causes rejection. Compare these with the authenticated read state.
 Persist the result atomically under the receiver's trust/mutation lock; failures
 return no snapshot and cannot advance trust. Never source a persisted snapshot,
 owner context or descriptor pin from the incoming bundle. Snapshot copies in TS
@@ -1599,11 +1641,23 @@ attempt cancellation does not mean logical-job cancellation. Queued, running,
 waiting, paused, completed, already superseded and complete-job attempts are
 ineligible. The job must remain executable under all current authority, policy,
 revocation, budget, frontier and lease checks. In-window eligible retries need
-no new signature. On expired authority, the required flow is authenticated state
+no new signature. For a job with original native admission, on expired authority the required flow is authenticated state
 read -> compute/review remaining scope -> exact Prepare -> sign replacement
 permission/delegation and renewal -> Renew -> state read -> Retry with a **NEW
 request ID**, the active replacement digest/epoch and eligible operation CAS.
 Renew's request ID MUST NOT be reused for Retry.
+
+A job whose original native admission never occurred before the original
+exclusive window ended MUST return retry-unavailable
+`ORIGINAL_WINDOW_ENDED (7)`. Renew/Retry cannot restore admission by replacing
+that original genesis authority; the caller must prepare/sign a **new logical
+job**. `original_import_retry_unavailable` / `originalImportRetryUnavailable`
+classify the independently retained original delegation, durable native admission
+fact and actual host clock. Hosts apply this gate before renewal preparation,
+renewal activation and retry admission, including when an active replacement has
+a later window. Commit acceptance alone is not native admission. A genuine
+original admission remains recoverable and can follow Renew → Retry for remaining
+work. Exact stored receipt replay remains an acknowledgement, as before.
 
 Every admitted Retry MUST allocate a fresh **host-generated physical UUID**,
 distinct from every prior attempt (including the first lineage UUID) and
@@ -1624,8 +1678,8 @@ contains one canonical non-nil physical UUID, the exact destination and a
 attempt selected from the durable job/lineage association, read transactionally
 with state, retained proof and retained source. The existing 2 MiB response
 bound includes it. Reasons distinguish no terminal attempt, attempt in progress,
-complete job, logical-job cancellation, logical-job revocation and an already
-superseded target. Authority expiry or lack of source custody alone does not
+complete job, logical-job cancellation, logical-job revocation an already
+superseded target and an original window that ended without native admission. Authority expiry or lack of source custody alone does not
 hide an otherwise eligible physical target: Renew/custody checks still gate
 admission. If the durable association cannot be read, refuse UNAVAILABLE after
 writer authorization; never guess from IDs or return partial state.

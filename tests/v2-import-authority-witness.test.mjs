@@ -123,7 +123,7 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
   assert.deepEqual(signature,bytes(v.signature_hex));assertCrypto(bytes(v.public_key_hex),input,signature);
 });
 test('frozen descriptor fields and public proof-only lookup',()=>{
-  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length+(entry.name==="heddle.api.v1alpha2.GetImportJobStateResponse"?2:0));for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
+  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length);for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
   for(const descriptor of fixture.enums){const schema=(descriptor.name.includes(".common.")?common:api)[`${descriptor.name.split(".").at(-1)}Schema`];assert.deepEqual(schema.values.map(v=>({name:v.name,number:v.number})),descriptor.values);}
   const expected = ['CancelImportJob', 'CommitImportJob', 'GetHostedWitnessHistoryProof', 'GetImportJobState', 'ImportSource',
     'PrepareImportJob', 'RenewImportJob', 'RetryImportSource', 'SynchronizeRemote']
@@ -765,4 +765,46 @@ for(const n of fixture.review_alpha31_vectors.scheduled.execution_negative)test(
  const recovered=await reviewVerify('review_scheduled_recovery',alpha31Pin(),undefined,[1100],1100000n);
  await assert.rejects(async()=>{authority.checkImportRevocations(request.proof.delegations[0],parent,n.revoked_parent?[parent.body.cancellationId]:[]);await authority.verifyNewImportOperation(vector('commit_future_operation'),d,BigInt(n.at));},expected(n.expected));
  authority.checkImportRevocations(request.proof.delegations[0],parent,[]);await authority.verifyNewImportOperation(vector('commit_future_operation'),d,1200n);assert.equal(recovered.snapshot.acceptedHistory[0].statements.length,0);
+});
+
+// alpha.32 uses frozen vectors; no test-time signing or expected-byte regeneration.
+test('alpha32 total over 1 GiB rejects then accepts the bounded control',()=>{
+ assert.throws(()=>authority.validateImportScope(vector('alpha32_total_over_1gib')),expected('Bounds'));
+ authority.validateImportScope(vector('scope'));
+});
+test('alpha32 widening rejects then narrowing accepts',async()=>{
+ await assert.rejects(authority.verifyImportDelegation(vector('alpha32_widening'),vector('permission'),ownerContext()),expected('Scope'));
+ await authority.verifyImportDelegation(vector('alpha32_narrowing'),vector('permission'),ownerContext());
+ assert.equal(vector('alpha32_narrowing').body.scope.maxResultBytes,999n);
+});
+test('alpha32 remaining after partial consumption',()=>{
+ assert.deepEqual(authority.remainingImportScope(vector('scope'),vector('partial_manifest')),vector('alpha32_remaining'));
+ const excessive=vector('partial_manifest');excessive.slots[0].resultBytes=2001n;
+ assert.throws(()=>authority.remainingImportScope(vector('scope'),excessive),expected('RenewalFork'));
+});
+test('alpha32 consumption across renewal never resets',async()=>{
+ await assert.rejects(reviewVerify('alpha32_consumption_reset'),expected('RenewalFork'));
+ await reviewVerify('review_control');
+});
+test('alpha32 aggregate bytes across slots reject then pass',async()=>{
+ await assert.rejects(reviewVerify('alpha32_aggregate_over',alpha31Pin(),undefined,[1100]),expected('Scope'));
+ await reviewVerify('alpha32_aggregate_at',alpha31Pin(),undefined,[1100]);
+});
+test('alpha32 unknown estimate rejects malformed then accepts explicit UNKNOWN',()=>{
+ for(const name of ['unknown_nonzero','unknown_enum'])assert.throws(()=>authority.validateRepositorySizeEstimate(vector('alpha32_estimate_'+name)),expected('Canonical'));
+ for(const name of ['unknown','available','empty'])authority.validateRepositorySizeEstimate(vector('alpha32_estimate_'+name));
+ const unknown=vector('alpha32_estimate_unknown');assert.equal(unknown.sizeEstimateState,api.ProviderRepositorySizeEstimateState.UNKNOWN);assert.equal(unknown.gitSizeKib,0n);
+});
+test('alpha32 original window ended is named and cannot regain admission',()=>{
+ const original=vector('delegation');
+ assert.equal(authority.originalImportRetryUnavailable(original,false,original.body.expiresAtUnixSeconds),api.ImportRetryUnavailableReason.ORIGINAL_WINDOW_ENDED);
+ assert.equal(authority.originalImportRetryUnavailable(original,true,original.body.expiresAtUnixSeconds),undefined);
+ assert.equal(authority.originalImportRetryUnavailable(original,false,original.body.expiresAtUnixSeconds-1n),undefined);
+ authority.validateImportRetryStateResponse(vector('job_state_request'),vector('alpha32_original_window_ended'));
+});
+test('alpha32 creator selection and typed recovery vs witnessed evidence',async()=>{
+ await assert.rejects(reviewVerify('alpha32_missing_creator',alpha31Pin(),undefined,[1100]),expected('Scope'));
+ assert.equal((await reviewVerify('alpha32_multisignature_recovery',alpha31Pin(),undefined,[1100])).evidence,'recovery');
+ assert.equal((await reviewVerify('review_control')).evidence,'witnessed');
+ assert.equal((await reviewVerify('review_renewed_recovery')).evidence,'recovery');
 });

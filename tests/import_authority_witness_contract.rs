@@ -25,11 +25,6 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
         assert_eq!(
             message.fields().count(),
             descriptor["fields"].as_array().expect("fields").len()
-                + if message.full_name() == "heddle.api.v1alpha2.GetImportJobStateResponse" {
-                    2
-                } else {
-                    0
-                }
         );
         for expected in descriptor["fields"].as_array().expect("fields") {
             let field = message
@@ -4085,4 +4080,146 @@ fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
         assert!(recovery.snapshot.accepted_history[0].statements.is_empty());
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn alpha32_total_over_1gib_reject_then_pass() {
+    let f = fixture();
+    assert_eq!(
+        import::validate_scope(&record(&f, "alpha32_total_over_1gib")),
+        Err(codec::Reject::Bounds)
+    );
+    import::validate_scope(&record(&f, "scope")).expect("bounded control");
+}
+#[test]
+fn alpha32_widening_reject_then_narrowing_pass() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let parent = record(&f, "permission");
+    assert_eq!(
+        import::verify_delegation(
+            &record(&f, "alpha32_widening"),
+            Some(&parent),
+            &c.owner(1100)
+        ),
+        Err(codec::Reject::Scope)
+    );
+    import::verify_delegation(
+        &record(&f, "alpha32_narrowing"),
+        Some(&parent),
+        &c.owner(1100),
+    )
+    .expect("narrow total with exact slots");
+}
+#[test]
+fn alpha32_remaining_after_partial_consumption() {
+    let f = fixture();
+    let scope = record(&f, "scope");
+    let mut manifest: api::ImportResultManifestV1 = record(&f, "partial_manifest");
+    assert_eq!(
+        import::remaining_import_scope(&scope, &manifest).expect("remaining"),
+        record(&f, "alpha32_remaining")
+    );
+    manifest.slots[0].result_bytes = 2001;
+    assert_eq!(
+        import::remaining_import_scope(&scope, &manifest),
+        Err(codec::Reject::RenewalFork)
+    );
+}
+#[test]
+fn alpha32_consumption_across_renewal_never_resets() {
+    let f = fixture();
+    let pin = alpha31_pin(&f, false);
+    assert_eq!(
+        review_verify(&f, "alpha32_consumption_reset", &pin, None, &[1100, 1250]),
+        Err(codec::Reject::RenewalFork)
+    );
+    review_verify(&f, "review_control", &pin, None, &[1100, 1250]).expect("narrow renewal control");
+}
+#[test]
+fn alpha32_aggregate_bytes_across_slots_reject_then_pass() {
+    let f = fixture();
+    let pin = alpha31_pin(&f, false);
+    assert_eq!(
+        review_verify(&f, "alpha32_aggregate_over", &pin, None, &[1100]),
+        Err(codec::Reject::Scope)
+    );
+    review_verify(&f, "alpha32_aggregate_at", &pin, None, &[1100]).expect("exact total control");
+}
+#[test]
+fn alpha32_unknown_estimate_reject_then_pass() {
+    let f = fixture();
+    for name in ["unknown_nonzero", "unknown_enum"] {
+        assert_eq!(
+            import::validate_repository_size_estimate(&record(
+                &f,
+                &format!("alpha32_estimate_{name}")
+            )),
+            Err(codec::Reject::Canonical)
+        );
+    }
+    for name in ["unknown", "available", "empty"] {
+        import::validate_repository_size_estimate(&record(&f, &format!("alpha32_estimate_{name}")))
+            .expect("advisory estimate");
+    }
+    let unknown: api::ProviderRepository = record(&f, "alpha32_estimate_unknown");
+    assert_eq!(
+        unknown.size_estimate_state,
+        api::ProviderRepositorySizeEstimateState::Unknown as i32
+    );
+    assert_eq!(unknown.git_size_kib, 0);
+}
+#[test]
+fn alpha32_original_window_ended_is_named() {
+    let f = fixture();
+    let original: api::SignedImportJobDelegationV1 = record(&f, "delegation");
+    let end = original
+        .body
+        .as_ref()
+        .expect("body")
+        .expires_at_unix_seconds;
+    assert_eq!(
+        import::original_import_retry_unavailable(&original, false, end).expect("classification"),
+        Some(api::ImportRetryUnavailableReason::OriginalWindowEnded)
+    );
+    assert_eq!(
+        import::original_import_retry_unavailable(&original, true, end).expect("admitted"),
+        None
+    );
+    assert_eq!(
+        import::original_import_retry_unavailable(&original, false, end - 1).expect("in window"),
+        None
+    );
+    import::validate_retry_state_response(
+        &record(&f, "job_state_request"),
+        &record(&f, "alpha32_original_window_ended"),
+    )
+    .expect("named reason");
+}
+#[test]
+fn alpha32_creator_selection_and_typed_evidence() {
+    let f = fixture();
+    let pin = alpha31_pin(&f, false);
+    assert_eq!(
+        review_verify(&f, "alpha32_missing_creator", &pin, None, &[1100]),
+        Err(codec::Reject::Scope)
+    );
+    assert_eq!(
+        review_verify(&f, "alpha32_multisignature_recovery", &pin, None, &[1100])
+            .expect("select creator")
+            .evidence,
+        import::ImportBundleEvidence::Recovery
+    );
+    assert_eq!(
+        review_verify(&f, "review_control", &pin, None, &[1100, 1250])
+            .expect("witnessed")
+            .evidence,
+        import::ImportBundleEvidence::Witnessed
+    );
+    assert_eq!(
+        review_verify(&f, "review_renewed_recovery", &pin, None, &[1100, 1250])
+            .expect("unwitnessed tail")
+            .evidence,
+        import::ImportBundleEvidence::Recovery
+    );
 }

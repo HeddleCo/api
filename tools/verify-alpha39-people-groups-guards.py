@@ -13,6 +13,19 @@ if language == "rust":
     groups = Path("src/v2/approval_groups.rs")
     cases = [
         ("co_member", people, "if shared\n", "if true\n"),
+        ("members_visibility", people, "&& context.members_readable_spool_ids.contains(id)", "&& true"),
+        ("hidden_handle", people, "!candidate.handle_visible", "false"),
+        ("absent_handle", people, "candidate.person.handle.is_empty()", "false"),
+        ("uuid_handle", people, "|| uuid_shaped_handle(&person.handle)", "|| false"),
+        ("explicit_admin", groups, "if !is_administrator {", "if false {"),
+        ("explicit_preservation", groups, "(!p.handle_visible || p.person.handle.is_empty())", "false"),
+        ("explicit_resolution", groups, "resolve_visible_human(handle)", "Some(handle.clone())"),
+        ("explicit_members_read", groups, "if context.is_administrator && context.can_read_members {", "if context.is_administrator {"),
+        ("explicit_hidden", groups, ".filter(|p| p.explicit_member && !p.is_agent && !p.subject.is_empty())\n        {\n            if !principal.handle_visible", ".filter(|p| p.explicit_member && !p.is_agent && !p.subject.is_empty())\n        {\n            if false"),
+        ("roster_absent", groups, "for principal in &members {\n            if !principal.handle_visible || principal.person.handle.is_empty()", "for principal in &members {\n            if !principal.handle_visible || false"),
+        ("explicit_view", groups, "if context.is_administrator && context.can_read_members {", "if context.can_read_members {"),
+        ("roster_visibility", groups, "if context.can_read_members {", "if true {"),
+        ("roster_hidden", groups, "for principal in &members {\n            if !principal.handle_visible", "for principal in &members {\n            if false"),
         ("agents", people, "if candidate.is_agent {", "if false {"),
         ("bound", people, "members.truncate(MAX_SUGGESTED_PRINCIPALS);", "// bound removed"),
         ("prefix", people, "!(2..=64).contains(&prefix.chars().count())", "false"),
@@ -28,6 +41,18 @@ elif language == "ts":
     groups = Path("packages/typescript/dist/v1alpha2/approval-groups.js")
     cases = [
         ("co_member", people, "if (shared &&", "if (true &&"),
+        ("members_visibility", people, "&& context.membersReadableSpoolIds.includes(id)", "&& true"),
+        ("hidden_handle", people, "!candidate.handleVisible", "false"),
+        ("absent_handle", people, "!candidate.person.handle", "false"),
+        ("uuid_handle", people, "|| /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(person.handle)", "|| false"),
+        ("explicit_admin", groups, "if (!isAdministrator)", "if (false)"),
+        ("explicit_preservation", groups, "(!p.handleVisible || !p.person.handle)", "false"),
+        ("explicit_resolution", groups, "const subject = resolveVisibleHuman(handle);", "const subject = handle;"),
+        ("explicit_members_read", groups, "context.isAdministrator && context.canReadMembers", "context.isAdministrator"),
+        ("roster_absent", groups, "p.handleVisible && !!p.person.handle", "p.handleVisible"),
+        ("explicit_view", groups, "context.isAdministrator && context.canReadMembers", "context.canReadMembers"),
+        ("roster_visibility", groups, "context.canReadMembers ? members.filter(visible) : []", "members.filter(visible)"),
+        ("roster_hidden", groups, "p.handleVisible &&", "true &&"),
         ("agents", people, "if (candidate.isAgent)", "if (false)"),
         ("bound", people, ".slice(0, MAX_SUGGESTED_PRINCIPALS)", ".slice(0)"),
         ("prefix", people, "[...prefix].length < 2 || [...prefix].length > 64", "false"),
@@ -82,5 +107,29 @@ try:
         subprocess.run(["npm", "run", "build"], check=True, stdout=subprocess.DEVNULL)
     green = run("no_id_leak", "green")
     print(f"alpha.39 {language} no_id_leak: broken exit {red}; restored exit {green}", flush=True)
+finally:
+    path.write_text(original)
+
+# Reintroduce the removed ID write arm. Hard-cut descriptor assertions must fail.
+path = Path("proto/heddle/api/v1alpha2/administration.proto")
+original = path.read_text()
+try:
+    marker = ('message ApprovalGroupRecord {\n'
+              '  RecordRef ref = 1;\n  bytes version = 2;\n'
+              '  string name = 3;\n  string description = 4;\n'
+              '  reserved 5;\n  reserved "principal_ids";')
+    if original.count(marker) != 1:
+        raise RuntimeError("expected one approval group write cutover site")
+    restored_id_arm = marker.replace('  reserved 5;\n  reserved "principal_ids";',
+                                    '  repeated string principal_ids = 5;')
+    path.write_text(original.replace(marker, restored_id_arm))
+    if language == "ts":
+        subprocess.run(["npm", "run", "build"], check=True, stdout=subprocess.DEVNULL)
+    red = run("handle_write_cutover", "red")
+    path.write_text(original)
+    if language == "ts":
+        subprocess.run(["npm", "run", "build"], check=True, stdout=subprocess.DEVNULL)
+    green = run("handle_write_cutover", "green")
+    print(f"alpha.39 {language} handle_write_cutover: broken exit {red}; restored exit {green}", flush=True)
 finally:
     path.write_text(original)

@@ -4,8 +4,10 @@
     {"name":"downgraded writer redeem", "offered":2, "current":1, "allowed":false},
     {"name":"admin requires admin accept", "offered":3, "current":2, "allowed":false},
     {"name":"admin requires admin redeem", "offered":3, "current":1, "allowed":false},
-    {"name":"reader accepts reader", "offered":1, "current":1, "allowed":true},
-    {"name":"writer redeems writer", "offered":2, "current":2, "allowed":true},
+    {"name":"reader inviter refused for reader", "offered":1, "current":1, "allowed":false},
+    {"name":"writer inviter refused for writer", "offered":2, "current":2, "allowed":false},
+    {"name":"admin accepts reader", "offered":1, "current":3, "allowed":true},
+    {"name":"admin accepts writer", "offered":2, "current":3, "allowed":true},
     {"name":"admin accepts admin", "offered":3, "current":3, "allowed":true},
     {"name":"expired authority", "offered":2, "current":0, "allowed":false},
     {"name":"invalid authority", "offered":1, "current":99, "allowed":false}

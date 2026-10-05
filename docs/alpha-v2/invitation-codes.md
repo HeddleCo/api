@@ -26,8 +26,13 @@ of a recipient or code do not bypass creator equality. Spool creator means the
 original inviter only, not any administrator who could have created an invite.
 The accountable account remains the creator when a delegated agent creates it;
 delegation must independently permit this read. Another account's agent cannot
-read it. Losing a spool admin role does not change creator identity or itself
-grant access to any other spool operation.
+read it. For GetInvitationCode, the original inviter MUST additionally still
+have current ADMINISTRATOR authority for every offered role, checked under the
+same read/transition lock BEFORE decrypting or returning a code. Creator identity
+survives demotion, but demotion denies this read even before auto-revoke commits.
+After creator matching, map lost authority to FAILED_PRECONDITION /
+INVITATION_INVITER_AUTHORITY_LOST (205), with no identity/resource/context detail.
+Signup code reads have no spool-admin requirement.
 
 An unknown reference and a non-creator MUST receive indistinguishable
 `NOT_FOUND`, using the same lookup/authorization shape and disclosing no code
@@ -45,7 +50,7 @@ also return empty; hosts MUST NOT mint a replacement code as a side effect.
 There is no read-once flag, quota consumption, version change or invitation
 extension: repeated reads return the exact original bytes while pending.
 
-Check creator and lifecycle before decryption. Reads MUST serialize with redeem,
+Check creator, current inviter admin authority (spool invitations) and lifecycle before decryption. Reads MUST serialize with redeem,
 revoke and expiry cleanup on the same authoritative invitation state: a read
 linearized after a terminal transition cannot decrypt or return the code. A
 read that completed before the transition can already have reached a client;
@@ -131,7 +136,8 @@ account/spool view state and durable local caches.
 
 Rust `v2::invitation_code` and TypeScript `v2/invitation-code` validate the two
 response types against trusted caller/creator subjects, lifecycle and current
-time. They reject non-creators even for empty responses and reject nonempty
+time; the spool validator also requires the host-loaded current inviter role.
+They reject demoted spool creators, non-creators even for empty responses and nonempty
 terminal responses; malformed/missing expiry also fails validation. Hosts map
 unknown/non-creator reads to `NOT_FOUND`, and map missing/invalid legacy expiry
 to empty without calling the known-valid-state response validator. Client

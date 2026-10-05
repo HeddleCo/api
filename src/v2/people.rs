@@ -26,13 +26,18 @@ pub struct PeopleCandidate {
     pub spool_ids: Vec<String>,
     pub is_agent: bool,
     pub is_public: bool,
+    pub handle_visible: bool,
 }
 
 /// Authenticated caller's live memberships (including inheritance), and a
 /// caller-account rate-budget decision already debited for this attempt.
 /// Public-spool read access alone MUST NOT populate caller_spool_ids.
+/// Co-member disclosure additionally needs members_readable_spool_ids, even
+/// without a request spool; exclude caller-hidden and absent handles.
 pub struct PeopleContext<'a> {
     pub caller_spool_ids: &'a [String],
+    /// Spools where current member-only MEMBERS-section read is authorized.
+    pub members_readable_spool_ids: &'a [String],
     pub rate_limit_allowed: bool,
 }
 
@@ -68,6 +73,7 @@ pub fn validate_suggest_principals_request(
 
 pub(crate) fn validate_person(person: &SuggestedPrincipal) -> Result<(), PeopleError> {
     if person.handle.is_empty()
+        || uuid_shaped_handle(&person.handle)
         || person.handle.len() > 256
         || person.handle.trim() != person.handle
         || person.handle.chars().any(char::is_control)
@@ -99,8 +105,12 @@ pub fn suggest_principals(
         if candidate.is_agent {
             continue;
         }
+        if !candidate.handle_visible || candidate.person.handle.is_empty() {
+            continue;
+        }
         let shared = candidate.spool_ids.iter().any(|id| {
             context.caller_spool_ids.contains(id)
+                && context.members_readable_spool_ids.contains(id)
                 && request.spool.as_ref().is_none_or(|spool| &spool.id == id)
         });
         let handle = normalized(&candidate.person.handle);
@@ -136,4 +146,15 @@ pub fn validate_suggest_principals_response(
         return Err(PeopleError::Projection);
     }
     Ok(())
+}
+
+fn uuid_shaped_handle(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(i, b)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                b == b'-'
+            } else {
+                b.is_ascii_hexdigit()
+            }
+        })
 }

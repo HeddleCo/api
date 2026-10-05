@@ -24,7 +24,8 @@ test('shared current inviter authority accept/redeem and retry vectors', () => {
     else assert.throws(() => validateInviterAuthority(v.offered, v.current), violation('InviterAuthorityLost', 205, 9), v.name);
     for (const state of [1, 2]) {
       const accept = () => planInvitationResponse(record({ role: v.offered, state }), account, account, 'accept', now, true, v.current);
-      if (v.allowed) accept();
+      if (state === 2) assert.deepEqual(accept(), { state: 2, changed: false, grantRole: false });
+      else if (v.allowed) accept();
       else assert.throws(accept, violation('InviterAuthorityLost', 205, 9), v.name);
     }
   }
@@ -114,4 +115,16 @@ test('review fix fields have stable tags and typed defaults', () => {
   assert.equal(ObserveNotificationsRequestSchema.fields.find(f => f.name === 'effective_delivery_spool').number, 5);
   assert.equal(SetNotificationPreferencesRequestSchema.fields.find(f => f.name === 'clear_unreadable_scopes').number, 4);
   assert.equal(create(SetNotificationPreferencesRequestSchema).clearUnreadableScopes, false);
+});
+
+test('admin loss revokes every pending offered role and preserves terminal records', async () => {
+  const { planInviterAuthorityLoss } = await import('../packages/typescript/dist/v1alpha2/invitation.js');
+  const records = [1, 2, 3].flatMap(role => [1, 2, 3, 4, 5].map(state => record({ role, state })));
+  assert.deepEqual(planInviterAuthorityLoss(records, 3, now), []);
+  for (const role of [0, 1, 2, 99]) {
+    const revoked = planInviterAuthorityLoss(records, role, now);
+    assert.deepEqual(revoked.map(r => r.role), [1, 2, 3]);
+    assert.ok(revoked.every(r => r.state === 4 && r.updatedAt === now));
+  }
+  assert.equal(records.filter(r => r.state === 1).length, 3);
 });

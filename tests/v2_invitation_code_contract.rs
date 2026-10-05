@@ -94,7 +94,7 @@ fn check(vector: &Vector) {
     };
     for result in [
         validate_signup_invitation_code_response(&signup_response, &signup, &context),
-        validate_invitation_code_response(&spool_response, &spool, &context),
+        validate_invitation_code_response(&spool_response, &spool, &context, 3),
     ] {
         assert_eq!(
             result.err().map(|error| format!("{error:?}")),
@@ -307,12 +307,49 @@ fn alpha38_terminal_states_and_non_link_invites_never_disclose_codes() {
             redemption_secret: hex::decode(vector.secret_hex).expect("secret bytes"),
         };
         assert_eq!(
-            validate_invitation_code_response(&response, &invitation, &context)
+            validate_invitation_code_response(&response, &invitation, &context, 3)
                 .err()
                 .map(|e| format!("{e:?}")),
             vector.error,
             "{}",
             vector.name
         );
+    }
+}
+
+#[test]
+fn demoted_creator_cannot_read_code_before_auto_revoke() {
+    use heddle_api::v2::invitation_code::InvitationCodeError;
+    let now = Timestamp {
+        seconds: 1,
+        nanos: 0,
+    };
+    let context = InvitationCodeReadContext {
+        caller_subject: "creator",
+        creator_subject: "creator",
+        now: &now,
+    };
+    let response = GetInvitationCodeResponse {
+        redemption_secret: vec![1],
+    };
+    for offered in 1..=3 {
+        let invitation = InvitationRecord {
+            role: offered,
+            state: 1,
+            recipient: Some(invitation_record::Recipient::Email("a@example.test".into())),
+            expires_at: Some(Timestamp {
+                seconds: 2,
+                nanos: 0,
+            }),
+            ..Default::default()
+        };
+        validate_invitation_code_response(&response, &invitation, &context, 3)
+            .expect("admin creator");
+        for current in [0, 1, 2, 99] {
+            assert_eq!(
+                validate_invitation_code_response(&response, &invitation, &context, current),
+                Err(InvitationCodeError::Authority)
+            );
+        }
     }
 }

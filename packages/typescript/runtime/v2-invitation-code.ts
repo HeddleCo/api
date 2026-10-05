@@ -25,7 +25,10 @@ export function validateInvitationCodeResponse(
   response: GetInvitationCodeResponse,
   invitation: InvitationRecord,
   context: InvitationCodeReadContext,
+  inviterRole: number,
 ): void {
+  validateCreator(context);
+  if (inviterRole !== 3) throw new Error("Authority: invitation code read requires current inviter admin authority");
   const nonLink = invitation.recipient.case !== "email" || invitation.recipient.value === "";
   validateCodeResponse(response.redemptionSecret, {
     redeemed: invitation.state !== InvitationState.PENDING,
@@ -44,11 +47,7 @@ function validateCodeResponse(
   invitation: Pick<SignupInvitation, "redeemed" | "revoked" | "expiresAt">,
   context: InvitationCodeReadContext,
 ): void {
-  if (typeof context.callerSubject !== "string" || typeof context.creatorSubject !== "string" ||
-      context.callerSubject === "" || context.creatorSubject === "" ||
-      context.callerSubject !== context.creatorSubject) {
-    throw new Error("Creator: invitation code read requires the original creator");
-  }
+  validateCreator(context);
   const expiry = invitation.expiresAt;
   if (expiry === undefined || !validTimestamp(expiry) || !validTimestamp(context.now)) {
     throw new Error("Expiry: invitation code read requires valid current time and finite expiry");
@@ -57,5 +56,13 @@ function validateCodeResponse(
     (context.now.seconds === expiry.seconds && context.now.nanos >= expiry.nanos);
   if (secret.length !== 0 && (invitation.redeemed || invitation.revoked || expired)) {
     throw new Error("NotPending: terminal invitation code response must be empty");
+  }
+}
+
+function validateCreator(context: InvitationCodeReadContext): void {
+  if (typeof context.callerSubject !== "string" || typeof context.creatorSubject !== "string" ||
+      context.callerSubject === "" || context.creatorSubject === "" ||
+      context.callerSubject !== context.creatorSubject) {
+    throw new Error("Creator: invitation code read requires the original creator");
   }
 }

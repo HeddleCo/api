@@ -11,6 +11,7 @@ directory.mkdir(parents=True, exist_ok=True)
 if language == "rust":
     path = Path("src/v2/invitation_code.rs")
     cases = [
+        ("current_admin", "if inviter_role != 3 {", "if false {"),
         ("creator", "context.caller_subject != context.creator_subject", "false"),
         ("spool_state", "invitation.state != InvitationState::Pending as i32", "false"),
         ("spool_recipient", "let non_link = !matches!", "let non_link = false && !matches!"),
@@ -23,6 +24,7 @@ if language == "rust":
 elif language == "ts":
     path = Path("packages/typescript/dist/v1alpha2/invitation-code.js")
     cases = [
+        ("current_admin", "if (inviterRole !== 3)", "if (false)"),
         ("creator", "context.callerSubject !== context.creatorSubject", "false"),
         ("spool_state", "invitation.state !== InvitationState.PENDING", "false"),
         ("spool_recipient", 'const nonLink = invitation.recipient.case !== "email" || invitation.recipient.value === "";', "const nonLink = false;"),

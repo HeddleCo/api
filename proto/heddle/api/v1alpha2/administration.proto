@@ -221,8 +221,11 @@ message ApprovalGroupRecord {
   bytes version = 2;
   string name = 3;
   string description = 4;
-  // Explicit extra members; write/storage only, never the people projection.
-  repeated string principal_ids = 5;
+  reserved 5;
+  reserved "principal_ids";
+  // PutApprovalGroup resolves canonical visible human handles server-side after
+  // admin authorization, storing private stable bindings. No ID input or shim.
+  repeated string explicit_member_handles = 7;
   // UNSPECIFIED adds no role members. Otherwise current effective spool role,
   // including inheritance, must be >= this threshold. READER is refused with
   // APPROVAL_ROLE_BELOW_ELIGIBILITY_FLOOR: WRITER (Developer) is the floor.
@@ -239,12 +242,23 @@ message ApprovalGroupView {
   reserved 5;
   reserved "principal_ids";
   ResourceRole member_role = 6;
-  // Complete current union of explicit and role members, eligible humans only.
+  // MEMBERS-section read (current member-only) is mandatory for BOTH handle
+  // lists below, in addition to approval-group section read. Exclude hidden and
+  // absent handles. Otherwise return counts only, with all handle lists empty.
+  // Current union of explicit and role members, eligible humans only.
   // Handles/display names; never account IDs. Uses section pagination for groups.
   repeated SuggestedPrincipal resolved_members = 7;
   // Subset supplied by member_role, letting UI label "Ada, Mara (admins) and
   // jun" without exposing explicit principal_ids. Sorted canonical handles.
   repeated string role_member_handles = 8;
+  // ADMINISTRATOR AND MEMBERS-section read required. Explicit configuration,
+  // including currently ineligible extras, for edit round-trips. Hidden/no-handle
+  // humans excluded; hosts retain their private bindings when editing visible extras.
+  repeated string explicit_member_handles = 9;
+  // Counts are available with approval-group section read alone.
+  uint32 resolved_member_count = 10;
+  uint32 role_member_count = 11;
+  uint32 explicit_member_count = 12;
 }
 message GroupRequirement {
   RecordRef group = 1;
@@ -406,7 +420,8 @@ message GetInvitationCodeRequest {
   RecordRef invitation = 1;
 }
 message GetInvitationCodeResponse {
-  // Original code, only for the authenticated creator while unredeemed,
+  // Original code, only for the authenticated creator with CURRENT inviter
+  // ADMINISTRATOR authority for every offered role, while unredeemed,
   // unrevoked and strictly before expires_at. Empty after any terminal state
   // or if no retrievable code exists (legacy/hash-only or handle invitation).
   // Non-creators and unknown references receive indistinguishable NOT_FOUND.

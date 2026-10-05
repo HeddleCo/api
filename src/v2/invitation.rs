@@ -276,9 +276,6 @@ pub fn plan_invitation_response(
     {
         return Err(InvitationError::Unavailable);
     }
-    if action == InvitationResponseAction::Accept {
-        validate_inviter_authority(record.role, inviter_role)?;
-    }
     let state = effective_invitation_state(record, now)?;
     let target = match action {
         InvitationResponseAction::Accept => InvitationState::Accepted,
@@ -291,6 +288,9 @@ pub fn plan_invitation_response(
             grant_role: false,
             notification_kind: None,
         });
+    }
+    if action == InvitationResponseAction::Accept {
+        validate_inviter_authority(record.role, inviter_role)?;
     }
     if state != InvitationState::Pending {
         return Err(InvitationError::Lifecycle);
@@ -349,16 +349,14 @@ pub fn validate_invitation_resolution(
 }
 
 /// Trusted CURRENT effective inviter role/credential ceilings, loaded under the
-/// transition lock. Use on Accept AND email Redeem, before receipt replay.
+/// transition lock. Every offered role requires ADMINISTRATOR on Create,
+/// pending Accept, email Redeem and GetInvitationCode. Accepted retries are no-ops.
 /// Also use on every authority change to auto-revoke affected pending invites.
 pub fn validate_inviter_authority(
     offered_role: i32,
     inviter_role: i32,
 ) -> Result<(), InvitationError> {
-    if !(1..=3).contains(&offered_role)
-        || !(1..=3).contains(&inviter_role)
-        || inviter_role < offered_role
-    {
+    if !(1..=3).contains(&offered_role) || inviter_role != 3 {
         return Err(InvitationError::InviterAuthorityLost);
     }
     Ok(())
@@ -414,4 +412,27 @@ pub fn validate_attention_invitation_projection(
         validate_invitation_record_projection(invitation, original)?;
     }
     Ok(())
+}
+
+/// SERVER ONLY: host loads ALL invitations by the immutable inviter subject on
+/// this spool. On loss of admin, atomically persist these replacements with new
+/// versions, dismiss attention, destroy codes and emit stream updates. Serialize
+/// with acceptance; includes every pending offered role, even expired records.
+pub fn plan_inviter_authority_loss(
+    invitations: &[InvitationRecord],
+    inviter_role: i32,
+    now: &Timestamp,
+) -> Vec<InvitationRecord> {
+    if inviter_role == 3 {
+        return Vec::new();
+    }
+    invitations
+        .iter()
+        .filter(|record| record.state == InvitationState::Pending as i32)
+        .map(|record| InvitationRecord {
+            state: InvitationState::Revoked as i32,
+            updated_at: Some(*now),
+            ..record.clone()
+        })
+        .collect()
 }

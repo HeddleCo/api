@@ -8,7 +8,8 @@
         "shared"
       ],
       "is_agent": false,
-      "is_public": true
+      "is_public": true,
+      "handle_visible": true
     },
     {
       "handle": "jun",
@@ -18,7 +19,8 @@
         "shared"
       ],
       "is_agent": false,
-      "is_public": false
+      "is_public": false,
+      "handle_visible": true
     },
     {
       "handle": "adam-private",
@@ -28,7 +30,8 @@
         "other"
       ],
       "is_agent": false,
-      "is_public": false
+      "is_public": false,
+      "handle_visible": true
     },
     {
       "handle": "adam-public",
@@ -38,7 +41,8 @@
         "other"
       ],
       "is_agent": false,
-      "is_public": true
+      "is_public": true,
+      "handle_visible": true
     },
     {
       "handle": "ada-agent",
@@ -48,7 +52,8 @@
         "shared"
       ],
       "is_agent": true,
-      "is_public": true
+      "is_public": true,
+      "handle_visible": true
     },
     {
       "handle": "ada-second",
@@ -58,17 +63,19 @@
         "second"
       ],
       "is_agent": false,
-      "is_public": false
+      "is_public": false,
+      "handle_visible": true
     },
     {
       "handle": "alice",
-      "display_name": "Élodie",
+      "display_name": "\u00c9lodie",
       "kind": 2,
       "spool_ids": [
         "shared"
       ],
       "is_agent": false,
-      "is_public": false
+      "is_public": false,
+      "handle_visible": true
     }
   ],
   "cases": [
@@ -85,7 +92,11 @@
         "ada",
         "jun"
       ],
-      "error": null
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "agents_excluded",
@@ -100,7 +111,11 @@
         "ada",
         "jun"
       ],
-      "error": null
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "exact_public_hit",
@@ -114,7 +129,11 @@
       "expected": [
         "adam-public"
       ],
-      "error": null
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "no_public_prefix_enumeration",
@@ -126,11 +145,15 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": null
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "display_name_prefix",
-      "prefix": "éL",
+      "prefix": "\u00e9L",
       "spool": "shared",
       "caller_spool_ids": [
         "shared",
@@ -140,11 +163,15 @@
       "expected": [
         "alice"
       ],
-      "error": null
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "nfc_prefix",
-      "prefix": "él",
+      "prefix": "e\u0301l",
       "spool": "shared",
       "caller_spool_ids": [
         "shared",
@@ -154,7 +181,11 @@
       "expected": [
         "alice"
       ],
-      "error": null
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "short_prefix",
@@ -166,7 +197,11 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Prefix"
+      "error": "Prefix",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "long_prefix",
@@ -178,7 +213,11 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Prefix"
+      "error": "Prefix",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "control_prefix",
@@ -190,7 +229,11 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Prefix"
+      "error": "Prefix",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "space_prefix",
@@ -202,11 +245,15 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Prefix"
+      "error": "Prefix",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "unicode_minimum",
-      "prefix": "é",
+      "prefix": "\u00e9",
       "spool": "shared",
       "caller_spool_ids": [
         "shared",
@@ -214,7 +261,11 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Prefix"
+      "error": "Prefix",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "no_scoped_membership",
@@ -223,7 +274,8 @@
       "caller_spool_ids": [],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Scope"
+      "error": "Scope",
+      "members_readable_spool_ids": []
     },
     {
       "name": "unknown_scope",
@@ -235,7 +287,11 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Scope"
+      "error": "Scope",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "empty_scope",
@@ -247,7 +303,11 @@
       ],
       "rate_limit_allowed": true,
       "expected": [],
-      "error": "Scope"
+      "error": "Scope",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "unscoped_shared_union",
@@ -263,7 +323,11 @@
         "ada-second",
         "jun"
       ],
-      "error": null
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "rate_limited",
@@ -275,7 +339,11 @@
       ],
       "rate_limit_allowed": false,
       "expected": [],
-      "error": "RateLimited"
+      "error": "RateLimited",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "all_attempts_debit_before_scope",
@@ -287,7 +355,11 @@
       ],
       "rate_limit_allowed": false,
       "expected": [],
-      "error": "RateLimited"
+      "error": "RateLimited",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
     },
     {
       "name": "bounded_results",
@@ -330,7 +402,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-01",
@@ -340,7 +413,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-02",
@@ -350,7 +424,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-03",
@@ -360,7 +435,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-04",
@@ -370,7 +446,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-05",
@@ -380,7 +457,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-06",
@@ -390,7 +468,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-07",
@@ -400,7 +479,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-08",
@@ -410,7 +490,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-09",
@@ -420,7 +501,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-10",
@@ -430,7 +512,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-11",
@@ -440,7 +523,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-12",
@@ -450,7 +534,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-13",
@@ -460,7 +545,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-14",
@@ -470,7 +556,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-15",
@@ -480,7 +567,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-16",
@@ -490,7 +578,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-17",
@@ -500,7 +589,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-18",
@@ -510,7 +600,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-19",
@@ -520,7 +611,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-20",
@@ -530,7 +622,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-21",
@@ -540,7 +633,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-22",
@@ -550,7 +644,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-23",
@@ -560,7 +655,8 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
         },
         {
           "handle": "ada-24",
@@ -570,7 +666,115 @@
             "shared"
           ],
           "is_agent": false,
-          "is_public": false
+          "is_public": false,
+          "handle_visible": true
+        }
+      ],
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ]
+    },
+    {
+      "prefix": "ad",
+      "spool": null,
+      "caller_spool_ids": [
+        "shared"
+      ],
+      "members_readable_spool_ids": [],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": null,
+      "name": "reader_without_MEMBERS_cannot_enumerate_unscoped_roster"
+    },
+    {
+      "prefix": "ada",
+      "spool": "shared",
+      "caller_spool_ids": [],
+      "members_readable_spool_ids": [],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": "Scope",
+      "name": "public_RESOURCE_READER_is_not_membership"
+    },
+    {
+      "prefix": "ad",
+      "spool": null,
+      "caller_spool_ids": [
+        "shared"
+      ],
+      "members_readable_spool_ids": [
+        "shared"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": null,
+      "name": "co_member_without_handle_excluded",
+      "replacement_candidates": [
+        {
+          "handle": "",
+          "display_name": "Ada no handle",
+          "kind": 1,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "prefix": "ad",
+      "spool": null,
+      "caller_spool_ids": [
+        "shared"
+      ],
+      "members_readable_spool_ids": [
+        "shared"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": null,
+      "name": "hidden_handle_excluded",
+      "replacement_candidates": [
+        {
+          "handle": "ada-hidden",
+          "display_name": "Ada no handle",
+          "kind": 1,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": false
+        }
+      ]
+    },
+    {
+      "prefix": "11",
+      "spool": null,
+      "caller_spool_ids": [
+        "shared"
+      ],
+      "members_readable_spool_ids": [
+        "shared"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": "Metadata",
+      "name": "uuid_shaped_handle_rejected",
+      "replacement_candidates": [
+        {
+          "handle": "11111111-1111-4111-8111-111111111111",
+          "display_name": "Ada no handle",
+          "kind": 1,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
         }
       ]
     }

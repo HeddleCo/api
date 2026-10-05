@@ -33,7 +33,7 @@ function check(v) {
       state: v.revoked ? InvitationState.REVOKED : v.redeemed ? InvitationState.ACCEPTED : InvitationState.PENDING,
       recipient: { case: "email", value: "recipient@example.test" }, expiresAt: state.expiresAt,
     } : state;
-    const run = () => validate(create(responseSchema, { redemptionSecret: bytes }), create(invitationSchema, invitation), context);
+    const run = () => validate(create(responseSchema, { redemptionSecret: bytes }), create(invitationSchema, invitation), context, 3);
     if (v.error === null) assert.doesNotThrow(run, v.name);
     else assert.throws(run, new RegExp(`^Error: ${v.error}:`), v.name);
   }
@@ -121,8 +121,18 @@ test("alpha.38 terminal states and non-link invites never disclose codes", () =>
       recipient: v.recipient_kind === "none" ? undefined : { case: v.recipient_kind === "account_id" ? "accountId" : v.recipient_kind, value: v.recipient },
     });
     const response = create(GetInvitationCodeResponseSchema, { redemptionSecret: Uint8Array.from(Buffer.from(v.secret_hex, "hex")) });
-    const run = () => validateInvitationCodeResponse(response, invitation, context);
+    const run = () => validateInvitationCodeResponse(response, invitation, context, 3);
     if (v.error) assert.throws(run, new RegExp(`^Error: ${v.error}:`), v.name);
     else assert.doesNotThrow(run, v.name);
+  }
+});
+
+test("demoted creator cannot read code before auto-revoke", () => {
+  const context = { callerSubject: "creator", creatorSubject: "creator", now: create(TimestampSchema, { seconds: 1n }) };
+  const response = create(GetInvitationCodeResponseSchema, { redemptionSecret: new Uint8Array([1]) });
+  for (const role of [1, 2, 3]) {
+    const invitation = create(InvitationRecordSchema, { role, state: 1, recipient: { case: "email", value: "a@example.test" }, expiresAt: create(TimestampSchema, { seconds: 2n }) });
+    validateInvitationCodeResponse(response, invitation, context, 3);
+    for (const current of [0, 1, 2, 99]) assert.throws(() => validateInvitationCodeResponse(response, invitation, context, current), /Authority:/);
   }
 });

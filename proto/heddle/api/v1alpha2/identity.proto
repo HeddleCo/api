@@ -1221,7 +1221,8 @@ message SuggestPrincipalsRequest {
 }
 message SuggestPrincipalsResponse {
   // At most 20, unique canonical handles, sorted by UTF-8 handle bytes.
-  // Prefix hits are current co-members plus at most one exact public-handle
+  // Prefix hits are co-members only where caller has member-only MEMBERS read,
+  // excluding hidden/no-handle humans, plus at most one exact public-handle
   // hit. No cursor, totals, principal/account IDs, or agent rows.
   repeated SuggestedPrincipal principals = 1;
 }

@@ -11,6 +11,8 @@ use prost_types::Timestamp;
 pub enum InvitationCodeError {
     #[error("Creator: invitation code read requires the original creator")]
     Creator,
+    #[error("Authority: invitation code read requires current inviter admin authority")]
+    Authority,
     #[error("Expiry: invitation code read requires valid current time and finite expiry")]
     Expiry,
     #[error("NotPending: terminal invitation code response must be empty")]
@@ -43,7 +45,12 @@ pub fn validate_invitation_code_response(
     response: &GetInvitationCodeResponse,
     invitation: &InvitationRecord,
     context: &InvitationCodeReadContext<'_>,
+    inviter_role: i32,
 ) -> Result<(), InvitationCodeError> {
+    validate_creator(context)?;
+    if inviter_role != 3 {
+        return Err(InvitationCodeError::Authority);
+    }
     let non_link = !matches!(
         invitation.recipient.as_ref(),
         Some(invitation_record::Recipient::Email(email)) if !email.is_empty()
@@ -69,12 +76,7 @@ fn validate_code_response(
     expires_at: Option<&Timestamp>,
     context: &InvitationCodeReadContext<'_>,
 ) -> Result<(), InvitationCodeError> {
-    if context.caller_subject.is_empty()
-        || context.creator_subject.is_empty()
-        || context.caller_subject != context.creator_subject
-    {
-        return Err(InvitationCodeError::Creator);
-    }
+    validate_creator(context)?;
     let expiry = expires_at.ok_or(InvitationCodeError::Expiry)?;
     if !valid_timestamp(expiry) || !valid_timestamp(context.now) {
         return Err(InvitationCodeError::Expiry);
@@ -82,6 +84,16 @@ fn validate_code_response(
     let expired = (context.now.seconds, context.now.nanos) >= (expiry.seconds, expiry.nanos);
     if !secret.is_empty() && (redeemed || revoked || expired) {
         return Err(InvitationCodeError::NotPending);
+    }
+    Ok(())
+}
+
+fn validate_creator(context: &InvitationCodeReadContext<'_>) -> Result<(), InvitationCodeError> {
+    if context.caller_subject.is_empty()
+        || context.creator_subject.is_empty()
+        || context.caller_subject != context.creator_subject
+    {
+        return Err(InvitationCodeError::Creator);
     }
     Ok(())
 }

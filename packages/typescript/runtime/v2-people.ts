@@ -9,10 +9,13 @@ export type PeopleCandidate = {
   spoolIds: readonly string[];
   isAgent: boolean;
   isPublic: boolean;
+  handleVisible: boolean;
 };
 /** Derived by the host, including inherited membership. Public read is insufficient.
+ * membersReadableSpoolIds requires member-only MEMBERS-section read, even
+ * without a request spool. handleVisible excludes caller-hidden handles.
  * rateLimitAllowed is the account budget decision already debited for this attempt. */
-export type PeopleContext = { callerSpoolIds: readonly string[]; rateLimitAllowed: boolean };
+export type PeopleContext = { callerSpoolIds: readonly string[]; membersReadableSpoolIds: readonly string[]; rateLimitAllowed: boolean };
 export const normalizedPeoplePrefix = (value: string): string => value.normalize("NFC").toLowerCase();
 const bytes = (value: string): Uint8Array => new TextEncoder().encode(value);
 const controls = /\p{Cc}/u;
@@ -42,7 +45,7 @@ export function validateSuggestPrincipalsRequest(request: SuggestPrincipalsReque
 /** Public rows must have exactly the ID-free schema, including at JS boundaries. */
 export function validateSuggestedPrincipal(person: SuggestedPrincipal): void {
   const allowed = new Set(["$typeName", "handle", "displayName", "kind"]);
-  if (Object.keys(person).some(key => !allowed.has(key)) || !person.handle || bytes(person.handle).length > 256 ||
+  if (Object.keys(person).some(key => !allowed.has(key)) || !person.handle || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(person.handle) || bytes(person.handle).length > 256 ||
     edgeWhitespace.test(person.handle) || controls.test(person.handle) || bytes(person.displayName).length > 1024 ||
     controls.test(person.displayName) || ![HandleKind.NATIVE, HandleKind.GITHUB, HandleKind.GITLAB].includes(person.kind)) {
     throw new Error("Metadata: invalid public people metadata");
@@ -56,7 +59,8 @@ export function suggestPrincipals(request: SuggestPrincipalsRequest, candidates:
   const members: SuggestedPrincipal[] = [], exact: SuggestedPrincipal[] = [];
   for (const candidate of candidates) {
     if (candidate.isAgent) continue;
-    const shared = candidate.spoolIds.some(id => context.callerSpoolIds.includes(id) && (!request.spool || request.spool.id === id));
+    if (!candidate.handleVisible || !candidate.person.handle) continue;
+    const shared = candidate.spoolIds.some(id => context.callerSpoolIds.includes(id) && context.membersReadableSpoolIds.includes(id) && (!request.spool || request.spool.id === id));
     const handle = normalizedPeoplePrefix(candidate.person.handle);
     if (shared && (handle.startsWith(prefix) || normalizedPeoplePrefix(candidate.person.displayName).startsWith(prefix))) {
       validateSuggestedPrincipal(candidate.person);

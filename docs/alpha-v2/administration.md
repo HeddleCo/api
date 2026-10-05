@@ -104,19 +104,25 @@ use `NOT_FOUND / RESOURCE_NOT_FOUND`, field `invitation`, message
 `invitation unavailable`, empty resource and absent context. Neither the
 inviter nor a spool administrator bypasses recipient matching.
 
-Accept AND email Redeem MUST recheck the original human inviter's CURRENT
-authority to grant the offered role under the transition lock, before grant or
-receipt replay. Administrator invitations require ADMINISTRATOR; other roles
-require at least the offered role, including current credential/grant ceilings.
+Create, pending Accept, email Redeem and GetInvitationCode MUST check the
+original human inviter's CURRENT ADMINISTRATOR authority under the transition
+lock for EVERY offered role, including current credential/grant ceilings.
+Only administrators may create invitations; READER/WRITER inviters cannot
+offer even their own role. Check before granting or decrypting a code.
 Removed, expired, revoked or insufficient authority refuses with
 `FAILED_PRECONDITION / INVITATION_INVITER_AUTHORITY_LOST (205)`, field `invitation`,
-empty resource/context and no inviter identity. Accepted retries cannot recreate
-a grant and still recheck authority. Decline does not require inviter authority.
-Hosts MUST auto-revoke affected PENDING invitations when the inviter loses this
-authority (grant removal/downgrade/expiry, inherited authority or credential
-revocation), serializing with acceptance. Commit REVOKED/version/time, attention
+empty resource/context and no inviter identity. After human-session and stored
+recipient matching, ACCEPTED retries return an idempotent no-op BEFORE the
+inviter-authority gate; they never recreate a grant, notification or attention.
+Decline does not require inviter authority.
+Hosts MUST auto-revoke ALL of the inviter's PENDING invitations on this spool
+for EVERY offered role when the inviter loses ADMINISTRATOR authority (grant
+removal/downgrade/expiry, inherited authority or credential revocation), serializing with acceptance. Commit REVOKED/version/time, attention
 DISMISSED and stream updates atomically; no grant. If loss is detected before
-that worker commits, Accept/Redeem still return the typed authority-lost refusal.
+that worker commits, pending Accept/Redeem and creator code reads still refuse.
+`plan_inviter_authority_loss` / `planInviterAuthorityLoss` plan every pending
+replacement from the host-loaded inviter list; hosts commit versions, attention,
+code destruction and stream updates atomically.
 `validate_inviter_authority` / `validateInviterAuthority` supply the shared gate;
 trusted effective roles are host-loaded, never request fields.
 

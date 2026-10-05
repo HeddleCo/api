@@ -12,6 +12,7 @@ struct Candidate {
     spool_ids: Vec<String>,
     is_agent: bool,
     is_public: bool,
+    handle_visible: bool,
 }
 impl Candidate {
     // Defaults keep the schema ID-leak mutation compilable, so it must fail
@@ -28,6 +29,7 @@ impl Candidate {
             spool_ids: self.spool_ids.clone(),
             is_agent: self.is_agent,
             is_public: self.is_public,
+            handle_visible: self.handle_visible,
         }
     }
 }
@@ -37,6 +39,7 @@ struct Case {
     prefix: String,
     spool: Option<String>,
     caller_spool_ids: Vec<String>,
+    members_readable_spool_ids: Vec<String>,
     rate_limit_allowed: bool,
     expected: Vec<String>,
     error: Option<String>,
@@ -52,7 +55,7 @@ struct Fixture {
 fn shared_people_vectors_enforce_scope_agents_exact_hit_prefix_and_bounds() {
     let fixture: Fixture = serde_json::from_str(include_str!("fixtures/people-suggestions.json"))
         .expect("people vectors");
-    assert_eq!(fixture.cases.len(), 18);
+    assert_eq!(fixture.cases.len(), 23);
     for case in fixture.cases {
         let request = SuggestPrincipalsRequest {
             prefix: case.prefix,
@@ -67,6 +70,7 @@ fn shared_people_vectors_enforce_scope_agents_exact_hit_prefix_and_bounds() {
             .collect();
         let context = PeopleContext {
             caller_spool_ids: &case.caller_spool_ids,
+            members_readable_spool_ids: &case.members_readable_spool_ids,
             rate_limit_allowed: case.rate_limit_allowed,
         };
         let result = suggest_principals(&request, &candidates, &context);
@@ -145,7 +149,11 @@ fn no_id_leak_in_public_people_or_group_projection() {
             "description",
             "member_role",
             "resolved_members",
-            "role_member_handles"
+            "role_member_handles",
+            "explicit_member_handles",
+            "resolved_member_count",
+            "role_member_count",
+            "explicit_member_count"
         ]
     );
     assert_eq!(
@@ -210,6 +218,7 @@ fn non_co_member_never_suggested_and_agents_excluded() {
     let memberships = ["shared".into()];
     let context = PeopleContext {
         caller_spool_ids: &memberships,
+        members_readable_spool_ids: &memberships,
         rate_limit_allowed: true,
     };
     let response = suggest_principals(&request, &candidates, &context).expect("scoped suggestions");

@@ -1,0 +1,377 @@
+{
+  "secret_wire_hex": "0a040001feff",
+  "empty_wire_hex": "",
+  "cases": [
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": null,
+      "name": "creator_pending"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": null,
+      "name": "creator_pending_repeat"
+    },
+    {
+      "caller": "other-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Creator",
+      "name": "other_account"
+    },
+    {
+      "caller": "another-admin",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Creator",
+      "name": "another_spool_admin"
+    },
+    {
+      "caller": "recipient-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Creator",
+      "name": "recipient"
+    },
+    {
+      "caller": "other-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "",
+      "error": "Creator",
+      "name": "non_creator_empty"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Creator",
+      "name": "missing_creator"
+    },
+    {
+      "caller": "",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Creator",
+      "name": "missing_caller"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": true,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "NotPending",
+      "name": "redeemed_disclosure"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": true,
+      "revoked": false,
+      "secret_hex": "",
+      "error": null,
+      "name": "redeemed_empty"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": true,
+      "secret_hex": "0001feff",
+      "error": "NotPending",
+      "name": "revoked_disclosure"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": true,
+      "secret_hex": "",
+      "error": null,
+      "name": "revoked_empty"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "NotPending",
+      "name": "expired_equal_disclosure"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "",
+      "error": null,
+      "name": "expired_equal_empty"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000001",
+        "nanos": 0
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "NotPending",
+      "name": "expired_later_disclosure"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000001",
+        "nanos": 0
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "",
+      "error": null,
+      "name": "expired_later_empty"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "",
+      "error": null,
+      "name": "legacy_or_handle_empty"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": null,
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Expiry",
+      "name": "missing_expiry"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 1000000000
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Expiry",
+      "name": "invalid_expiry_nanos"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": -1
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Expiry",
+      "name": "invalid_now_nanos"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "2000000000",
+        "nanos": 100
+      },
+      "expires_at": {
+        "seconds": "253402300800",
+        "nanos": 0
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Expiry",
+      "name": "invalid_expiry_seconds"
+    },
+    {
+      "caller": "creator-account",
+      "creator": "creator-account",
+      "now": {
+        "seconds": "-62135596801",
+        "nanos": 0
+      },
+      "expires_at": {
+        "seconds": "2000000000",
+        "nanos": 101
+      },
+      "redeemed": false,
+      "revoked": false,
+      "secret_hex": "0001feff",
+      "error": "Expiry",
+      "name": "invalid_now_seconds"
+    }
+  ]
+}

@@ -196,6 +196,8 @@ message SignupInvitation {
   bool redeemed = 5;
   bool revoked = 6;
   string distribution_id = 7;
+  // Codes are confined to creation and GetSignupInvitationCode responses;
+  // account lists, observations, inbox and receipts never contain them.
 }
 message InvitationQuota {
   string distribution_id = 1;
@@ -1269,6 +1271,20 @@ message ClaimHandleResponse {
 message CreateSignupInvitationRequest {
   string client_operation_id = 1;
   SignupInvitation invitation = 2;
+}
+// Creator-only re-read; no secret is added to SignupInvitation or any projection.
+// Host storage, lifecycle, audit and rate limits: invitation-codes.md.
+message GetSignupInvitationCodeRequest {
+  // Stable invitation reference, never a capability or creator assertion.
+  RecordRef invitation = 1;
+}
+message GetSignupInvitationCodeResponse {
+  // Original code, only for the authenticated creator while unredeemed,
+  // unrevoked and strictly before expires_at. Empty after any terminal state
+  // or if no retrievable code exists (legacy/hash-only or handle invitation).
+  // Non-creators and unknown references receive indistinguishable NOT_FOUND.
+  // Never cache, log, observe or embed in a receipt.
+  bytes redemption_secret = 1;
 }
 message CreateSignupInvitationResponse {
   MutationReceipt receipt = 1;

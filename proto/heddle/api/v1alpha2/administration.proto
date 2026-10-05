@@ -166,7 +166,8 @@ message InvitationRecord {
   google.protobuf.Timestamp expires_at = 5;
   bool revoked = 6;
   bool redeemed = 7;
-  // Redemption secrets are returned only by CreateInvitation, never observations.
+  // Codes are returned only by CreateInvitation and GetInvitationCode,
+  // never lists, observations, inbox or receipts.
   // This record has no include_descendants field. Redeeming MUST preserve an
   // existing GrantRecord.include_descendants bit on conflict.
 }
@@ -322,6 +323,20 @@ message RevokeGrantRequest {
 message CreateInvitationRequest {
   string client_operation_id = 1;
   InvitationRecord invitation = 2;
+}
+// Creator-only re-read; no secret is added to InvitationRecord or any projection.
+// Host storage, lifecycle, audit and rate limits: invitation-codes.md.
+message GetInvitationCodeRequest {
+  // Stable invitation reference, never a capability or creator assertion.
+  RecordRef invitation = 1;
+}
+message GetInvitationCodeResponse {
+  // Original code, only for the authenticated creator while unredeemed,
+  // unrevoked and strictly before expires_at. Empty after any terminal state
+  // or if no retrievable code exists (legacy/hash-only or handle invitation).
+  // Non-creators and unknown references receive indistinguishable NOT_FOUND.
+  // Never cache, log, observe or embed in a receipt.
+  bytes redemption_secret = 1;
 }
 message CreateInvitationResponse {
   MutationReceipt receipt = 1;

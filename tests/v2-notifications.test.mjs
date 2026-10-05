@@ -62,11 +62,12 @@ test('additive descriptor and wire fields remain on the same preferences read', 
     [api.NotificationPreferencesSchema, 'effective_delivery', 6],
     [api.NotificationPreferencesSchema, 'next_digest_at', 7],
     [api.NotificationDigestOverrideSchema, 'next_digest_at', 3],
-    ...['kind', 'spool', 'actor_origin', 'channel', 'delivery', 'source', 'locked'].map((name, i) =>
+    ...['kind', 'spool', 'actor_origin', 'channel', 'delivery', 'source', 'locked', 'source_spool'].map((name, i) =>
       [api.EffectiveDeliverySchema, name, i + 1]),
   ]) assert.equal(schema.fields.find(field => field.name === name)?.number, number);
   assert.deepEqual([api.EffectiveDelivery_Source.UNSPECIFIED, api.EffectiveDelivery_Source.RULE,
-    api.EffectiveDelivery_Source.DEFAULT], [0, 1, 2]);
+    api.EffectiveDelivery_Source.DEFAULT, api.EffectiveDelivery_Source.INHERITED,
+    api.EffectiveDelivery_Source.ACCOUNT], [0, 1, 2, 3, 4]);
   const preferences = create(api.NotificationPreferencesSchema, {
     effectiveDelivery: [create(api.EffectiveDeliverySchema, {
       kind: 'account_security', channel: 2, delivery: 1, source: 2, locked: true,

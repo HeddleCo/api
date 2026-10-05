@@ -22,24 +22,75 @@ settings version used by `expected_version`; a clock/default-policy change need
 not change it.
 
 Each `EffectiveDelivery` identifies concrete kind, channel, origin (human/agent,
-or empty for origin-independent kinds), and optional Spool. `source = RULE` means
-a stored selector matched; `DEFAULT` means a weft default. `delivery` is the
-resolved mode, not delivery status or a guarantee that a destination exists.
-`locked` is true for security/recovery email and its mode is always IMMEDIATE.
+or empty for origin-independent kinds), and optional event Spool. Delivery rules
+inherit by default: **account → personal/top-level root → children**. For an
+event in S, resolve each (kind × actor_origin × channel) separately: S first,
+then its parent, continuing through the personal/top-level root. The **nearest
+level with a matching rule wins**, even if a farther rule is more specific.
+Otherwise use a matching account rule, otherwise a weft default. Within one
+level specificity is exact kind before exact channel before exact origin; ties
+keep the first rule. Empty or `*` kind is a wildcard; empty/`any` origin matches
+human and agent; unspecified channel matches all channels.
 
-The account matrix is complete for supported kinds/origins/channels. Spool
-scopes are sparse: include cells when delivery, source or locked differs from
-the account cell; omitted Spool cells inherit it. Only currently authorized
-Spools are disclosed. Cells are unique by (kind, Spool, origin, channel).
-There are at most **4096 cells**, and the **entire encoded preferences message is
-at most 1 MiB**, including rules and selector strings. Weft must reject an
-oversized projection with `RESOURCE_EXHAUSTED / QUOTA_EXCEEDED`, never silently
-truncate it. The Rust/TypeScript bound helper enforces both limits before emit.
+Load the actual parent chain using stable Spool IDs, never a string prefix or
+a client-supplied chain. Use the host's existing **64 or 128 node** ancestor
+bound, including S (and the system root if loaded); the portable helpers accept
+only these limits and reject overflow/duplicates. The host must verify parent
+links and completeness. A cyclic, incomplete, or over-bound chain fails closed
+with `FAILED_PRECONDITION / POLICY_DENIED`; it never silently falls back to
+account rules. The shared system root `spool` is transparent and cannot hold
+rules. Reject rules resolving to it with `INVALID_ARGUMENT / FIELD_INVALID`.
+An unreadable ancestor still participates in resolution: read authorization
+controls disclosure, not selection. Locked security/recovery email remains
+IMMEDIATE at every level, independently of cadence.
 
-Spool rules precede account rules. Within a scope specificity is exact kind
-before exact channel before exact origin; ties keep the first rule. Empty or
-`*` kind is a wildcard; empty/`any` origin matches human and agent; unspecified
-channel matches all channels. Defaults apply only when no rule matches.
+The read-only `source` describes the winning rule's scope:
+
+| Source | Meaning | `source_spool` |
+| --- | --- | --- |
+| `RULE = 1` | Stored rule at the cell's own scope (account or S) | Absent |
+| `DEFAULT = 2` | Weft default, no matching rule at any level | Absent |
+| `INHERITED = 3` | Stored rule at a proper ancestor of S | Actual winning ancestor, only when currently readable |
+| `ACCOUNT = 4` | Stored account rule applied to a Spool cell | Absent; display “Same as your account settings” |
+
+An account cell can only be RULE or DEFAULT. For INHERITED, the host checks
+current read access to the **winning** ancestor. If it is unreadable, retain
+INHERITED but omit `source_spool` and display “Inherited from a parent spool”.
+Disclose no name, address, ID, depth, placeholder, or alternate readable
+ancestor. Also omit stored rules and digest overrides for unreadable scopes
+from preferences reads; a source reference redaction alone is insufficient.
+Recompute and redact the projection when authorization changes. `source_spool`
+is a `SpoolRef`, never an address, account reference, event Spool or system root.
+The Rust/TS provenance validators reject references to unreadable ancestors,
+non-ancestors, the target or system root. Hosts must compare the projected cell
+to the resolver result as well; provenance validation alone does not prove that
+a rule actually won. Defaults and effective digest cadence remain host inputs.
+
+`delivery` is the resolved mode, not delivery status or a guarantee that a
+destination exists. `locked` is true for security/recovery email, always
+IMMEDIATE. The account matrix is complete for supported kinds/origins/channels.
+Spool scopes are sparse: include cells for **every readable descendant** where
+delivery, source, source_spool or locked differs from its account fallback,
+including descendants without local rules. A Spool's account fallback copies
+the account cell, changing RULE to ACCOUNT. An omitted Spool cell means this
+fallback, not an instruction to reconstruct settings on the client. A child
+inheriting an ancestor MUST be emitted even if delivery equals the account mode.
+Only readable event Spools are disclosed. Cells are unique by (kind, Spool,
+origin, channel). There are at most **4096 cells**, and the **entire encoded
+preferences message is at most 1 MiB**, including rules and selector strings.
+Weft must reject an oversized projection with `RESOURCE_EXHAUSTED /
+QUOTA_EXCEEDED`, never silently truncate it. The Rust/TypeScript bound helper
+enforces both limits before emit.
+
+To return a cell in S to inheritance, remove **all S-scoped rules matching that
+cell** from the atomic settings replacement. Removing one exact rule can leave
+a matching wildcard override; split wildcard rules first if other cells must
+retain their overrides. This changes no ancestor/account rules. Explicit
+DISABLED is a local override and does not inherit. Stored DELIVERY_UNSPECIFIED
+is invalid on write, never an inherit sentinel or an alias for DISABLED.
+Migrate legacy unspecified stored routing explicitly: remove a rule intended to
+inherit, or replace it with DISABLED if it was intended to mute. Do not evaluate
+legacy zero as Disabled under this contract.
 
 `SetNotificationPreferences` atomically validates every stored rule and digest
 interval before writing. Projection fields are read-only and ignored on writes (including the
@@ -47,8 +98,7 @@ per-Spool next digest timestamp); they are recomputed and never persisted as
 rules or accepted as authority. The Rust and TypeScript notification helpers
 validate settings replacement and public `UnsubscribeNotifications`. Servers
 must invoke these gates or implement equivalent validation; generated protobuf
-messages alone do not enforce cross-field constraints. No generic notification
-validator existed in this repository before this addition. These helpers
+messages alone do not enforce cross-field constraints. These helpers
 complement the host's remaining stored-settings validation, including timezone,
 selectors, duplicate overrides and input budgets; they do not replace it.
 
@@ -83,7 +133,7 @@ have a next digest while the account cadence is off. These are schedule
 projections, not promises of queued mail; turning the interval off sends no
 digest email for that scope. A stored DIGEST mode can remain selected while the
 cadence is off, but the effective email cell then reports DISABLED while
-retaining the RULE/DEFAULT source. Destination readiness remains separate from
+retaining its RULE/INHERITED/ACCOUNT/DEFAULT source. Destination readiness remains separate from
 this routing projection. Cadence changes never delay the inbox or push.
 Activity email requires a verified address and current authorization and uses
 the existing outbox and unsubscribe path. These contract additions do not
@@ -134,3 +184,22 @@ kind without converting these v2 string fields into enums. Clients display the
 observed classification rather than treating every reply as blocking. The
 ambiguous interpretations above follow the decision's spirit and are listed
 explicitly for weft's default implementation in #2529.
+
+## Inheritance conformance and host integration
+
+The 2026-10-05 owner decision adds hierarchy inheritance to the existing
+notification contract. `tests/fixtures/notification-inheritance.json` is shared
+by Rust and TypeScript: parent/account fallback, nearest ancestor, per-level
+specificity and ties, removal, explicit Disabled, invalid unspecified writes,
+source wire round trips, unreadable ancestor redaction, forged provenance,
+transparent system root, locks and effective digest-off behavior. Both runners
+also exercise the inclusive 64/128 limits and rejection one node over each.
+Hosts must integrate the helpers with trusted ancestry loading, current read
+checks, scope validation on write (use
+`validate_notification_preferences_write_for_system_root` /
+`validateNotificationPreferencesWriteForSystemRoot` with the resolved shared
+root identity), and projection of readable descendants.
+The existing weft `notifications/preferences.rs` exact-path evaluator must be
+replaced by this ancestor resolution; this API release does not implement weft
+storage/handlers or the UI. Digest cadence still uses its separate existing
+account/per-Spool override contract above.

@@ -3,12 +3,13 @@
  * destination verification and expectedVersion. These gates complement remaining
  * stored-settings validation: hosts must also check timezone, selectors,
  * duplicate overrides and input budgets. */
-import { toBinary } from '@bufbuild/protobuf';
+import { create, toBinary } from '@bufbuild/protobuf';
 import { CallFailureCode, ErrorReason } from '../common/errors_pb.js';
 import {
+  EffectiveDeliverySchema, EffectiveDelivery_Source as Source,
   NotificationPreferencesSchema, NotificationRule_Channel as Channel,
   NotificationRule_Delivery as Delivery,
-  type NotificationRule, type NotificationPreferences,
+  type EffectiveDelivery, type NotificationRule, type NotificationPreferences,
   type SetNotificationPreferencesRequest, type UnsubscribeNotificationsRequest,
 } from './activity_pb.js';
 
@@ -16,7 +17,7 @@ export const MAX_EFFECTIVE_DELIVERIES = 4096;
 export const MAX_NOTIFICATION_PREFERENCES_BYTES = 1024 * 1024;
 export const LOCKED_EMAIL_KINDS: readonly string[] = ['account_security', 'security_surface'];
 export type NotificationValidationReason = 'InvalidRule' | 'DigestRequiresEmail' |
-  'LockedEmail' | 'InvalidDigestInterval' | 'UnsubscribeDelivery' | 'ProjectionTooLarge';
+  'LockedEmail' | 'InvalidDigestInterval' | 'UnsubscribeDelivery' | 'ProjectionTooLarge' | 'InvalidAncestry' | 'InvalidSource';
 
 export class NotificationValidationError extends Error {
   readonly code: CallFailureCode;
@@ -24,9 +25,9 @@ export class NotificationValidationError extends Error {
   constructor(readonly violation: NotificationValidationReason) {
     super(violation);
     this.name = 'NotificationValidationError';
-    this.code = violation === 'LockedEmail' ? CallFailureCode.FAILED_PRECONDITION :
+    this.code = ['LockedEmail', 'InvalidAncestry'].includes(violation) ? CallFailureCode.FAILED_PRECONDITION :
       violation === 'ProjectionTooLarge' ? CallFailureCode.RESOURCE_EXHAUSTED : CallFailureCode.INVALID_ARGUMENT;
-    this.reason = violation === 'LockedEmail' ? ErrorReason.POLICY_DENIED :
+    this.reason = ['LockedEmail', 'InvalidAncestry'].includes(violation) ? ErrorReason.POLICY_DENIED :
       violation === 'ProjectionTooLarge' ? ErrorReason.QUOTA_EXCEEDED : ErrorReason.FIELD_INVALID;
   }
 }
@@ -59,6 +60,16 @@ export function validateNotificationPreferencesWrite(request: SetNotificationPre
   for (const rule of rules) validateNotificationRule(rule);
 }
 
+/** Write gate with the host-resolved shared system-root identity. */
+export function validateNotificationPreferencesWriteForSystemRoot(
+  request: SetNotificationPreferencesRequest, systemRoot: { id: string },
+): void {
+  validateNotificationPreferencesWrite(request);
+  if (request.preferences?.rules.some(rule => rule.spool?.id === systemRoot.id)) {
+    throw new NotificationValidationError('InvalidRule');
+  }
+}
+
 function validateDigestInterval(interval: { seconds: bigint; nanos: number }): void {
   if (interval.nanos !== 0 || ![0n, 3600n, 86400n, 604800n].includes(interval.seconds)) {
     throw new NotificationValidationError('InvalidDigestInterval');
@@ -78,4 +89,103 @@ export function validateNotificationPreferencesBound(preferences: NotificationPr
       toBinary(NotificationPreferencesSchema, preferences).length > MAX_NOTIFICATION_PREFERENCES_BYTES) {
     throw new NotificationValidationError('ProjectionTooLarge');
   }
+}
+
+/** Hosts with a 64-node ancestor bound pass 64 instead. Includes event spool. */
+export const MAX_NOTIFICATION_ANCESTORS = 128;
+export interface NotificationAncestor {
+  spool: { id: string };
+  readable: boolean;
+  systemRoot: boolean;
+}
+
+/** Trusted host-loaded, complete parent chain; never from client input. */
+function validateAncestry(cell: EffectiveDelivery, ancestors: readonly NotificationAncestor[], limit: number): void {
+  if (![64, MAX_NOTIFICATION_ANCESTORS].includes(limit) || ancestors.length > limit ||
+      cell.spool?.id !== ancestors[0]?.spool.id || ancestors.some((level, i) =>
+        level.spool.id === '' || ancestors.slice(0, i).some(other => other.spool.id === level.spool.id) ||
+        (level.systemRoot && (i === 0 || i + 1 !== ancestors.length)))) {
+    throw new NotificationValidationError('InvalidAncestry');
+  }
+  if (ancestors[0] && !ancestors[0].readable) throw new NotificationValidationError('InvalidSource');
+}
+
+/** Shared routing/read projection. Host supplies defaults, effective cadence and
+ * complete ancestry (including unreadable levels). The system root is optional,
+ * last and transparent. Host must verify parent links and completeness first. */
+export function resolveNotificationDelivery(
+  rules: readonly NotificationRule[], cell: EffectiveDelivery, ancestors: readonly NotificationAncestor[],
+  ancestorLimit: number, defaultDelivery: Delivery, digestEnabled: boolean,
+): EffectiveDelivery {
+  validateAncestry(cell, ancestors, ancestorLimit);
+  if (![Channel.IN_APP, Channel.EMAIL, Channel.PUSH].includes(cell.channel) ||
+      ['', '*'].includes(cell.kind) || !['', 'human', 'agent'].includes(cell.actorOrigin) ||
+      ![Delivery.IMMEDIATE, Delivery.DIGEST, Delivery.DISABLED].includes(defaultDelivery) ||
+      (defaultDelivery === Delivery.DIGEST && cell.channel !== Channel.EMAIL)) {
+    throw new NotificationValidationError('InvalidRule');
+  }
+  for (const rule of rules) {
+    validateNotificationRule(rule);
+    if (ancestors.some(level => level.systemRoot && rule.spool?.id === level.spool.id)) {
+      throw new NotificationValidationError('InvalidRule');
+    }
+  }
+  let delivery = defaultDelivery;
+  let source: Source = Source.DEFAULT;
+  let sourceSpool: { id: string } | undefined;
+  let selected = false;
+  for (const [i, level] of ancestors.entries()) {
+    if (level.systemRoot) continue;
+    const rule = bestNotificationRule(rules, cell, level.spool.id);
+    if (rule) {
+      delivery = rule.delivery;
+      source = i === 0 ? Source.RULE : Source.INHERITED;
+      sourceSpool = i > 0 && level.readable ? level.spool : undefined;
+      selected = true;
+      break;
+    }
+  }
+  if (!selected) {
+    const account = bestNotificationRule(rules, cell, undefined);
+    if (account) {
+      delivery = account.delivery;
+      source = cell.spool ? Source.ACCOUNT : Source.RULE;
+    }
+  }
+  const locked = cell.channel === Channel.EMAIL && LOCKED_EMAIL_KINDS.includes(cell.kind);
+  if (locked) delivery = Delivery.IMMEDIATE;
+  else if (delivery === Delivery.DIGEST && !digestEnabled) delivery = Delivery.DISABLED;
+  return create(EffectiveDeliverySchema, {
+    kind: cell.kind, spool: cell.spool, actorOrigin: cell.actorOrigin, channel: cell.channel,
+    delivery, source, locked, sourceSpool,
+  });
+}
+
+function bestNotificationRule(
+  rules: readonly NotificationRule[], cell: EffectiveDelivery, spoolId: string | undefined,
+): NotificationRule | undefined {
+  let best: NotificationRule | undefined;
+  let previous = -1;
+  for (const rule of rules) {
+    const exactKind = !['', '*'].includes(rule.kind);
+    const exactChannel = rule.channel !== Channel.UNSPECIFIED;
+    const exactOrigin = !['', 'any'].includes(rule.actorOrigin);
+    if (rule.spool?.id !== spoolId || (exactKind && rule.kind !== cell.kind) ||
+        (exactChannel && rule.channel !== cell.channel) || (exactOrigin && rule.actorOrigin !== cell.actorOrigin)) continue;
+    const score = Number(exactKind) * 4 + Number(exactChannel) * 2 + Number(exactOrigin);
+    if (score > previous) { best = rule; previous = score; }
+  }
+  return best;
+}
+
+/** Checks provenance/disclosure; hosts also compare with the resolved result. */
+export function validateEffectiveDeliverySource(
+  cell: EffectiveDelivery, ancestors: readonly NotificationAncestor[], ancestorLimit: number,
+): void {
+  validateAncestry(cell, ancestors, ancestorLimit);
+  const valid = [Source.RULE, Source.DEFAULT].includes(cell.source) ? !cell.sourceSpool :
+    cell.source === Source.ACCOUNT ? !!cell.spool && !cell.sourceSpool :
+    cell.source === Source.INHERITED ? !!cell.spool && ancestors.slice(1).some(level =>
+      !level.systemRoot && (cell.sourceSpool ? level.readable && cell.sourceSpool.id === level.spool.id : !level.readable)) : false;
+  if (!valid) throw new NotificationValidationError('InvalidSource');
 }

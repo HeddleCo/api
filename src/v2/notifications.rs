@@ -347,10 +347,11 @@ pub fn notification_projection_scopes(
     }
     let mut scopes = vec![None];
     for rule in rules {
-        if let Some(spool) = &rule.spool {
-            if readable.contains(spool) && !scopes.contains(&Some(spool.clone())) {
-                scopes.push(Some(spool.clone()));
-            }
+        if let Some(spool) = &rule.spool
+            && readable.contains(spool)
+            && !scopes.contains(&Some(spool.clone()))
+        {
+            scopes.push(Some(spool.clone()));
         }
     }
     Ok(scopes)

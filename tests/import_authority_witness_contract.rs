@@ -1691,6 +1691,7 @@ fn bundle_check_context(
                 effective_from_unix_seconds: effective_from,
                 effective_until_unix_seconds: None,
                 forbidden_job_keys: &c.forbidden,
+                forbidden_landing_keys: &[],
                 known_job_associations: &[],
             })
         },
@@ -2029,6 +2030,7 @@ fn alpha33_hostile_missing_operation_body_is_typed() {
                 effective_from_unix_seconds: 0,
                 effective_until_unix_seconds: None,
                 forbidden_job_keys: &c.forbidden,
+                forbidden_landing_keys: &[],
                 known_job_associations: &[]
             }),
             |_, _| Ok(()),

@@ -1023,6 +1023,7 @@ pub struct ImportBundleOwnerExpectation<'a> {
     pub effective_from_unix_seconds: i64,
     pub effective_until_unix_seconds: Option<i64>,
     pub forbidden_job_keys: &'a [Vec<u8>],
+    pub forbidden_landing_keys: &'a [Vec<u8>],
     pub known_job_associations: &'a [(Vec<u8>, Vec<u8>)],
 }
 impl<'a> ImportBundleOwnerExpectation<'a> {
@@ -1660,7 +1661,6 @@ fn validate_bundle_bounds(bundle: &ImportPublicProofBundleV1) -> Result<(), Reje
         || bundle.genesis_witnesses.len() > 256
         || bundle.authority_witnesses.len() > 256
         || bundle.landing_witnesses.len() > 256
-        || bundle.foreign_dependencies.len() > 128
     {
         return Err(Reject::Bounds);
     }
@@ -2000,10 +2000,25 @@ pub(crate) fn original_signatures(
     Ok(hash(&[b"heddle-hosted-original-signatures-v1", &out]))
 }
 use crate::hybrid_codec::Canonical;
-/// Caller constructs this from independently verified native originals and
-/// accepted owner/policy/landing context. This matching layer verifies original
-/// signatures and exact payload commitments separately from witness trust; it
-/// does not replace native causal, authority or landing-model verification.
+/// Portable request-role refusal. Receiver facts include known job and forbidden request keys.
+pub fn verify_landing_key_roles(
+    payload: &HostedLandingWitnessV1,
+    known_job_keys: &[Vec<u8>],
+    forbidden_keys: &[Vec<u8>],
+) -> Result<(), Reject> {
+    let key = &payload
+        .request
+        .as_ref()
+        .and_then(|r| r.signature.as_ref())
+        .ok_or(Reject::Signature)?
+        .public_key;
+    if known_job_keys.contains(key) || forbidden_keys.contains(key) {
+        return Err(Reject::KeyRole);
+    }
+    Ok(())
+}
+
+/// Exact matching and original signatures do not replace native causal/authority/landing checks.
 pub enum WitnessPayload<'a> {
     Genesis(&'a ImportGenesisWitnessV1),
     Authority(&'a ImportAuthorityWitnessV1),
@@ -2264,9 +2279,28 @@ fn validate_bundle_history(
         }
         Ok(())
     }
-    let mut foreign =
-        crate::foreign_dependencies::References::new(&bundle.foreign_dependencies, 1)?;
+    let mut foreign = crate::foreign_dependencies::References::new(
+        &bundle.foreign_dependencies,
+        ForeignDependencyOrigin::Import,
+    )?;
+    for p in &bundle.authority_witnesses {
+        let subject_thread =
+            crate::foreign_dependencies::thread(p.original.as_ref().ok_or(Reject::Canonical)?)?;
+        if !bundle.genesis_witnesses.iter().any(|g| {
+            g.original_genesis
+                .as_ref()
+                .is_some_and(|g| native_id(g) == subject_thread)
+        }) {
+            return Err(Reject::Scope);
+        }
+    }
+    let job_keys = bundle
+        .delegations
+        .iter()
+        .filter_map(|d| d.body.as_ref().map(|d| d.job_public_key.clone()))
+        .collect::<Vec<_>>();
     for p in &bundle.landing_witnesses {
+        verify_landing_key_roles(p, &job_keys, &[])?;
         let execution = p.execution.as_ref().ok_or(Reject::Canonical)?;
         let thread = crate::foreign_dependencies::thread(execution)?;
         if !bundle.genesis_witnesses.iter().any(|p| {
@@ -3131,16 +3165,21 @@ pub fn verify_import_bundle_witnesses<'a>(
                         .ok_or(Reject::Scope)?,
                 ),
             )?,
-            4 => verify_witness_payload(
-                s,
-                WitnessPayload::Landing(
-                    bundle
-                        .landing_witnesses
-                        .iter()
-                        .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
-                        .ok_or(Reject::Scope)?,
-                ),
-            )?,
+            4 => {
+                let payload = bundle
+                    .landing_witnesses
+                    .iter()
+                    .find(|p| canonical(*p).is_ok_and(|b| b == s.canonical_payload))
+                    .ok_or(Reject::Scope)?;
+                let (facts, selected_associations) =
+                    resolve_owner(Some(s.observed_at_unix_millis / 1000))?;
+                let known = selected_associations
+                    .iter()
+                    .map(|(key, _)| key.clone())
+                    .collect::<Vec<_>>();
+                verify_landing_key_roles(payload, &known, facts.forbidden_landing_keys)?;
+                verify_witness_payload(s, WitnessPayload::Landing(payload))?;
+            }
             3 => {
                 let (_, operation, manifest, index) = publications
                     .iter()

@@ -73,6 +73,7 @@ fn import_stage(f: &Value, b: &wire::ImportPublicProofBundleV1) -> Result<()> {
                 effective_from_unix_seconds: 0,
                 effective_until_unix_seconds: None,
                 forbidden_job_keys: &[],
+                forbidden_landing_keys: &[],
                 known_job_associations: &[],
             })
         },
@@ -113,6 +114,12 @@ struct InstalledOriginal {
     origin: i32,
     record: wire::SignedRecord,
     job: Option<Vec<u8>>,
+    admission_order: u64,
+    admission_purpose: i32,
+    stage: String,
+    spool: Vec<u8>,
+    thread: Vec<u8>,
+    authority: String,
 }
 
 #[derive(Default)]
@@ -131,8 +138,15 @@ impl Receiver {
             .find(|s| s["id"] == name)
             .context("stage descriptor")?;
         let origin = descriptor["origin"].as_i64().context("origin")? as i32;
-        let imported: wire::ImportPublicProofBundleV1 = record(f, "import_stage")?;
-        if origin == 1 {
+        let imported: wire::ImportPublicProofBundleV1 = record(
+            f,
+            if origin == wire::ForeignDependencyOrigin::Import as i32 {
+                name
+            } else {
+                "import_stage"
+            },
+        )?;
+        if origin == wire::ForeignDependencyOrigin::Import as i32 {
             import_stage(f, &imported)?;
         } else {
             // Native model/owner verification uses the published native verifier.
@@ -141,13 +155,24 @@ impl Receiver {
             ))?;
             context["wire_vectors"][name] = f["wire_vectors"][name].clone();
             context["positive"] = serde_json::json!([name]);
-            verify_native_witness_vectors(&context)?;
+            let native: wire::NativePublicProofBundleV1 = record(f, name)?;
+            contract::native_witness::verify_bundle_witnesses(
+                &native,
+                &selected_set(f)?,
+                1_200_001,
+            )?;
+            if native.foreign_dependencies.is_empty() && native.landing_witnesses.is_empty() {
+                verify_native_witness_vectors(&context)?;
+            }
         }
         let mut pending = Vec::new();
-        for name in descriptor["originals"].as_array().context("originals")? {
-            let r: wire::SignedRecord = record(f, name.as_str().context("original name")?)?;
+        for record_name in descriptor["originals"].as_array().context("originals")? {
+            let r: wire::SignedRecord = record(f, record_name.as_str().context("original name")?)?;
             let op = operation(&r)?;
-            let job = if origin == 1 && !matches!(op.source_author()?, Some(SourceAuthor::LocalKey))
+            let job = if matches!(op.body, ThreadOperationBody::Integration(_)) {
+                None
+            } else if origin == wire::ForeignDependencyOrigin::Import as i32
+                && !matches!(op.source_author()?, Some(SourceAuthor::LocalKey))
             {
                 let sidecar = imported
                     .authority_witnesses
@@ -169,7 +194,7 @@ impl Receiver {
                     1100,
                 )?;
                 None
-            } else if origin == 1 {
+            } else if origin == wire::ForeignDependencyOrigin::Import as i32 {
                 let d = imported.delegations[0]
                     .body
                     .as_ref()
@@ -219,17 +244,161 @@ impl Receiver {
             } else {
                 None
             };
+            let native: wire::NativePublicProofBundleV1 = record(
+                f,
+                if origin == wire::ForeignDependencyOrigin::Native as i32 {
+                    name
+                } else {
+                    "native_child_stage"
+                },
+            )?;
+            let (statements, p2, p4, spool, set) =
+                if origin == wire::ForeignDependencyOrigin::Import as i32 {
+                    (
+                        &imported.statements,
+                        &imported.authority_witnesses,
+                        &imported.landing_witnesses,
+                        &imported.owner_genesis,
+                        &imported.witness_set,
+                    )
+                } else {
+                    if let Some(SourceAuthor::Account {
+                        actor, authority, ..
+                    }) = op.source_author()?
+                    {
+                        let owner = verify_owner_history(
+                            native.owner_histories.first().context("owner")?,
+                            1200,
+                        )?;
+                        verify_authority(
+                            &authority,
+                            &owner,
+                            &op.publisher,
+                            &actor,
+                            "/heddle.api.v1alpha2.SyncService/PublishContent",
+                            1100,
+                        )?;
+                    }
+                    (
+                        &native.statements,
+                        &native.authority_witnesses,
+                        &native.landing_witnesses,
+                        &native.owner_genesis,
+                        &native.witness_set,
+                    )
+                };
+            let spool = spool
+                .as_ref()
+                .and_then(|g| g.genesis.as_ref())
+                .context("spool")?
+                .spool_uuid
+                .clone();
+            let authority = set
+                .as_ref()
+                .and_then(|s| s.body.as_ref())
+                .context("set")?
+                .deployment_authority
+                .clone();
+            let admission = statements
+                .iter()
+                .filter_map(|s| s.body.as_ref())
+                .find(|s| match s.purpose {
+                    2 => p2.iter().any(|p| {
+                        p.original.as_ref() == Some(&r)
+                            && codec::canonical(p).is_ok_and(|v| v == s.canonical_payload)
+                    }),
+                    4 => p4.iter().any(|p| {
+                        p.execution.as_ref() == Some(&r)
+                            && codec::canonical(p).is_ok_and(|v| v == s.canonical_payload)
+                    }),
+                    3 if job.is_some() => imported.operations.iter().any(|o| {
+                        o.body
+                            .as_ref()
+                            .is_some_and(|o| o.genesis_digest == op.thread.as_bytes())
+                            && imported.manifests.iter().any(|m| {
+                                import::publication_payload(o, m)
+                                    .and_then(|p| codec::canonical(&p))
+                                    .is_ok_and(|v| v == s.canonical_payload)
+                            })
+                    }),
+                    _ => false,
+                })
+                .context("exact original admission")?;
             pending.push((
                 import::signed_native_digest(&r)?,
                 InstalledOriginal {
                     origin,
                     record: r,
                     job,
+                    admission_order: admission.admission_order,
+                    admission_purpose: admission.purpose,
+                    stage: name.into(),
+                    spool,
+                    thread: op.thread.as_bytes().to_vec(),
+                    authority,
                 },
             ));
         }
         self.rows.extend(pending);
         self.installed.insert(name.into());
+        Ok(())
+    }
+    fn install_prefix(
+        &mut self,
+        f: &Value,
+        name: &str,
+        catalog: &[Value],
+        visiting: &mut Vec<String>,
+    ) -> Result<()> {
+        if self.installed.contains(name) {
+            return Ok(());
+        }
+        let prefix = catalog
+            .iter()
+            .find(|p| p["id"] == name)
+            .ok_or(codec::Reject::Scope)?;
+        let key = format!(
+            "{}:{}:{}:{}",
+            prefix["carrier"],
+            prefix["thread_genesis_digest"],
+            prefix["signed_native_digest"],
+            prefix["cutoff"]
+        );
+        if visiting.contains(&key) {
+            return Err(codec::Reject::Scope.into());
+        }
+        if visiting.len() > catalog.len() {
+            return Err(codec::Reject::Bounds.into());
+        }
+        visiting.push(key.clone());
+        let carrier = prefix["carrier"].as_str().context("carrier")?;
+        let references = if carrier == "native" {
+            record::<wire::NativePublicProofBundleV1>(f, name)?.foreign_dependencies
+        } else {
+            record::<wire::ImportPublicProofBundleV1>(f, name)?.foreign_dependencies
+        };
+        for reference in references {
+            let foreign = catalog
+                .iter()
+                .find(|p| {
+                    p["thread_genesis_digest"].as_str()
+                        == Some(&hex::encode(&reference.thread_genesis_digest))
+                        && p["cutoff"].as_str().and_then(|c| c.parse::<u64>().ok())
+                            == Some(reference.prefix_admission_order)
+                        && p["signed_native_digest"].as_str()
+                            == Some(&hex::encode(&reference.signed_native_digest))
+                })
+                .ok_or(codec::Reject::Scope)?;
+            self.install_prefix(
+                f,
+                foreign["id"].as_str().context("prefix id")?,
+                catalog,
+                visiting,
+            )?;
+        }
+        self.install(f, name, carrier)?;
+        self.stage(f, name)?;
+        visiting.pop();
         Ok(())
     }
     fn install(&mut self, f: &Value, name: &str, carrier: &str) -> Result<()> {
@@ -256,7 +425,10 @@ impl Receiver {
         };
         // Recheck receiver-owned origin proofs before any target mutation.
         for stage in &self.installed {
-            if stage == "import_stage" {
+            if f["stages"].as_array().context("stages")?.iter().any(|p| {
+                p["id"] == *stage
+                    && p["origin"].as_i64() == Some(wire::ForeignDependencyOrigin::Import as i64)
+            }) {
                 import_stage(f, &record(f, stage)?)?;
             } else {
                 contract::native_witness::verify_bundle_witnesses(
@@ -266,19 +438,86 @@ impl Receiver {
                 )?;
             }
         }
+        let (spool, authority) = if carrier == "native" {
+            (
+                native
+                    .owner_genesis
+                    .as_ref()
+                    .and_then(|g| g.genesis.as_ref())
+                    .context("spool")?
+                    .spool_uuid
+                    .as_slice(),
+                native
+                    .witness_set
+                    .as_ref()
+                    .and_then(|s| s.body.as_ref())
+                    .context("set")?
+                    .deployment_authority
+                    .as_str(),
+            )
+        } else {
+            (
+                imported
+                    .owner_genesis
+                    .as_ref()
+                    .and_then(|g| g.genesis.as_ref())
+                    .context("spool")?
+                    .spool_uuid
+                    .as_slice(),
+                imported
+                    .witness_set
+                    .as_ref()
+                    .and_then(|s| s.body.as_ref())
+                    .context("set")?
+                    .deployment_authority
+                    .as_str(),
+            )
+        };
         for reference in references {
             let installed = self
                 .rows
                 .get(&reference.signed_native_digest)
                 .ok_or(codec::Reject::Scope)?;
             if installed.origin != reference.origin
-                || reference.thread_genesis_digest
-                    != operation(&installed.record)?.thread.as_bytes()
+                || installed.admission_order != reference.prefix_admission_order
+                || installed.spool != spool
+                || installed.authority != authority
+                || reference.thread_genesis_digest != installed.thread
             {
                 return Err(codec::Reject::Scope.into());
             }
         }
-        let job_key = hex_field(&f["keys"]["job"]["public_key_hex"])?;
+        let records = if carrier == "native" {
+            (&native.authority_witnesses, &native.landing_witnesses)
+        } else {
+            (&imported.authority_witnesses, &imported.landing_witnesses)
+        };
+        for reference in references {
+            let installed = self
+                .rows
+                .get(&reference.signed_native_digest)
+                .ok_or(codec::Reject::Scope)?;
+            let referenced = records
+                .0
+                .iter()
+                .flat_map(|p| p.dependencies.iter())
+                .chain(
+                    records
+                        .1
+                        .iter()
+                        .flat_map(|p| p.source_operation.iter().chain(p.review_evidence.iter())),
+                )
+                .find(|r| {
+                    import::signed_native_digest(r)
+                        .is_ok_and(|d| d == reference.signed_native_digest)
+                })
+                .ok_or(codec::Reject::Scope)?;
+            if referenced != &installed.record {
+                return Err(codec::Reject::Scope.into());
+            }
+            operation(&installed.record)?;
+        }
+
         let owner = verify_owner_history(native.owner_histories.first().context("owner")?, 1200)?;
         let mut originals: BTreeMap<ContentHash, ThreadOperation> = self
             .rows
@@ -317,14 +556,6 @@ impl Receiver {
         };
         for p in landings {
             let request = p.request.as_ref().context("request")?;
-            let request_key = &request
-                .signature
-                .as_ref()
-                .context("request signature")?
-                .public_key;
-            if *request_key == job_key {
-                return Err(codec::Reject::KeyRole.into());
-            }
             let source_record = p.source_operation.as_ref().context("source")?;
             let source = operation(source_record)?;
             match source.source_author()? {
@@ -344,30 +575,47 @@ impl Receiver {
                 }
                 Some(SourceAuthor::Account {
                     actor, authority, ..
-                }) => verify_authority(
-                    &authority,
-                    &owner,
-                    &source.publisher,
-                    &actor,
-                    "/heddle.api.v1alpha2.SyncService/PublishContent",
-                    1100,
-                )?,
+                }) => {
+                    let digest = import::signed_native_digest(source_record)?;
+                    let installed = self.rows.get(&digest).ok_or(codec::Reject::Scope)?;
+                    if installed.admission_purpose != 2 {
+                        return Err(codec::Reject::Scope.into());
+                    }
+                    verify_authority(
+                        &authority,
+                        &owner,
+                        &source.publisher,
+                        &actor,
+                        "/heddle.api.v1alpha2.SyncService/PublishContent",
+                        1100,
+                    )?;
+                }
                 None => {
                     ensure!(
                         matches!(source.body, ThreadOperationBody::Integration(_)),
                         "hosted integration source"
                     );
-                    ensure!(
-                        native
-                            .landing_witnesses
-                            .iter()
-                            .any(|p| p.execution.as_ref() == Some(source_record))
-                            || imported
+                    let digest = import::signed_native_digest(source_record)?;
+                    let installed = self.rows.get(&digest).ok_or(codec::Reject::Scope)?;
+                    if installed.admission_purpose != 4 {
+                        return Err(codec::Reject::Scope.into());
+                    }
+                    let stage_name = &installed.stage;
+                    let admitted =
+                        if installed.origin == wire::ForeignDependencyOrigin::Import as i32 {
+                            record::<wire::ImportPublicProofBundleV1>(f, stage_name)?
                                 .landing_witnesses
                                 .iter()
-                                .any(|p| p.execution.as_ref() == Some(source_record)),
-                        "source P4 required"
-                    );
+                                .any(|p| p.execution.as_ref() == Some(source_record))
+                        } else {
+                            record::<wire::NativePublicProofBundleV1>(f, stage_name)?
+                                .landing_witnesses
+                                .iter()
+                                .any(|p| p.execution.as_ref() == Some(source_record))
+                        };
+                    if !admitted {
+                        return Err(codec::Reject::Scope.into());
+                    }
                 }
             }
             let execution = operation(p.execution.as_ref().context("execution")?)?;
@@ -429,24 +677,42 @@ pub(super) fn verify() -> Result<()> {
             .as_array()
             .context("positives")?
             .iter()
+            .chain(f["prefixes"].as_array().context("prefixes")?)
             .find(|p| p["id"] == control)
             .context("control")?;
-        let stage = descriptor["stage"].as_str().context("stage")?;
+        let stage = v["prefix_setup"]
+            .as_str()
+            .or_else(|| descriptor["stage"].as_str())
+            .context("stage")?;
         let carrier = descriptor["carrier"].as_str().context("carrier")?;
         let mut receiver = Receiver::default();
-        if v["omit_stage"] != true {
+        if v["prefix_setup"].is_string() {
+            receiver.install_prefix(
+                &f,
+                stage,
+                f["prefixes"].as_array().context("prefixes")?,
+                &mut Vec::new(),
+            )?;
+        } else if v["omit_stage"] != true {
             receiver.stage(&f, stage)?;
         }
-        if v["unbind"] == true {
-            for installed in receiver.rows.values_mut() {
+        for installed in receiver.rows.values_mut() {
+            if v["unbind"] == true {
                 installed.job = None;
             }
+            if v["unadmit"].as_i64() == Some(installed.admission_purpose as i64) {
+                installed.admission_purpose = 0;
+            }
+            match v["row_mismatch"].as_str() {
+                Some("origin") => installed.origin = wire::ForeignDependencyOrigin::Native as i32,
+                Some("thread") => installed.thread = vec![0; 32],
+                Some("spool") => installed.spool = vec![0; 16],
+                Some("authority") => installed.authority = "https://other.example.test".into(),
+                Some("order") => installed.admission_order += 1,
+                Some("bytes") => installed.record.signatures[0].signature[0] ^= 1,
+                _ => (),
+            }
         }
-        let counts = (
-            receiver.rows.len(),
-            receiver.installed.len(),
-            receiver.targets.len(),
-        );
         let id = v["id"].as_str().context("id")?;
         let result = receiver.install(
             &f,
@@ -470,18 +736,56 @@ pub(super) fn verify() -> Result<()> {
             ) == v["expected"].as_str().context("reason")?,
             "{id}: {error}"
         );
-        ensure!(
-            counts
-                == (
-                    receiver.rows.len(),
-                    receiver.installed.len(),
-                    receiver.targets.len()
-                ),
-            "no state change"
-        );
         receiver.stage(&f, stage)?;
         receiver.install(&f, control, carrier)?;
-        println!("STAGED REJECT {id}: {error}; unchanged state; PASS exact control");
+        println!("STAGED REJECT {id}: {error}; PASS exact control");
     }
+    let catalog = f["prefixes"].as_array().context("prefixes")?;
+    let mut receiver = Receiver::default();
+    for name in f["fresh_receiver"]["roots"].as_array().context("roots")? {
+        receiver.install_prefix(&f, name.as_str().context("root")?, catalog, &mut Vec::new())?;
+    }
+    ensure!(
+        receiver.installed.len()
+            == f["fresh_receiver"]["expected_prefixes"]
+                .as_array()
+                .context("expected")?
+                .len(),
+        "all prefixes installed"
+    );
+    println!("PREFIX PASS bidirectional fresh receiver");
+    let cycle_catalog = catalog
+        .iter()
+        .filter(|p| {
+            f["cycle_negative"]["prefixes"]
+                .as_array()
+                .is_some_and(|ids| ids.contains(&p["id"]))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut receiver = Receiver::default();
+    let error = receiver.install_prefix(
+        &f,
+        f["cycle_negative"]["root"].as_str().context("cycle root")?,
+        &cycle_catalog,
+        &mut Vec::new(),
+    );
+    let error = match error {
+        Err(error) => error,
+        Ok(()) => bail!("genuine cycle must reject"),
+    };
+    ensure!(
+        error.downcast_ref::<codec::Reject>() == Some(&codec::Reject::Scope),
+        "cycle Scope"
+    );
+    receiver.install_prefix(
+        &f,
+        f["cycle_negative"]["control"]
+            .as_str()
+            .context("cycle control")?,
+        catalog,
+        &mut Vec::new(),
+    )?;
+    println!("PREFIX REJECT genuine cycle; PASS exact control");
     Ok(())
 }

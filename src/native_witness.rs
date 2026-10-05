@@ -1,6 +1,7 @@
 //! Job-free native witness closure. This layer checks transport commitments and
 //! signatures; callers still verify native models, independently selected owner
 //! authority, policy, causal closure and boundary intent before durable mutation.
+use crate::foreign_dependencies::thread;
 use crate::heddle::api::{common as host, v1alpha2 as api};
 use crate::hybrid_codec::{Reject, canonical, field, hash, key_id, record, signing_digest, width};
 use crate::import_authority as import;
@@ -30,10 +31,6 @@ struct GenesisSelectors {
     spool: String,
     creator: [u8; 32],
     owner: NativeOwner,
-}
-#[derive(serde::Deserialize)]
-struct ThreadSelector {
-    thread: [u8; 32],
 }
 fn spool_uuid(text: &str) -> Result<Vec<u8>, Reject> {
     if text.len() != 36
@@ -171,14 +168,6 @@ fn sorted<T>(values: &[T], digest: impl Fn(&T) -> Result<Vec<u8>, Reject>) -> Re
 fn authority_payload_digest(p: &api::ImportAuthorityWitnessV1) -> Result<Vec<u8>, Reject> {
     signing_digest("heddle-import-authority-witness-payload-v1", p)
 }
-fn thread(record: &api::SignedRecord) -> Result<Vec<u8>, Reject> {
-    if record.format == "heddle-thread-genesis-v1" {
-        return Ok(import::native_id(record));
-    }
-    let value: ThreadSelector =
-        rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Canonical)?;
-    Ok(value.thread.to_vec())
-}
 /// Reference completeness, including a statement for every sidecar, a witnessed
 /// genesis for every original/dependency and an explicit claim for LocalKey.
 /// Presence is never permission. Call verify_bundle_witnesses with a
@@ -202,7 +191,10 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     {
         return Err(Reject::Bounds);
     }
-    let mut foreign = crate::foreign_dependencies::References::new(&b.foreign_dependencies, 2)?;
+    let mut foreign = crate::foreign_dependencies::References::new(
+        &b.foreign_dependencies,
+        api::ForeignDependencyOrigin::Native,
+    )?;
     let owner = b
         .owner_genesis
         .as_ref()
@@ -278,6 +270,14 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     for p in &b.authority_witnesses {
         require_statement(b, 2, &canonical(p)?)?;
         if !requires_authority(p.original.as_ref().ok_or(Reject::Canonical)?)? {
+            return Err(Reject::Scope);
+        }
+        let subject_thread = thread(p.original.as_ref().ok_or(Reject::Canonical)?)?;
+        if !b.genesis_witnesses.iter().any(|g| {
+            g.original_genesis
+                .as_ref()
+                .is_some_and(|g| import::native_id(g) == subject_thread)
+        }) {
             return Err(Reject::Scope);
         }
         for original in p.original.iter().chain(p.dependencies.iter()) {
@@ -521,6 +521,9 @@ pub fn verify_bundle_witnesses(
     now_ms: i64,
 ) -> Result<(), Reject> {
     validate_public_bundle(b)?;
+    for p in &b.landing_witnesses {
+        import::verify_landing_key_roles(p, set.known_job_keys(), &[])?;
+    }
     let carried = b.witness_set.as_ref().ok_or(Reject::Canonical)?;
     if carried.body.as_ref() != Some(set.body()) || carried.body_digest != set.digest() {
         return Err(Reject::StaleContext);

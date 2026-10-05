@@ -590,6 +590,12 @@
           "number": 4,
           "type": "12",
           "list": false
+        },
+        {
+          "name": "prefix_admission_order",
+          "number": 5,
+          "type": "4",
+          "list": false
         }
       ]
     },

@@ -1,5 +1,5 @@
 // Internal reference completeness. Durable trust belongs to the receiver.
-import type { ForeignDependencyV1 } from "./import_authority_pb.js";
+import { ForeignDependencyOrigin, type ForeignDependencyV1 } from "./import_authority_pb.js";
 import type { SignedRecord } from "./common_pb.js";
 import { compare, equal, reject, width } from "./_hybrid-codec.js";
 import { decode } from "./_collaboration-msgpack.js";
@@ -17,11 +17,11 @@ export function foreignThread(record:SignedRecord):Uint8Array {
 }
 export class ForeignReferences {
   private readonly used=new Set<number>();
-  constructor(private readonly entries:ForeignDependencyV1[],carrier:number){
-    if(entries.length>128)reject("Bounds");
+  constructor(private readonly entries:ForeignDependencyV1[],carrier:ForeignDependencyOrigin){
     entries.forEach((entry,i)=>{
-      if(entry.formatVersion!==1||![1,2].includes(entry.origin))reject("Version");
+      if(entry.formatVersion!==1||![ForeignDependencyOrigin.IMPORT,ForeignDependencyOrigin.NATIVE].includes(entry.origin))reject("Version");
       if(entry.origin===carrier)reject("Scope");
+      if(entry.prefixAdmissionOrder===0n)reject("Scope");
       width(entry.threadGenesisDigest,32);width(entry.signedNativeDigest,32);
       if(i&&compare(entries[i-1]!.signedNativeDigest,entry.signedNativeDigest)>=0)reject("Canonical");
     });

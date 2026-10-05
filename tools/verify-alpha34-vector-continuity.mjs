@@ -7,7 +7,7 @@ const recordSha=v=>sha(JSON.stringify(v));
 let changed=0,added=0,retired=0,unchanged=0;
 for(const [path,entry] of Object.entries(manifest.fixtures)){
  const bytes=readFileSync(path),fixture=JSON.parse(bytes);assert.equal(sha(bytes),entry.sha256,path);
- if(entry.new_file){assert.equal(fixture.positive.length,5);assert.equal(fixture.negative.length,23);assert.equal(fixture.receiver_negative.length,5);continue;}
+ if(entry.new_file){assert.equal(fixture.positive.length,5);assert.equal(fixture.negative.length,35);assert.equal(fixture.receiver_negative.length,12);continue;}
  for(const [group,result] of Object.entries(entry.groups)){
   const values=Array.isArray(fixture[group])?Object.fromEntries(fixture[group].map((v,i)=>[String(v.id??v.name??v.count??i),v])):fixture[group]??{};
   assert.deepEqual(Object.keys(values).sort(),[...result.changed,...result.added,...Object.keys(result.unchanged_sha256)].sort(),`${path}: ${group} exact inventory`);

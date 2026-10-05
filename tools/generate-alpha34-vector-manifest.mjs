@@ -2,6 +2,13 @@
 import {execFileSync} from 'node:child_process';
 import {existsSync,readFileSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {fromBinary,toBinary} from '@bufbuild/protobuf';
+import * as native from '../packages/typescript/dist/v1alpha2/native_witness_pb.js';
+import * as imported from '../packages/typescript/dist/v1alpha2/import_authority_pb.js';
+import * as hosted from '../packages/typescript/dist/common/hosted_witness_pb.js';
+import * as owners from '../packages/typescript/dist/v1alpha2/owner_records_pb.js';
+import * as common from '../packages/typescript/dist/v1alpha2/common_pb.js';
+import assert from 'node:assert/strict';
 const baseline='c9bd6ba2';
 const git=(...args)=>execFileSync('git',args,{maxBuffer:64*1024*1024});
 const sha=value=>createHash('sha256').update(value).digest('hex');
@@ -39,5 +46,24 @@ for(const path of paths){
  }
  entry.sha256=sha(after);manifest.fixtures[path]=entry;
 }
+// Fix-round continuity also covers nested signed records/statements in the alpha.34 corpus.
+const path='tests/fixtures/foreign-dependencies-alpha34.json',fixBaseline='474ccc97';
+const prior=JSON.parse(git('show',`${fixBaseline}:${path}`)),current=JSON.parse(readFileSync(path));
+const schemas=new Map(Object.values({...native,...imported,...hosted,...common,...owners}).filter(s=>s&&typeof s==='object'&&s.kind==='message').map(s=>[s.typeName,s]));
+function signedParts(vector){
+ const parts=[];
+ function walk(value){if(!value||typeof value!=='object'||value instanceof Uint8Array)return;
+  if(value.$typeName&&(value.$typeName.endsWith('.SignedRecord')||value.$typeName.split('.').at(-1).startsWith('Signed'))){const schema=schemas.get(value.$typeName);assert.ok(schema,value.$typeName);parts.push(sha(toBinary(schema,value)));}
+  for(const [key,child] of Object.entries(value))if(key!=='$typeName')if(Array.isArray(child))child.forEach(walk);else walk(child);
+ }
+ walk(fromBinary(schemas.get(vector.schema),Buffer.from(vector.wire_hex,'hex')));return [...new Set(parts)].sort();
+}
+const changed=[];
+for(const [id,old] of Object.entries(prior.wire_vectors)){
+ const value=current.wire_vectors[id];assert.ok(value,id);
+ assert.deepEqual(signedParts(value),signedParts(old),id+': existing signed parts');
+ if(value.wire_hex!==old.wire_hex)changed.push(id);
+}
+manifest.fix_round={baseline:fixBaseline,unchanged_signed_parts_by_vector:Object.fromEntries(Object.entries(prior.wire_vectors).map(([id,v])=>[id,signedParts(v)])),changed_carrier_wires:changed,added_vectors:Object.keys(current.wire_vectors).filter(id=>!(id in prior.wire_vectors)),reason:'ForeignDependencyV1 tag 5 prefix_admission_order and byte-bound vectors alter carrier encoding only; all existing nested signed originals, payload commitments, signatures, manifests and statements are unchanged.'};
 writeFileSync('breaking/0.31.0-alpha.34-vectors.json',JSON.stringify(manifest,null,2)+'\n');
 console.log('Generated exact alpha.34 vector inventory');

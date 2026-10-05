@@ -1096,72 +1096,134 @@ are advisory and do not replace the signed logical-job budget or publication sum
 
 ## Foreign dependencies (alpha.34 hard cut)
 
-A Thread has exactly one immutable origin carrier for life: IMPORT or NATIVE.
-A closure may reference originals from another Thread of the other origin.
-Both public bundles carry `foreign_dependencies`: references only, never nested
-proof bundles, permissions, owner enrollment or new trust anchors. Preserve and
-re-export the entries verbatim under the target Thread's own exclusive carrier.
-There is no alpha.33 compatibility reader, alias, shim or permissive fallback.
+A Thread keeps one immutable IMPORT or NATIVE origin for life. Both public
+bundles carry `foreign_dependencies` as references, with one carrier per message.
+Every witness SUBJECT MUST have an in-carrier genesis: the P1 original genesis,
+P2 `original`, and P4 `execution`. Only authority dependencies, the landing source
+and review originals may be foreign. An in-carrier genesis dependency MUST be
+byte-identical to its witnessed SignedRecord, including original signatures.
+A foreign reference never enrolls an owner or authorizes a subject.
 
-`ForeignDependencyV1` has `format_version` = 1; `origin` = 1 IMPORT or 2 NATIVE,
-which MUST differ from the enclosing carrier; `thread_genesis_digest` = the
-original Thread's 32-byte genesis ID; and `signed_native_digest` = the 32-byte
-`heddle-signed-native-record-v1` commitment to the exact SignedRecord, including
-its original signature bytes. Entries MUST be strictly increasing in raw signed
-native digest order, unique by that digest, and at most 128. The existing 1 MiB
-bundle bound still applies. Unknown version/origin or wrong digest widths reject.
+`ForeignDependencyV1` fields are:
 
-For each selected original whose Thread has no genesis witness in this carrier,
-require exactly one foreign entry matching BOTH its signed native digest and its
-Thread genesis digest. This applies to authority dependencies (including genesis,
-source, control, claim and resolution originals), landing source/review closure,
-and native dependency resolution, symmetrically in import bundle history.
-Every entry MUST be referenced; unused, duplicate, unsorted, same-origin,
-missing or mismatched entries reject. A reference to an original already covered
-by an in-carrier genesis is unused and cannot replace that origin's authority.
-The target landing execution still belongs to the target's own origin carrier.
-Original signatures, P2/P4, owner/capability, causal and State checks remain
-mandatory according to each original's role; entries grant no permission.
+| Tag | Field | Rule |
+| --- | --- | --- |
+| 1 | `format_version` | Exactly 1. |
+| 2 | `origin` | Generated `ForeignDependencyOrigin.IMPORT` / `NATIVE`; opposite to the carrier. |
+| 3 | `thread_genesis_digest` | Exact 32-byte original Thread genesis ID. |
+| 4 | `signed_native_digest` | Exact 32-byte signed-native commitment, including signatures. |
+| 5 | `prefix_admission_order` | Positive own-origin authenticated admission cutoff defined below. |
 
-Before installing the dependent closure, the receiver MUST have ALREADY durably
-installed each foreign original through its OWN origin carrier. Fetch delivers
-foreign stages first, with one carrier per message. A missing stage rejects with
-`Scope` and leaves the dependent installation's state unchanged. There is no
-native-only retry, origin conversion or other fallback. Simultaneous import and
-native carriers on one message still reject with `Protocol` before staging;
-`validate_carriers` / `validateNativeWitnessCarriers` keep this rule unchanged.
-Bound stage traversal by the 128 references and reject unresolved/cyclic stages.
+Entries are strictly increasing by raw signed-native digest, unique and fully
+used. Each foreign dependency must match both digests. Unknown version/origin,
+wrong widths, zero cutoff, missing/mismatched or unused references reject.
+The former 128-entry carrier cap is removed. References share the 1 MiB encoded
+carrier limit with every original and proof; P2 dependencies/reviews remain
+bounded at 128 per payload, and P2/P4 arrays at 256 per carrier. Thus the reference
+list cannot exhaust a separate smaller lifetime quota before the carrier does.
+Carriers and import snapshots remain cumulative within these existing bounds;
+A cumulative export cannot grow beyond 256 sidecars / 1 MiB. Unbounded history
+needs a future pagination/cumulative-proof design, explicitly deferred here.
+This change removes the earlier reference-only threshold; receivers MUST retain
+evidence and enforce snapshot high-water checks when extending an export.
 
-Trust is selected from the receiver's own durable installed state under its
-mutation lock, never from a caller-supplied resolver, asserted origin, envelope
-or key. Recheck exact original bytes/signatures, immutable genesis, Spool and
-independent deployment authority. For IMPORT originals require the retained
-verified import carrier, delegation/job binding and the purpose-3 publication
-whose exact resulting frontier binds this original, plus its content binding.
-Native continuations in that same IMPORT Thread retain their own P2/P4.
-For NATIVE originals require their own retained native carrier and exact admission.
-Recheck every selected witness against the independently authenticated fresh
-witness set, including root epoch, generation and clock floors: CURRENT needs
-interval/signature, RETIRED needs its exact original leaf proof, REVOKED rejects.
+### Deterministic prefix staging
+
+Staging is at ORIGINAL/PREFIX granularity, never whole-Thread granularity.
+The tuple `(origin, thread_genesis_digest, signed_native_digest,
+prefix_admission_order)` identifies the exact original and its own-origin prefix.
+For a delegated import original, the cutoff is the `admission_order` of its exact
+P3 publication, selected by replaying `operations` in progressive-manifest order.
+The P3 resulting frontier MUST include the original's native operation ID and
+its content digest MUST bind that exact capture. The selected manifest contains
+all publications through that position, including prior branches of that job.
+For an Account/control/claim/resolution original, the cutoff is its exact P2
+statement's `admission_order`; for a hosted integration, its exact P4; for a
+genesis, its P1. Native LocalKey work has no synthetic P2: use the maximum
+admission order in its required P1/ownership-claim/resolution proof closure and
+include only the exact signed original's native causal ancestor closure. Its
+signed digest disambiguates originals sharing that authority cutoff.
+
+Fetch sends a bounded prefix carrier with the original and all earlier necessary
+own-origin admissions, exact signed sidecars/statements, causal ancestors,
+owner/policy lineage and retirement proofs. It excludes later P2/P4 admissions
+and their foreign obligations. Native prefixes filter statement/sidecar arrays
+by the cutoff and retain the required native causal closure. Import prefixes
+also truncate `operations` through the selected P3 position, retain their exact
+progressive manifests, and select that authenticated cumulative manifest as
+`terminal_manifest`; the signed delegation/genesis bindings stay unchanged.
+Import native continuations are included only through their P2/P4 cutoff.
+Genesis bindings for still-unpublished branches may remain as delegation closure,
+without installing those branches. Prefix projection changes carrier arrays and
+unsigned selectors, never a signed original, payload, statement or manifest.
+Each projected carrier MUST pass its ordinary format/witness/owner/model checks.
+
+The receiver recursively installs foreign ORIGINAL prefixes first, then atomically
+installs the requested prefix. Track outstanding obligations by the full original
+tuple, so revisiting a Thread at an earlier cutoff is allowed. Reject an unresolved
+reference or a repeated outstanding original obligation with `Scope`. A genuine
+cycle cannot occur in causally admitted history. A Thread cycle alone is valid:
+C's child prefix uses M's import tip; M's later landing uses C's child; C's still
+later sync uses M's landing. A fresh receiver installs these prefixes in that
+order and can clone both Threads. Never forbid the reverse direction.
+
+Persist originals and their origin proofs in the receiver's admission journal.
+Later prefixes extend the same immutable origin: compare retained originals,
+signatures and admission bindings byte-for-byte, replay the added causal closure,
+keep old evidence, and apply ordinary import high-water/transition checks using
+the previously accepted prefix snapshot. Previously installed prefixes can be
+reused after the rechecks below. A smaller request may use retained history but
+must not roll back the installed prefix. Per-message bounds do not bound traversal
+by 128; bound each supplied carrier and traverse distinct original obligations.
+
+### Receiver trust and landing roles
+
+A foreign original's Thread MUST belong to the target's Spool under the same
+independently selected deployment authority. Installed origin MUST equal
+`ref.origin`, installed Thread MUST equal `thread_genesis_digest`, and the
+selected admission cutoff MUST equal `prefix_admission_order`. Any mismatch,
+missing stage or substituted original is `Scope`.
+
+Under the receiver's mutation lock, recheck exact original bytes and signatures,
+immutable genesis, Spool/deployment membership, and its retained origin proof.
+For imported job originals, recheck delegation/job publisher binding and the
+exact P3 frontier AND content binding. For native originals and import native
+continuations, recheck their exact P1/P2/P4 admission statement and full native
+causal/owner/capability/State rules; LocalKey work retains its ownership proof.
+Recheck every selected witness against the independently authenticated CURRENT
+set, root epoch, generation and clock floors: CURRENT requires interval and
+signature; RETIRED requires the exact original leaf proof; REVOKED rejects.
+Carried sets and caller-supplied origin/envelope assertions cannot select trust.
 Commit dependent admission and retention atomically only after every check passes.
+On rejection there MUST be no dependent state change. This rule is tested in
+heddle's transaction; these API conformance models do not exercise rollback, and
+this API-only verification does not run the downstream transaction suite.
+Simultaneous carriers still reject `Protocol` before staging; no fallback.
 
-Landing role selection follows the SOURCE, independently of the target carrier:
+Landing selects the SOURCE role independently of the target carrier:
 
-- An Account source uses `native_authority`, including its exact original source
-  authority, owner/capability and P2 admission checks.
-- A LocalKey import source is accepted only when this exact original is bound to
-  its verified installed import carrier and its publisher is the bound job key.
-  Otherwise reject with `ImportPermission`. It does not satisfy the native
-  LocalKey ownership-claim exception and cannot acquire landing authority.
-- A hosted integration source requires its exact P4 and full native checks.
-- A landing request signed by a job key MUST reject (`KeyRole`), including a key
-  in the receiver's known job associations or forbidden job-role keys. The owner
-  request proof, exact method/body, source/target revisions, policy and reviews
-  remain mandatory. A source's publication permission cannot authorize a landing.
+- Account: exact installed P2 admission plus `native_authority`, including the
+  source's original owner/capability authority.
+- LocalKey import: exact installed P3/delegation binding and publisher equal to
+  the bound job key, otherwise `ImportPermission`.
+- Hosted integration: exact installed P4 and full native landing/source checks.
+- Landing request signer: `KeyRole` for any delegation job key in the bundle,
+  independently known job association, or explicitly forbidden landing key.
 
-Thus an imported tip can land into a native target (fast-forward or merge), and
-a native child can land back into an imported main whose causal frontier is the
-imported tip. Each original keeps its own previously installed origin and proof;
-neither target re-witnesses the foreign genesis or retains a second carrier.
-The API validators check portable reference completeness; durable storage,
-transactional staging and full native landing authorization are receiver duties.
+The request-role refusal is portable and shipped in both Rust and TS:
+`verify_landing_key_roles` / `verifyLandingKeyRoles` accepts independently selected
+known-job and forbidden-landing lists. Import structural validation checks bundle
+delegation keys; import witness verification also checks selected owner facts at
+the authenticated landing time. Native witness verification checks the known job
+keys retained from witness-set verification; receivers also invoke the helper
+with their complete role lists. `forbidden_landing_keys` /
+`forbiddenLandingKeys` is distinct from keys forbidden to assume a JOB role:
+ordinary device keys can be forbidden job keys and valid landing signers.
+
+Binding LocalKey sources to installed carriers, checking the installed P2/P4 of
+Account/integration sources, and full request method/body/revision/policy/review
+validation remain receiver-normative. Portable role refusal does not supply
+those installed-state checks. Multiple import jobs on one Thread are explicitly
+DEFERRED: `delegations.len() == 1` remains enforced; no implicit multi-job reader.
+The generated fresh-receiver models demonstrate prefix scheduling and exact
+bindings, not a production Fetch/storage implementation.

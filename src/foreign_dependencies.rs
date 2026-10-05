@@ -1,6 +1,6 @@
 //! Reference completeness only; installed trust is selected by the receiver.
 use crate::{
-    heddle::api::v1alpha2::{ForeignDependencyV1, SignedRecord},
+    heddle::api::v1alpha2::{ForeignDependencyOrigin, ForeignDependencyV1, SignedRecord},
     hybrid_codec::{Reject, width},
     import_authority as import,
 };
@@ -10,18 +10,24 @@ pub(crate) struct References<'a> {
     used: Vec<bool>,
 }
 impl<'a> References<'a> {
-    pub(crate) fn new(entries: &'a [ForeignDependencyV1], carrier: i32) -> Result<Self, Reject> {
-        if entries.len() > 128 {
-            return Err(Reject::Bounds);
-        }
+    pub(crate) fn new(
+        entries: &'a [ForeignDependencyV1],
+        carrier: ForeignDependencyOrigin,
+    ) -> Result<Self, Reject> {
         for (i, entry) in entries.iter().enumerate() {
             if entry.format_version != 1 {
                 return Err(Reject::Version);
             }
-            if ![1, 2].contains(&entry.origin) {
+            if !matches!(
+                ForeignDependencyOrigin::try_from(entry.origin),
+                Ok(ForeignDependencyOrigin::Import | ForeignDependencyOrigin::Native)
+            ) {
                 return Err(Reject::Version);
             }
-            if entry.origin == carrier {
+            if entry.origin == carrier as i32 {
+                return Err(Reject::Scope);
+            }
+            if entry.prefix_admission_order == 0 {
                 return Err(Reject::Scope);
             }
             width(&entry.thread_genesis_digest, 32)?;

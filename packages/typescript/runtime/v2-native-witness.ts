@@ -1,14 +1,14 @@
 import { ForeignReferences } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./native_witness_pb.js";
-import { ImportIdentityV1Schema, ImportOwnerChainV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type ImportPublicProofBundleV1 } from "./import_authority_pb.js";
+import { ForeignDependencyOrigin, ImportIdentityV1Schema, ImportOwnerChainV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type ImportPublicProofBundleV1 } from "./import_authority_pb.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
 import type { HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
 import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, reject, strictDecode, HybridContractError, verifySignature } from "./_hybrid-codec.js";
 import { ThreadControlAuthoritySchema } from "./identity_pb.js";
 import { threadGenesisId, type ThreadGenesisSigner } from "./thread-genesis.js";
 import { decode, type Value } from "./_collaboration-msgpack.js";
-import { verifyNativeRecord, originalSignaturesDigest, ownerChainDigest, matchWitnessBoundary, requireBoundaryOriginal, verifyWitnessPayload, validatePublicBundle, requirePolicyHistory } from "./import-authority.js";
+import { verifyLandingKeyRoles, verifyNativeRecord, originalSignaturesDigest, ownerChainDigest, matchWitnessBoundary, requireBoundaryOriginal, verifyWitnessPayload, validatePublicBundle, requirePolicyHistory } from "./import-authority.js";
 import { resolveWitnessStatement, verifyWitnessInclusion, leafDigest, statementSigningDigest, type VerifiedWitnessSet } from "./witness-trust.js";
 
 export const NATIVE_GENESIS_DOMAIN = "heddle-native-genesis-authority-v1";
@@ -89,7 +89,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   b=clone(api.NativePublicProofBundleV1Schema,b);
   if(b.formatVersion!==1)reject("Version");
   if(toBinary(api.NativePublicProofBundleV1Schema,b).length>1048576||b.ownerHistories.length>64||b.ownershipTransfers.length>64||!b.ownerChains.length||b.ownerChains.length>64||b.policies.length>256||!b.genesisWitnesses.length||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256||b.statements.length>1024||b.historyProofs.length>1024)reject("Bounds");
-  const foreign=new ForeignReferences(b.foreignDependencies,2);
+  const foreign=new ForeignReferences(b.foreignDependencies,ForeignDependencyOrigin.NATIVE);
   const owner=b.ownerGenesis?.genesis??reject("Canonical"),chain=b.ownerChains[0]??reject("Canonical");
   sorted(b.ownerChains,ownerChainDigest);
   if(!b.witnessSet)reject("Canonical");
@@ -126,6 +126,8 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   for(const p of b.authorityWitnesses){
     requireStatement(2,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p));
     if(!requiresAuthority(p.original??reject("Canonical")))reject("Scope");
+    const subjectThread=thread(p.original??reject("Canonical"));
+    if(!b.genesisWitnesses.some(g=>g.originalGenesis&&equal(threadGenesisId(g.originalGenesis.canonicalRecord),subjectThread)))reject("Scope");
     for(const original of [...(p.original?[p.original]:[]),...p.dependencies]){
       if(["heddle-thread-genesis-v1","heddle-thread-operation-v1","heddle-thread-ownership-claim-v1","heddle-thread-ownership-resolution-v1"].includes(original.format)){
         const t=thread(original);
@@ -158,6 +160,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
 /** All statements resolve separately, including exact retirement proofs. */
 export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint):Promise<void> {
   b=clone(api.NativePublicProofBundleV1Schema,b);await validatePublicNativeBundle(b);
+  for(const p of b.landingWitnesses)verifyLandingKeyRoles(p,set.knownJobKeys);
   // The opaque verified snapshot, rather than the carrier, selects trust.
   if(!b.witnessSet?.body||!equal(b.witnessSet.bodyDigest,set.digest)||!equal(signingDigest("heddle-hosted-witness-set-v1\0",(await import("../common/hosted_witness_pb.js")).HostedWitnessSetV1Schema,b.witnessSet.body),set.digest))reject("StaleContext");
   for(const signed of b.statements){

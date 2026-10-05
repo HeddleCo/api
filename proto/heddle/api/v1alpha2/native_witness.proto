@@ -61,6 +61,6 @@ message NativePublicProofBundleV1 {
   heddle.api.common.SignedHostedWitnessSetV1 witness_set = 10;
   repeated heddle.api.common.SignedHostedWitnessStatementV1 statements = 11;
   repeated heddle.api.common.HostedWitnessHistoryProofV1 history_proofs = 12;
-  // Strictly digest-sorted unique, all referenced; at most 128. Import stages first.
+  // Strictly digest-sorted unique, all referenced; bounded by carrier bytes. Foreign prefixes first.
   repeated ForeignDependencyV1 foreign_dependencies = 13;
 }

@@ -1,13 +1,15 @@
+import { blake3 } from "@noble/hashes/blake3.js";
 import { clone, toBinary } from "@bufbuild/protobuf";
 import { ThreadControlAuthoritySchema, type ThreadControlAuthority } from "./identity_pb.js";
 import { SignedOwnerMintRootAttachmentSchema, type SignedOwnerMintRootAttachment, type OwnerHistory, type SignedSpoolPolicyRecord, type ResourceTransferAuditRecord } from "./owner_records_pb.js";
-import { HostedWitnessStatementV1Schema, type HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
-import { strictDecode, equal, keyId, reject, width, verifySignature } from "./_hybrid-codec.js";
+import { HostedWitnessBoundaryAcceptanceV1Schema, HostedWitnessStatementV1Schema, type HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
+import { strictDecode, canonicalHybridV1, join, utf8, equal, keyId, reject, width, verifySignature } from "./_hybrid-codec.js";
 import { mintRootAttachmentSigningDigest } from "./owner-certificates.js";
-import { requirePolicyHistory, verifyWitnessPayload, type WitnessPayload } from "./import-authority.js";
+import { signedNativeDigest, requirePolicyHistory, verifyWitnessPayload, type WitnessPayload } from "./import-authority.js";
 import { verifyNativeGenesisPayload } from "./native-witness.js";
 import { NativeGenesisWitnessV1Schema, type NativeGenesisWitnessV1 } from "./native_witness_pb.js";
-import { ImportGenesisWitnessV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type HostedLandingWitnessV1, type ImportAuthorityWitnessV1 } from "./import_authority_pb.js";
+import { ImportGenesisWitnessV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportBoundaryAcceptanceV1, type ImportIdentityV1, type HostedLandingWitnessV1, type ImportAuthorityWitnessV1 } from "./import_authority_pb.js";
+import { decode, type Value } from "./_collaboration-msgpack.js";
 import type { RecordSignature } from "./common_pb.js";
 
 export function decodeWriterAuthority(envelope:Uint8Array):ThreadControlAuthority {
@@ -26,16 +28,53 @@ export function checkWriterKeys(a:ThreadControlAuthority,publisherKeyId:Uint8Arr
   width(publisherKeyId,32);width(a.mintRootPublicKey,32);
   if(revokedKeyIds.some(id=>equal(id,publisherKeyId)||equal(id,keyId(a.mintRootPublicKey))))reject("Revoked");
 }
-/** Reference checks only: caller authenticates the selected policy and Spool history. */
-export function checkWitnessWriter(s:HostedWitnessStatementV1,envelope:Uint8Array,histories:OwnerHistory[],policies:SignedSpoolPolicyRecord[],spoolAccount:Uint8Array,coSigners:readonly RecordSignature[]=[]):void {
+/** Reference checks only: caller authenticates the selected policy, Spool history,
+ * original payload and acceptance signatures before admission. */
+export function checkWitnessWriter(s:HostedWitnessStatementV1,envelope:Uint8Array,histories:OwnerHistory[],policies:SignedSpoolPolicyRecord[],spoolAccount:Uint8Array,coSigners:readonly RecordSignature[]=[],boundary?:ImportBoundaryAcceptanceV1):void {
   validateOwnerHistories(histories);
   requirePolicyHistory(policies,s.spoolUuid,s.policySequence,s.policyStateHash);
   const revoked=policies.find(p=>p.body&&equal(p.body.spoolUuid,s.spoolUuid)&&p.body.sequence===s.policySequence&&equal(p.body.policyStateHash,s.policyStateHash))?.body?.policy?.revokedKeyIds??[];
+  if(s.basis===2){
+    // Preserve original provenance bindings; only the signed acceptor is cut.
+    // P1 retains its existing genesis provenance verifier (import: delegated).
+    if(s.purpose!==1){const original=decodeWriterAuthority(envelope);verifyWriterAccountBinding(original,original.owner?.root?.root?.accountUuid??reject("Root"),spoolAccount,s.ownerId);}
+    const e=boundary??reject("BoundaryAcceptance"),binding=e.binding??reject("BoundaryAcceptance"),selected=s.boundaryAcceptance??reject("BoundaryAcceptance");
+    if(!equal(canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,binding),canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,selected)))reject("BoundaryAcceptance");
+    const signed=e.signedAcceptance??reject("BoundaryAcceptance");
+    if(signed.format!=="heddle-original-boundary-acceptance-v1")reject("Version");
+    if(!signed.canonicalRecord.length||signed.canonicalRecord.length>65536)reject("Bounds");
+    if(!equal(acceptingId(signed.format,signed.canonicalRecord),binding.acceptanceId)||!equal(signedNativeDigest(signed),binding.signedAcceptanceDigest))reject("BoundaryAcceptance");
+    const acceptance=acceptingSelectors(signed.canonicalRecord),publisher=acceptingOctets(acceptance.accepting_publisher,32);
+    if(signed.signatures.length!==1||!equal(signed.signatures[0]!.publicKey,publisher))reject("Signature");
+    const author=acceptingMap(acceptance.accepting_author),actor=acceptingMap(author.actor);
+    if(author.kind!=="account"||!equal(acceptingOctets(author.spool,16),s.spoolUuid))reject("Scope");
+    const authority=acceptingOctets(author.authority),digest=acceptingOctets(author.authority_digest,32);
+    if(!equal(acceptingId("heddle-thread-control-authority-v1",authority),digest))reject("GenesisBinding");
+    const current=decodeWriterAuthority(authority);
+    verifyWriterAccountBinding(current,acceptingOctets(actor.principal_id,16),spoolAccount,s.ownerId);
+    checkWriterKeys(current,keyId(publisher),revoked);return;
+  }
   if(revoked.some(id=>equal(id,s.publisherKeyId))||coSigners.some(s=>revoked.some(id=>equal(id,keyId(s.publicKey)))))reject("Revoked");
   if(!envelope.length){if(s.purpose!==1)reject("Bounds");return;}
   const a=decodeWriterAuthority(envelope);
   verifyWriterAccountBinding(a,a.owner?.root?.root?.accountUuid??reject("Root"),spoolAccount,s.ownerId);
   checkWriterKeys(a,s.publisherKeyId,revoked);
+}
+
+function acceptingId(format:string,bytes:Uint8Array):Uint8Array {
+  const n=new Uint8Array(8);new DataView(n.buffer).setBigUint64(0,BigInt(bytes.length),true);
+  return blake3(join(utf8.encode(format),n,Uint8Array.of(0),bytes));
+}
+function acceptingSelectors(bytes:Uint8Array):{[key:string]:Value} {
+  try{return acceptingMap(decode(bytes));}catch{reject("Canonical");}
+}
+function acceptingMap(v:Value|undefined):{[key:string]:Value} {
+  if(!v||typeof v!=="object"||Array.isArray(v)||v instanceof Uint8Array)reject("Canonical");return v;
+}
+function acceptingOctets(v:Value|undefined,n?:number):Uint8Array {
+  if(v instanceof Uint8Array){if(n!==undefined)width(v,n);return v;}
+  if(!Array.isArray(v)||v.some(b=>typeof b!=="number"||!Number.isInteger(b)||b<0||b>255))reject("Canonical");
+  const bytes=Uint8Array.from(v as number[]);if(n!==undefined)width(bytes,n);return bytes;
 }
 
 export function validateOwnerHistories(histories:readonly OwnerHistory[]):void {

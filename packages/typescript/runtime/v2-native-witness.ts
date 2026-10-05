@@ -4,7 +4,7 @@ import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./native_witness_pb.js";
 import { ForeignDependencyOrigin, ImportIdentityV1Schema, ImportOwnerChainV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type ImportPublicProofBundleV1 } from "./import_authority_pb.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
-import type { HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
+import { HostedWitnessBoundaryAcceptanceV1Schema, type HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
 import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, reject, HybridContractError, verifySignature, join } from "./_hybrid-codec.js";
 import { decodeWriterAuthority, verifyWriterAccountBinding, checkWitnessWriter, validateOwnerHistories, spoolAccountForStatement } from "./writer-authority.js";
 import { threadGenesisId, type ThreadGenesisSigner } from "./thread-genesis.js";
@@ -152,8 +152,8 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
     const s=signed.body??reject("Canonical");
     if(!equal(s.spoolUuid,owner.spoolUuid)||!equal(s.spoolGenesisDigest,chain.spoolGenesisDigest)||!b.ownerHistories.some(h=>equal(h.stateHash,s.ownerStateHash)&&h.root?.root&&equal(h.root.root.ownerId,s.ownerId)))reject("Scope");
     requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);
-    if(s.purpose===1){const p=b.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyNativeGenesisPayload(s,p);checkWitnessWriter(s,p.creatorAuthorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers));}
-    else if(s.purpose===2){const p=b.authorityWitnesses.find(p=>equal(canonicalHybridV1(ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"authority",payload:p});checkWitnessWriter(s,p.authorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers),p.kind===2||p.kind===3?p.original?.signatures:[]);}
+    if(s.purpose===1){const p=b.genesisWitnesses.find(p=>equal(canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyNativeGenesisPayload(s,p);checkWitnessWriter(s,p.creatorAuthorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers),[],p.boundaryAcceptance);}
+    else if(s.purpose===2){const p=b.authorityWitnesses.find(p=>equal(canonicalHybridV1(ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"authority",payload:p});checkWitnessWriter(s,p.authorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers),p.kind===2||p.kind===3?p.original?.signatures:[],p.boundaryAcceptances.find(e=>s.boundaryAcceptance&&e.binding&&equal(canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,e.binding),canonicalHybridV1(HostedWitnessBoundaryAcceptanceV1Schema,s.boundaryAcceptance))));}
     else if(s.purpose===4){const p=b.landingWitnesses.find(p=>equal(canonicalHybridV1(HostedLandingWitnessV1Schema,p),s.canonicalPayload))??reject("Scope");await verifyWitnessPayload(s,{kind:"landing",payload:p});checkWitnessWriter(s,p.authorityEnvelope,b.ownerHistories,b.policies,spoolAccountForStatement(s,b.genesisWitnesses.flatMap(p=>p.binding?.body?.identity?[p.binding.body.identity]:[]),b.ownershipTransfers));}
     else reject("Version");
   }

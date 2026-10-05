@@ -1853,7 +1853,7 @@ enum NativeBoundarySubject {
     OwnershipClaim([u8; 32]),
     OwnershipResolution([u8; 32]),
 }
-fn native_octets_id(format: &str, bytes: &[u8]) -> Vec<u8> {
+pub(crate) fn native_octets_id(format: &str, bytes: &[u8]) -> Vec<u8> {
     let mut h = blake3::Hasher::new();
     h.update(format.as_bytes());
     h.update(&(bytes.len() as u64).to_le_bytes());
@@ -2403,6 +2403,15 @@ fn validate_bundle_history(
             &s.policy_state_hash,
         )?;
         let envelope = match s.purpose {
+            1 if s.basis == 2 => Some(
+                bundle
+                    .genesis_witnesses
+                    .iter()
+                    .find(|p| canonical(*p).is_ok_and(|v| v == s.canonical_payload))
+                    .ok_or(Reject::Scope)?
+                    .creator_authority_envelope
+                    .as_slice(),
+            ),
             2 => Some(
                 bundle
                     .authority_witnesses
@@ -2453,6 +2462,23 @@ fn validate_bundle_history(
                     .and_then(|p| p.original.as_ref())
                     .map(|r| r.signatures.as_slice())
                     .unwrap_or(&[]),
+                if s.purpose == 1 {
+                    bundle
+                        .genesis_witnesses
+                        .iter()
+                        .find(|p| canonical(*p).is_ok_and(|v| v == s.canonical_payload))
+                        .and_then(|p| p.boundary_acceptance.as_ref())
+                } else {
+                    bundle
+                        .authority_witnesses
+                        .iter()
+                        .find(|p| canonical(*p).is_ok_and(|v| v == s.canonical_payload))
+                        .and_then(|p| {
+                            p.boundary_acceptances
+                                .iter()
+                                .find(|e| e.binding == s.boundary_acceptance)
+                        })
+                },
             )?;
         }
     }

@@ -178,6 +178,7 @@ fn retry(f: &Fixture, change: &Value) -> Result<(), a::Reject> {
         original: &original,
         retry_lineage_id: &lineage,
         logical_job_terminal: change["terminal"].as_bool().unwrap_or(false),
+        original_admitted: true,
         now_unix_seconds: change["now"].as_i64().unwrap_or(1100),
     };
     a::check_retry_admission(&request, &context, &f.active(&read), &c)
@@ -229,6 +230,7 @@ fn co_writer_control_and_custody_vectors() {
                         original: &original,
                         retry_lineage_id: &state.retry_lineage_id,
                         logical_job_terminal: false,
+                        original_admitted: true,
                         now_unix_seconds: 1100,
                     },
                     &f.active(&read),
@@ -293,6 +295,7 @@ fn writer_retry_disclosure_reject_then_pass_vectors() {
                     original: &original,
                     retry_lineage_id: &read.state.as_ref().expect("state").retry_lineage_id,
                     logical_job_terminal: false,
+                    original_admitted: true,
                     now_unix_seconds: 1100
                 },
                 &f.active(&read),
@@ -448,6 +451,7 @@ fn authority_only_renew_then_explicit_retry_uses_new_id_and_active_fence() {
             original: &original,
             retry_lineage_id: &read.state.as_ref().expect("state").retry_lineage_id,
             logical_job_terminal: false,
+            original_admitted: true,
             now_unix_seconds: 1250,
         },
         &f.active(&read),
@@ -479,4 +483,38 @@ fn retry_target_is_additive_and_typed() {
         response.get_field(5).expect("unavailability").name(),
         "retry_unavailable"
     );
+}
+#[test]
+fn review_fix_retry_original_window_reject_then_pass() {
+    let f = Fixture::load();
+    let read: api::GetImportJobStateResponse = f.record("control_renewed_state");
+    let original = f.record("control_original");
+    let request = f.record("control_retry_renewed");
+    let context = a::ImportRetryAdmission {
+        read: &read,
+        original: &original,
+        retry_lineage_id: &read.state.as_ref().expect("state").retry_lineage_id,
+        logical_job_terminal: false,
+        original_admitted: false,
+        now_unix_seconds: 1300,
+    };
+    assert_eq!(
+        a::check_retry_admission(
+            &request,
+            &context,
+            &f.active(&read),
+            &caller(&read, "owner")
+        ),
+        Err(a::Reject::OriginalWindowEnded)
+    );
+    a::check_retry_admission(
+        &request,
+        &a::ImportRetryAdmission {
+            original_admitted: true,
+            ..context
+        },
+        &f.active(&read),
+        &caller(&read, "owner"),
+    )
+    .expect("admitted control");
 }

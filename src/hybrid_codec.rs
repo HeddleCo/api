@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum Reject {
+    #[error("original admission window ended")]
+    OriginalWindowEnded,
     #[error("unsupported format")]
     Version,
     #[error("noncanonical or missing field")]

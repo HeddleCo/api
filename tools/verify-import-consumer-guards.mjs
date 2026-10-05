@@ -6,9 +6,9 @@ const directory=process.argv[2]??'/tmp/api352-consumer-guards';mkdirSync(directo
 const cases=[
  ['caller_owner','alpha32 caller availability connected_co_writer','retained.connection && caller.connectionOwnerAccount !== caller.callerAccount ? R.NOT_CONNECTION_OWNER','false ? R.NOT_CONNECTION_OWNER'],
  ['required_controls','alpha32 controls REJECT then PASS','validateImportRetryStateResponse(request, response);\n    const controls =','validateImportRetryStateResponse(request, response); return;\n    const controls ='],
- ['recovery_noop','alpha32 recovery snapshot same_set','if (witnessed || newSet)','if (true)'],
- ['recovery_history','alpha32 recovery snapshot new_set','acceptedHistory: witnessed ? history : snapshot?.acceptedHistory ?? []','acceptedHistory: history'],
- ['receipt_times','alpha32 selected owner times','nowUnixSeconds: times[i]?.time ?? 0n','nowUnixSeconds: 900n'],
+ ['recovery_noop','alpha32 recovery snapshot same_set','if (witnessedPrefix > 0 || newSet)','if (true)'],
+ ['recovery_history','alpha32 recovery snapshot new_set','acceptedHistory: witnessedPrefix > 0 ? history : snapshot?.acceptedHistory ?? []','acceptedHistory: history'],
+ ['receipt_times','alpha32 selected owner times','owner = await resolveOwner(i, times[i]?.time)','owner = await resolveOwner(i, 900n)'],
 ];
 const run=(name,stage,pattern)=>{const r=spawnSync('node',['--test','--test-name-pattern='+pattern,'tests/v2-import-consumer.test.mjs'],{encoding:'utf8'});writeFileSync(`${directory}/${name}-${stage}.log`,r.stdout+r.stderr);return r.status;};
 try {

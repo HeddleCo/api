@@ -424,8 +424,13 @@ byte authorization limit. Branches/operations cannot exceed 256. The advertised
 byte maximum is an operator-configurable positive u64 and may be very large;
 it is the only admission ceiling on a job total. Prepare and Commit MUST refuse
 a total above the CURRENT advertised maximum, including when that maximum
-was lowered after Prepare. Historical signed authority and durable consumption
-are never enlarged or reset by a configuration change.
+was lowered after Prepare, for an initial activation. Once activated, a job's
+signed total retains the byte maximum in effect at its original Prepare; renewal
+preparation and activation MUST NOT apply a later host byte maximum. Renewal
+still narrows against the authenticated predecessor remainder. Changes to the
+advertised byte maximum MUST NOT advance `destination_version`; other effective
+configuration, owner and policy changes still do. Historical signed authority
+and durable consumption are never enlarged or reset by a configuration change.
 `ImportBudgetLimitsV1.max_branch_result_bytes` (tag 4) is removed/reserved. The caller chooses
 **every** scope field: provider/URL, exact ordered branches and ref disclosure,
 converter/options, stable slot IDs, the total byte limit and operation count, targets and
@@ -469,7 +474,7 @@ most 2 MiB. Existing size bounds still apply even below 256 branches.
 
 **Sibling jobs MAY be Prepared, Committed and executed concurrently.**
 `destination_version` MUST fence the destination's effective configuration,
-ownership and policy: converter/options/provider support and limits, accepted
+ownership and policy: converter/options/provider support and branch/operation limits, accepted
 owner state/transfer, and effective destination authorization/policy changes.
 The host MUST advance this opaque token whenever those facts change, and MUST
 read/compare it in the Prepare/activation transaction. Imports alone, including
@@ -498,7 +503,11 @@ canceled or expired physical attempts that can still Renew/Retry. Keep the
 original job's entire ref selection reserved through partial publication and
 scope narrowing. A physical-attempt terminal state is not logical termination.
 Commit MUST compare the current token and prove that its unexpired reservation
-still owns every exact ref/slot before activation, in one transaction. Renewal
+still owns every exact ref/slot before activation, in one transaction. The
+reservation helper's mandatory `activation=true` checks ownership; Prepare uses
+`activation=false`. An empty inventory cannot authorize Commit. Full refs,
+`target_thread_id` and `genesis_digest` MUST each be unique within a job and
+exclusive across jobs in the same spool, even when refs differ. Renewal
 keeps those identities and cannot reserve a different branch under the same job.
 Exact stored request replay is resolved first and reserves/activates nothing again.
 
@@ -515,7 +524,8 @@ reason with `field = "proposed_scope.branches.slot_id"`. These conflicts MUST
 NOT silently merge, allocate replacement slots or consume budget. No other
 job's identity or hidden details are disclosed.
 
-Release active reservations atomically only on definitive logical completion,
+Release active reservations atomically on `ORIGINAL_WINDOW_ENDED` without native
+admission, or on definitive logical completion,
 cancellation, revocation or expiry of an uncommitted Prepare, after fencing any
 in-flight activation/work. Retain durable receipts, manifests and replay history.
 Admitted authority expiry alone does not release recoverable job reservations.
@@ -1655,9 +1665,8 @@ in place. No v2 encoding or compatibility path is introduced.
 `verify_import_bundle_witnesses` / `verifyImportBundleWitnesses` accept the retained
 `ImportPublicProofBundleV1`, an independently installed descriptor pin (authority,
 root ID, public key, epoch), the receiver's durable snapshot, actual verification
-clock, independently verified historical owner facts in delegation order (without
-caller-supplied times), and
-a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
+clock, a mandatory resolver for effective owner facts at internally selected
+authenticated times, and a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
 its response/retained closure, independently verify owner histories and original
 native authority/causal/landing context with heddle, then call this composition
 before reviewing or computing remaining scope. The hook receives each exact
@@ -1674,15 +1683,29 @@ For each delegation with publications, the verifier MUST derive its owner-check
 time internally as floor(observed_at_unix_millis / 1000) of its first
 authenticated publication in accepted admission order. For the initial delegation
 with admissions but no publication, it MUST use its earliest authenticated
-genesis admission. `ImportBundleOwnerExpectation` has the independently verified
-owner facts in delegation order and **no caller-supplied time**. The verifier
-returns `owner_check_times_unix_seconds` (Rust) / `ownerCheckTimesUnixSeconds`
-(TS), with `None` / `undefined` for each unwitnessed delegation. Consumers MUST
-NOT reimplement this selection rule. Neither receiver time nor a signed author's
-timestamp selects historical owner state. Each genesis admission and publication is additionally rechecked at
-its own authenticated observation. The policy hook MUST independently select and
-verify the effective owner/native/policy context for every statement at that
-observation, including when different events fall across an owner transition.
+genesis admission. The mandatory `owner_at(delegation_index, Option<i64>)`
+(Rust) / `ownerAt(delegationIndex, bigint | undefined)` (TS) resolver receives
+that authenticated time and MUST return the independently verified EFFECTIVE
+owner identity, key, chain digest and authority expiry at that time. It is called
+again for each purpose-1/3 statement's own observation. Facts MUST include their
+half-open effective interval (`effective_from_unix_seconds`,
+`effective_until_unix_seconds` / `effectiveFromUnixSeconds`,
+`effectiveUntilUnixSeconds`); an absent end means unbounded. The verifier refuses
+`Scope` if the selected time falls outside it. A claim accepted after an earlier
+deferred observation cannot substitute current unbounded owner facts for the
+then-effective deferred deadline. Neither the resolver nor policy hook has a
+default. The removed `From<ImportOwnerExpectation>` conversion must be replaced
+by explicit historical resolution. `None` / `undefined` requests time-free
+recovery closure and asserts no admission. The resolver MUST NOT authenticate
+owner history from unverified input claims.
+
+The verifier returns `owner_check_times_unix_seconds` (Rust) /
+`ownerCheckTimesUnixSeconds` (TS), with absent times for unwitnessed delegations.
+Consumers MUST NOT reimplement receipt-time selection; they MUST implement
+owner-state resolution for the selected time using independently verified owner
+history. Neither receiver time nor a signed author's timestamp selects historical
+owner state. The policy hook still verifies native/policy context at each
+statement's observation, including across owner transitions.
 Every statement's Spool UUID, Spool genesis digest, owner ID, owner state hash and
 ownership-transfer sequence MUST match a verified delegation identity. Initial
 genesis bindings MUST match the original delegation, creator, parent permission,
@@ -1719,7 +1742,7 @@ valid earlier signature neither substitutes for the creator nor causes rejection
 The returned snapshot MAY be persisted atomically under the receiver's
 trust/mutation lock, including for a zero-admission recovery read. Its witness-set
 high-water mark, root pin and clock floor MUST advance ONLY from a set actually
-authenticated under the independently installed pin. If Recovery authenticates
+authenticated under the independently installed pin. If Recovery has no witnessed prefix and authenticates
 **no new set** (no carried set, or the same exact set and pin as the input), the
 verifier MUST return the input snapshot unchanged and `snapshot_advanced=false` /
 `snapshotAdvanced=false`. With no input snapshot this returns `None` / `undefined`:
@@ -1730,11 +1753,13 @@ an invalid set MUST NOT silently fall back to recovery.
 
 A new authenticated set MAY advance the set high-water mark and clock floor even
 when `evidence=Recovery`, with `snapshot_advanced=true` / `snapshotAdvanced=true`.
-Recovery preserves the input accepted history and job-key associations; it MUST
-NOT persist unwitnessed certificates or an activation tail as authenticated
-history. This implementation conservatively persists incoming job history and
-new job-key associations only when every delegation is witnessed. Existing
-history rollback checks still apply. `accepted_history` / `acceptedHistory` in
+Recovery preserves the input accepted history and job-key associations and MUST
+also persist any newly authenticated contiguous delegation prefix, with its
+statements, operations and key associations. Truncate unwitnessed delegations
+and their renewal tail before persistence. A fresh receiver accepting a witnessed
+prefix with an unwitnessed renewal tail MUST reject a later view that discards
+that prefix with `HighWater`. Purely unwitnessed recovery adds no admitted
+history. Existing history rollback checks apply regardless of the evidence kind. `accepted_history` / `acceptedHistory` in
 the result is the verified read's CAS state for review, independent of the durable
 snapshot's admitted history. Witnessed reads may extend authenticated history
 under an unchanged set. The boolean reports actual snapshot change, including
@@ -1831,7 +1856,7 @@ contains one canonical non-nil physical UUID, the exact destination and a
 attempt selected from the durable job/lineage association, read transactionally
 with state, retained proof and retained source. The existing 2 MiB response
 bound includes it. Reasons distinguish no terminal attempt, attempt in progress,
-complete job, logical-job cancellation, logical-job revocation an already
+complete job, logical-job cancellation, logical-job revocation, an already
 superseded target and an original window that ended without native admission. Authority expiry or lack of source custody alone does not
 hide an otherwise eligible physical target: Renew/custody checks still gate
 admission. If the durable association cannot be read, refuse UNAVAILABLE after
@@ -1847,7 +1872,8 @@ CAS, active certificate digest/epoch and current authorization. A stale target
 or concurrent replacement refuses; a target alone grants no execution authority.
 
 Every successful current writer-only state read MUST also include
-`control_availability = 6` (`controlAvailability` in TS), containing required
+`control_availability = 6` (`controlAvailability` in TS), computed from cached
+or derived host state without per-read provider API calls, containing required
 `retry`, `renew` and `cancel` `ImportControlAvailabilityV1` values. Each has exactly
 one `available=true` or `unavailable=ImportControlUnavailableReason`; false,
 missing, unspecified or unknown values reject `Canonical`. The host MUST compute
@@ -1910,3 +1936,39 @@ hosts MUST populate the new disclosure on current successful reads.
 and Commit size helpers validate the portable receipt/size requirements. Hosts
 own the authorization lookup, transaction, allocation, credential binding and
 worker fences; API helpers are not a storage or execution implementation.
+
+
+### alpha.32 review fixes: publication and control transaction gates
+
+Every publication MUST refuse when the SUM of newly committed result bytes
+would exceed the signed logical-job total, across operations and delegations.
+`check_import_publication_budget` / `checkImportPublicationBudget` verifies the
+operation, validates the complete cumulative receiver-owned pre-operation
+manifest, handles exact replay, and compares the new bytes and operation count
+with `remaining_import_scope` / `remainingImportScope`. It runs under the same
+lock/transaction as manifest installation, unique-slot insertion and frontier
+CAS. Hosts MUST retain the original manifest/budgets and activate only renewals
+narrowed to the predecessor remainder. An empty or partial invented manifest
+cannot replace host-durable consumption. `verify_new_operation` /
+`verifyNewImportOperation` now requires that manifest. `verify_publication` /
+`verifyImportPublication` reconstructs the pre-operation view from its exact
+post-operation manifest and performs the same check. Bundle composition performs
+both publication checks and cumulative original/certificate/permission accounting.
+An arithmetic u64 overflow refuses `Bounds` in both languages; a representable
+budget excess refuses `Scope` (renewal subtraction excess remains `RenewalFork`).
+
+Retry admission, renewal request validation/activation, and retained-source
+renewal Prepare MUST use independently retained `original_admitted` facts and
+the current host time, and MUST refuse `OriginalWindowEnded` if no original
+native admission occurred before the original certificate's exclusive expiry.
+Exact stored replay is resolved before these gates. Under the inventory lock,
+hosts MUST call `release_ended_import_reservations` /
+`releaseEndedImportReservations` and durably release that job's refs/threads/
+geneses before preparing a new logical job. Keep other jobs' reservations and
+all old replay/accounting records. Already admitted originals retain recoverable
+reservations through authority expiry.
+
+`control_availability` MUST be computed from host state, without per-read
+provider API calls. Cache or derive grant/custody and selected-commit facts;
+refresh separately as needed. The disclosure remains advisory: Retry/Renew
+admission independently rechecks current source access and commit availability.

@@ -1,7 +1,7 @@
 import { fromBinary, toBinary, ScalarType, type DescMessage, type Message, type MessageShape } from "@bufbuild/protobuf";
 import { sha256 } from "@noble/hashes/sha2.js";
 
-export type RejectReason = "Version" | "Canonical" | "Bounds" | "Signature" | "Root" | "Semantic" | "HighWater" | "Transition" | "JobAsWitness" | "KeyRole" | "Expired" | "Scope" | "ImportPermission" | "RenewalFork" | "StaleManifest" | "CommittedSlot" | "StaleContext" | "Proof" | "Revoked" | "SlotConflict" | "Protocol" | "BoundaryAcceptance" | "PreparedFields" | "ValidityBounds" | "GenesisBinding" | "PreparationRefused" | "RefDisclosure" | "RefPinning" | "SourceSelection" | "ImportSourceRequiresCommit" | "OperationIdReused" | "PendingOperation";
+export type RejectReason = "OriginalWindowEnded" | "Version" | "Canonical" | "Bounds" | "Signature" | "Root" | "Semantic" | "HighWater" | "Transition" | "JobAsWitness" | "KeyRole" | "Expired" | "Scope" | "ImportPermission" | "RenewalFork" | "StaleManifest" | "CommittedSlot" | "StaleContext" | "Proof" | "Revoked" | "SlotConflict" | "Protocol" | "BoundaryAcceptance" | "PreparedFields" | "ValidityBounds" | "GenesisBinding" | "PreparationRefused" | "RefDisclosure" | "RefPinning" | "SourceSelection" | "ImportSourceRequiresCommit" | "OperationIdReused" | "PendingOperation";
 export class HybridContractError extends Error { constructor(readonly reason: RejectReason, readonly preparationRefusalReason?: number) { super(reason); } }
 export function reject(reason: RejectReason): never { throw new HybridContractError(reason); }
 export function equal(a: Uint8Array, b: Uint8Array): boolean { return a.length === b.length && a.every((v,i) => v === b[i]); }

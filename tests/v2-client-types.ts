@@ -32,17 +32,18 @@ const platformStream: AsyncIterable<PlatformAuthorizationResponse> = platform.au
 void platformStream;
 
 import { verifyNewImportOperation, preflightPreparedImportDelegation, type VerifiedImportRenewalPredecessor, type VerifiedImportDelegation } from "../packages/typescript/dist/v1alpha2/import-authority.js";
-import type { SignedDelegatedImportOperationV1 } from "../packages/typescript/dist/v1alpha2/import_authority_pb.js";
+import type { ImportResultManifestV1, ImportPublicProofBundleV1, SignedDelegatedImportOperationV1 } from "../packages/typescript/dist/v1alpha2/import_authority_pb.js";
 declare const recoveredPredecessor: VerifiedImportRenewalPredecessor;
 declare const importOperation: SignedDelegatedImportOperationV1;
+declare const committedBefore: ImportResultManifestV1;
 // @ts-expect-error Recovery evidence cannot authorize execution.
-verifyNewImportOperation(importOperation, recoveredPredecessor, 1350n);
+verifyNewImportOperation(importOperation, recoveredPredecessor, 1350n, committedBefore);
 declare const preflightResult: Awaited<ReturnType<typeof preflightPreparedImportDelegation>>;
 // @ts-expect-error Signing preflight returns void, never execution authority.
 const executablePreflight: VerifiedImportDelegation = preflightResult;
 void executablePreflight;
 
-import { type ImportBundleOwnerExpectation, type VerifiedImportBundleWitnesses } from "../packages/typescript/dist/v1alpha2/import-authority.js";
+import { verifyImportBundleWitnesses, type ImportWitnessRootPin, type ImportBundleOwnerExpectation, type VerifiedImportBundleWitnesses } from "../packages/typescript/dist/v1alpha2/import-authority.js";
 declare const bundleOwnerFacts: ImportBundleOwnerExpectation;
 // @ts-expect-error Historical times are internally derived from authenticated receipts.
 const callerTimedOwner: ImportBundleOwnerExpectation = { ...bundleOwnerFacts, nowUnixSeconds: 1100n };
@@ -50,3 +51,15 @@ declare const verifiedBundle: VerifiedImportBundleWitnesses;
 // @ts-expect-error A recovery with no input or carried set has no durable snapshot.
 const assumedSnapshot: import("../packages/typescript/dist/v1alpha2/import-authority.js").ImportWitnessSnapshot = verifiedBundle.snapshot;
 void callerTimedOwner; void assumedSnapshot;
+
+declare const importBundle: ImportPublicProofBundleV1;
+declare const witnessPin: ImportWitnessRootPin;
+verifyImportBundleWitnesses(importBundle, witnessPin, undefined, 1350000n,
+  (_index, _authenticatedTime) => bundleOwnerFacts, () => {});
+// @ts-expect-error Caller owner lists cannot replace historical resolution.
+verifyImportBundleWitnesses(importBundle, witnessPin, undefined, 1350000n, [bundleOwnerFacts], () => {});
+// @ts-expect-error The effective owner resolver has no default.
+verifyImportBundleWitnesses(importBundle, witnessPin, undefined, 1350000n, () => {});
+declare const activeImport: VerifiedImportDelegation;
+// @ts-expect-error Publication admission requires a cumulative pre-operation manifest.
+verifyNewImportOperation(importOperation, activeImport, 1350n);

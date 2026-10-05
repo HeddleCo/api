@@ -726,8 +726,13 @@ fn complete_owner_member_job_operation_publication_chain_and_direct_owner_contro
             &codec::hash(&[&bytes(&original["envelope_hex"])]),
         )
         .expect("exact genesis/envelope binding");
-        import::verify_new_operation(&record(&f, &format!("operation_{name}")), &d, 1100)
-            .expect("job-signed scoped operation");
+        import::verify_new_operation(
+            &record(&f, &format!("operation_{name}")),
+            &d,
+            1100,
+            &empty_for(&d),
+        )
+        .expect("job-signed scoped operation");
     }
     let set = witness::verify_set(&record(&f, "current_set"), &c.set(1_100_000), None)
         .expect("current witness");
@@ -749,7 +754,7 @@ fn complete_owner_member_job_operation_publication_chain_and_direct_owner_contro
     )
     .expect("exact committed history after expiry");
     assert_eq!(
-        import::verify_new_operation(&operation, &d, 1350),
+        import::verify_new_operation(&operation, &d, 1350, &empty_for(&d)),
         Err(codec::Reject::Expired)
     );
 }
@@ -802,6 +807,7 @@ fn negative_vectors_isolate_their_named_gate() {
                 &codec::strict_decode(&wire, import::MAX_RECORD_BYTES).expect("operation"),
                 &d,
                 v["now_seconds"].as_i64().expect("now"),
+                &empty_for(&d),
             ),
             "renewal" => {
                 let member: api::SignedImportMemberPermissionV1 =
@@ -865,10 +871,13 @@ fn negative_vectors_isolate_their_named_gate() {
             }
             "operation" => import::verify_operation(&record(&f, "operation_main"), &d)
                 .expect("passing operation"),
-            "new_operation" => {
-                import::verify_new_operation(&record(&f, "operation_main"), &d, 1299)
-                    .expect("otherwise valid before expiry")
-            }
+            "new_operation" => import::verify_new_operation(
+                &record(&f, "operation_main"),
+                &d,
+                1299,
+                &empty_for(&d),
+            )
+            .expect("otherwise valid before expiry"),
             "renewal" => {
                 import::verify_renewal(
                     &record(&f, "renewal"),
@@ -999,7 +1008,7 @@ fn concurrent_renewals_and_paused_old_worker_obey_retry_contract_fixture() {
             "publish_paused_worker" => {
                 let stale: api::SignedDelegatedImportOperationV1 =
                     record(&f, event["operation"].as_str().expect("paused operation"));
-                import::verify_new_operation(&stale, &old, 1250)
+                import::verify_new_operation(&stale, &old, 1250, &empty_for(&old))
                     .expect("otherwise time-valid old worker");
                 let stale = stale.body.as_ref().expect("paused body");
                 assert_eq!(
@@ -1033,6 +1042,7 @@ fn concurrent_renewals_and_paused_old_worker_obey_retry_contract_fixture() {
                     &operation,
                     next.as_ref().expect("activated renewal"),
                     1250,
+                    &empty_for(next.as_ref().expect("activated renewal")),
                 )
                 .expect("fresh key for remaining slot");
                 assert!(
@@ -1647,7 +1657,7 @@ fn preparation_wire_state_and_publication_wins_manifest_cas() {
     let renewal: api::SignedImportJobRenewalV1 = record(&f, "publication_wins_renewal");
     let old = delegation(&f, &c);
     let p: api::SignedImportMemberPermissionV1 = record(&f, "renewed_permission");
-    import::verify_new_operation(&record(&f, "operation_main"), &old, 1250)
+    import::verify_new_operation(&record(&f, "operation_main"), &old, 1250, &empty_for(&old))
         .expect("time-valid publication wins");
     import::verify_renewal(
         &renewal,
@@ -2062,10 +2072,10 @@ fn commit_future_operation_obeys_signed_start() {
     .expect("future commit within skew");
     let operation = record(&f, "commit_future_operation");
     assert_eq!(
-        import::verify_new_operation(&operation, &d, 1199),
+        import::verify_new_operation(&operation, &d, 1199, &empty_for(&d)),
         Err(codec::Reject::Expired)
     );
-    import::verify_new_operation(&operation, &d, 1200)
+    import::verify_new_operation(&operation, &d, 1200, &empty_for(&d))
         .expect("matching job-signed operation at signed start");
     println!("COMMIT FUTURE OPERATION: 1199 Expired; 1200 PASS");
 }
@@ -2442,7 +2452,7 @@ fn alpha24_renew_and_read_negatives_reject_then_pass() {
                 .creator_authority_envelopes = vec![vec![1; size as usize]];
         }
         let read = record(&f, v["read"].as_str().expect("read"));
-        let result = import::validate_renew_request(&request, &read, false);
+        let result = import::validate_renew_request(&request, &read, false, true, 1200);
         let actual = result
             .err()
             .map(|r| format!("{r:?}"))
@@ -2455,6 +2465,8 @@ fn alpha24_renew_and_read_negatives_reject_then_pass() {
             &record(&f, v["control"].as_str().expect("control")),
             &read,
             false,
+            true,
+            1200,
         )
         .expect("passing control");
     }
@@ -2552,9 +2564,15 @@ fn superseded_renewal_recovery_remains_settled_and_replays_stored_receipt() {
             read.state.as_ref().expect("CAS state").authority_epoch,
             epoch
         );
-        let verified =
-            import::verify_renew_submission(&request, &read, &c.owner(now), &c.owner(now), false)
-                .expect("accepted signed renewal");
+        let verified = import::verify_renew_submission(
+            &request,
+            &read,
+            &c.owner(now),
+            &c.owner(now),
+            false,
+            true,
+        )
+        .expect("accepted signed renewal");
         assert_eq!(
             verified.digest(),
             import::signed_delegation_digest(&record(
@@ -2634,7 +2652,7 @@ fn superseded_renewal_recovery_remains_settled_and_replays_stored_receipt() {
     ));
     assert_eq!(response.encode_to_vec(), stored_response);
     assert_eq!(
-        import::validate_renew_request(&r1, &read, false),
+        import::validate_renew_request(&r1, &read, false, true, 1200),
         Err(codec::Reject::StaleContext)
     );
     let expired = v["replay_now_seconds"].as_i64().expect("replay time");
@@ -2644,7 +2662,8 @@ fn superseded_renewal_recovery_remains_settled_and_replays_stored_receipt() {
             &record(&f, v["r1_read"].as_str().expect("old read")),
             &c.owner(expired),
             &c.owner(expired),
-            false
+            false,
+            true
         )
         .err(),
         Some(codec::Reject::Expired)
@@ -2664,7 +2683,7 @@ fn superseded_renewal_negatives_reject_then_pass() {
             record(&f, v["request"].as_str().expect("request"));
         let actual = if let Some(read_name) = v["read"].as_str() {
             let read = record(&f, read_name);
-            let reason = import::validate_renew_request(&request, &read, false)
+            let reason = import::validate_renew_request(&request, &read, false, true, 1200)
                 .expect_err("new candidate uses stale snapshot");
             assert_eq!(
                 import::verify_renew_submission(
@@ -2672,7 +2691,8 @@ fn superseded_renewal_negatives_reject_then_pass() {
                     &read,
                     &c.owner(now),
                     &c.owner(now),
-                    false
+                    false,
+                    true
                 )
                 .err(),
                 Some(reason)
@@ -2683,6 +2703,7 @@ fn superseded_renewal_negatives_reject_then_pass() {
                 &c.owner(now),
                 &c.owner(now),
                 false,
+                true,
             )
             .expect("same signed candidate passes against original snapshot");
             assert_ne!(request.client_operation_id, r1.client_operation_id);
@@ -2759,7 +2780,8 @@ fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
                     &read,
                     &current.owner(1350),
                     &current.owner(1350),
-                    false
+                    false,
+                    true
                 ),
                 Err(codec::Reject::Root)
             ));
@@ -2770,6 +2792,7 @@ fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
             &original.owner(1350),
             &current.owner(1350),
             false,
+            true,
         )
         .expect("historical predecessor and current replacement");
         assert_eq!(
@@ -2806,7 +2829,8 @@ fn alpha24_actual_renew_requests_separate_rotated_and_expired_contexts() {
                 &read,
                 &original.owner(1350),
                 &current.owner(1800),
-                false
+                false,
+                true
             ),
             Err(codec::Reject::Expired)
         ));
@@ -2968,6 +2992,11 @@ fn alpha25_prepare_source_negatives() {
                 None,
                 &record(&f, "import_configuration"),
                 &scope.destination_version,
+                Some(&import::ImportOriginalAdmission {
+                    original: &record(&f, "delegation"),
+                    admitted: true,
+                    now_unix_seconds: 1600,
+                }),
                 None,
             )
             .map(|_| ()),
@@ -2980,6 +3009,11 @@ fn alpha25_prepare_source_negatives() {
             None,
             &record(&f, "import_configuration"),
             &scope.destination_version,
+            Some(&import::ImportOriginalAdmission {
+                original: &record(&f, "delegation"),
+                admitted: true,
+                now_unix_seconds: 1600,
+            }),
             None,
         )
         .expect("control");
@@ -3130,6 +3164,11 @@ fn alpha25_public_selector_may_omit_repository_id() {
         None,
         &record(&f, "import_configuration"),
         &scope.destination_version,
+        Some(&import::ImportOriginalAdmission {
+            original: &record(&f, "delegation"),
+            admitted: true,
+            now_unix_seconds: 1600,
+        }),
         None,
     )
     .expect("public Prepare input may omit redundant ID");
@@ -3219,6 +3258,11 @@ fn alpha25_renewal_source_prepare_vectors() {
             Some("github"),
             &configuration,
             &record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version,
+            Some(&import::ImportOriginalAdmission {
+                original: &record(&f, "delegation"),
+                admitted: true,
+                now_unix_seconds: 1600,
+            }),
             retained,
         );
         if let Ok(prepared) = &result {
@@ -3300,6 +3344,11 @@ fn alpha27_retained_custody_recovery_and_grant_refusal_vectors() {
                 if revoked { None } else { Some("github") },
                 &record(&f, "import_configuration"),
                 &record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version,
+                Some(&import::ImportOriginalAdmission {
+                    original: &record(&f, "delegation"),
+                    admitted: true,
+                    now_unix_seconds: 1600,
+                }),
                 Some((
                     &predecessor,
                     state,
@@ -3374,12 +3423,13 @@ fn alpha31_verify_with_associations(
     let c = Context::new(f);
     let mut first = c.owner(1100);
     first.known_job_associations = associations;
+    let first = bundle_owner(first);
     import::verify_import_bundle_witnesses(
         &record(f, name),
         pin,
         snapshot,
         1_350_000,
-        &[first.into(), c.owner(1250).into()],
+        |i, _| Ok([first, bundle_owner(c.owner(1250))][i]),
         |b, s| {
             // Exact previously signature-verified policy input, as the WASM hook.
             if b.policies != vec![record(f, "signed_policy")] {
@@ -3565,7 +3615,7 @@ fn alpha31_policy_hook_rejects_then_passes() {
             &pin,
             None,
             1_350_000,
-            &[c.owner(1100).into(), c.owner(1200).into()],
+            |i, _| Ok([bundle_owner(c.owner(1100)), bundle_owner(c.owner(1200))][i]),
             |_, _| Err(codec::Reject::Signature)
         )
         .err(),
@@ -3689,7 +3739,7 @@ fn alpha31_stale_manifest_refusal_rejects_then_new_signature_passes() {
     let after: api::GetImportJobStateResponse =
         record(&f, v["fresh_read"].as_str().expect("S prime"));
     let fresh: api::RenewImportJobRequest = record(&f, v["fresh_request"].as_str().expect("fresh"));
-    import::verify_renew_submission(&old, &before, &c.owner(1200), &c.owner(1200), false)
+    import::verify_renew_submission(&old, &before, &c.owner(1200), &c.owner(1200), false, true)
         .expect("signature against S");
     assert_eq!(
         old.encode_to_vec(),
@@ -3731,13 +3781,20 @@ fn alpha31_stale_manifest_refusal_rejects_then_new_signature_passes() {
             "OperationIdReused"
         } else {
             assert_eq!(
-                import::validate_renew_request(&old, &after, false),
+                import::validate_renew_request(&old, &after, false, true, 1200),
                 Err(codec::Reject::StaleManifest)
             );
             "StaleManifest"
         };
-        import::verify_renew_submission(&fresh, &after, &c.owner(1200), &c.owner(1200), false)
-            .expect("re-read remaining scope and new signature");
+        import::verify_renew_submission(
+            &fresh,
+            &after,
+            &c.owner(1200),
+            &c.owner(1200),
+            false,
+            true,
+        )
+        .expect("re-read remaining scope and new signature");
         println!("alpha31 {}: {reason} -> control PASS", n["id"]);
     }
     assert_ne!(
@@ -3782,14 +3839,21 @@ fn review_verify_at(
     let owners = bundle
         .delegations
         .iter()
-        .map(|_| c.owner(0).into())
+        .map(|_| bundle_owner(c.owner(0)))
         .collect::<Vec<_>>();
-    import::verify_import_bundle_witnesses(&bundle, pin, snapshot, now_ms, &owners, |b, _| {
-        if b.policies != vec![record(f, "signed_policy")] {
-            return Err(codec::Reject::Signature);
-        }
-        Ok(())
-    })
+    import::verify_import_bundle_witnesses(
+        &bundle,
+        pin,
+        snapshot,
+        now_ms,
+        |i, _| Ok(owners[i]),
+        |b, _| {
+            if b.policies != vec![record(f, "signed_policy")] {
+                return Err(codec::Reject::Signature);
+            }
+            Ok(())
+        },
+    )
 }
 #[test]
 fn review_alpha31_signed_negatives_reject_then_pass() {
@@ -3848,7 +3912,7 @@ fn review_alpha31_zero_statements_require_policy_hook() {
             &pin,
             None,
             1_350_000,
-            &[c.owner(1100).into()],
+            |i, _| Ok([bundle_owner(c.owner(1100))][i]),
             |_, _| Err(codec::Reject::Signature)
         ),
         Err(codec::Reject::Signature)
@@ -3859,7 +3923,7 @@ fn review_alpha31_zero_statements_require_policy_hook() {
         &pin,
         None,
         1_350_000,
-        &[c.owner(1100).into()],
+        |i, _| Ok([bundle_owner(c.owner(1100))][i]),
         |_, _| {
             calls += 1;
             Ok(())
@@ -3947,10 +4011,11 @@ fn review_alpha31_scheduled_commit_defers_native_admission() {
     );
     let operation = record(&f, "commit_future_operation");
     assert_eq!(
-        import::verify_new_operation(&operation, &committed, 1199),
+        import::verify_new_operation(&operation, &committed, 1199, &empty_for(&committed)),
         Err(codec::Reject::Expired)
     );
-    import::verify_new_operation(&operation, &committed, 1200).expect("execution at N");
+    import::verify_new_operation(&operation, &committed, 1200, &empty_for(&committed))
+        .expect("execution at N");
     review_verify(
         &f,
         "review_scheduled_admitted",
@@ -3959,7 +4024,7 @@ fn review_alpha31_scheduled_commit_defers_native_admission() {
     )
     .expect("historical admission at receiver 1350");
     assert_eq!(
-        import::verify_new_operation(&operation, &committed, 1300),
+        import::verify_new_operation(&operation, &committed, 1300, &empty_for(&committed)),
         Err(codec::Reject::Expired)
     );
     let parent = record(&f, "permission");
@@ -4010,14 +4075,21 @@ fn review_alpha31_renew_after_cancel_refuses() {
     let request = record(&f, v["request"].as_str().expect("request"));
     let read = record(&f, v["read"].as_str().expect("read"));
     assert_eq!(
-        import::validate_renew_request(&request, &read, true),
+        import::validate_renew_request(&request, &read, true, true, 1200),
         Err(codec::Reject::Transition)
     );
     assert_eq!(
-        import::verify_renew_submission(&request, &read, &c.owner(1200), &c.owner(1200), true),
+        import::verify_renew_submission(
+            &request,
+            &read,
+            &c.owner(1200),
+            &c.owner(1200),
+            true,
+            true
+        ),
         Err(codec::Reject::Transition)
     );
-    import::verify_renew_submission(&request, &read, &c.owner(1200), &c.owner(1200), false)
+    import::verify_renew_submission(&request, &read, &c.owner(1200), &c.owner(1200), false, true)
         .expect("non-terminal control");
 }
 #[test]
@@ -4116,6 +4188,7 @@ fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
                     &operation,
                     &committed,
                     n["at"].as_i64().expect("time"),
+                    &empty_for(&committed),
                 )
             });
         let actual = result.map_or_else(|r| format!("{r:?}"), |_| "OK".into());
@@ -4124,7 +4197,8 @@ fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
             failures.push(format!("{}: {actual}", n["id"]));
         }
         import::check_import_revocations(signed, Some(&parent), &[]).expect("unrevoked control");
-        import::verify_new_operation(&operation, &committed, 1200).expect("N control");
+        import::verify_new_operation(&operation, &committed, 1200, &empty_for(&committed))
+            .expect("N control");
         assert!(
             recovery
                 .snapshot
@@ -4372,4 +4446,447 @@ fn alpha32_bundle_owner_time_comes_from_authenticated_receipts() {
         result.owner_check_times_unix_seconds,
         vec![Some(1100), Some(1250)]
     );
+}
+
+fn bundle_owner(
+    owner: import::ImportOwnerExpectation<'_>,
+) -> import::ImportBundleOwnerExpectation<'_> {
+    import::ImportBundleOwnerExpectation {
+        identity: owner.identity,
+        owner_public_key: owner.owner_public_key,
+        owner_chain_digest: owner.owner_chain_digest,
+        authority_expires_at_seconds: owner.authority_expires_at_seconds,
+        effective_from_unix_seconds: 0,
+        effective_until_unix_seconds: None,
+        forbidden_job_keys: owner.forbidden_job_keys,
+        known_job_associations: owner.known_job_associations,
+    }
+}
+fn empty_for(active: &import::VerifiedImportDelegation) -> api::ImportResultManifestV1 {
+    api::ImportResultManifestV1 {
+        format_version: 1,
+        logical_job_id: active.body().logical_job_id.clone(),
+        retry_lineage_id: active.body().retry_lineage_id.clone(),
+        slots: vec![],
+    }
+}
+
+fn review_fix_fixture() -> Value {
+    let mut f = fixture();
+    let additions: Value =
+        serde_json::from_str(include_str!("fixtures/import-review-fixes-alpha32.json"))
+            .expect("fix corpus");
+    for group in ["wire_vectors", "signed_vectors"] {
+        for (name, value) in additions[group].as_object().expect("vectors") {
+            f[group][name] = value.clone();
+        }
+    }
+    f
+}
+#[test]
+fn review_fix_publication_budget_reject_then_pass() {
+    let f = review_fix_fixture();
+    let c = Context::new(&f);
+    for (name, refuses) in [
+        ("publication_twice_total", true),
+        ("publication_exact_total", false),
+        ("narrowed_over", true),
+        ("narrowed_at", false),
+    ] {
+        let b: api::ImportPublicProofBundleV1 = record(&f, name);
+        let index = b.delegations.len() - 1;
+        let signed = &b.delegations[index];
+        let body = signed.body.as_ref().expect("body");
+        let d = import::verify_delegation(
+            signed,
+            import::resolve_bundle_permission(&b, &body.parent_permission_digest).expect("parent"),
+            &c.owner(1250),
+        )
+        .expect("active delegation");
+        let mut before = empty_for(&d);
+        for (i, operation) in b.operations.iter().enumerate() {
+            let expected = if refuses && i == 1 {
+                Err(codec::Reject::Scope)
+            } else {
+                Ok(())
+            };
+            assert_eq!(
+                import::check_import_publication_budget(operation, &d, &before),
+                expected,
+                "{name}:{i}"
+            );
+            assert_eq!(
+                import::verify_new_operation(operation, &d, 1250, &before),
+                expected,
+                "live:{name}:{i}"
+            );
+            if expected.is_err() {
+                break;
+            }
+            let digest = import::signed_operation_digest(operation).expect("digest");
+            before.slots.push(
+                b.terminal_manifest
+                    .as_ref()
+                    .expect("manifest")
+                    .slots
+                    .iter()
+                    .find(|s| s.signed_operation_digest == digest)
+                    .expect("slot")
+                    .clone(),
+            );
+            before
+                .slots
+                .sort_by(|a, b| (&a.ref_name, a.slot_id).cmp(&(&b.ref_name, b.slot_id)));
+            assert_eq!(
+                import::check_import_publication_budget(operation, &d, &before),
+                Ok(()),
+                "exact replay"
+            );
+        }
+        let set = witness::verify_set(
+            b.witness_set.as_ref().expect("set"),
+            &c.set(1_350_000),
+            None,
+        )
+        .expect("witness set");
+        let operation = b.operations.last().expect("last operation");
+        let statement = b
+            .statements
+            .iter()
+            .find(|s| {
+                s.body
+                    .as_ref()
+                    .is_some_and(|s| s.purpose == 3 && s.admission_order == 101)
+            })
+            .expect("second publication");
+        let publication = import::verify_publication(
+            operation,
+            &d,
+            b.terminal_manifest.as_ref().expect("terminal"),
+            statement,
+            &set,
+            None,
+            1_350_000,
+        );
+        if refuses {
+            assert_eq!(publication, Err(codec::Reject::Scope));
+        } else {
+            publication.expect("publication control");
+        }
+        let result = review_verify(&f, name, &alpha31_pin(&f, false), None);
+        if refuses {
+            assert_eq!(result, Err(codec::Reject::Scope), "bundle:{name}");
+        } else {
+            result.expect("exact total control");
+        }
+    }
+}
+#[test]
+fn review_fix_owner_resolver_reject_then_pass() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let b = record(&f, "review_control");
+    for current in [false, true] {
+        let result = import::verify_import_bundle_witnesses(
+            &b,
+            &alpha31_pin(&f, false),
+            None,
+            1_350_000,
+            |i, time| {
+                let mut facts = bundle_owner(c.owner(0));
+                if i == 1 {
+                    assert_eq!(time, Some(1250));
+                    facts.authority_expires_at_seconds = if current { i64::MAX } else { 1240 };
+                    facts.effective_from_unix_seconds = if current { 1260 } else { 0 };
+                    facts.effective_until_unix_seconds = if current { None } else { Some(1260) };
+                }
+                Ok(facts)
+            },
+            |_, _| Ok(()),
+        );
+        assert_eq!(
+            result,
+            Err(codec::Reject::Scope),
+            "deferred expiry/current state"
+        );
+        review_verify(&f, "review_control", &alpha31_pin(&f, false), None).expect("owner control");
+    }
+    let mut observations = vec![];
+    import::verify_import_bundle_witnesses(
+        &b,
+        &alpha31_pin(&f, false),
+        None,
+        1_350_000,
+        |i, time| {
+            observations.push((i, time));
+            Ok(bundle_owner(c.owner(0)))
+        },
+        |_, _| Ok(()),
+    )
+    .expect("resolver");
+    assert!(observations.contains(&(0, Some(1100))));
+    assert!(observations.contains(&(1, Some(1250))));
+    assert!(observations.len() > 2, "each receipt resolved again");
+}
+#[test]
+fn review_fix_recovery_prefix_rollback_reject_then_pass() {
+    let f = review_fix_fixture();
+    let pin = alpha31_pin(&f, false);
+    let recovery = review_verify(&f, "witnessed_prefix_recovery", &pin, None).expect("prefix");
+    assert_eq!(recovery.evidence, import::ImportBundleEvidence::Recovery);
+    let snapshot = recovery.snapshot.as_ref().expect("snapshot");
+    assert_eq!(snapshot.accepted_history.len(), 1);
+    assert_eq!(snapshot.accepted_history[0].delegations.len(), 1);
+    assert_eq!(snapshot.job_associations.len(), 1);
+    assert_eq!(
+        review_verify(&f, "review_renewed_recovery", &pin, Some(snapshot)),
+        Err(codec::Reject::HighWater)
+    );
+    review_verify(&f, "witnessed_prefix_recovery", &pin, Some(snapshot))
+        .expect("same prefix control");
+}
+#[test]
+fn review_fix_host_max_renewal_reject_then_pass() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let read: api::GetImportJobStateResponse = record(&f, "job_state_partial");
+    let state = read.state.as_ref().expect("state");
+    let parent = record(&f, "permission");
+    let predecessor = import::verify_renewal_predecessor(state, Some(&parent), &c.owner(1600))
+        .expect("predecessor");
+    let request = record(&f, "renew_prepare_request");
+    let mut configuration: api::GetImportConfigurationResponse = record(&f, "import_configuration");
+    configuration
+        .limits
+        .as_mut()
+        .expect("limits")
+        .max_result_bytes = 1;
+    let original = record(&f, "delegation");
+    let facts = import::ImportOriginalAdmission {
+        original: &original,
+        admitted: true,
+        now_unix_seconds: 1600,
+    };
+    let source = record(&f, "renew_source_moved_head");
+    let run = |facts: &import::ImportOriginalAdmission<'_>| {
+        import::prepare_import_source_scope(
+            &request,
+            &source,
+            Some("github"),
+            &configuration,
+            &record::<api::ImportPermissionScopeV1>(&f, "scope").destination_version,
+            Some(facts),
+            Some((
+                &predecessor,
+                state,
+                read.retained_source.as_ref().expect("source"),
+            )),
+        )
+    };
+    let ended = import::ImportOriginalAdmission {
+        admitted: false,
+        ..facts
+    };
+    assert_eq!(run(&ended), Err(codec::Reject::OriginalWindowEnded));
+    run(&facts).expect("in-flight retains Prepare max");
+}
+#[test]
+fn review_fix_overflow_reason_reject_then_pass() {
+    let f = review_fix_fixture();
+    let c = Context::new(&f);
+    let old = import::verify_delegation(&record(&f, "overflow_predecessor"), None, &c.owner(1100))
+        .expect("old");
+    assert_eq!(
+        import::verify_renewal(
+            &record(&f, "overflow_renewal"),
+            &old,
+            &record(&f, "overflow_manifest"),
+            1,
+            None,
+            &c.owner(1250)
+        ),
+        Err(codec::Reject::Bounds)
+    );
+    import::verify_renewal(
+        &record(&f, "overflow_control_renewal"),
+        &old,
+        &record(&f, "overflow_manifest_control"),
+        1,
+        None,
+        &c.owner(1250),
+    )
+    .expect("no overflow control");
+}
+#[test]
+fn review_fix_renew_original_window_reject_then_pass() {
+    let f = fixture();
+    let c = Context::new(&f);
+    let request = record(&f, "alpha31_fresh_renew_request");
+    let read = record(&f, "job_state_partial");
+    assert_eq!(
+        import::validate_renew_request(&request, &read, false, false, 1300),
+        Err(codec::Reject::OriginalWindowEnded)
+    );
+    assert_eq!(
+        import::verify_renew_submission(
+            &request,
+            &read,
+            &c.owner(1100),
+            &c.owner(1300),
+            false,
+            false
+        ),
+        Err(codec::Reject::OriginalWindowEnded)
+    );
+    import::validate_renew_request(&request, &read, false, true, 1300).expect("admitted control");
+    import::verify_renew_submission(&request, &read, &c.owner(1100), &c.owner(1300), false, true)
+        .expect("activation control");
+}
+#[test]
+fn review_fix_signed_parity() {
+    let f = review_fix_fixture();
+    let additions: Value =
+        serde_json::from_str(include_str!("fixtures/import-review-fixes-alpha32.json"))
+            .expect("vectors");
+    for (name, v) in additions["signed_vectors"].as_object().expect("signed") {
+        match v["body_schema"]
+            .as_str()
+            .expect("schema")
+            .rsplit('.')
+            .next()
+            .expect("type")
+        {
+            "DelegatedImportOperationV1" => {
+                let r: api::SignedDelegatedImportOperationV1 = record(&f, name);
+                assert_bytes(
+                    r.body.as_ref().expect("body"),
+                    &r.job_signature.expect("signature").signature,
+                    v,
+                );
+            }
+            "ImportJobDelegationV1" => {
+                let r: api::SignedImportJobDelegationV1 = record(&f, name);
+                assert_bytes(
+                    r.body.as_ref().expect("body"),
+                    &r.delegating_signature.expect("signature").signature,
+                    v,
+                );
+            }
+            "ImportMemberPermissionV1" => {
+                let r: api::SignedImportMemberPermissionV1 = record(&f, name);
+                assert_bytes(
+                    r.body.as_ref().expect("body"),
+                    &r.owner_signature.expect("signature").signature,
+                    v,
+                );
+            }
+            "ImportJobRenewalV1" => {
+                let r: api::SignedImportJobRenewalV1 = record(&f, name);
+                assert_bytes(
+                    r.body.as_ref().expect("body"),
+                    &r.delegating_signature.expect("signature").signature,
+                    v,
+                );
+            }
+            _ => panic!("unknown signed fixture"),
+        }
+    }
+}
+#[test]
+fn review_fix_narrowed_bundle_reject_then_pass() {
+    let f = review_fix_fixture();
+    let pin = alpha31_pin(&f, false);
+    assert_eq!(
+        review_verify(&f, "narrowed_over", &pin, None),
+        Err(codec::Reject::Scope)
+    );
+    review_verify(&f, "narrowed_at", &pin, None).expect("narrowed exact control");
+}
+
+// Reviewer probe, adapted only for the mandatory cumulative manifest input.
+#[test]
+fn review_probe_live_aggregate_resigned() {
+    use ed25519_dalek::{Signer, SigningKey};
+    let f = fixture();
+    let c = Context::new(&f);
+    let bundle: api::ImportPublicProofBundleV1 = record(&f, "alpha32_aggregate_over");
+    let d = &bundle.delegations[0];
+    let body = d.body.as_ref().unwrap();
+    let parent =
+        import::resolve_bundle_permission(&bundle, &body.parent_permission_digest).unwrap();
+    let t = body.not_before_unix_seconds;
+    let verified = import::verify_delegation(d, parent, &c.owner(t)).expect("delegation");
+    let total = body.scope.as_ref().unwrap().max_result_bytes;
+    let seed = f["keys"]
+        .as_object()
+        .unwrap()
+        .values()
+        .find(|k| bytes(&k["public_key_hex"]) == body.job_public_key)
+        .map(|k| bytes(&k["seed_hex"]))
+        .expect("job seed");
+    let sk = SigningKey::from_bytes(&seed.try_into().unwrap());
+    let mut sum = 0u64;
+    let mut before = empty_for(&verified);
+    let mut manifest = bundle.terminal_manifest.clone().unwrap();
+    for (i, o) in bundle.operations.iter().enumerate() {
+        let mut o = o.clone();
+        o.body.as_mut().unwrap().result_bytes = total; // each publication claims the WHOLE job total
+        let input = codec::hash(&[
+            import::OPERATION_DOMAIN.as_bytes(),
+            &codec::canonical(o.body.as_ref().unwrap()).unwrap(),
+        ]);
+        o.job_signature.as_mut().unwrap().signature = sk.sign(&input).to_bytes().to_vec();
+        let ob = o.body.clone().unwrap();
+        let actual = import::verify_new_operation(&o, &verified, t, &before);
+        assert_eq!(
+            actual,
+            if i == 0 {
+                Ok(())
+            } else {
+                Err(codec::Reject::Scope)
+            }
+        );
+        println!("REVIEW PROBE resigned operation {i}: {actual:?}");
+        sum += total;
+        let digest = import::signed_operation_digest(&o).unwrap();
+        let slot = manifest
+            .slots
+            .iter_mut()
+            .find(|s| s.ref_name == ob.ref_name)
+            .unwrap();
+        slot.result_bytes = total;
+        slot.signed_operation_digest = digest;
+        if i == 0 {
+            before.slots.push(slot.clone());
+        }
+        assert!(import::check_slot_replay(&manifest, &o).unwrap());
+    }
+    import::validate_manifest(&manifest).expect("manifest with 2x total is structurally valid");
+    println!(
+        "PROBE resigned: {} ops each == total {} -> second publication refused Scope; requested sum {} = {}x total",
+        bundle.operations.len(),
+        total,
+        sum,
+        sum / total
+    );
+    println!(
+        "PROBE remaining_import_scope(active, manifest) = {:?}",
+        import::remaining_import_scope(body.scope.as_ref().unwrap(), &manifest)
+            .map(|s| s.max_result_bytes)
+    );
+}
+
+#[test]
+fn review_fix_renewal_narrowing_independent_reject_then_pass() {
+    let f = review_fix_fixture();
+    let pin = alpha31_pin(&f, false);
+    for kind in ["certificate", "permission"] {
+        assert_eq!(
+            review_verify(&f, &format!("renew_{kind}_over"), &pin, None),
+            Err(codec::Reject::RenewalFork),
+            "{kind} remaining bound"
+        );
+        review_verify(&f, &format!("renew_{kind}_at"), &pin, None)
+            .expect("remaining exact control");
+    }
 }

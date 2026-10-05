@@ -78,6 +78,8 @@ impl Fixture {
                     owner_public_key: &self.owner,
                     owner_chain_digest: &b.owner_chain_digest,
                     authority_expires_at_seconds: 2000,
+                    effective_from_unix_seconds: 0,
+                    effective_until_unix_seconds: None,
                     forbidden_job_keys: &[],
                     known_job_associations: &[],
                 }
@@ -88,7 +90,7 @@ impl Fixture {
             &self.pin(replacement),
             snapshot,
             now,
-            &owners,
+            |i, _| Ok(owners[i]),
             |b, _| {
                 assert_eq!(b.policies, vec![self.record("signed_policy")]);
                 Ok(())
@@ -378,6 +380,8 @@ fn alpha32_owner_times_are_internal_and_receipt_ordered() {
             .expect("body")
             .owner_chain_digest,
         authority_expires_at_seconds: 2000,
+        effective_from_unix_seconds: 0,
+        effective_until_unix_seconds: None,
         forbidden_job_keys: &[],
         known_job_associations: &[],
     };
@@ -387,7 +391,7 @@ fn alpha32_owner_times_are_internal_and_receipt_ordered() {
         &f.pin(false),
         None,
         1_100_000,
-        &[owner],
+        |i, _| Ok([owner][i]),
         |_, statement| {
             calls += 1;
             assert!(statement.is_none());
@@ -402,7 +406,7 @@ fn alpha32_owner_times_are_internal_and_receipt_ordered() {
             &f.pin(false),
             None,
             1_100_000,
-            &[owner],
+            |i, _| Ok([owner][i]),
             |_, _| Err(a::Reject::Signature)
         ),
         Err(a::Reject::Signature)

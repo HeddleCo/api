@@ -36,3 +36,9 @@ const consumer=JSON.parse(readFileSync('breaking/0.31.0-alpha.32-consumer-vector
 for(const [path,sha] of Object.entries(consumer.unchanged_files))assert.equal(digest(readFileSync(path)),sha,`consumer additions: existing fixture ${path}`);
 assert.equal(digest(readFileSync(consumer.new_fixture)),consumer.new_fixture_sha256,'consumer additions: frozen new corpus');
 console.log(`consumer continuity vs ${consumer.baseline}: ${Object.keys(consumer.unchanged_files).length} byte-identical existing fixture files; ${consumer.unchanged_signed_and_wire_records} signed/wire records unchanged; one new shared corpus`);
+const fixes=JSON.parse(readFileSync('breaking/0.31.0-alpha.32-review-fixes-vectors.json'));
+for(const [path,sha] of Object.entries(fixes.unchanged_files))assert.equal(digest(readFileSync(path)),sha,`review fixes: existing fixture ${path}`);
+assert.equal(digest(readFileSync(fixes.new_fixture)),fixes.new_fixture_sha256,'review fixes: frozen new corpus');
+const fixCorpus=JSON.parse(readFileSync(fixes.new_fixture));
+assert.equal(Object.keys(fixCorpus.signed_vectors).length+Object.keys(fixCorpus.wire_vectors).length,fixes.new_signed_and_wire_records,'review fixes: new record inventory');
+console.log(`review fix continuity vs ${fixes.baseline}: ${Object.keys(fixes.unchanged_files).length} byte-identical existing fixture files; ${fixes.unchanged_signed_and_wire_records} signed/wire records unchanged; ${fixes.new_signed_and_wire_records} new records`);

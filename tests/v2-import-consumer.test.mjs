@@ -41,7 +41,7 @@ test('alpha32 advisory availability never overrides admission',()=>{
 function pin(replacement=false){return {authority:old.context.authority,rootId:replacement?'descriptor-root-2':old.context.root_id,publicKey:bytes(old.keys[replacement?'wrong_root':'root'].public_key_hex),epoch:replacement?2n:1n};}
 function owners(bundle){return bundle.delegations.map(d=>({identity:d.body.identity,ownerPublicKey:bytes(old.keys.owner.public_key_hex),ownerChainDigest:d.body.ownerChainDigest,authorityExpiresAtSeconds:2000n,forbiddenJobKeys:[],knownJobAssociations:[]}));}
 function policy(b){assert.deepEqual(toBinary(api.SignedSpoolPolicyRecordSchema,b.policies[0]),toBinary(api.SignedSpoolPolicyRecordSchema,v('signed_policy')));}
-const verify=(b,snapshot,now=1150000n,replacement=false,hook=policy)=>a.verifyImportBundleWitnesses(b,pin(replacement),snapshot,now,owners(b),hook);
+const verify=(b,snapshot,now=1150000n,replacement=false,hook=policy)=>a.verifyImportBundleWitnesses(b, pin(replacement), snapshot, now, (i,t)=>({...(owners(b))[i],effectiveFromUnixSeconds:0n,effectiveUntilUnixSeconds:undefined}), hook);
 for(const row of f.recovery)test(`alpha32 recovery snapshot ${row.id}`,async()=>{
  const initialBundle=v('review_scheduled_recovery');if(row.initial_set)initialBundle.witnessSet=v(row.initial_set);
  const initial=row.input?await verify(initialBundle,undefined,row.initial_set?1350000n:1100000n):undefined;
@@ -77,7 +77,7 @@ test('alpha32 selected owner times are internal and receipt ordered',async()=>{
  await assert.rejects(verify(noSet,undefined,1100000n,false,()=>{throw new a.HybridContractError('Signature');}),rejects('Signature'));
  // Runtime callers cannot inject a check time, including through object spread.
  const inputs=owners(b).map(o=>({...o,nowUnixSeconds:900n}));
- const result=await a.verifyImportBundleWitnesses(b,pin(),undefined,1350000n,inputs,policy);assert.deepEqual(result.ownerCheckTimesUnixSeconds,[1100n,1250n]);
+ const result=await a.verifyImportBundleWitnesses(b, pin(), undefined, 1350000n, (i,t)=>({...(inputs)[i],effectiveFromUnixSeconds:0n,effectiveUntilUnixSeconds:undefined}), policy);assert.deepEqual(result.ownerCheckTimesUnixSeconds,[1100n,1250n]);
 });
 test('alpha32 availability wire discloses no account or connection identity',()=>{
  assert.equal(api.GetImportJobStateResponseSchema.fields.find(f=>f.number===6).message,api.ImportJobControlAvailabilityV1Schema);

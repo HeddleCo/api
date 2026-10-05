@@ -112,6 +112,7 @@ fn alpha32_sibling_scenarios() {
                             &d.logical_job_id,
                             &scope,
                             &held,
+                            action == "commit",
                         )?;
                         verified(&f, job)?;
                         inventory.get_mut(job).expect("reserved job").1 = true;
@@ -122,6 +123,7 @@ fn alpha32_sibling_scenarios() {
                             &d.logical_job_id,
                             &selected,
                             &held,
+                            action == "commit",
                         )?;
                         if action == "prepare" {
                             import::validate_preparation_response(
@@ -151,7 +153,14 @@ fn alpha32_sibling_gates_reject_then_pass() {
     let f = fixture();
     for v in f["gate_vectors"].as_array().expect("gates") {
         let run = |name: &str| {
-            let scope = record(&f, name);
+            let scope = if name == "scope_256" {
+                let corrected: Value =
+                    serde_json::from_str(include_str!("fixtures/import-review-fixes-alpha32.json"))
+                        .expect("corrected control");
+                record(&corrected, "unique_scope_256")
+            } else {
+                record(&f, name)
+            };
             let current = bytes(&f[v["current"].as_str().expect("token")]);
             if v["kind"] == "activate" {
                 import::check_import_destination_version(&scope, &current)
@@ -276,6 +285,142 @@ fn alpha32_sibling_signed_parity_and_independent_totals() {
         logical_job_id: &da.logical_job_id,
         branches: &a.branches,
     };
-    import::check_import_spool_reservations(&identity.spool_uuid, &db.logical_job_id, &a, &[held])
-        .expect("another spool does not conflict");
+    import::check_import_spool_reservations(
+        &identity.spool_uuid,
+        &db.logical_job_id,
+        &a,
+        &[held],
+        false,
+    )
+    .expect("another spool does not conflict");
+}
+
+#[test]
+fn review_fix_reservation_ownership_and_destinations_reject_then_pass() {
+    let f = fixture();
+    let identity: api::ImportIdentityV1 = record(&f, "identity");
+    let a: api::ImportPermissionScopeV1 = record(&f, "scope_a");
+    let b: api::ImportPermissionScopeV1 = record(&f, "scope_b");
+    let da: api::SignedImportJobDelegationV1 = record(&f, "delegation_a");
+    let db: api::SignedImportJobDelegationV1 = record(&f, "delegation_b");
+    let job_a = &da.body.as_ref().expect("a").logical_job_id;
+    let job_b = &db.body.as_ref().expect("b").logical_job_id;
+    let conflict = Err(codec::Reject::PreparationRefused(
+        api::ImportPreparationRefusalReason::DestinationConflict,
+    ));
+    assert_eq!(
+        import::check_import_spool_reservations(&identity.spool_uuid, job_a, &a, &[], true),
+        conflict
+    );
+    let held = import::ImportSpoolReservation {
+        spool_uuid: &identity.spool_uuid,
+        logical_job_id: job_a,
+        branches: &a.branches,
+    };
+    import::check_import_spool_reservations(&identity.spool_uuid, job_a, &a, &[held], true)
+        .expect("owned control");
+    for genesis in [false, true] {
+        let mut selected = b.clone();
+        if genesis {
+            selected.branches[0].genesis_digest = a.branches[0].genesis_digest.clone();
+        } else {
+            selected.branches[0].target_thread_id = a.branches[0].target_thread_id.clone();
+        }
+        let held = import::ImportSpoolReservation {
+            spool_uuid: &identity.spool_uuid,
+            logical_job_id: job_a,
+            branches: &a.branches,
+        };
+        assert_eq!(
+            import::check_import_spool_reservations(
+                &identity.spool_uuid,
+                job_b,
+                &selected,
+                &[held],
+                false
+            ),
+            conflict,
+            "cross-job target identity"
+        );
+        let held = import::ImportSpoolReservation {
+            spool_uuid: &identity.spool_uuid,
+            logical_job_id: job_a,
+            branches: &a.branches,
+        };
+        import::check_import_spool_reservations(&identity.spool_uuid, job_b, &b, &[held], false)
+            .expect("distinct sibling control");
+        let mut combined = a.clone();
+        combined.max_operations = 2;
+        combined.branches.extend(selected.branches);
+        combined
+            .branches
+            .sort_by(|a, b| a.ref_name.cmp(&b.ref_name));
+        assert_eq!(
+            import::validate_scope(&combined),
+            Err(codec::Reject::Scope),
+            "within-job target identity"
+        );
+        let mut good = a.clone();
+        good.max_operations = 2;
+        good.branches.extend(b.branches.clone());
+        good.branches.sort_by(|a, b| a.ref_name.cmp(&b.ref_name));
+        import::validate_scope(&good).expect("distinct within-job control");
+    }
+}
+#[test]
+fn review_fix_original_window_releases_reservations() {
+    let f = fixture();
+    let identity: api::ImportIdentityV1 = record(&f, "identity");
+    let a: api::ImportPermissionScopeV1 = record(&f, "scope_a");
+    let b: api::ImportPermissionScopeV1 = record(&f, "scope_b");
+    let da: api::SignedImportJobDelegationV1 = record(&f, "delegation_a");
+    let db: api::SignedImportJobDelegationV1 = record(&f, "delegation_b");
+    let job_a = &da.body.as_ref().expect("a").logical_job_id;
+    let job_b = &db.body.as_ref().expect("b").logical_job_id;
+    let mut held = vec![
+        import::ImportSpoolReservation {
+            spool_uuid: &identity.spool_uuid,
+            logical_job_id: job_a,
+            branches: &a.branches,
+        },
+        import::ImportSpoolReservation {
+            spool_uuid: &identity.spool_uuid,
+            logical_job_id: job_b,
+            branches: &b.branches,
+        },
+    ];
+    let facts = import::ImportOriginalAdmission {
+        original: &da,
+        admitted: false,
+        now_unix_seconds: da.body.as_ref().expect("a").expires_at_unix_seconds,
+    };
+    assert_eq!(
+        import::check_original_import_window(&facts),
+        Err(codec::Reject::OriginalWindowEnded)
+    );
+    assert!(
+        import::check_import_spool_reservations(&identity.spool_uuid, job_b, &a, &held, false)
+            .is_err()
+    );
+    assert!(
+        import::release_ended_import_reservations(&identity.spool_uuid, job_a, &facts, &mut held)
+            .expect("release")
+    );
+    assert_eq!(held.len(), 1);
+    assert_eq!(held[0].logical_job_id, job_b);
+    // The other sibling's own reservation is unchanged; a new job can reuse a's destinations.
+    let fresh: api::SignedImportJobDelegationV1 = record(&f, "delegation_fresh");
+    import::check_import_spool_reservations(
+        &identity.spool_uuid,
+        &fresh.body.expect("fresh").logical_job_id,
+        &a,
+        &held,
+        false,
+    )
+    .expect("new job admitted");
+    let admitted = import::ImportOriginalAdmission {
+        admitted: true,
+        ..facts
+    };
+    import::check_original_import_window(&admitted).expect("admitted originals control");
 }

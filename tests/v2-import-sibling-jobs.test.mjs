@@ -27,11 +27,11 @@ for(const scenario of f.scenarios)test('alpha32 sibling '+scenario.id,async()=>{
    }else if(step.action==='commit'){
     a.checkImportDestinationVersion(scope,current);
     assert.ok(inventory.has(step.job),'activation owns its reservation');
-    a.checkImportSpoolReservations(id,d.logicalJobId,scope,[...inventory.values()]);
+    a.checkImportSpoolReservations(id, d.logicalJobId, scope, [...inventory.values()], false);
     await verify(step.job);inventory.get(step.job).active=true;
    }else{
     const selected=a.prepareImportScope(scope,record('configuration'),current);
-    a.checkImportSpoolReservations(id,d.logicalJobId,selected,[...inventory.values()]);
+    a.checkImportSpoolReservations(id, d.logicalJobId, selected, [...inventory.values()], false);
     if(step.action==='prepare'){
      a.validateImportPreparationResponse(record('prepare_'+step.job),record('prepared_'+step.job));
      inventory.set(step.job,{spoolUuid:id,logicalJobId:d.logicalJobId,branches:selected.branches,active:false});
@@ -44,7 +44,7 @@ for(const scenario of f.scenarios)test('alpha32 sibling '+scenario.id,async()=>{
  }
 });
 for(const v of f.gate_vectors)test('alpha32 sibling '+v.id+' REJECT then PASS',()=>{
- const run=scope=>v.kind==='activate'?a.checkImportDestinationVersion(record(scope),bytes(f[v.current])):a.prepareImportScope(record(scope),record('configuration'),bytes(f[v.current]));
+ const run=scope=>v.kind==='activate'?a.checkImportDestinationVersion(record(scope),bytes(f[v.current])):a.prepareImportScope((scope==='scope_256'?a.strictDecode(api.ImportPermissionScopeV1Schema,bytes(JSON.parse(readFileSync(new URL('./fixtures/import-review-fixes-alpha32.json',import.meta.url))).wire_vectors.unique_scope_256.wire_hex)):record(scope)),record('configuration'),bytes(f[v.current]));
  assert.throws(()=>run(v.scope),e=>expected(e)===v.expected);run(v.control);
  console.log(`SIBLING ${v.id}: ${v.expected} -> OK`);
 });
@@ -66,7 +66,7 @@ test('alpha32 sibling signed parity and independent totals',async()=>{
  // Reservations are scoped to spool, and inspection leaves caller inputs intact.
  const held={spoolUuid:new Uint8Array(16).fill(0xff),logicalJobId:record('delegation_a').body.logicalJobId,branches:sa.branches};
  const before=toBinary(api.ImportPermissionScopeV1Schema,sa);
- a.checkImportSpoolReservations(record('identity').spoolUuid,record('delegation_b').body.logicalJobId,sa,[held]);
+ a.checkImportSpoolReservations(record('identity').spoolUuid, record('delegation_b').body.logicalJobId, sa, [held], false);
  assert.deepEqual(toBinary(api.ImportPermissionScopeV1Schema,sa),before);
 });
 test('alpha32 sibling typed refusal fields REJECT then PASS',()=>{

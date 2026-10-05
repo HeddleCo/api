@@ -21,7 +21,7 @@ async function retry(change={}){
  if(change.superseded)original.supersededBy=create(api.OperationRefSchema,{spool:original.ref.spool,id:f.prior_attempt_ids[1]});
  if(change.replacement_connection){c.authorizedSource=v('control_public_state').retainedSource;}
  for(const [key,field] of [['exact_grants_current','exactGrantsCurrent'],['selected_commits_available','selectedCommitsAvailable'],['authenticated_pop','authenticatedPop'],['destination_writer','destinationWriter']])if(key in change)c[field]=change[key];
- a.checkImportRetryAdmission(request,{read,original,retryLineageId:lineage,logicalJobTerminal:change.terminal??false,nowUnixSeconds:BigInt(change.now??1100)},await active(read),c);
+ a.checkImportRetryAdmission(request,{read,original,retryLineageId:lineage,originalAdmitted:true,logicalJobTerminal:change.terminal??false,nowUnixSeconds:BigInt(change.now??1100)},await active(read),c);
 }
 for(const row of f.control_vectors)test(`job control ${row.id}`,async()=>{
  const read=v(row.read),d=read.state.activePredecessor.body,c=caller(read,row.caller);
@@ -30,7 +30,7 @@ for(const row of f.control_vectors)test(`job control ${row.id}`,async()=>{
  const run=async()=>{
   a.checkImportControlCaller(row.action,read.retainedSource,d.scope,c);
   if(row.action==='Cancel')a.checkImportCancelRequest(v('cancel_active'),read.state.activePredecessor,read.state.authorityEpoch,false);
-  if(row.action==='Retry')a.checkImportRetryAdmission(v(row.read==='control_public_state'?'control_retry_public':'control_retry_connected'),{read,original:v(row.read==='control_public_state'?'control_public_original':'control_original'),retryLineageId:read.state.retryLineageId,logicalJobTerminal:false,nowUnixSeconds:1100n},await active(read),c);
+  if(row.action==='Retry')a.checkImportRetryAdmission(v(row.read==='control_public_state'?'control_retry_public':'control_retry_connected'),{read,original:v(row.read==='control_public_state'?'control_public_original':'control_original'),retryLineageId:read.state.retryLineageId,originalAdmitted:true,logicalJobTerminal:false,nowUnixSeconds:1100n},await active(read),c);
  };
  if(row.expected==='OK')await run();else {await assert.rejects(run(),rejects(row.expected));await retry();}
 });
@@ -42,7 +42,7 @@ for(const row of f.state_negatives)test(`retry disclosure REJECT then PASS ${row
 test('explicit retry unavailability is bounded; no target can be admitted',async()=>{
  for(let reason=1;reason<=6;reason++){
   const read=v('control_unavailable_'+reason),verified=await active(read);a.validateImportRetryStateResponse(v('job_state_request'),read);
-  assert.throws(()=>a.checkImportRetryAdmission(v('control_retry_connected'),{read,original:v('control_original'),retryLineageId:read.state.retryLineageId,logicalJobTerminal:false,nowUnixSeconds:1100n},verified,caller(read)),rejects('StaleContext'));
+  assert.throws(()=>a.checkImportRetryAdmission(v('control_retry_connected'),{read,original:v('control_original'),retryLineageId:read.state.retryLineageId,originalAdmitted:true,logicalJobTerminal:false,nowUnixSeconds:1100n},verified,caller(read)),rejects('StaleContext'));
  }
  await retry();
 });
@@ -80,5 +80,5 @@ test('Renew applied acknowledgement followed by explicit Retry under replacement
  const flow=f.renew_retry_flow,renew=v(flow.renew_request),retryRequest=v(flow.retry_request),read=v(flow.new_state);
  a.validateImportRenewResponse(renew,v(flow.renew_response));assert.equal(v(flow.renew_response).receipt.outcome.value.resultingVersions.length,0);
  assert.notEqual(renew.clientOperationId,retryRequest.clientOperationId);
- a.checkImportRetryAdmission(retryRequest,{read,original:v('control_original'),retryLineageId:read.state.retryLineageId,logicalJobTerminal:false,nowUnixSeconds:1250n},await active(read),caller(read));
+ a.checkImportRetryAdmission(retryRequest,{read,original:v('control_original'),retryLineageId:read.state.retryLineageId,originalAdmitted:true,logicalJobTerminal:false,nowUnixSeconds:1250n},await active(read),caller(read));
 });

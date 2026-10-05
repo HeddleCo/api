@@ -69,7 +69,8 @@ text or errors. Explicit account-ID inputs may echo that same supplied ID.
 `CreateInvitationResponse` has `receipt = 1`, `invitation = 2`, and
 `redemption_secret = 3`. Only email invitations receive a secret. Account and
 handle invitations MUST have an empty secret and no link capability. Stored
-secrets never enter reads. `validate_create_invitation_response` /
+secrets never enter reads. The create result is a PENDING creation snapshot;
+use observations for current lifecycle state. `validate_create_invitation_response` /
 `validateCreateInvitationResponse` check this split and recipient preservation
 against the original request.
 Hosts MUST run these gates or equivalent validation before emitting a response,
@@ -145,12 +146,18 @@ Same-state Revoke under a fresh operation ID requires the current version.
 
 `RedeemInvitation` remains email-only, using a link secret or the existing
 verified matching OAuth-email flow. It uses the same ACCEPTED transaction,
-grant and retry rules. It MUST NOT redeem account/handle invitations by secret
+grant and retry rules. Retain verified recipient-email/account matching;
+possession of a forwarded preview secret does not let another account redeem.
+Persist the accepting human account privately for matching accepted retries.
+It MUST NOT redeem account/handle invitations by secret
 guessing or handle re-resolution. Anonymous `ResolveInvitation` remains an
 email-link preview: wrong secret, non-email, declined, expired, revoked or
 unavailable all return the byte-identical UNAVAILABLE projection. Valid pending
 email links project AVAILABLE; accepted links project REDEEMED. Existing public
-inviter and timing protections apply. Email links have no in-app Decline in
+inviter and timing protections apply. Email link capabilities still expire at
+expires_at: an accepted record remains ACCEPTED, but its expired anonymous link
+preview is UNAVAILABLE and an expired secret cannot authorize receipt replay.
+Email links have no in-app Decline in
 this release.
 
 ## Inbox and delivery

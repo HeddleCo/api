@@ -189,3 +189,49 @@ export function validateEffectiveDeliverySource(
       !level.systemRoot && (cell.sourceSpool ? level.readable && cell.sourceSpool.id === level.spool.id : !level.readable)) : false;
   if (!valid) throw new NotificationValidationError('InvalidSource');
 }
+
+/** Choose scopes before expanding matrices; rule-free descendants never enter. */
+export function notificationProjectionScopes(
+  request: import('./views_pb.js').ObserveNotificationsRequest, rules: readonly NotificationRule[], readable: readonly { id: string }[],
+): ({ id: string } | undefined)[] {
+  const spool = request.effectiveDeliverySpool;
+  if (spool) {
+    if (!request.includePreferences || !spool.id || !readable.some(s => s.id === spool.id)) throw new NotificationValidationError('InvalidSource');
+    return [spool];
+  }
+  const scopes: ({ id: string } | undefined)[] = [undefined];
+  for (const rule of rules) {
+    if (rule.spool && readable.some(s => s.id === rule.spool?.id) && !scopes.some(s => s?.id === rule.spool?.id)) scopes.push(rule.spool);
+  }
+  return scopes;
+}
+
+/** Host loads stored state/current readability under the commit lock/CAS, and
+ * validates storage budgets after preserving hidden selectors. */
+export function replaceNotificationPreferences(
+  stored: NotificationPreferences, request: SetNotificationPreferencesRequest, readable: readonly { id: string }[],
+): NotificationPreferences {
+  validateNotificationPreferencesWrite(request);
+  const next = create(NotificationPreferencesSchema, request.preferences!);
+  const hidden = (spool: { id: string } | undefined) => !!spool && !readable.some(s => s.id === spool.id);
+  if (next.rules.some(rule => hidden(rule.spool)) || next.digestOverrides.some(item => !item.spool || hidden(item.spool))) throw new NotificationValidationError('InvalidSource');
+  if (!request.clearUnreadableScopes) {
+    next.rules = [...next.rules, ...stored.rules.filter(rule => hidden(rule.spool))];
+    next.digestOverrides = [...next.digestOverrides, ...stored.digestOverrides.filter(item => hidden(item.spool))];
+  }
+  return create(NotificationPreferencesSchema, { ...next, effectiveDelivery: [], nextDigestAt: undefined,
+    digestOverrides: next.digestOverrides.map(item => ({ ...item, nextDigestAt: undefined })) });
+}
+
+/** Invitation binding authorizes delivery without membership. Decline to a
+ * departed inviter MUST route at account scope, never InvalidSource. */
+export function resolveInvitationNotificationDelivery(
+  rules: readonly NotificationRule[], cell: EffectiveDelivery, ancestors: readonly NotificationAncestor[],
+  ancestorLimit: number, defaultDelivery: Delivery, digestEnabled: boolean,
+): EffectiveDelivery {
+  if (!['spool_invitation', 'spool_invitation_declined'].includes(cell.kind)) throw new NotificationValidationError('InvalidRule');
+  if (cell.spool && ancestors[0] && !ancestors[0].readable) {
+    return resolveNotificationDelivery(rules, create(EffectiveDeliverySchema, { ...cell, spool: undefined }), [], ancestorLimit, defaultDelivery, digestEnabled);
+  }
+  return resolveNotificationDelivery(rules, cell, ancestors, ancestorLimit, defaultDelivery, digestEnabled);
+}

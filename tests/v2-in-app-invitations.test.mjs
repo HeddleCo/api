@@ -58,12 +58,12 @@ test('shared recipient vectors preserve typed refusal and private handle binding
 test('shared signed-in accept/decline vectors check authorization before terminal state', () => {
   for (const v of vectors.response) {
     const record = create(InvitationRecordSchema, {
-      recipient: recipient(v), state: v.state,
+      recipient: recipient(v), role: 1, state: v.state,
       expiresAt: v.expires_seconds === undefined ? undefined :
         { seconds: BigInt(v.expires_seconds), nanos: v.expires_nanos },
     });
     const respond = () => planInvitationResponse(record, v.stored ?? undefined, v.caller ?? undefined,
-      v.action, { seconds: BigInt(v.now_seconds), nanos: v.now_nanos });
+      v.action, { seconds: BigInt(v.now_seconds), nanos: v.now_nanos }, true, 3);
     if (v.code) refusal(respond, v);
     else {
       const plan = respond();
@@ -79,7 +79,7 @@ test('two declines produce one notification, and retry never grants a role', () 
   const record = create(InvitationRecordSchema, { recipient: { case: 'handle', value: 'mara' }, state: InvitationState.PENDING });
   let notifications = 0;
   for (let i = 0; i < 2; i++) {
-    const plan = planInvitationResponse(record, account, account, 'decline', now);
+    const plan = planInvitationResponse(record, account, account, 'decline', now, true, 3);
     record.state = plan.state;
     notifications += plan.notificationKind === SPOOL_INVITATION_DECLINED ? 1 : 0;
     assert.equal(plan.grantRole, false);

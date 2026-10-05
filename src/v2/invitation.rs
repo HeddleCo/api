@@ -31,6 +31,10 @@ pub enum InvitationError {
     Lifecycle,
     #[error("invalid invitation input or projection")]
     InvalidRecord,
+    #[error("human session required")]
+    HumanSessionRequired,
+    #[error("inviter authority lost")]
+    InviterAuthorityLost,
 }
 
 impl InvitationError {
@@ -38,12 +42,15 @@ impl InvitationError {
         match self {
             Self::HandleNotFound | Self::Unavailable => CallFailureCode::NotFound,
             Self::Unauthenticated => CallFailureCode::Unauthenticated,
-            Self::Lifecycle => CallFailureCode::FailedPrecondition,
+            Self::Lifecycle | Self::InviterAuthorityLost => CallFailureCode::FailedPrecondition,
+            Self::HumanSessionRequired => CallFailureCode::PermissionDenied,
             _ => CallFailureCode::InvalidArgument,
         }
     }
     pub const fn reason(self) -> ErrorReason {
         match self {
+            Self::HumanSessionRequired => ErrorReason::InvitationHumanSessionRequired,
+            Self::InviterAuthorityLost => ErrorReason::InvitationInviterAuthorityLost,
             Self::HandleNotFound => ErrorReason::InvitationHandleNotFound,
             Self::Unavailable => ErrorReason::ResourceNotFound,
             Self::Unauthenticated => ErrorReason::CredentialMissing,
@@ -200,12 +207,7 @@ pub fn validate_create_invitation_response(
     {
         return Err(InvitationError::InvalidRecord);
     }
-    validate_invitation_resolution(&InvitationResolution {
-        inviter: output.inviter.clone(),
-        inviter_via_agent_label: output.inviter_via_agent_label.clone(),
-        ..Default::default()
-    })
-    .map_err(|_| InvitationError::InvalidRecord)
+    validate_invitation_record_projection(output, &recipient)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -246,7 +248,7 @@ pub fn effective_invitation_state(
 
 /// Account values MUST come from verified session/credential and private stored
 /// binding, never request fields, public handles or caller-selected principals.
-/// Delegations act as their human account and still obey their own ceilings.
+/// Accept/Decline require a verified human session; delegation is insufficient.
 /// This gate MUST run again before replaying a receipt, even for terminal states.
 pub fn plan_invitation_response(
     record: &InvitationRecord,
@@ -254,10 +256,15 @@ pub fn plan_invitation_response(
     authenticated_account: Option<&str>,
     action: InvitationResponseAction,
     now: &Timestamp,
+    human_session: bool,
+    inviter_role: i32,
 ) -> Result<InvitationResponsePlan, InvitationError> {
     let caller = authenticated_account
         .filter(|id| !id.is_empty())
         .ok_or(InvitationError::Unauthenticated)?;
+    if !human_session {
+        return Err(InvitationError::HumanSessionRequired);
+    }
     let recipient = stored_recipient_account.ok_or(InvitationError::Unavailable)?;
     if !is_account_uuid(caller)
         || !is_account_uuid(recipient)
@@ -268,6 +275,9 @@ pub fn plan_invitation_response(
         )
     {
         return Err(InvitationError::Unavailable);
+    }
+    if action == InvitationResponseAction::Accept {
+        validate_inviter_authority(record.role, inviter_role)?;
     }
     let state = effective_invitation_state(record, now)?;
     let target = match action {
@@ -323,7 +333,7 @@ pub fn validate_invitation_resolution(
     if response
         .inviter
         .as_ref()
-        .is_some_and(|owner| owner.handle.is_empty())
+        .is_some_and(|owner| owner.handle.is_empty() || is_account_uuid(&owner.handle))
     {
         return Err(InvitationResolutionError::InviterHandle);
     }
@@ -334,6 +344,74 @@ pub fn validate_invitation_resolution(
             .is_some_and(|owner| !owner.handle.is_empty())
     {
         return Err(InvitationResolutionError::AgentWithoutInviter);
+    }
+    Ok(())
+}
+
+/// Trusted CURRENT effective inviter role/credential ceilings, loaded under the
+/// transition lock. Use on Accept AND email Redeem, before receipt replay.
+/// Also use on every authority change to auto-revoke affected pending invites.
+pub fn validate_inviter_authority(
+    offered_role: i32,
+    inviter_role: i32,
+) -> Result<(), InvitationError> {
+    if !(1..=3).contains(&offered_role)
+        || !(1..=3).contains(&inviter_role)
+        || inviter_role < offered_role
+    {
+        return Err(InvitationError::InviterAuthorityLost);
+    }
+    Ok(())
+}
+
+/// Validate every wire projection against the originally stored recipient arm,
+/// never the resolved private binding. Hosts must call before emit/replay.
+pub fn validate_invitation_record_projection(
+    record: &InvitationRecord,
+    original: &Recipient,
+) -> Result<(), InvitationError> {
+    if normalize_invitation_recipient(record)? != *original
+        || !(1..=3).contains(&record.role)
+        || !(1..=5).contains(&record.state)
+    {
+        return Err(InvitationError::InvalidRecord);
+    }
+    validate_invitation_resolution(&InvitationResolution {
+        inviter: record.inviter.clone(),
+        inviter_via_agent_label: record.inviter_via_agent_label.clone(),
+        ..Default::default()
+    })
+    .map_err(|_| InvitationError::InvalidRecord)
+}
+
+pub fn validate_spool_invitation_projection(
+    event: &crate::heddle::api::v1alpha2::SpoolEvent,
+    original: &Recipient,
+) -> Result<(), InvitationError> {
+    if let Some(crate::heddle::api::v1alpha2::spool_event::Payload::Invitation(record)) =
+        &event.payload
+    {
+        validate_invitation_record_projection(record, original)?;
+    }
+    Ok(())
+}
+
+pub fn validate_notification_invitation_projection(
+    record: &crate::heddle::api::v1alpha2::NotificationRecord,
+    original: &Recipient,
+) -> Result<(), InvitationError> {
+    if let Some(invitation) = &record.invitation {
+        validate_invitation_record_projection(invitation, original)?;
+    }
+    Ok(())
+}
+
+pub fn validate_attention_invitation_projection(
+    item: &crate::heddle::api::v1alpha2::AttentionItem,
+    original: &Recipient,
+) -> Result<(), InvitationError> {
+    if let Some(invitation) = &item.invitation {
+        validate_invitation_record_projection(invitation, original)?;
     }
     Ok(())
 }

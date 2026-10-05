@@ -17,7 +17,15 @@ for example “Straight away (default)”, rather than reconstructing them.
 `NotificationEvent.preferences` with stored `rules`, email cadence, timezone,
 per-Spool digest overrides, `effective_delivery`, and `next_digest_at`. Live
 preferences updates recompute this projection, including scheduling/policy
-changes. No second preferences RPC is necessary. `version` remains the stored
+changes. `ObserveNotificationsRequest.effective_delivery_spool = 5` is an
+optional per-Spool effective read: with `include_preferences = true`, return
+ONLY that Spool's full effective matrix (no account/other Spool cells), including
+`source` / `source_spool`. Stored settings remain the ordinary redacted settings.
+Require current Spool read access and reauthorize/redact each live update; reject
+an unreadable/unknown filter using hidden-existence authorization, never fall
+back to account. Reject a filter without include_preferences as invalid input.
+Bind the filter into observation cursors. The same 4096-cell/1-MiB bound applies;
+its matrix size is independent of descendant count. `version` remains the stored
 settings version used by `expected_version`; a clock/default-policy change need
 not change it.
 
@@ -69,12 +77,14 @@ a rule actually won. Defaults and effective digest cadence remain host inputs.
 `delivery` is the resolved mode, not delivery status or a guarantee that a
 destination exists. `locked` is true for security/recovery email, always
 IMMEDIATE. The account matrix is complete for supported kinds/origins/channels.
-Spool scopes are sparse: include cells for **every readable descendant** where
-delivery, source, source_spool or locked differs from its account fallback,
-including descendants without local rules. A Spool's account fallback copies
-the account cell, changing RULE to ACCOUNT. An omitted Spool cell means this
-fallback, not an instruction to reconstruct settings on the client. A child
-inheriting an ancestor MUST be emitted even if delivery equals the account mode.
+The ordinary preferences read projects complete matrices ONLY for readable
+Spool scopes with local routing rules, plus the complete account matrix.
+Select these scopes before matrix expansion; MUST NOT enumerate rule-free
+descendants or emit their inherited cells. A digest-only override does not add
+a routing scope. Omitted scopes do not imply account fallback: clients MUST use
+`effective_delivery_spool` when displaying effective settings for a Spool.
+That read resolves the full ancestor chain even when the selected Spool has no
+local rules, retaining inherited provenance and its disclosure redaction.
 Only readable event Spools are disclosed. Cells are unique by (kind, Spool,
 origin, channel). There are at most **4096 cells**, and the **entire encoded
 preferences message is at most 1 MiB**, including rules and selector strings.
@@ -91,6 +101,20 @@ is invalid on write, never an inherit sentinel or an alias for DISABLED.
 Migrate legacy unspecified stored routing explicitly: remove a rule intended to
 inherit, or replace it with DISABLED if it was intended to mute. Do not evaluate
 legacy zero as Disabled under this contract.
+
+`SetNotificationPreferences` replaces account and currently readable scopes.
+The host MUST PRESERVE existing rules AND digest overrides on scopes the caller
+cannot currently read, even when absent from the replacement. Readability,
+expected_version, preservation and commit are serialized in one transaction;
+validate final stored quotas after preservation. New selectors naming unreadable
+scopes are refused; hidden scopes are not editable by ID. The caller-bound
+`clear_unreadable_scopes = 4` flag (default false) explicitly clears ALL hidden
+rules/overrides without exposing their IDs, names, counts or ancestry. Clients
+may label this action “Clear settings for spools you can no longer read”.
+Receipt retry follows the ordinary operation-ID contract and does not reinterpret
+a previously committed clear against a new authorization snapshot.
+`replace_notification_preferences` / `replaceNotificationPreferences` plan this
+preservation/clear; hosts own current readability, CAS, quotas and persistence.
 
 `SetNotificationPreferences` atomically validates every stored rule and digest
 interval before writing. Projection fields are read-only and ignored on writes (including the
@@ -198,7 +222,11 @@ Hosts must integrate the helpers with trusted ancestry loading, current read
 checks, scope validation on write (use
 `validate_notification_preferences_write_for_system_root` /
 `validateNotificationPreferencesWriteForSystemRoot` with the resolved shared
-root identity), and projection of readable descendants.
+root identity), and local-rule-only preferences projection plus filtered Spool
+reads. `tests/fixtures/alpha38-review-fixes.json` adds shared large-tree,
+hidden replacement/clear and account-scoped decline vectors.
+`tools/verify-alpha38-guards.py` disables each new guard, requires a failing
+test assertion in Rust/TypeScript, restores it and requires the same tests pass.
 The existing weft `notifications/preferences.rs` exact-path evaluator must be
 replaced by this ancestor resolution; this API release does not implement weft
 storage/handlers or the UI. Digest cadence still uses its separate existing

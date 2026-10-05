@@ -108,6 +108,7 @@ fn accept_authorization_and_decline_idempotence_vectors() {
     for v in vectors()["response"].as_array().expect("responses") {
         let record = InvitationRecord {
             recipient: recipient(v),
+            role: 1,
             state: v["state"].as_i64().expect("state") as i32,
             expires_at: v["expires_seconds"].as_i64().map(|seconds| Timestamp {
                 seconds,
@@ -128,6 +129,8 @@ fn accept_authorization_and_decline_idempotence_vectors() {
                 seconds: v["now_seconds"].as_i64().expect("now"),
                 nanos: v["now_nanos"].as_i64().expect("nanos") as i32,
             },
+            true,
+            3,
         );
         if v.get("code").is_some() {
             refusal(result.expect_err("refusal"), v);
@@ -155,6 +158,7 @@ fn accept_authorization_and_decline_idempotence_vectors() {
 fn repeated_decline_emits_one_notification_and_no_grant() {
     let mut record = InvitationRecord {
         recipient: Some(Recipient::Handle("mara".into())),
+        role: 1,
         state: 1,
         ..Default::default()
     };
@@ -170,6 +174,8 @@ fn repeated_decline_emits_one_notification_and_no_grant() {
             Some("11111111-1111-4111-8111-111111111111"),
             InvitationResponseAction::Decline,
             &now,
+            true,
+            3,
         )
         .expect("own decline");
         record.state = plan.state as i32;
@@ -189,6 +195,7 @@ fn accept_refuses_a_different_signed_in_account_even_on_retry() {
     for state in [1, 2, 3, 4, 5] {
         let record = InvitationRecord {
             recipient: Some(Recipient::Handle("mara".into())),
+            role: 1,
             state,
             ..Default::default()
         };
@@ -198,7 +205,9 @@ fn accept_refuses_a_different_signed_in_account_even_on_retry() {
                 Some("11111111-1111-4111-8111-111111111111"),
                 Some("22222222-2222-4222-8222-222222222222"),
                 InvitationResponseAction::Accept,
-                &now
+                &now,
+                true,
+                3,
             ),
             Err(InvitationError::Unavailable)
         );

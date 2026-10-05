@@ -42,6 +42,12 @@ enum ErrorReason {
   ERROR_REASON_ROLE_INSUFFICIENT = 201;
   ERROR_REASON_POLICY_DENIED = 202;
   ERROR_REASON_PLAN_LIMIT = 203;
+  // AcceptInvitation and DeclineInvitation require a human session, never agent
+  // or delegated credentials. PERMISSION_DENIED; field "invitation".
+  ERROR_REASON_INVITATION_HUMAN_SESSION_REQUIRED = 204;
+  // Accept/Redeem: inviter no longer holds authority to grant the offered role.
+  // FAILED_PRECONDITION; field "invitation"; disclose no inviter identity.
+  ERROR_REASON_INVITATION_INVITER_AUTHORITY_LOST = 205;
 
   // Existence (3xx)
   ERROR_REASON_RESOURCE_NOT_FOUND = 300;

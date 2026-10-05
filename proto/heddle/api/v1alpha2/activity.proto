@@ -149,18 +149,15 @@ message NotificationPreferences {
   // One override per Spool. Removing an override restores the account default.
   // Cadence can be overridden without overriding any routing rules.
   repeated NotificationDigestOverride digest_overrides = 5;
-  // Read-only resolved cells, not stored rules. Complete account matrix plus
-  // sparse cells whose result/provenance differs in readable Spool scopes,
-  // including descendants without local rules. Unique by
-  // (kind, spool, actor_origin, channel), at most 4096 cells and 1 MiB encoded
-  // for the complete preferences message. No silent truncation: a larger read
-  // fails with RESOURCE_EXHAUSTED / QUOTA_EXCEEDED. Omitted Spool cells inherit
-  // the account cell (RULE becomes ACCOUNT at a Spool). A child differing due
-  // to an ancestor MUST be emitted even without local rules. Only readable
-  // event Spool scopes may be disclosed.
-  // Weft owns defaults and precedence; clients must not infer defaults from
-  // missing stored rules. See EffectiveDelivery for provenance and ancestor
-  // disclosure. A locked email cell is always IMMEDIATE.
+  // Read-only resolved cells: complete account matrix plus complete matrices
+  // ONLY for currently readable Spool scopes having local routing rules.
+  // Never enumerate rule-free descendants. Omission says nothing about a
+  // Spool's effective delivery: use ObserveNotifications.effective_delivery_spool
+  // for that one Spool's complete matrix, including inherited provenance.
+  // Unique by (kind, spool, actor_origin, channel), at most 4096 cells and 1 MiB
+  // for the entire preferences message. Oversize reads fail RESOURCE_EXHAUSTED /
+  // QUOTA_EXCEEDED, never truncate. Only readable event scopes are disclosed.
+  // Weft owns defaults and precedence. Locked email is always IMMEDIATE.
   repeated EffectiveDelivery effective_delivery = 6;
   // Read-only next account email digest window, absent when its effective
   // interval is off. A schedule projection, not a promise of queued email.
@@ -225,6 +222,12 @@ message SetNotificationPreferencesRequest {
   string client_operation_id = 1;
   NotificationPreferences preferences = 2;
   bytes expected_version = 3;
+  // Default false: preserve existing rules AND digest overrides on scopes the
+  // caller cannot currently read. Replace only account/currently readable scopes.
+  // True explicitly clears ALL unreadable scopes without disclosing their IDs.
+  // New unreadable selectors are rejected. Resolve readability transactionally
+  // with expected_version; preserve hidden state before checking storage budgets.
+  bool clear_unreadable_scopes = 4;
 }
 // Public, single-purpose disabling action. The opaque capability determines
 // the recipient and exact allowed selectors; no account credential is required.

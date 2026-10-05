@@ -331,3 +331,124 @@ pub fn validate_effective_delivery_source(
         Err(NotificationValidationError::InvalidSource)
     }
 }
+
+/// Choose scopes BEFORE expanding the kind/origin/channel matrix. The host
+/// supplies current readable IDs; rule-free descendants never enter this list.
+pub fn notification_projection_scopes(
+    request: &crate::heddle::api::v1alpha2::ObserveNotificationsRequest,
+    rules: &[NotificationRule],
+    readable: &[SpoolRef],
+) -> Result<Vec<Option<SpoolRef>>, NotificationValidationError> {
+    if let Some(spool) = &request.effective_delivery_spool {
+        if !request.include_preferences || spool.id.is_empty() || !readable.contains(spool) {
+            return Err(NotificationValidationError::InvalidSource);
+        }
+        return Ok(vec![Some(spool.clone())]);
+    }
+    let mut scopes = vec![None];
+    for rule in rules {
+        if let Some(spool) = &rule.spool {
+            if readable.contains(spool) && !scopes.contains(&Some(spool.clone())) {
+                scopes.push(Some(spool.clone()));
+            }
+        }
+    }
+    Ok(scopes)
+}
+
+/// Plan an atomic replacement. Readability and stored settings must be loaded
+/// under the same lock/CAS as commit. Clear is caller-account authority only.
+/// Host validates storage quotas AFTER preservation, not projection budgets.
+pub fn replace_notification_preferences(
+    stored: &NotificationPreferences,
+    request: &SetNotificationPreferencesRequest,
+    readable: &[SpoolRef],
+) -> Result<NotificationPreferences, NotificationValidationError> {
+    validate_notification_preferences_write(request)?;
+    let mut next = request
+        .preferences
+        .clone()
+        .ok_or(NotificationValidationError::InvalidRule)?;
+    if next.rules.iter().any(|rule| {
+        rule.spool
+            .as_ref()
+            .is_some_and(|spool| !readable.contains(spool))
+    }) || next.digest_overrides.iter().any(|item| {
+        item.spool
+            .as_ref()
+            .is_none_or(|spool| !readable.contains(spool))
+    }) {
+        return Err(NotificationValidationError::InvalidSource);
+    }
+    if !request.clear_unreadable_scopes {
+        next.rules.extend(
+            stored
+                .rules
+                .iter()
+                .filter(|rule| {
+                    rule.spool
+                        .as_ref()
+                        .is_some_and(|spool| !readable.contains(spool))
+                })
+                .cloned(),
+        );
+        next.digest_overrides.extend(
+            stored
+                .digest_overrides
+                .iter()
+                .filter(|item| {
+                    item.spool
+                        .as_ref()
+                        .is_some_and(|spool| !readable.contains(spool))
+                })
+                .cloned(),
+        );
+    }
+    next.effective_delivery.clear();
+    next.next_digest_at = None;
+    for item in &mut next.digest_overrides {
+        item.next_digest_at = None;
+    }
+    Ok(next)
+}
+
+/// Invitation-only routing: recipient binding authorizes delivery even without
+/// spool read. In particular Decline to a departed inviter MUST use account
+/// scope, never InvalidSource and never weaken the ordinary provenance gate.
+pub fn resolve_invitation_notification_delivery(
+    rules: &[NotificationRule],
+    cell: &EffectiveDelivery,
+    ancestors: &[NotificationAncestor],
+    ancestor_limit: usize,
+    default_delivery: Delivery,
+    digest_enabled: bool,
+) -> Result<EffectiveDelivery, NotificationValidationError> {
+    if !matches!(
+        cell.kind.as_str(),
+        "spool_invitation" | "spool_invitation_declined"
+    ) {
+        return Err(NotificationValidationError::InvalidRule);
+    }
+    if cell.spool.is_some() && ancestors.first().is_some_and(|level| !level.readable) {
+        let account = EffectiveDelivery {
+            spool: None,
+            ..cell.clone()
+        };
+        return resolve_notification_delivery(
+            rules,
+            &account,
+            &[],
+            ancestor_limit,
+            default_delivery,
+            digest_enabled,
+        );
+    }
+    resolve_notification_delivery(
+        rules,
+        cell,
+        ancestors,
+        ancestor_limit,
+        default_delivery,
+        digest_enabled,
+    )
+}

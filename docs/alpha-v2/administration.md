@@ -63,8 +63,12 @@ existing spool authorization failure, with no handle-dependent result.
 Resolve and store the private human account binding transactionally once.
 Handle removal/rename/reassignment MUST NOT retarget it. Return only the
 original normalized recipient arm. A handle is never replaced/supplemented
-with its account UUID in create, observations, inbox, receipts, notification
-text or errors. Explicit account-ID inputs may echo that same supplied ID.
+with its account UUID in create, invitation observations, inbox, receipts,
+notification text or errors before acceptance. Explicit account-ID inputs may
+echo that same supplied ID. After Accept/Redeem, member/grant records expose the
+accepted human principal by design under ordinary spool authorization. This
+privacy rule does not suppress that membership identity. InvitationRecord itself
+continues to preserve the original recipient arm in every lifecycle state.
 
 `CreateInvitationResponse` has `receipt = 1`, `invitation = 2`, and
 `redemption_secret = 3`. Only email invitations receive a secret. Account and
@@ -85,9 +89,11 @@ take only `client_operation_id = 1` and `invitation = 2` (`RecordRef`). They
 require authenticated-principal Tier-1 proof of possession, durable receipts,
 client-operation-ID retries, caller-bound authorization and hidden existence.
 There is no secret, OAuth-only gate, owner signature or existing membership
-prerequisite. A session or credential acts for its verified human account;
-agents act as their delegating user within credential ceilings, never as an
-independent recipient.
+prerequisite. Accept AND Decline REQUIRE a verified human session. Agent,
+service and delegated credentials MUST refuse with `PERMISSION_DENIED /
+INVITATION_HUMAN_SESSION_REQUIRED (204)`, field `invitation`, before invitation
+lookup/state/receipt replay, even when delegated by the recipient. Agents are
+delegations of a user, not people; they cannot make this human membership choice.
 
 Compare the verified caller account with the stored recipient binding, never
 the current handle owner or caller-selected principal. Recheck active auth and
@@ -97,6 +103,22 @@ Signed-in foreign callers, nonexistent invites and email-only invites uniformly
 use `NOT_FOUND / RESOURCE_NOT_FOUND`, field `invitation`, message
 `invitation unavailable`, empty resource and absent context. Neither the
 inviter nor a spool administrator bypasses recipient matching.
+
+Accept AND email Redeem MUST recheck the original human inviter's CURRENT
+authority to grant the offered role under the transition lock, before grant or
+receipt replay. Administrator invitations require ADMINISTRATOR; other roles
+require at least the offered role, including current credential/grant ceilings.
+Removed, expired, revoked or insufficient authority refuses with
+`FAILED_PRECONDITION / INVITATION_INVITER_AUTHORITY_LOST (205)`, field `invitation`,
+empty resource/context and no inviter identity. Accepted retries cannot recreate
+a grant and still recheck authority. Decline does not require inviter authority.
+Hosts MUST auto-revoke affected PENDING invitations when the inviter loses this
+authority (grant removal/downgrade/expiry, inherited authority or credential
+revocation), serializing with acceptance. Commit REVOKED/version/time, attention
+DISMISSED and stream updates atomically; no grant. If loss is detected before
+that worker commits, Accept/Redeem still return the typed authority-lost refusal.
+`validate_inviter_authority` / `validateInviterAuthority` supply the shared gate;
+trusted effective roles are host-loaded, never request fields.
 
 Accept atomically commits ACCEPTED and grants the offered role once. An active
 grant already meeting or exceeding that role remains unchanged, including its
@@ -108,6 +130,11 @@ authority. A retry MUST NOT recreate a subsequently revoked grant. Decline
 commits DECLINED without a grant and emits one `spool_invitation_declined`
 notification to the original human inviter, including if they have left the
 spool. That notification permits only its invitation-scoped projection.
+Normatively, if the inviter cannot currently read the spool, resolve
+`spool_invitation_declined` at ACCOUNT scope with no event Spool/ancestor chain.
+MUST NOT return InvalidSource or require spool-read authorization for this
+required effect. Account preferences, suppression and ordinary outbox semantics
+apply, so leaving the spool cannot make Decline impossible or roll it back.
 
 Serialize Accept/Decline/Redeem/Revoke/expiry races. Commit state/version/time,
 grant, attention update, receipt and required notification/outbox in one
@@ -176,7 +203,9 @@ title/headline "Invited to <spool> as <role> by <inviter.handle>". Optional
 display name accompanies the handle; a public agent label may only follow as
 "via <label>". If inviter identity is unavailable, omit it and use
 "Invited to <spool> as <role>". Reuse InvitationResolution's read-time public
-inviter/lifecycle omission rules; never fabricate a username or disclose a UUID.
+inviter/lifecycle omission rules; never fabricate a username or disclose a
+private resolved UUID before acceptance. Member/grant principals are visible
+through their ordinary authorized reads after acceptance.
 
 The stored binding authorizes the invitee to read only invitation state, spool
 name/address, role, expiry and public attribution before membership. It grants
@@ -188,6 +217,8 @@ Pending account/handle items advertise fully qualified routes
 `/heddle.api.v1alpha2.SpoolService/AcceptInvitation` and
 `/heddle.api.v1alpha2.SpoolService/DeclineInvitation`, with invitation target,
 host endpoint and existing implemented/authorized/requirements flags.
+`authorized` MUST be false for agent/delegated credentials; advice must reflect
+the human-session gate without granting authority.
 Capabilities are `CAPABILITY_ACCEPT_INVITATION = 10` and
 `CAPABILITY_DECLINE_INVITATION = 11`. Advice never grants authority. Terminal
 updates remove actionable advice and update all devices. Marking read,
@@ -205,7 +236,16 @@ preferences; never disclose unauthorized spool cells in the preference matrix.
 ## Inviter read model and people-only rows
 
 `ObserveSpool(SPOOL_SECTION_INVITATIONS, SpoolPages.invitations)` returns the
-existing paginated `SpoolEvent.invitation`. Administrators can see all retained
+existing paginated `SpoolEvent.invitation`. Hosts MUST run
+`validate_invitation_record_projection` / `validateInvitationRecordProjection`
+(or equivalent) against the original normalized recipient arm before emitting
+ANY InvitationRecord, including Create/replay, ObserveSpool invitations,
+`NotificationRecord.invitation` and `AttentionItem.invitation`. The respective
+spool/notification/attention projection validators invoke this shared gate.
+It rejects substitution of a handle with its private account ID, invalid
+role/state, missing public inviter handle, UUID-as-inviter and orphan agent
+labels. Private bindings never supply projection recipient values.
+Administrators can see all retained
 states in People/invitations with live versions and the existing read budget.
 
 | InvitationRecord field | Tag | Meaning |

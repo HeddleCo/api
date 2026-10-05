@@ -174,7 +174,11 @@ enum InvitationState {
 // Inviter-side People/invitations read model, also used in the invitee's inbox.
 // Terminal states never reopen. Only the selected recipient arm is returned:
 // a handle is NEVER replaced/supplemented with its resolved account UUID.
-// Server-only recipient binding and inviter UUID are never wire fields.
+// This protects private bindings before acceptance; after Accept/Redeem the
+// member/grant records expose the human principal under normal authorization.
+// InvitationRecord keeps its original arm even after acceptance. Hosts MUST run
+// the shared InvitationRecord projection gate on ObserveSpool, notification,
+// attention and Create/replay outputs. Server-only bindings are not wire fields.
 message InvitationRecord {
   RecordRef ref = 1;
   bytes version = 2;
@@ -429,6 +433,14 @@ message RedeemInvitationRequest {
 // or pre-existing spool membership. The host MUST compare the verified caller's
 // account with the stored resolved recipient before state/idempotency lookup.
 // Foreign/nonexistent/link-only invitations uniformly hide existence.
+// Accept/Decline REQUIRE a human session; agent/delegated credentials refuse
+// PERMISSION_DENIED / INVITATION_HUMAN_SESSION_REQUIRED before lookup/replay.
+// Accept AND Redeem recheck current inviter grant authority before replay/grant:
+// administrator for admin invites, otherwise at least the offered role. Loss
+// returns FAILED_PRECONDITION / INVITATION_INVITER_AUTHORITY_LOST. Auto-revoke
+// affected pending invitations on authority loss, serializing all transitions.
+// Decline to an inviter without spool read routes at ACCOUNT scope; lack of
+// spool access must never make its required notification fail InvalidSource.
 message AcceptInvitationRequest {
   string client_operation_id = 1;
   RecordRef invitation = 2;

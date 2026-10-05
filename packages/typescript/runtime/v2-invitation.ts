@@ -7,7 +7,7 @@ import { type CreateInvitationRequest, type CreateInvitationResponse } from './a
 export const SPOOL_INVITATION = 'spool_invitation';
 export const SPOOL_INVITATION_DECLINED = 'spool_invitation_declined';
 export type InvitationViolation = 'RecipientRequired' | 'InvalidEmail' | 'InvalidHandle' |
-  'InvalidAccountId' | 'HandleNotFound' | 'Unauthenticated' | 'Unavailable' | 'Lifecycle' | 'InvalidRecord';
+  'InvalidAccountId' | 'HandleNotFound' | 'Unauthenticated' | 'Unavailable' | 'Lifecycle' | 'InvalidRecord' | 'HumanSessionRequired' | 'InviterAuthorityLost';
 
 export class InvitationError extends Error {
   readonly code: CallFailureCode;
@@ -19,8 +19,11 @@ export class InvitationError extends Error {
     this.name = 'InvitationError';
     this.code = ['HandleNotFound', 'Unavailable'].includes(violation) ? CallFailureCode.NOT_FOUND :
       violation === 'Unauthenticated' ? CallFailureCode.UNAUTHENTICATED :
-      violation === 'Lifecycle' ? CallFailureCode.FAILED_PRECONDITION : CallFailureCode.INVALID_ARGUMENT;
-    this.reason = violation === 'HandleNotFound' ? ErrorReason.INVITATION_HANDLE_NOT_FOUND :
+      violation === 'HumanSessionRequired' ? CallFailureCode.PERMISSION_DENIED :
+      ['Lifecycle', 'InviterAuthorityLost'].includes(violation) ? CallFailureCode.FAILED_PRECONDITION : CallFailureCode.INVALID_ARGUMENT;
+    this.reason = violation === 'HumanSessionRequired' ? ErrorReason.INVITATION_HUMAN_SESSION_REQUIRED :
+      violation === 'InviterAuthorityLost' ? ErrorReason.INVITATION_INVITER_AUTHORITY_LOST :
+      violation === 'HandleNotFound' ? ErrorReason.INVITATION_HANDLE_NOT_FOUND :
       violation === 'Unavailable' ? ErrorReason.RESOURCE_NOT_FOUND :
       violation === 'Unauthenticated' ? ErrorReason.CREDENTIAL_MISSING :
       violation === 'Lifecycle' ? ErrorReason.LIFECYCLE_STATE :
@@ -108,6 +111,7 @@ export function validateCreateInvitationResponse(request: CreateInvitationReques
       (recipient.case === 'email') === (response.redemptionSecret.length === 0) ||
       (output.inviter !== undefined && output.inviter.handle === '') ||
       (output.inviterViaAgentLabel !== '' && !output.inviter?.handle)) throw new InvitationError('InvalidRecord');
+  validateInvitationRecordProjection(output, recipient);
 }
 
 export type InvitationResponseAction = 'accept' | 'decline';
@@ -127,16 +131,18 @@ export function effectiveInvitationState(record: InvitationRecord, now: Time): I
 }
 
 /** Trusted stored binding + VERIFIED caller account, never caller-selected IDs.
- * Recheck before receipt replay. Delegations act as their user within ceilings.
+ * Recheck before receipt replay. Accept/Decline require a human session.
  * Host serializes races and atomically commits state, grant, attention, receipt,
  * notification/outbox. This function plans effects; it performs no durable write. */
 export function planInvitationResponse(record: InvitationRecord, storedRecipientAccount: string | undefined,
-  authenticatedAccount: string | undefined, action: InvitationResponseAction, now: Time): InvitationResponsePlan {
+  authenticatedAccount: string | undefined, action: InvitationResponseAction, now: Time, humanSession: boolean, inviterRole: number): InvitationResponsePlan {
   if (!authenticatedAccount) throw new InvitationError('Unauthenticated');
+  if (!humanSession) throw new InvitationError('HumanSessionRequired');
   if (!storedRecipientAccount || !accountUuid.test(authenticatedAccount) ||
       !accountUuid.test(storedRecipientAccount) || asciiLower(authenticatedAccount) !== asciiLower(storedRecipientAccount) ||
       !['handle', 'accountId'].includes(record.recipient.case ?? '')) throw new InvitationError('Unavailable');
   if (action !== 'accept' && action !== 'decline') throw new InvitationError('InvalidRecord');
+  if (action === 'accept') validateInviterAuthority(record.role, inviterRole);
   const state = effectiveInvitationState(record, now);
   const target = action === 'accept' ? InvitationState.ACCEPTED : InvitationState.DECLINED;
   if (state === target) return { state, changed: false, grantRole: false };
@@ -154,10 +160,37 @@ export function validateInvitationResolution(response: InvitationResolution): vo
        response.inviterViaAgentLabel !== "")) {
     throw new Error("UNAVAILABLE invitation resolution contains disclosed details");
   }
-  if (response.inviter !== undefined && response.inviter.handle === "") {
+  if (response.inviter !== undefined && (response.inviter.handle === "" || accountUuid.test(response.inviter.handle))) {
     throw new Error("inviter requires an already-public handle");
   }
   if (response.inviterViaAgentLabel !== "" && !response.inviter?.handle) {
     throw new Error("agent label requires an inviter handle");
   }
+}
+
+/** Trusted current effective role/ceilings under the host transition lock.
+ * Use for Accept AND Redeem before replay and to auto-revoke pending invites. */
+export function validateInviterAuthority(offeredRole: number, inviterRole: number): void {
+  if (![1, 2, 3].includes(offeredRole) || ![1, 2, 3].includes(inviterRole) || inviterRole < offeredRole) {
+    throw new InvitationError('InviterAuthorityLost');
+  }
+}
+
+/** Original stored recipient arm, never the private resolved account binding. */
+export function validateInvitationRecordProjection(record: InvitationRecord, original: InvitationRecord['recipient']): void {
+  const actual = normalizeInvitationRecipient(record);
+  if (actual.case !== original.case || actual.value !== original.value ||
+      ![1, 2, 3].includes(record.role) || ![1, 2, 3, 4, 5].includes(record.state)) throw new InvitationError('InvalidRecord');
+  try { validateInvitationResolution({ inviter: record.inviter, inviterViaAgentLabel: record.inviterViaAgentLabel } as InvitationResolution); }
+  catch { throw new InvitationError('InvalidRecord'); }
+}
+
+export function validateSpoolInvitationProjection(event: import('./views_pb.js').SpoolEvent, original: InvitationRecord['recipient']): void {
+  if (event.payload.case === 'invitation') validateInvitationRecordProjection(event.payload.value, original);
+}
+export function validateNotificationInvitationProjection(record: import('./activity_pb.js').NotificationRecord, original: InvitationRecord['recipient']): void {
+  if (record.invitation) validateInvitationRecordProjection(record.invitation, original);
+}
+export function validateAttentionInvitationProjection(item: import('./activity_pb.js').AttentionItem, original: InvitationRecord['recipient']): void {
+  if (item.invitation) validateInvitationRecordProjection(item.invitation, original);
 }

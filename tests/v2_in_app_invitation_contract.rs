@@ -100,3 +100,36 @@ fn decline_is_an_idempotent_terminal_state() {
         ]
     );
 }
+
+#[test]
+fn review_fix_fields_and_reasons_have_stable_tags() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("descriptor");
+    for (message, field, tag) in [
+        ("ObserveNotificationsRequest", "effective_delivery_spool", 5),
+        (
+            "SetNotificationPreferencesRequest",
+            "clear_unreadable_scopes",
+            4,
+        ),
+    ] {
+        let descriptor = pool
+            .get_message_by_name(&format!("heddle.api.v1alpha2.{message}"))
+            .expect("message");
+        assert_eq!(
+            descriptor.get_field_by_name(field).expect("field").number(),
+            tag
+        );
+    }
+    let reasons = pool
+        .get_enum_by_name("heddle.api.common.ErrorReason")
+        .expect("reasons");
+    for (name, value) in [
+        ("ERROR_REASON_INVITATION_HUMAN_SESSION_REQUIRED", 204),
+        ("ERROR_REASON_INVITATION_INVITER_AUTHORITY_LOST", 205),
+    ] {
+        assert_eq!(
+            reasons.get_value_by_name(name).expect("reason").number(),
+            value
+        );
+    }
+}

@@ -70,6 +70,7 @@ copyFileSync("packages/typescript/runtime/v2-hybrid-codec.ts", join(v2Root, "_hy
 copyFileSync("packages/typescript/runtime/v2-import-authority.ts", join(v2Root, "import-authority.ts"));
 copyFileSync("packages/typescript/runtime/v2-witness-trust.ts", join(v2Root, "witness-trust.ts"));
 copyFileSync("packages/typescript/runtime/v2-native-witness.ts", join(v2Root, "native-witness.ts"));
+copyFileSync("packages/typescript/runtime/v2-writer-authority.ts", join(v2Root, "writer-authority.ts"));
 copyFileSync("packages/typescript/runtime/v2-foreign-dependencies.ts", join(v2Root, "_foreign-dependencies.ts"));
 const v2Modules = readdirSync(v2Root)
   .filter((name) => name.endsWith(".ts") && name !== "index.ts" && !name.startsWith("_"))

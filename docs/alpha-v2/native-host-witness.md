@@ -1,4 +1,4 @@
-# Native host witnessing v1 (alpha.34)
+# Native host witnessing v1 (alpha.35)
 
 Normative companion to `import-authority-host-witness.md`; closes api#339 and api#343.
 The original native formats, import formats, witness statement/set formats,
@@ -25,6 +25,8 @@ unknown/discarded fields, duplicate tags, noncanonical order and trailing bytes.
    owner ID (32), Spool owner's account UUID (16), accepted owner-state hash (32),
    ownership-transfer sequence u64. This is `ImportIdentityV1`'s unchanged public
    layout reused as a job-independent lineage tuple; it grants no import scope.
+   It is the Spool governance identity, independent of the genesis author's
+   Account and that author's `ThreadControlAuthority.owner`.
 3. `owner_kind` u32 = 1 ACCOUNT or 2 LOCAL_KEY, matching the immutable genesis.
 4. `genesis_digest` counted original native typed BLAKE3 ID (32).
 5. `original_signatures_digest` counted SHA-256 commitment (32), defined below.
@@ -88,10 +90,13 @@ carrier; no delegation can authorize any of them. Purpose 4 can carry unchanged
 
 CLI **and browser** StartThread producers must:
 
-1. Select/verify the immutable Spool lineage and current owner authority; obtain
-   the exact portable native `ThreadControlAuthority` for StartThread. Bind the
+1. Select/verify the immutable Spool lineage and its governance owner authority;
+   independently resolve the author's own account authority and obtain its exact
+   portable native `ThreadControlAuthority` for StartThread. Bind the
    original account/creator and exact `/heddle.api.v1alpha2.ThreadService/StartThread`
    method, using the existing owner → mint-root/capability verification.
+   The envelope's `owner.root.root.account_uuid` MUST equal the immutable genesis
+   Account, with the owner-identity hard rule below.
 2. Construct and sign the original `heddle-thread-genesis-v1` as before. Freeze
    both that original and the canonical authority envelope before constructing
    the binding. Authority may be prepared before genesis; it must be final before
@@ -106,6 +111,123 @@ CLI **and browser** StartThread producers must:
    export them with the complete native witness carrier. A different envelope
    requires a new creator binding, never a rewritten first admission or a host-
    fabricated signature. Retained identities cannot be silently converted.
+
+## Writer authority (i)/(ii)/(iii)
+
+**Owner decision, 2026-10-05; alpha.35 hard cut from alpha.34.** Resolve three
+independent things for native P1/P2/P4, including native continuations carried
+in an import bundle:
+
+1. **(i) Spool governance.** Select the Spool owner, lineage, owner-chain digest,
+   accepted transfers and owner-signed policy head exactly as before. `identity`
+   and the statement's owner/state/transfer fields remain the Spool lineage.
+2. **(ii) Author/actor account authority.** Resolve the actor's OWN
+   `ThreadControlAuthority`, immutable root, verified owner history and original
+   device mint root. For P1, the envelope root account equals the genesis Account;
+   for P2 it equals the original actor or accepting account in the native claim
+   or resolution. A Capture on the owner's Thread still uses the co-writer's
+   authority. Reviews use their own reviewers' authorities. P4 resolves the
+   landing requester's account from the **verified sealed token's subject**,
+   never from the Spool owner or the untrusted envelope alone. Derived agents
+   use their verified subject account; agent attribution remains native.
+   The host resolves the account's independently installed state (the same
+   source used by ObserveIdentity). An offline receiver verifies the envelope's
+   own OwnerHistory as the exact historical acceptance attested by the witness.
+   Any independently pinned newer state for that account MUST extend that
+   history and have the same immutable owner ID. Verify owner signatures,
+   mint-root association, sealed Biscuit signature/attenuation, cnf = publisher,
+   exact native method, exact Spool path, validity and credential revocations.
+3. **(iii) Write role.** The authenticated purpose-1/2/4 statement **is the
+   host's testimony** that at its `admission_order`, under the issuance fence,
+   that actor held the role required by this operation on this exact Spool:
+   direct grant, ancestor grant with `include_descendants`, or ownership. The
+   host evaluates and rechecks this role with the authorization epoch in the
+   same transaction as durable admission and witness issuance. No new signed
+   field, owner-signed membership permission or independent role proof is added.
+
+**Hard rule:** when the actor's account equals `identity.owner_account_uuid`,
+the actor's immutable `owner_id` MUST exactly equal the independently selected
+Spool governance owner's `owner_id`. A self-signed root claiming that account
+UUID fails even with valid root, creator and witness signatures. Otherwise
+account equality with the Spool owner is neither required nor an authority
+substitute. Keep the original genesis owner and creator unchanged.
+
+Apply the selected owner-signed Spool policy's grow-only `revoked_key_ids` to
+each actor's **publisher and mint-root key IDs**, including co-writers, reviewers,
+landing requesters and boundary acceptors. This is the owner's offline-enforceable
+cut at the statement's bound policy head; it is separate from host grant removal
+and the Biscuit revocation callback. Removing a role after historical admission
+does not rewrite old statements. A later signed key cut governs statements
+bound to that policy head. Authenticate the policy chain and selected head;
+an unsigned list or a policy for another Spool cannot supply these facts.
+
+The Rust/TS binding verifier enforces P1's root-account match and owner-ID hard
+rule. Both public bundle validators enforce the hard rule and publisher/mint
+cuts for native P1 and native P2/P4 (including import continuations). They still
+require the native verifier's actor/subject selection, full owner/Biscuit,
+boundary and causal checks; decoding a carried root does not authenticate it.
+
+## Retained paired-device authority after Rotate
+
+Ordinary **Rotate** preserves a previously admitted device mint-root attachment;
+a paired leaf inherits the exact original attachment. No owner signature or
+authority is reminted or recertified. The attachment's issuer may be a prior
+root/state in the actor's verified owner history. It remains usable only while
+that issuer retains mint authority: **Recover clears it for every earlier
+issuer**, even if an old owner signs a new, backdated certificate afterward.
+Unknown issuers, issuer state/sequence/key mismatches and invalid signatures
+reject; certificate interval and ordinary key/credential revocations still apply.
+
+Verifiers receive the retained inventory as exact
+`SignedOwnerMintRootAttachment` records, per actor account and mint-root key:
+
+- **Issuance:** the host supplies its durable pre-transition admitted inventory
+  (registration/device records), independent of the envelope. A non-current
+  attachment MUST be byte-identical to an inventory member; a valid historical
+  signature or claimed enrollment time cannot establish admission.
+- **Offline receipt:** first authenticate the independently selected witness set
+  and exact P1/P2/P4 statement, retirement proof where required, payload bytes
+  and authority-envelope digest. Extract that payload's exact owner-mint
+  attachment and use it as the statement-attested inventory member for that
+  actor and mint root. The statement testifies that this non-current attachment
+  matched the host's durable inventory at issuance. No extra carrier field or
+  new mint-admission purpose is introduced. An attachment in an unrelated
+  payload or merely present elsewhere in the bundle cannot join this inventory.
+
+Then resolve the issuer by exact `(owner_state_hash, owner_sequence)` in the
+actor's independently verified owner history, with no Recover between that
+issuer and the selected actor state. An attested inventory member does not
+restore recovered or unknown authority. In the API's
+`verify_retained_owner_mint_root_attachment` /
+`verifyRetainedOwnerMintRootAttachment`, supply those verified issuer facts,
+`issuer_retained_mint_authority` / `issuerRetainedMintAuthority`, the exact
+`admitted_attachments` / `admittedAttachments` inventory, expected account/mint
+and statement observation time. These explicit inputs are checked for exact
+membership, issuer binding, interval and owner signature; the native owner
+verifier establishes their history/recovery provenance. The host MUST NOT use
+receiver testimony as its issuance inventory. Fresh enrollment always requires
+current owner authority. Apply the same inventory path to P1 StartThread,
+P2 operations/claims/resolutions, P4 requesters and import-source genesis where
+native account authority is verified. Temporary passkey associations retain
+their distinct existing proof shape; never reinterpret them as device roots.
+
+## P4 required CI checks
+
+**Owner decision, QA9 option B (2026-10-05).**
+`HostedIntegration.review_evidence` contains **only native Review operation IDs**;
+the P4 `HostedLandingWitnessV1.review_evidence` members are their exact native
+ThreadOperation/ThreadControl Review SignedRecords. CheckEvidence digests and
+records are not members of either set and MUST NOT be wrapped as native reviews.
+Required-check satisfaction is enforced host-side. The P4 statement testifies
+that the landing policy bound by `review_policy_version`, **including required
+checks**, was satisfied at execution/admission order under the issuance fence.
+Check evidence references may remain in host LandingSatisfaction/EvidenceService
+records for audit, outside P4. A receiver can verify the original request proof,
+Review signatures and authorities, source/target ancestry and policy-version
+binding offline. It cannot independently prove which CI checks passed, who
+reported them, evidence completeness, supersession, expiry/revocation judgement,
+or the absence of an unsuperseded failure; it trusts the authenticated host
+witness's landing-policy testimony for those host-side decisions.
 
 Local `adopt` continues to sign native genesis/content with the local key and
 preserve Git attribution. **LocalKey equals creator**, including in the original

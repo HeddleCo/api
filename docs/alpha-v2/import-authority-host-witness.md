@@ -79,6 +79,7 @@ contains a full limit and the signed genesis-binding digest, not a bare URL/ref.
 
 Authorization key IDs retain the owner namespace:
 H(`heddle-key-v1` || u32be(1) || raw public key).
+
 Witness selectors are H(`heddle-hosted-witness-key-v1\0` || raw public key).
 `executor_id` means this selector, never an owner, endpoint or trust anchor.
 New witness statement domains deliberately distinguish new accepted-state/order
@@ -529,6 +530,44 @@ request and request PoP only and do not silently complete/sign a delegation.
 The generated `commit_vectors` freeze passing completed commits, future
 not-before at the skew edge, and negatives for every frozen scalar/byte/string
 field (including nested identity, scope, both branches and manifest limits),
+## Writer authority (i)/(ii)/(iii)
+
+**Owner decision, 2026-10-05 (QA7 option B), alpha.35 hard cut.** Independently
+resolve (i) Spool governance owner/lineage/policy, (ii) each native author/actor's
+OWN account authority, and (iii) that actor's required write role on the Spool.
+`identity`, owner-chain digest and statement owner/state/transfer remain (i).
+P2 Capture/control/review actors and claim/resolution or boundary acceptors use
+their own verified ThreadControlAuthority, owner history and device mint root,
+including work on the Spool owner's Thread. The P4 landing requester account
+comes from the **verified sealed token's subject**, never the Spool owner UUID.
+If that account equals the Spool owner's account, immutable owner IDs MUST match
+exactly; a self-signed root claiming the owner's UUID fails. The host resolves
+the actor's installed account state; the offline receiver verifies the envelope's
+own witness-attested history, and any independently pinned newer actor state
+must extend it. All native method/path/cnf, signature, validity and revocation
+checks remain mandatory.
+
+The P1/P2/P4 statement **is the host's testimony** that the actor held the
+required role at `admission_order` under the issuance fence: direct grant,
+ancestor grant with `include_descendants`, or ownership. No new signed field or
+owner-signed native member permission is added. Apply the bound owner-signed
+Spool policy's grow-only `revoked_key_ids` to the actor's publisher and mint-root
+keys, including co-writers, as an offline-enforceable cut. An import job's
+separate member permission/delegation and P3 do not grant native write roles.
+
+Device attachments admitted under a prior root/state survive ordinary Rotate
+without recertification; only Recover clears retained mint authority for prior
+issuers. At issuance the verifier receives exact durable host-admitted
+attachments per actor account/mint root. Receivers first authenticate each exact
+P1/P2/P4 statement and payload/envelope digest, then use only that payload's
+attested attachment as its retained inventory. Resolve its exact historical
+issuer state/sequence/key through the verified actor history, with no Recover
+since; unknown/recovered issuers, newly forged old-owner certificates, invalid
+signatures and interval/revocation failures reject. A historical signature alone
+cannot establish admission. The explicit API helper inputs and host/receiver
+inventory rules are normative in
+[native-host-witness.md](native-host-witness.md#retained-paired-device-authority-after-rotate).
+
 ## Witness set, statements and retirement
 
 The complete sorted root-signed set is served at
@@ -790,8 +829,19 @@ parents and executor. Its named MessagePack fields, in native order, are
 use arrays of integer bytes; sets are bytewise sorted arrays. `result` is native
 Capture v1, described below. This selects the existing
 `heddle-hosted-integration-v1` meaning; HostedImport is explicitly ineligible.
+`HostedIntegration.review_evidence` contains ONLY native Review operation IDs;
+P4 retains their exact ThreadOperation/ThreadControl Review SignedRecords.
+Required CI checks are enforced host-side: the authenticated P4 statement
+testifies that the policy at the bound `review_policy_version`, required checks
+included, was satisfied at execution/admission order under the issuance fence.
+CheckEvidence records/digests are NOT P4 members. The host may keep evidence refs
+in LandingSatisfaction and EvidenceService for audit. Offline receivers verify
+Review signatures/authority, request proof, source/target ancestry and policy
+version binding. They cannot independently prove check verdicts/reporters,
+completeness, supersession, expiry/revocation judgement or absence of failures;
+those remain host testimony (QA9 option B, 2026-10-05).
 The native landing verifier still checks exact source State, target ancestry,
-policy and all review/evidence originals. Request proof is the original
+policy binding and all native Review originals. Request proof is the original
 `signing::unary_bytes` / `unarySigningBytes` input for
 `/heddle.api.v1alpha2.ThreadService/LandThread`, positive millisecond timestamp,
 16-byte nonce, deterministic `LandThreadRequest` protobuf bytes and signature.

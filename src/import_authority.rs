@@ -2363,6 +2363,35 @@ fn validate_bundle_history(
             s.policy_sequence,
             &s.policy_state_hash,
         )?;
+        let envelope = match s.purpose {
+            2 => Some(
+                bundle
+                    .authority_witnesses
+                    .iter()
+                    .find(|p| canonical(*p).is_ok_and(|bytes| bytes == s.canonical_payload))
+                    .ok_or(Reject::Scope)?
+                    .authority_envelope
+                    .as_slice(),
+            ),
+            4 => Some(
+                bundle
+                    .landing_witnesses
+                    .iter()
+                    .find(|p| canonical(*p).is_ok_and(|bytes| bytes == s.canonical_payload))
+                    .ok_or(Reject::Scope)?
+                    .authority_envelope
+                    .as_slice(),
+            ),
+            _ => None,
+        };
+        if let Some(envelope) = envelope {
+            crate::writer_authority::check_witness_writer(
+                s,
+                envelope,
+                &bundle.owner_histories,
+                &bundle.policies,
+            )?;
+        }
     }
     sorted(&bundle.manifests, manifest_digest)?;
     if let Some(p) = &bundle.member_permission

@@ -10,7 +10,12 @@ import "heddle/api/v1alpha2/stream.proto";
 
 // Original author evidence bound into each signed Thread metadata operation.
 // Supplied history never establishes trust: receivers verify against separately
-// admitted current account authority at first durable admission. Canonical
+// admitted author/actor account authority at first durable admission, resolved
+// independently of Spool governance. Durable device certificates survive an
+// ordinary owner Rotate without recertification: match the exact retained
+// host-admitted (or P1/P2/P4 witness-attested) attachment and a historical issuer
+// with no Recover since. See native-host-witness.md for inventory provenance.
+// Canonical
 // protobuf encoding is mandatory and the entire envelope is bounded to 64 KiB.
 message ThreadControlAuthority {
   uint32 format = 1; // Must be 1.
@@ -539,6 +544,8 @@ message CredentialResult {
   OwnerAuthorizationBundle owner_authorization = 4;
   // Exact retained public association for this credential’s original mint root.
   // A paired leaf inherits it; no owner signature or authority is reminted.
+  // Ordinary owner Rotate preserves the admitted attachment; Recover invalidates
+  // retained mint authority for earlier issuers. See native-host-witness.md.
   SignedOwnerMintRootAttachment mint_root_attachment = 5;
   // Verified original human authentication, not inferred from credential kind.
   // Provisioned agent capabilities have no human authentication method.

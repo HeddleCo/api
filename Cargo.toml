@@ -1,6 +1,6 @@
 [package]
 name = "heddle-api"
-version = "0.31.0-alpha.34"
+version = "0.31.0-alpha.35"
 edition = "2024"
 authors = ["HeddleCo"]
 license = "Apache-2.0"

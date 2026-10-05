@@ -1,6 +1,7 @@
 import { ForeignReferences, foreignThread } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
+import { checkWitnessWriter } from "./writer-authority.js";
 import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse, type RetryImportSourceRequest } from "./integration_pb.js";
 import { RecordRefSchema, SpoolRefSchema } from "./common_pb.js";
 import type { HybridImportJobSelector, MutationResponse, OperationRecord, SpoolRef, RecordRef } from "./common_pb.js";
@@ -457,7 +458,12 @@ function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolea
     else if(original.format==="heddle-thread-genesis-v1"&&!b.genesisWitnesses.some(p=>p.originalGenesis&&equal(toBinary(SignedRecordSchema,p.originalGenesis),toBinary(SignedRecordSchema,original))))reject("Scope");
   }
   foreign.finish();
-  for(const {body:s} of b.statements){if(!s)reject("Canonical");validateStatementBoundary(s);requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);}
+  for(const {body:s} of b.statements){if(!s)reject("Canonical");validateStatementBoundary(s);requirePolicyHistory(b.policies,s.spoolUuid,s.policySequence,s.policyStateHash);
+    if(s.purpose===2||s.purpose===4){
+      const envelope=s.purpose===2?b.authorityWitnesses.find(p=>equal(canonicalHybridV1(api.ImportAuthorityWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope:b.landingWitnesses.find(p=>equal(canonicalHybridV1(api.HostedLandingWitnessV1Schema,p),s.canonicalPayload))?.authorityEnvelope;
+      checkWitnessWriter(s,envelope??reject("Scope"),b.ownerHistories,b.policies);
+    }
+  }
   for(const list of [b.manifests.map(manifestDigest)])for(let i=1;i<list.length;i++)if(compare(list[i-1]!,list[i]!)>=0)reject("Canonical");
   if(b.memberPermission&&!equal(canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,resolveBundlePermission(b,signedPermissionDigest(b.memberPermission))!),canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,b.memberPermission)))reject("ImportPermission");const terminal=b.terminalManifest??reject("Canonical");resolveBundleManifest(b,manifestDigest(terminal));if(b.delegations.length!==1)reject("Canonical");
   b.delegations.forEach(d=>{const body=d.body??reject("Canonical");resolveBundlePermission(b,body.parentPermissionDigest);for(const branch of body.branchManifest){const g=b.genesisAuthorities.find(g=>equal(signedGenesisDigest(g),branch.genesisAuthorityDigest))?.body??reject("Scope");resolveBundlePermission(b,g.parentPermissionDigest);if(!b.originalGeneses.some(o=>equal(threadGenesisId(o.canonicalRecord),g.genesisDigest))||!b.creatorAuthorityEnvelopes.some(e=>equal(hash(e),g.creatorAuthorityEnvelopeDigest)))reject("Scope");if(requireAdmissions&&b.operations.some(o=>equal((o.body??reject("Canonical")).genesisDigest,g.genesisDigest))&&!b.genesisWitnesses.some(p=>p.binding&&equal(signedGenesisDigest(p.binding),branch.genesisAuthorityDigest)&&p.originalGenesis&&equal(threadGenesisId(p.originalGenesis.canonicalRecord),g.genesisDigest)&&b.originalGeneses.some(o=>equal(signedNativeDigest(o),signedNativeDigest(p.originalGenesis!)))&&equal(hash(p.creatorAuthorityEnvelope),g.creatorAuthorityEnvelopeDigest)&&b.statements.some(s=>s.body?.purpose===1&&equal(s.body.canonicalPayload,canonicalHybridV1(api.ImportGenesisWitnessV1Schema,p)))))reject("Scope");}});

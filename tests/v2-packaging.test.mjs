@@ -90,3 +90,11 @@ test('npm public import-authority export includes alpha33 one-shot helpers', asy
   assert.equal(runtime.signImportRenewal, undefined);
   assert.equal(typeof runtime.validateRepositorySizeEstimate, 'function');
 });
+
+test('npm public writer-authority export exposes alpha35 verification helpers', async () => {
+  const runtime = await import('@heddleco/api/v2/writer-authority');
+  assert.equal(typeof runtime.decodeWriterAuthority, 'function');
+  assert.equal(typeof runtime.verifyWriterAccountBinding, 'function');
+  assert.equal(typeof runtime.checkWriterKeys, 'function');
+  assert.equal(typeof runtime.verifyRetainedOwnerMintRootAttachment, 'function');
+});

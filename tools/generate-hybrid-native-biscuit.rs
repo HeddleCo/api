@@ -9,11 +9,22 @@ fn fixture<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, String> {
 }
 fn main() -> Result<(), String> {
     let path = std::env::args().nth(1).ok_or("output path required")?;
-    let account = std::env::args().nth(2).unwrap_or_else(|| "21212121-2121-2121-2121-212121212121".to_owned());
+    let account = std::env::args()
+        .nth(2)
+        .unwrap_or_else(|| "21212121-2121-2121-2121-212121212121".to_owned());
     if account.len() != 36 || account.bytes().any(|b| !b.is_ascii_hexdigit() && b != b'-') {
         return Err("fixture account UUID required".to_owned());
     }
-    let root = fixture(KeyPair::from_bytes(&[2; 32], Algorithm::Ed25519.into()))?;
+    let root_seed = std::env::args()
+        .nth(3)
+        .map(|value| value.parse::<u8>())
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .unwrap_or(2);
+    let root = fixture(KeyPair::from_bytes(
+        &[root_seed; 32],
+        Algorithm::Ed25519.into(),
+    ))?;
     let next = fixture(KeyPair::from_bytes(&[14; 32], Algorithm::Ed25519.into()))?;
     let mut builder = Biscuit::builder();
     for fact in [

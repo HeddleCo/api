@@ -147,5 +147,7 @@ test('LocalKey cutoff ignores later claim and resolution in both install orders'
    assert.equal(native.localWorkCutoff(installed,original,order),carrier.foreignDependencies[0].prefixAdmissionOrder);
   }
  }
+ assert.throws(()=>native.localWorkCutoff(history,original,204n),{reason:'Scope'});
+ assert.throws(()=>native.localWorkCutoff(history,original,237n),{reason:'Scope'});
  assert.equal(native.localWorkCutoff(history,original,238n),238n);
 });

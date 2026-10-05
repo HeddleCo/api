@@ -437,7 +437,7 @@ impl Receiver {
                     &record(f, stage)?,
                     &selected_set(f)?,
                     1_200_001,
-                &[],
+                    &[],
                 )?;
             }
         }
@@ -659,10 +659,74 @@ impl Receiver {
         Ok(())
     }
 }
+fn verify_local_cutoff(f: &Value) -> Result<()> {
+    let original: wire::SignedRecord = record(f, "local_cutoff_original")?;
+    let prefix: wire::NativePublicProofBundleV1 = record(f, "local_cutoff_prefix")?;
+    let history: wire::NativePublicProofBundleV1 = record(f, "local_cutoff_history")?;
+    let carrier: wire::ImportPublicProofBundleV1 = record(f, "local_cutoff_dependent")?;
+    import_stage(f, &carrier)?;
+    let dependent = carrier
+        .statements
+        .iter()
+        .filter_map(|s| s.body.as_ref())
+        .find(|s| s.purpose == 2)
+        .context("dependent statement")?;
+    let reference = carrier.foreign_dependencies.first().context("reference")?;
+    ensure!(
+        reference.signed_native_digest == import::signed_native_digest(&original)?,
+        "exact local original"
+    );
+    for histories in [[&prefix, &history], [&history, &prefix]] {
+        for installed in histories {
+            let cutoff = contract::native_witness::local_work_cutoff(
+                installed,
+                &original,
+                dependent.admission_order,
+            )?;
+            ensure!(
+                cutoff == reference.prefix_admission_order,
+                "same dependent carrier cutoff under both install orders"
+            );
+            let mut context = serde_json::from_str::<Value>(include_str!(
+                "../../../tests/fixtures/native-host-witness-v1.json"
+            ))?;
+            // Verify installed history with published native codecs, signatures,
+            // owner authority and explicit conflict resolution.
+            context["wire_vectors"]["installed"] =
+                serde_json::json!({"wire_hex": hex::encode(installed.encode_to_vec())});
+            context["wire_vectors"]["current_set"] = f["wire_vectors"]["mixed_set"].clone();
+            context["positive"] = serde_json::json!(["installed"]);
+            verify_native_witness_vectors(&context)?;
+            // Native authorization uses the same admission-time proof closure.
+            let mut eligible = installed.clone();
+            eligible.statements.retain(|s| {
+                s.body
+                    .as_ref()
+                    .is_some_and(|s| s.admission_order <= dependent.admission_order)
+            });
+            eligible.authority_witnesses.retain(|p| {
+                codec::canonical(p).is_ok_and(|payload| {
+                    eligible.statements.iter().any(|s| {
+                        s.body
+                            .as_ref()
+                            .is_some_and(|s| s.purpose == 2 && s.canonical_payload == payload)
+                    })
+                })
+            });
+            context["wire_vectors"]["installed"]["wire_hex"] =
+                serde_json::json!(hex::encode(eligible.encode_to_vec()));
+            verify_native_witness_vectors(&context)?;
+        }
+    }
+    println!("LOCAL CUTOFF PASS claim A, later conflict B and resolution: both install orders");
+    Ok(())
+}
+
 pub(super) fn verify() -> Result<()> {
     let f = serde_json::from_str::<Value>(include_str!(
         "../../../tests/fixtures/foreign-dependencies-alpha34.json"
     ))?;
+    verify_local_cutoff(&f)?;
     for v in f["positive"].as_array().context("positives")? {
         let mut receiver = Receiver::default();
         let stage = v["stage"].as_str().context("stage")?;

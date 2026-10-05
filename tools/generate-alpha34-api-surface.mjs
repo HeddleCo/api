@@ -24,7 +24,7 @@ function typescript(source){
  }
  return declarations;
 }
-let document='# Alpha.34 exact API surface\n\nGenerated against alpha.33 (`c9bd6ba2`). Existing verifier entry-point signatures remain unchanged. Added role helpers/context and generated protobuf surface are listed below.\n';
+let document='# Alpha.34 exact API surface\n\nGenerated against alpha.33 (`c9bd6ba2`). Native witness verification gains a forbidden landing key parameter (required in Rust, optional in TS). Added cutoff/role helpers, context and generated protobuf surface are listed below.\n';
 for(const [language,path,parse] of [['rust','src/import_authority.rs',rust],['rust','src/native_witness.rs',rust],['typescript','packages/typescript/runtime/v2-import-authority.ts',typescript],['typescript','packages/typescript/runtime/v2-native-witness.ts',typescript],['rust','src/witness_trust.rs',rust],['typescript','packages/typescript/runtime/v2-witness-trust.ts',typescript]]){
  const before=parse(execFileSync('git',['show',`${baseline}:${path}`],{maxBuffer:8*1024*1024}).toString()),after=parse(readFileSync(path,'utf8'));
  document+=`\n## ${language==='rust'?'Rust':'TypeScript'}\n\nSource: \`${path}\`.\n`;
@@ -42,7 +42,7 @@ document+=`
 ## Runtime role surface
 
 Rust adds \`import_authority::verify_landing_key_roles(payload, known_job_keys, forbidden_keys)\` and \`VerifiedWitnessSet::known_job_keys(&self) -> &[Vec<u8>]\`. \`ImportBundleOwnerExpectation\` gains the required \`forbidden_landing_keys: &[Vec<u8>]\` receiver input.
-TypeScript adds \`verifyLandingKeyRoles(payload, knownJobKeys, forbiddenKeys = [])\`, \`VerifiedWitnessSet.knownJobKeys\` (a copy on access), and optional \`ImportOwnerExpectation.forbiddenLandingKeys\` (defaults to an empty list). Receiver integrations must supply their complete selected role lists.
+TypeScript adds \`verifyLandingKeyRoles(payload, knownJobKeys, forbiddenKeys = [])\`, \`VerifiedWitnessSet.knownJobKeys\` (a copy on access), and optional \`ImportOwnerExpectation.forbiddenLandingKeys\` (defaults to an empty list). Native witness verification accepts the same forbidden landing list (required in Rust, optional and empty by default in TypeScript). The new \`local_work_cutoff\` / \`localWorkCutoff\` helpers select LocalKey proof cutoffs as of the authenticated dependent admission order. Receiver integrations must supply their complete selected role lists and verify native ownership and causal closure as of that order.
 
 ## Generated protobuf surface
 

@@ -1132,24 +1132,32 @@ evidence and enforce snapshot high-water checks when extending an export.
 Staging is at ORIGINAL/PREFIX granularity, never whole-Thread granularity.
 The tuple `(origin, thread_genesis_digest, signed_native_digest,
 prefix_admission_order)` identifies the exact original and its own-origin prefix.
-For a delegated import original, the cutoff is the `admission_order` of its exact
-P3 publication, selected by replaying `operations` in progressive-manifest order.
-The P3 resulting frontier MUST include the original's native operation ID and
+For a delegated import original, the cutoff is the `admission_order` of the
+**earliest P3 in progressive-manifest order** whose resulting frontier includes
+that original, selected by replaying `operations`.
+That earliest P3 resulting frontier MUST include the original's native operation
+ID and
 its content digest MUST bind that exact capture. The selected manifest contains
 all publications through that position, including prior branches of that job.
 For an Account/control/claim/resolution original, the cutoff is its exact P2
 statement's `admission_order`; for a hosted integration, its exact P4; for a
-genesis, its P1. Native LocalKey work has no synthetic P2: use the maximum
-admission order in its required P1/ownership-claim/resolution proof closure and
-include only the exact signed original's native causal ancestor closure. Its
-signed digest disambiguates originals sharing that authority cutoff.
+genesis, its P1. Native LocalKey work has no synthetic P2: evaluate its required
+P1/ownership-claim/resolution proof closure **as of the dependent statement's own
+admission order**, ignoring claims and resolutions admitted later. Use the maximum
+admission order in that closure and include only the exact signed original's
+native causal ancestor closure. A fully synced receiver and a fresh receiver MUST
+select the same cutoff for the same dependent statement. Its signed digest
+disambiguates originals sharing that authority cutoff. The portable
+`local_work_cutoff` / `localWorkCutoff` helpers select this cutoff from independently
+verified native history; receivers apply native ownership and causal checks to the
+same as-of closure.
 
 Fetch sends a bounded prefix carrier with the original and all earlier necessary
 own-origin admissions, exact signed sidecars/statements, causal ancestors,
 owner/policy lineage and retirement proofs. It excludes later P2/P4 admissions
 and their foreign obligations. Native prefixes filter statement/sidecar arrays
 by the cutoff and retain the required native causal closure. Import prefixes
-also truncate `operations` through the selected P3 position, retain their exact
+also truncate `operations` through that earliest P3 position, retain their exact
 progressive manifests, and select that authenticated cumulative manifest as
 `terminal_manifest`; the signed delegation/genesis bindings stay unchanged.
 Import native continuations are included only through their P2/P4 cutoff.
@@ -1187,8 +1195,8 @@ missing stage or substituted original is `Scope`.
 Under the receiver's mutation lock, recheck exact original bytes and signatures,
 immutable genesis, Spool/deployment membership, and its retained origin proof.
 For imported job originals, recheck delegation/job publisher binding and the
-exact P3 frontier AND content binding. For native originals and import native
-continuations, recheck their exact P1/P2/P4 admission statement and full native
+earliest P3 in progressive-manifest order, with exact frontier AND content
+binding. For native originals and import native continuations, recheck their exact P1/P2/P4 admission statement and full native
 causal/owner/capability/State rules; LocalKey work retains its ownership proof.
 Recheck every selected witness against the independently authenticated CURRENT
 set, root epoch, generation and clock floors: CURRENT requires interval and
@@ -1215,8 +1223,10 @@ The request-role refusal is portable and shipped in both Rust and TS:
 known-job and forbidden-landing lists. Import structural validation checks bundle
 delegation keys; import witness verification also checks selected owner facts at
 the authenticated landing time. Native witness verification checks the known job
-keys retained from witness-set verification; receivers also invoke the helper
-with their complete role lists. `forbidden_landing_keys` /
+keys retained from witness-set verification and the receiver-supplied
+`forbidden_landing_keys` / `forbiddenLandingKeys` parameter. Receivers supply their
+complete selected role lists; TS defaults an omitted forbidden list to empty.
+`forbidden_landing_keys` /
 `forbiddenLandingKeys` is distinct from keys forbidden to assume a JOB role:
 ordinary device keys can be forbidden job keys and valid landing signers.
 

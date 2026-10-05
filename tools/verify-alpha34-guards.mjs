@@ -5,6 +5,8 @@ import {spawnSync} from 'node:child_process';
 const directory=process.argv[2]??'/tmp/api-alpha34-guards';mkdirSync(directory,{recursive:true});
 const helper='packages/typescript/dist/v1alpha2/_foreign-dependencies.js';
 const cases=[
+ ['local_cutoff_asof','packages/typescript/dist/v1alpha2/native-witness.js','LocalKey cutoff ignores later','s.admissionOrder > dependentAdmissionOrder','false'],
+ ['native_forbidden_roles','packages/typescript/dist/v1alpha2/native-witness.js','native witnesses apply forbidden','verifyLandingKeyRoles(p, set.knownJobKeys, forbiddenLandingKeys);','verifyLandingKeyRoles(p, set.knownJobKeys);'],
  ['native_foreign_support','packages/typescript/dist/v1alpha2/native-witness.js','foreign closure PASS native_child_imported_frontier','await foreign.verify(original);','reject("Scope");'],
  ['import_foreign_support','packages/typescript/dist/v1alpha2/import-authority.js','foreign closure PASS native_child_imported_main','foreign.require(original);','reject("Scope");'],
  ['foreign_bound','packages/typescript/dist/v1alpha2/native-witness.js','foreign REJECT then PASS native_foreign_over_bound','toBinary(api.NativePublicProofBundleV1Schema, b).length > 1048576','false'],
@@ -17,7 +19,7 @@ const cases=[
  ['foreign_unknown_origin',helper,'foreign REJECT then PASS import_foreign_origin_unknown',' || ![ForeignDependencyOrigin.IMPORT, ForeignDependencyOrigin.NATIVE].includes(entry.origin)',''],
  ['foreign_width',helper,'foreign REJECT then PASS import_foreign_width','width(entry.signedNativeDigest, 32);',''],
  ['local_import_binding','tests/v2-foreign-dependencies.test.mjs','staged receiver REJECT then PASS unbound_local_key_import_source',"if(!row?.job||!equal(row.job,new Uint8Array(source.publisher)))reject('ImportPermission');",''],
- ['job_landing_role','packages/typescript/dist/v1alpha2/native-witness.js','foreign REJECT then PASS job_signed_landing','verifyLandingKeyRoles(p, set.knownJobKeys);',''],
+ ['job_landing_role','packages/typescript/dist/v1alpha2/native-witness.js','foreign REJECT then PASS job_signed_landing','verifyLandingKeyRoles(p, set.knownJobKeys, forbiddenLandingKeys);',''],
  ['missing_stage','tests/v2-foreign-dependencies.test.mjs','staged receiver REJECT then PASS missing_frontier_stage',"if(!row||row.origin!==ref.origin||!equal(row.thread,ref.threadGenesisDigest)||row.admissionOrder!==ref.prefixAdmissionOrder||!equal(row.spool,b.ownerGenesis.genesis.spoolUuid)||row.authority!==b.witnessSet.body.deploymentAuthority)reject('Scope');",''],
  ['native_p2_subject','packages/typescript/dist/v1alpha2/native-witness.js','foreign REJECT then PASS native_foreign_p2_subject','if (!b.genesisWitnesses.some(g => g.originalGenesis && equal(threadGenesisId(g.originalGenesis.canonicalRecord), subjectThread)))','if (false)'],
  ['import_p2_subject','packages/typescript/dist/v1alpha2/import-authority.js','foreign REJECT then PASS import_foreign_p2_subject','if (!b.genesisWitnesses.some(g => g.originalGenesis && equal(threadGenesisId(g.originalGenesis.canonicalRecord), subjectThread)))','if (false)'],

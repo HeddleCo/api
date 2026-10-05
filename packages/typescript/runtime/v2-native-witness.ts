@@ -159,9 +159,9 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   foreign.finish();
 }
 /** All statements resolve separately, including exact retirement proofs. */
-export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint,_forbiddenLandingKeys:Uint8Array[]=[]):Promise<void> {
+export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint,forbiddenLandingKeys:Uint8Array[]=[]):Promise<void> {
   b=clone(api.NativePublicProofBundleV1Schema,b);await validatePublicNativeBundle(b);
-  for(const p of b.landingWitnesses)verifyLandingKeyRoles(p,set.knownJobKeys);
+  for(const p of b.landingWitnesses)verifyLandingKeyRoles(p,set.knownJobKeys,forbiddenLandingKeys);
   // The opaque verified snapshot, rather than the carrier, selects trust.
   if(!b.witnessSet?.body||!equal(b.witnessSet.bodyDigest,set.digest)||!equal(signingDigest("heddle-hosted-witness-set-v1\0",(await import("../common/hosted_witness_pb.js")).HostedWitnessSetV1Schema,b.witnessSet.body),set.digest))reject("StaleContext");
   for(const signed of b.statements){
@@ -176,13 +176,16 @@ export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV
 /** Select a LocalKey proof cutoff from independently verified native history.
  * Native causal/owner checks remain required; the order comes from the exact
  * authenticated dependent statement. */
-export function localWorkCutoff(b:api.NativePublicProofBundleV1,original:SignedRecord,_dependentAdmissionOrder:bigint):bigint {
+export function localWorkCutoff(b:api.NativePublicProofBundleV1,original:SignedRecord,dependentAdmissionOrder:bigint):bigint {
   const subject=thread(original),orders:bigint[]=[],claims:Uint8Array[]=[],resolutions:SignedRecord[]=[];
+  let genesisCount=0;
   for(const signed of b.statements){
     const s=signed.body??reject("Canonical");
-    if(s.purpose===1){for(const p of b.genesisWitnesses){const binding=p.binding?.body??reject("Canonical");if(equal(binding.genesisDigest,subject)&&equal(s.canonicalPayload,canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p))){if(binding.ownerKind!==2)reject("Scope");orders.push(s.admissionOrder);}}}
+    if(s.admissionOrder>dependentAdmissionOrder)continue;
+    if(s.purpose===1){for(const p of b.genesisWitnesses){const binding=p.binding?.body??reject("Canonical");if(equal(binding.genesisDigest,subject)&&equal(s.canonicalPayload,canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p))){if(binding.ownerKind!==2)reject("Scope");genesisCount++;orders.push(s.admissionOrder);}}}
     else if(s.purpose===2){for(const p of b.authorityWitnesses){if(![2,3].includes(p.kind)||!equal(s.canonicalPayload,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p)))continue;const r=p.original??reject("Canonical");if(!equal(thread(r),subject))continue;orders.push(s.admissionOrder);if(p.kind===2)claims.push(nativeOriginalId(r));else resolutions.push(r);}}
   }
+  if(genesisCount!==1)reject("Scope");
   if(resolutions.length===0){if(claims.length!==1)reject("Scope");}
   else if(resolutions.length===1){const r=selectors(resolutions[0]!);claims.sort(compare);const conflicts=r.conflicting_claims;if(!Array.isArray(conflicts)||claims.length!==conflicts.length||claims.some((c,i)=>!equal(c,octets(conflicts[i],32)))||!claims.some(c=>equal(c,octets(r.winning_claim,32))))reject("Scope");}
   else reject("Scope");

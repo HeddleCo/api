@@ -519,11 +519,11 @@ pub fn verify_bundle_witnesses(
     b: &api::NativePublicProofBundleV1,
     set: &crate::witness_trust::VerifiedWitnessSet,
     now_ms: i64,
-    _forbidden_landing_keys: &[Vec<u8>],
+    forbidden_landing_keys: &[Vec<u8>],
 ) -> Result<(), Reject> {
     validate_public_bundle(b)?;
     for p in &b.landing_witnesses {
-        import::verify_landing_key_roles(p, set.known_job_keys(), &[])?;
+        import::verify_landing_key_roles(p, set.known_job_keys(), forbidden_landing_keys)?;
     }
     let carried = b.witness_set.as_ref().ok_or(Reject::Canonical)?;
     if carried.body.as_ref() != Some(set.body()) || carried.body_digest != set.digest() {
@@ -564,35 +564,57 @@ pub fn verify_bundle_witnesses(
 /// Select a LocalKey original's own-origin proof cutoff from an independently
 /// verified native carrier. Native causal/owner verification remains required.
 /// The caller supplies the dependent statement's authenticated admission order.
+/// Later admissions are ignored for both conflict selection and the maximum.
 pub fn local_work_cutoff(
     b: &api::NativePublicProofBundleV1,
     original: &api::SignedRecord,
-    _dependent_admission_order: u64,
+    dependent_admission_order: u64,
 ) -> Result<u64, Reject> {
     let subject = thread(original)?;
+    let mut genesis_count = 0;
     let mut orders = Vec::new();
     let mut claims = Vec::new();
     let mut resolutions = Vec::new();
     for signed in &b.statements {
         let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        if s.admission_order > dependent_admission_order {
+            continue;
+        }
         if s.purpose == 1 {
             for p in &b.genesis_witnesses {
-                let binding = p.binding.as_ref().and_then(|v| v.body.as_ref()).ok_or(Reject::Canonical)?;
+                let binding = p
+                    .binding
+                    .as_ref()
+                    .and_then(|v| v.body.as_ref())
+                    .ok_or(Reject::Canonical)?;
                 if binding.genesis_digest == subject && s.canonical_payload == canonical(p)? {
-                    if binding.owner_kind != 2 { return Err(Reject::Scope); }
+                    if binding.owner_kind != 2 {
+                        return Err(Reject::Scope);
+                    }
+                    genesis_count += 1;
                     orders.push(s.admission_order);
                 }
             }
         } else if s.purpose == 2 {
             for p in &b.authority_witnesses {
-                if ![2, 3].contains(&p.kind) || s.canonical_payload != canonical(p)? { continue; }
+                if ![2, 3].contains(&p.kind) || s.canonical_payload != canonical(p)? {
+                    continue;
+                }
                 let r = p.original.as_ref().ok_or(Reject::Canonical)?;
-                if thread(r)? != subject { continue; }
+                if thread(r)? != subject {
+                    continue;
+                }
                 orders.push(s.admission_order);
-                if p.kind == 2 { claims.push(import::native_id(r)); }
-                else { resolutions.push(r); }
+                if p.kind == 2 {
+                    claims.push(import::native_id(r));
+                } else {
+                    resolutions.push(r);
+                }
             }
         }
+    }
+    if genesis_count != 1 {
+        return Err(Reject::Scope);
     }
     match resolutions.as_slice() {
         [] if claims.len() == 1 => (),
@@ -602,13 +624,20 @@ pub fn local_work_cutoff(
                 winning_claim: Vec<u8>,
                 conflicting_claims: Vec<Vec<u8>>,
             }
-            let r: Resolution = rmp_serde::from_slice(&r.canonical_record).map_err(|_| Reject::Canonical)?;
+            let r: Resolution =
+                rmp_serde::from_slice(&r.canonical_record).map_err(|_| Reject::Canonical)?;
             claims.sort();
-            if claims != r.conflicting_claims || !claims.contains(&r.winning_claim) { return Err(Reject::Scope); }
+            if claims != r.conflicting_claims || !claims.contains(&r.winning_claim) {
+                return Err(Reject::Scope);
+            }
         }
         _ => return Err(Reject::Scope),
     }
-    orders.into_iter().max().filter(|v| *v > 0).ok_or(Reject::Scope)
+    orders
+        .into_iter()
+        .max()
+        .filter(|v| *v > 0)
+        .ok_or(Reject::Scope)
 }
 /// Transport dispatch is explicit and rejects dual arms before staging. Missing
 /// import delegation remains an import rejection, never native fallback.

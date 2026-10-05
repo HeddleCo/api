@@ -593,7 +593,7 @@
       "sha256": "4d800bcf64bcac322131e1a9579b8f403db140c23c3ded7a9bbadfa5c76b768b"
     },
     "tests/fixtures/foreign-dependencies-alpha34.json": {
-      "sha256": "9fae5d1cbc8c93fbc2233d43e24a3d5e509319cf11a046ab3ad581cc6d650587",
+      "sha256": "56d319976b8e299f0014242b15bcce8f98fa23b3ab8614395b87e8d1e9c0fcc7",
       "new_file": true
     }
   },
@@ -1403,7 +1403,11 @@
       "known_job_landing_key",
       "forbidden_job_landing_key",
       "import_known_landing_key",
-      "import_forbidden_landing_key"
+      "import_forbidden_landing_key",
+      "local_cutoff_prefix",
+      "local_cutoff_history",
+      "local_cutoff_dependent",
+      "local_cutoff_original"
     ],
     "reason": "ForeignDependencyV1 tag 5 prefix_admission_order and byte-bound vectors alter carrier encoding only; all existing nested signed originals, payload commitments, signatures, manifests and statements are unchanged."
   }

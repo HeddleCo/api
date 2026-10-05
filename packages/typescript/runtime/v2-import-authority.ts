@@ -30,7 +30,14 @@ function branch(v:api.ImportBranchLimitV1){if(!v.refName.startsWith("refs/heads/
 export function validateImportScope(v:api.ImportPermissionScopeV1){canonicalHttps(v.sourceUrl);if(!/^[a-z0-9-]{1,64}$/.test(v.provider)||!v.converterVersion||v.converterVersion.length>128||!/^[\x00-\x7f]+$/.test(v.converterVersion))reject("Canonical");width(v.destinationVersion,32);width(v.optionsDigest,32);if(!v.branches.length||v.branches.length>MAX_BRANCHES||v.maxOperations<=0||v.maxOperations>MAX_BRANCHES||v.maxResultBytes<=0n||v.maxResultBytes>=(1n<<64n))reject("Bounds");if(v.maxOperations<v.branches.length)reject("Scope");v.branches.forEach((b,i)=>{branch(b);if(v.branches.slice(0,i).some(other=>equal(other.targetThreadId,b.targetThreadId)||equal(other.genesisDigest,b.genesisDigest)))reject("Scope");if(i&&v.branches[i-1]!.refName>=b.refName)reject("Canonical");});}
 function branchSubset(c:api.ImportBranchLimitV1,p:api.ImportBranchLimitV1):boolean{return equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,c),canonicalHybridV1(api.ImportBranchLimitV1Schema,p));}
 
-/** Compare independently observed OID knowledge before preparing/signing. */
+/** Compare independently observed OID knowledge before preparing/signing.
+ * Clients MUST pin every known OID; OBSERVE is only for genuinely unknown OIDs.
+ * Exclude a branch whose known OID becomes unavailable; never downgrade it.
+ * Signed refDisclosure is explicit authorization and the audit trail; unsigned
+ * or missing disclosure and silent downgrades refuse. Human presentation is
+ * client product policy: a one-click client may set/sign it on the user's behalf
+ * without showing it or requiring branch selection or authorization screens.
+ * Clients MUST never sign scope wider than the user's action. */
 export function validateImportRefSelection(value:api.ImportBranchLimitV1, knownCommitOid?:Uint8Array):void {
   branch(value);
   if (knownCommitOid !== undefined) {

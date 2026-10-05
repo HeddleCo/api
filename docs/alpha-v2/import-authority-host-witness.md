@@ -333,15 +333,24 @@ certificate digest, ref/slot, observed Git OID AND hash algorithm, original gene
 target and expected/result frontiers, content digest/byte count, options/converter.
 PINNED_COMMIT authorizes the exact raw 20-byte SHA1 or 32-byte SHA256 commit;
 **Whenever the exact selected commit OID is known, the caller MUST pin it.**
-Failed pinning, stale observations and empty OIDs never authorize a silent
-downgrade. OBSERVE_AT_EXECUTION is only an explicit fallback when the caller
-cannot obtain the OID. Before signing, disclose this fixed promise:
+The client MUST use OBSERVE_AT_EXECUTION only for genuinely unknown OIDs and
+MUST never downgrade a known OID. A branch whose OID was known but became
+unavailable MUST be excluded, not observed. Failed pinning, stale observations
+and empty OIDs never authorize a silent downgrade. The signed `ref_disclosure`
+for OBSERVE_AT_EXECUTION authorizes this fixed promise:
 
 > The exact commit is unavailable. This branch may move before execution. The
 > import will convert the commit observed when the job executes, which may differ
 > from the commit you saw when selecting the branch.
 
-The caller must explicitly select and sign that fallback. Each observe branch
+OBSERVE requires the SIGNED `ref_disclosure` field: the signature is the explicit
+authorization, recorded in the authorization as the audit trail. Presentation
+to a human is client product policy, not a protocol requirement. A client may
+automatically include genuinely unknown-OID branches and set and sign the
+disclosure on the user's behalf as part of a one-click repository import,
+without branch selection or authorization screens and without showing the
+disclosure to the user. The client MUST never sign a scope wider than the user's
+action and MUST pin every known OID. Each observe branch
 has an empty `pinned_commit_oid`, an explicit hash algorithm and
 `ref_disclosure = IMPORT_REF_DISCLOSURE_OBSERVE_AT_EXECUTION (1)`.
 Pinned branches require `ref_disclosure = UNSPECIFIED (0)`. Alpha.32 removes/reserves field 9 `max_result_bytes` from
@@ -352,13 +361,14 @@ The result retains its exact observed OID and algorithm.
 
 `validate_ref_selection` / `validateImportRefSelection` additionally take an
 independently known OID available when choosing the scope. They reject observe
-mode or a different pin with `RefPinning`; None/undefined supplies no consent
-and never changes the mode. A receiver cannot prove UI consent or discover an
+mode or a different pin with `RefPinning`; None/undefined supplies no
+authorization and never changes the mode. A receiver cannot discover an
 undisclosed locally known OID from signed bytes alone. It verifies the explicit
-marker, signatures and mode; authoring clients and hosts with that independent
-knowledge must enforce exact pinning. No implicit mutable-ref authorization
-exists. A URL/ref signature does
-not prove deterministic Git conversion or original Git authorship; those require
+signed marker and mode; authoring clients and hosts with that independent
+knowledge MUST enforce exact pinning. No implicit mutable-ref authorization
+exists: unsigned or missing disclosure and silent downgrades always refuse.
+A URL/ref signature does not prove deterministic Git conversion or original
+Git authorship; those require
 retained objects and a mapping verifier, or the disclosed trust in the converter.
 
 Owner → typed parent (or direct owner) → delegation → job operation signatures

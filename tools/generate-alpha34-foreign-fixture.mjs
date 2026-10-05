@@ -129,7 +129,28 @@ for(const [carrier,control]of [['native','foreign_review_closure'],['import','na
  negative(carrier+'_foreign_over_bound',control,b=>b.foreignDependencies=Array.from({length:129},()=>b.foreignDependencies[0]),'Bounds');
 }
 f.receiver_negative.push({id:'missing_frontier_stage',control:'native_child_imported_frontier',omit_stage:true,expected:'Scope'},{id:'missing_import_stage',control:'import_tip_native_fast_forward',omit_stage:true,expected:'Scope'},{id:'missing_native_stage',control:'native_child_imported_main',omit_stage:true,expected:'Scope'},{id:'unbound_local_key_import_source',control:'import_tip_native_fast_forward',unbind:true,expected:'ImportPermission'});
-const job=clone(nat.NativePublicProofBundleV1Schema,ff),r=job.landingWitnesses[0].request;r.signature.publicKey=key('job');r.signingIdentity='principal:device-key:'+hex(key('job'));r.signature.signature=sig('job',await unarySigningBytes(r.signingIdentity,r.methodPath,r.timestampMillis,r.nonce,r.requestBody));const jobExecution=decode(job.landingWitnesses[0].execution.canonicalRecord),jobIntegration=decode(new Uint8Array(jobExecution.body.canonical));jobIntegration.initiating_request_proof=Array.from(nativeId('weft-hosted-landing-request-proof-v1',join(await unarySigningBytes(r.signingIdentity,r.methodPath,r.timestampMillis,r.nonce,r.requestBody),r.signature.signature)));jobExecution.body.canonical=Array.from(raw(execFileSync(codec,['encode','heddle-hosted-integration-v1'],{input:hex(encode(jobIntegration)),encoding:'utf8'}).trim()));job.landingWitnesses[0].execution=native('heddle-thread-operation-v1',jobExecution,['witness']);job.statements=job.statements.filter(s=>s.body.purpose!==4);const js=fresh(landingStatement(job.landingWitnesses[0],235));js.body.publisherKeyId=keyId(key('job'));js.signature=sig('witness',statementSigningDigest(js.body));job.statements.push(js);sortBundle(job);wire('job_signed_landing',nat.NativePublicProofBundleV1Schema,job);f.receiver_negative.push({id:'job_signed_landing',control:'import_tip_native_fast_forward',expected:'KeyRole'});
+const job=clone(nat.NativePublicProofBundleV1Schema,ff),r=job.landingWitnesses[0].request;r.signature.publicKey=key('job');r.signingIdentity='principal:device-key:'+hex(key('job'));r.signature.signature=sig('job',await unarySigningBytes(r.signingIdentity,r.methodPath,r.timestampMillis,r.nonce,r.requestBody));const jobExecution=decode(job.landingWitnesses[0].execution.canonicalRecord),jobIntegration=decode(new Uint8Array(jobExecution.body.canonical));jobIntegration.initiating_request_proof=Array.from(nativeId('weft-hosted-landing-request-proof-v1',join(await unarySigningBytes(r.signingIdentity,r.methodPath,r.timestampMillis,r.nonce,r.requestBody),r.signature.signature)));jobExecution.body.canonical=Array.from(raw(execFileSync(codec,['encode','heddle-hosted-integration-v1'],{input:hex(encode(jobIntegration)),encoding:'utf8'}).trim()));job.landingWitnesses[0].execution=native('heddle-thread-operation-v1',jobExecution,['witness']);job.statements=job.statements.filter(s=>s.body.purpose!==4);const js=fresh(landingStatement(job.landingWitnesses[0],235));js.body.publisherKeyId=keyId(key('job'));js.signature=sig('witness',statementSigningDigest(js.body));job.statements.push(js);sortBundle(job);wire('job_signed_landing',nat.NativePublicProofBundleV1Schema,job);f.negative.push({id:'job_signed_landing',control:'import_tip_native_fast_forward',carrier:'native',witnesses:true,expected:'KeyRole'});
+negative('native_foreign_p2_subject','import_tip_native_merge',b=>{
+ b.authorityWitnesses.push(clone(imp.ImportAuthorityWitnessV1Schema,reviewP2));
+ b.statements.push(fresh(authorityStatement(reviewP2,240)));
+ b.foreignDependencies=refs([tip,importedReview],imp.ForeignDependencyOrigin.IMPORT);sortBundle(b);
+},'Scope');
+negative('import_foreign_p2_subject','native_child_imported_main',b=>{
+ b.authorityWitnesses.push(clone(imp.ImportAuthorityWitnessV1Schema,childP2));
+ b.statements.push(fresh(authorityStatement(childP2,241)));
+},'Scope');
+negative('import_foreign_execution','native_child_imported_main',b=>{
+ b.landingWitnesses=[clone(imp.HostedLandingWitnessV1Schema,ff.landingWitnesses[0])];
+ b.statements=b.statements.filter(s=>s.body.purpose!==4);
+ b.statements.push(fresh(landingStatement(b.landingWitnesses[0],242)));
+ b.foreignDependencies=refs([b.landingWitnesses[0].execution],imp.ForeignDependencyOrigin.NATIVE);
+},'Scope');
+negative('import_genesis_signature_substitution','native_child_imported_main',b=>{
+ const g=b.genesisWitnesses.find(g=>hex(nativeId(g.originalGenesis.format,g.originalGenesis.canonicalRecord))===hex(mainThread)).originalGenesis;
+ const alternate=clone(SignedRecordSchema,g);alternate.signatures.push(native(g.format,decode(g.canonicalRecord),['device']).signatures[0]);
+ const p=b.authorityWitnesses[0];p.dependencies.push(alternate);p.dependencies.sort((a,b)=>compare(signedNativeDigest(a),signedNativeDigest(b)));
+ b.statements=b.statements.filter(s=>s.body.purpose!==2);b.statements.push(fresh(authorityStatement(p,243)));
+},'Scope');
 f.negative.push({id:'dual_carriers',control:'import_tip_native_fast_forward',carrier:'dispatch',expected:'Protocol'});
 writeFileSync('tests/fixtures/foreign-dependencies-alpha34.json',JSON.stringify(f,null,2)+'\n');
 console.log(`Generated alpha.34: ${f.positive.length} closures, ${f.negative.length} reference negatives, ${f.receiver_negative.length} staged/role negatives`);

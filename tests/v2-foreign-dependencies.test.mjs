@@ -11,7 +11,7 @@ import {SignedHostedWitnessSetV1Schema} from '../packages/typescript/dist/common
 const f=JSON.parse(readFileSync(new URL('./fixtures/foreign-dependencies-alpha34.json',import.meta.url)));
 const bytes=h=>new Uint8Array(Buffer.from(h,'hex'));
 const wire=(name,schema=f.wire_vectors[name].schema===nat.NativePublicProofBundleV1Schema.typeName?nat.NativePublicProofBundleV1Schema:imp.ImportPublicProofBundleV1Schema)=>fromBinary(schema,bytes(f.wire_vectors[name].wire_hex));
-async function check(name,carrier){if(carrier==='native')await native.validatePublicNativeBundle(wire(name));else if(carrier==='import')imported.validatePublicBundle(wire(name));else await native.validateNativeWitnessCarriers(wire('import_stage'),wire(name));}
+async function check(name,carrier){if(carrier==='native'){if(name==='job_signed_landing')await nativeWitnesses(wire(name));else await native.validatePublicNativeBundle(wire(name));}else if(carrier==='import')imported.validatePublicBundle(wire(name));else await native.validateNativeWitnessCarriers(wire('import_stage'),wire(name));}
 for(const v of f.positive)test(`foreign closure PASS ${v.id}`,()=>check(v.id,v.carrier));
 for(const v of f.negative)test(`foreign REJECT then PASS ${v.id}`,async()=>{
  await assert.rejects(()=>check(v.carrier==='dispatch'?v.control:v.id,v.carrier),{reason:v.expected});

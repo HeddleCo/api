@@ -16,6 +16,16 @@ fn wire<T: Message + Default>(f: &Value, name: &str) -> T {
 }
 fn check(f: &Value, name: &str, carrier: &str) -> Result<(), codec::Reject> {
     match carrier {
+        "native" if name == "job_signed_landing" => {
+            let root = bytes(&f["keys"]["root"]["public_key_hex"]);
+            let job = bytes(&f["keys"]["job"]["public_key_hex"]);
+            let set = witness::verify_set(&wire(f, "mixed_set"), &witness::SetExpectation {
+                authority: "https://weft.example.test", root_id: "descriptor-root-1",
+                root_public_key: &root, root_epoch: 1, now_unix_millis: 1200001,
+                clock_floor_unix_millis: 1000000, known_job_keys: &[job],
+            }, None)?;
+            native::verify_bundle_witnesses(&wire(f, name), &set, 1200001)
+        }
         "native" => native::validate_public_bundle(&wire(f, name)),
         "import" => import::validate_public_bundle(&wire(f, name)),
         "dispatch" => {

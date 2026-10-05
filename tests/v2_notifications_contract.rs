@@ -142,6 +142,7 @@ fn effective_delivery_and_digest_timestamps_round_trip_on_the_same_read() {
                 source: Source::Rule as i32,
                 spool: Some(SpoolRef::default()),
                 locked: false,
+                ..Default::default()
             },
         ],
         next_digest_at: Some(next),
@@ -244,6 +245,7 @@ fn descriptor_fields_are_additive_and_sources_are_stable() {
         ("delivery", 5),
         ("source", 6),
         ("locked", 7),
+        ("source_spool", 8),
     ] {
         assert_eq!(
             message.get_field_by_name(name).expect(name).number(),
@@ -257,6 +259,8 @@ fn descriptor_fields_are_additive_and_sources_are_stable() {
         ("SOURCE_UNSPECIFIED", 0),
         ("SOURCE_RULE", 1),
         ("SOURCE_DEFAULT", 2),
+        ("SOURCE_INHERITED", 3),
+        ("SOURCE_ACCOUNT", 4),
     ] {
         assert_eq!(source.get_value_by_name(name).expect(name).number(), number);
     }

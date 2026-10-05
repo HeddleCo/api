@@ -1,0 +1,180 @@
+{
+  "cases": [
+    {
+      "name": "pending_email_code",
+      "state": 1,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "0001feff",
+      "error": null
+    },
+    {
+      "name": "pending_legacy_hash_only_empty",
+      "state": 1,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "accepted_code_refused",
+      "state": 2,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "accepted_empty",
+      "state": 2,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "declined_code_refused",
+      "state": 3,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "declined_empty",
+      "state": 3,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "revoked_code_refused",
+      "state": 4,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "revoked_empty",
+      "state": 4,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "expired_code_refused",
+      "state": 5,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "expired_empty",
+      "state": 5,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "unspecified_code_refused",
+      "state": 0,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "unspecified_empty",
+      "state": 0,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "unknown_code_refused",
+      "state": 99,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "unknown_empty",
+      "state": 99,
+      "recipient_kind": "email",
+      "recipient": "recipient@example.test",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "pending_handle_code_refused",
+      "state": 1,
+      "recipient_kind": "handle",
+      "recipient": "jun",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "pending_handle_empty",
+      "state": 1,
+      "recipient_kind": "handle",
+      "recipient": "jun",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "pending_account_id_code_refused",
+      "state": 1,
+      "recipient_kind": "account_id",
+      "recipient": "11111111-1111-4111-8111-111111111111",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "pending_account_id_empty",
+      "state": 1,
+      "recipient_kind": "account_id",
+      "recipient": "11111111-1111-4111-8111-111111111111",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "pending_none_missing_code_refused",
+      "state": 1,
+      "recipient_kind": "none",
+      "recipient": "",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "pending_none_missing_empty",
+      "state": 1,
+      "recipient_kind": "none",
+      "recipient": "",
+      "secret_hex": "",
+      "error": null
+    },
+    {
+      "name": "pending_email_missing_code_refused",
+      "state": 1,
+      "recipient_kind": "email",
+      "recipient": "",
+      "secret_hex": "0001feff",
+      "error": "NotPending"
+    },
+    {
+      "name": "pending_email_missing_empty",
+      "state": 1,
+      "recipient_kind": "email",
+      "recipient": "",
+      "secret_hex": "",
+      "error": null
+    }
+  ]
+}

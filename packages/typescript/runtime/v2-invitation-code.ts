@@ -1,6 +1,7 @@
 /** Creator-only code response checks. Authenticated host subjects and current
  * transactional state are required; a projection never establishes access. */
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { InvitationState } from "./administration_pb.js";
 import type { GetInvitationCodeResponse, InvitationRecord } from "./administration_pb.js";
 import type { GetSignupInvitationCodeResponse, SignupInvitation } from "./identity_pb.js";
 
@@ -25,7 +26,12 @@ export function validateInvitationCodeResponse(
   invitation: InvitationRecord,
   context: InvitationCodeReadContext,
 ): void {
-  validateCodeResponse(response.redemptionSecret, invitation, context);
+  const nonLink = invitation.recipient.case !== "email" || invitation.recipient.value === "";
+  validateCodeResponse(response.redemptionSecret, {
+    redeemed: invitation.state !== InvitationState.PENDING,
+    revoked: nonLink,
+    expiresAt: invitation.expiresAt,
+  }, context);
 }
 
 function validTimestamp(time: Timestamp): boolean {
@@ -35,7 +41,7 @@ function validTimestamp(time: Timestamp): boolean {
 
 function validateCodeResponse(
   secret: Uint8Array,
-  invitation: SignupInvitation | InvitationRecord,
+  invitation: Pick<SignupInvitation, "redeemed" | "revoked" | "expiresAt">,
   context: InvitationCodeReadContext,
 ): void {
   if (typeof context.callerSubject !== "string" || typeof context.creatorSubject !== "string" ||

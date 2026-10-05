@@ -300,6 +300,14 @@ message ObserveNotificationsRequest {
   // Includes stored settings, bounded effective delivery and next email digest
   // windows together in NotificationEvent.preferences, with live updates.
   bool include_preferences = 4;
+  // Optional per-Spool effective read. Requires include_preferences and current
+  // read access to this Spool; otherwise reject, never fall back to account.
+  // Returns its complete effective matrix ONLY (no other Spool/account cells).
+  // Stored settings remain the ordinary redacted settings; the 4096-cell/1-MiB
+  // preferences bound still applies. Bind this filter into stream cursors and
+  // reauthorize/redact on every update. Absent projects account cells plus
+  // readable scopes with local routing rules, never rule-free descendants.
+  SpoolRef effective_delivery_spool = 5;
   PageRequest page = 2;
   ObserveOptions observe = 3;
 }

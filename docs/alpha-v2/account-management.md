@@ -1,5 +1,17 @@
 # Account management additions
 
+Spool invitations addressed to handles resolve on the host, never through a
+client account-ID lookup. The [administration contract](administration.md)
+specifies typed recipients, exact public-directory disclosure, private stable
+binding, signed-in Accept/Decline and the state machine. The invitee uses their
+verified session or credential without a link secret or prior spool membership.
+Handle changes never retarget invitations. Email keeps link/OAuth redemption.
+
+Agents are delegations of their human user, not people. Member, grant and
+invitation reads MUST never return an agent principal as its own row. The human
+is the member/grantee/recipient/inviter; a public agent label only qualifies
+attribution and never replaces that person.
+
 This is the additive contract for [api#315](https://github.com/HeddleCo/api/issues/315)
 and weft [#2530](https://github.com/HeddleCo/weft/issues/2530),
 [#2531](https://github.com/HeddleCo/weft/issues/2531), and

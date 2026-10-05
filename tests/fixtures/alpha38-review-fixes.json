@@ -1,0 +1,31 @@
+{
+  "authority": [
+    {"name":"removed inviter accept", "offered":1, "current":0, "allowed":false},
+    {"name":"downgraded writer redeem", "offered":2, "current":1, "allowed":false},
+    {"name":"admin requires admin accept", "offered":3, "current":2, "allowed":false},
+    {"name":"admin requires admin redeem", "offered":3, "current":1, "allowed":false},
+    {"name":"reader accepts reader", "offered":1, "current":1, "allowed":true},
+    {"name":"writer redeems writer", "offered":2, "current":2, "allowed":true},
+    {"name":"admin accepts admin", "offered":3, "current":3, "allowed":true},
+    {"name":"expired authority", "offered":2, "current":0, "allowed":false},
+    {"name":"invalid authority", "offered":1, "current":99, "allowed":false}
+  ],
+  "sessions": [
+    {"name":"human", "human":true},
+    {"name":"agent", "human":false},
+    {"name":"delegated", "human":false}
+  ],
+  "descendants": 1000,
+  "replacement": [
+    {"name":"preserve hidden selectors", "clear":false, "rules":1, "overrides":1},
+    {"name":"explicitly clear hidden selectors", "clear":true, "rules":0, "overrides":0}
+  ],
+  "projections": [
+    {"name":"safe handle", "recipient":"handle", "inviter":"alice", "label":"helper", "allowed":true},
+    {"name":"private binding substitution", "recipient":"accountId", "inviter":"alice", "label":"", "allowed":false},
+    {"name":"inviter UUID", "recipient":"handle", "inviter":"11111111-1111-4111-8111-111111111111", "label":"", "allowed":false},
+    {"name":"missing public handle", "recipient":"handle", "inviter":"", "label":"", "allowed":false},
+    {"name":"orphan label", "recipient":"handle", "inviter":null, "label":"helper", "allowed":false},
+    {"name":"unavailable inviter omitted", "recipient":"handle", "inviter":null, "label":"", "allowed":true}
+  ]
+}

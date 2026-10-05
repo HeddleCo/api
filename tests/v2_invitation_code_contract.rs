@@ -6,7 +6,7 @@ use heddle_api::{
         },
         v1alpha2::{
             GetInvitationCodeResponse, GetSignupInvitationCodeResponse, InvitationRecord,
-            SignupInvitation,
+            InvitationState, SignupInvitation, invitation_record,
         },
     },
     v2::{
@@ -74,8 +74,16 @@ fn check(vector: &Vector) {
     };
     let spool = InvitationRecord {
         expires_at,
-        redeemed: vector.redeemed,
-        revoked: vector.revoked,
+        state: if vector.revoked {
+            InvitationState::Revoked
+        } else if vector.redeemed {
+            InvitationState::Accepted
+        } else {
+            InvitationState::Pending
+        } as i32,
+        recipient: Some(invitation_record::Recipient::Email(
+            "recipient@example.test".into(),
+        )),
         ..Default::default()
     };
     let signup_response = GetSignupInvitationCodeResponse {
@@ -223,7 +231,7 @@ fn every_service_projection_excludes_invite_codes_except_top_level_create_and_cr
             walk(output.clone(), output.full_name(), &mut BTreeSet::new());
         }
     }
-    assert!(methods >= 171, "non-vacuous service projection coverage");
+    assert!(methods >= 174, "non-vacuous service projection coverage");
     assert_eq!(roots_with_codes.len(), 4);
     for name in ["GetInvitationCode", "GetSignupInvitationCode"] {
         let request = pool
@@ -246,5 +254,65 @@ fn every_service_projection_excludes_invite_codes_except_top_level_create_and_cr
             .expect("code");
         assert_eq!(code.number(), 1);
         assert_eq!(code.kind(), Kind::Bytes);
+    }
+}
+
+#[derive(Deserialize)]
+struct SpoolStateVector {
+    name: String,
+    state: i32,
+    recipient_kind: String,
+    recipient: String,
+    secret_hex: String,
+    error: Option<String>,
+}
+#[derive(Deserialize)]
+struct SpoolStateFixture {
+    cases: Vec<SpoolStateVector>,
+}
+
+#[test]
+fn alpha38_terminal_states_and_non_link_invites_never_disclose_codes() {
+    let fixture: SpoolStateFixture =
+        serde_json::from_str(include_str!("fixtures/invitation-code-states.json"))
+            .expect("state vectors");
+    assert_eq!(fixture.cases.len(), 22);
+    let now = Timestamp {
+        seconds: 1,
+        nanos: 0,
+    };
+    let context = InvitationCodeReadContext {
+        caller_subject: "creator",
+        creator_subject: "creator",
+        now: &now,
+    };
+    for vector in fixture.cases {
+        let recipient = match vector.recipient_kind.as_str() {
+            "email" => Some(invitation_record::Recipient::Email(vector.recipient)),
+            "handle" => Some(invitation_record::Recipient::Handle(vector.recipient)),
+            "account_id" => Some(invitation_record::Recipient::AccountId(vector.recipient)),
+            "none" => None,
+            _ => panic!("unknown fixture kind"),
+        };
+        let invitation = InvitationRecord {
+            state: vector.state,
+            recipient,
+            expires_at: Some(Timestamp {
+                seconds: 2,
+                nanos: 0,
+            }),
+            ..Default::default()
+        };
+        let response = GetInvitationCodeResponse {
+            redemption_secret: hex::decode(vector.secret_hex).expect("secret bytes"),
+        };
+        assert_eq!(
+            validate_invitation_code_response(&response, &invitation, &context)
+                .err()
+                .map(|e| format!("{e:?}")),
+            vector.error,
+            "{}",
+            vector.name
+        );
     }
 }

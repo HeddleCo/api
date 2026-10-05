@@ -144,3 +144,17 @@ and creator-read responses may expose codes. This repository contains API types
 and validators, not a host database or service implementation. Hosts must add
 transactional encryption/deletion, AEAD substitution, rate-limit/audit and
 concurrent lifecycle integration tests when implementing these contracts.
+
+## Alpha.38 lifecycle integration
+
+Spool invitations use `InvitationRecord.state: InvitationState`; the retired
+`redeemed`/`revoked` boolean fields remain reserved. Only PENDING EMAIL
+invitations with original retrievable material can return a nonempty code.
+ACCEPTED, DECLINED, REVOKED and EXPIRED states are terminal; unspecified or
+unknown states suppress disclosure too. Handle/account invitations and missing
+recipient arms never have retrievable codes and MUST return empty for their
+creator. Terminal transitions, including acceptance/decline, MUST destroy any
+retrievable material in the same transaction. Signup invitations retain their
+separate redeemed/revoked flags. The shared state vectors and mutation probes
+cover these rules in both languages, independently of the wall-clock expiry
+check. No alpha.38 reserved field is restored by this release.

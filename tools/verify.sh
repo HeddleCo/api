@@ -39,6 +39,8 @@ python3 tools/verify-alpha36-guards.py rust
 python3 tools/verify-alpha36-guards.py ts
 python3 tools/verify-alpha37-guards.py rust
 python3 tools/verify-alpha37-guards.py ts
+python3 tools/verify-alpha38-guards.py rust
+python3 tools/verify-alpha38-guards.py ts
 python3 tools/verify-alpha39-guards.py rust
 python3 tools/verify-alpha39-guards.py ts
 python3 tools/verify-alpha39-people-groups-guards.py rust

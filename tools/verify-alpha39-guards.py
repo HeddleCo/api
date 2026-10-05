@@ -12,6 +12,8 @@ if language == "rust":
     path = Path("src/v2/invitation_code.rs")
     cases = [
         ("creator", "context.caller_subject != context.creator_subject", "false"),
+        ("spool_state", "invitation.state != InvitationState::Pending as i32", "false"),
+        ("spool_recipient", "let non_link = !matches!", "let non_link = false && !matches!"),
         ("redeemed", "redeemed || revoked || expired", "false || revoked || expired"),
         ("revoked", "redeemed || revoked || expired", "redeemed || false || expired"),
         ("expired", "redeemed || revoked || expired", "redeemed || revoked || false"),
@@ -22,6 +24,8 @@ elif language == "ts":
     path = Path("packages/typescript/dist/v1alpha2/invitation-code.js")
     cases = [
         ("creator", "context.callerSubject !== context.creatorSubject", "false"),
+        ("spool_state", "invitation.state !== InvitationState.PENDING", "false"),
+        ("spool_recipient", 'const nonLink = invitation.recipient.case !== "email" || invitation.recipient.value === "";', "const nonLink = false;"),
         ("subject_types", 'typeof context.callerSubject !== "string" || typeof context.creatorSubject !== "string"', "false"),
         ("timestamp_type", 'typeof time.seconds === "bigint"', "true"),
         ("redeemed", "invitation.redeemed || invitation.revoked || expired", "false || invitation.revoked || expired"),

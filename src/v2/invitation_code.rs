@@ -2,7 +2,8 @@
 //! subjects and current transactional state; projections never establish access.
 
 use crate::heddle::api::v1alpha2::{
-    GetInvitationCodeResponse, GetSignupInvitationCodeResponse, InvitationRecord, SignupInvitation,
+    GetInvitationCodeResponse, GetSignupInvitationCodeResponse, InvitationRecord, InvitationState,
+    SignupInvitation, invitation_record,
 };
 use prost_types::Timestamp;
 
@@ -43,10 +44,14 @@ pub fn validate_invitation_code_response(
     invitation: &InvitationRecord,
     context: &InvitationCodeReadContext<'_>,
 ) -> Result<(), InvitationCodeError> {
+    let non_link = !matches!(
+        invitation.recipient.as_ref(),
+        Some(invitation_record::Recipient::Email(email)) if !email.is_empty()
+    );
     validate_code_response(
         &response.redemption_secret,
-        invitation.redeemed,
-        invitation.revoked,
+        invitation.state != InvitationState::Pending as i32,
+        non_link,
         invitation.expires_at.as_ref(),
         context,
     )

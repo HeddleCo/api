@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { TimestampSchema } from "@bufbuild/protobuf/wkt";
 import {
-  GetInvitationCodeRequestSchema, GetInvitationCodeResponseSchema, InvitationRecordSchema,
+  InvitationState, GetInvitationCodeRequestSchema, GetInvitationCodeResponseSchema, InvitationRecordSchema,
 } from "../packages/typescript/dist/v1alpha2/administration_pb.js";
 import {
   GetSignupInvitationCodeRequestSchema, GetSignupInvitationCodeResponseSchema, SignupInvitationSchema,
@@ -29,7 +29,11 @@ function check(v) {
     [validateInvitationCodeResponse, GetInvitationCodeResponseSchema, InvitationRecordSchema],
     [validateSignupInvitationCodeResponse, GetSignupInvitationCodeResponseSchema, SignupInvitationSchema],
   ]) {
-    const run = () => validate(create(responseSchema, { redemptionSecret: bytes }), create(invitationSchema, state), context);
+    const invitation = invitationSchema === InvitationRecordSchema ? {
+      state: v.revoked ? InvitationState.REVOKED : v.redeemed ? InvitationState.ACCEPTED : InvitationState.PENDING,
+      recipient: { case: "email", value: "recipient@example.test" }, expiresAt: state.expiresAt,
+    } : state;
+    const run = () => validate(create(responseSchema, { redemptionSecret: bytes }), create(invitationSchema, invitation), context);
     if (v.error === null) assert.doesNotThrow(run, v.name);
     else assert.throws(run, new RegExp(`^Error: ${v.error}:`), v.name);
   }
@@ -98,12 +102,27 @@ test("every service projection excludes codes except top-level create and creato
       walk(method.output, method.output.typeName);
     }
   }
-  assert.ok(count >= 171);
+  assert.ok(count >= 174);
   assert.deepEqual(roots, allowed);
   for (const schema of [GetInvitationCodeRequestSchema, GetSignupInvitationCodeRequestSchema]) {
     assert.deepEqual(schema.fields.map(f => [f.name, f.number, f.message?.typeName]), [["invitation", 1, "heddle.api.v1alpha2.RecordRef"]]);
   }
   for (const schema of [GetInvitationCodeResponseSchema, GetSignupInvitationCodeResponseSchema]) {
     assert.deepEqual(schema.fields.map(f => [f.name, f.number, f.scalar]), [["redemption_secret", 1, 12]]);
+  }
+});
+
+test("alpha.38 terminal states and non-link invites never disclose codes", () => {
+  const states = JSON.parse(readFileSync(new URL("./fixtures/invitation-code-states.json", import.meta.url)));
+  assert.equal(states.cases.length, 22);
+  const context = { callerSubject: "creator", creatorSubject: "creator", now: create(TimestampSchema, { seconds: 1n }) };
+  for (const v of states.cases) {
+    const invitation = create(InvitationRecordSchema, { state: v.state, expiresAt: create(TimestampSchema, { seconds: 2n }),
+      recipient: v.recipient_kind === "none" ? undefined : { case: v.recipient_kind === "account_id" ? "accountId" : v.recipient_kind, value: v.recipient },
+    });
+    const response = create(GetInvitationCodeResponseSchema, { redemptionSecret: Uint8Array.from(Buffer.from(v.secret_hex, "hex")) });
+    const run = () => validateInvitationCodeResponse(response, invitation, context);
+    if (v.error) assert.throws(run, new RegExp(`^Error: ${v.error}:`), v.name);
+    else assert.doesNotThrow(run, v.name);
   }
 });

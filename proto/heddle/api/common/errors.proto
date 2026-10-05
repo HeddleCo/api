@@ -42,10 +42,20 @@ enum ErrorReason {
   ERROR_REASON_ROLE_INSUFFICIENT = 201;
   ERROR_REASON_POLICY_DENIED = 202;
   ERROR_REASON_PLAN_LIMIT = 203;
+  // AcceptInvitation and DeclineInvitation require a human session, never agent
+  // or delegated credentials. PERMISSION_DENIED; field "invitation".
+  ERROR_REASON_INVITATION_HUMAN_SESSION_REQUIRED = 204;
+  // Accept/Redeem: inviter no longer holds authority to grant the offered role.
+  // FAILED_PRECONDITION; field "invitation"; disclose no inviter identity.
+  ERROR_REASON_INVITATION_INVITER_AUTHORITY_LOST = 205;
 
   // Existence (3xx)
   ERROR_REASON_RESOURCE_NOT_FOUND = 300;
   ERROR_REASON_RESOURCE_GONE = 301;
+  // CreateInvitation only, after spool administration authorization. The
+  // supplied handle has no publicly resolvable claimed account. NOT_FOUND,
+  // field "invitation.handle"; no account ID or private lifecycle detail.
+  ERROR_REASON_INVITATION_HANDLE_NOT_FOUND = 302;
 
   // Request validity (4xx)
   ERROR_REASON_FIELD_INVALID = 400;

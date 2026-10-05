@@ -18,6 +18,7 @@ mod transport;
 pub mod treadle;
 pub mod v2;
 pub mod witness_trust;
+pub mod writer_authority;
 
 /// Fixed native HYBRID binding/closure fixture, shared with TypeScript.
 pub const NATIVE_HOST_WITNESS_V1_FIXTURE_JSON: &str =

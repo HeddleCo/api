@@ -1642,6 +1642,7 @@ pub fn validate_public_bundle(bundle: &ImportPublicProofBundleV1) -> Result<(), 
     validate_bundle_history(bundle, true)
 }
 fn validate_bundle_bounds(bundle: &ImportPublicProofBundleV1) -> Result<(), Reject> {
+    crate::writer_authority::validate_owner_histories(&bundle.owner_histories)?;
     use prost::Message;
     if bundle.format_version != 1 {
         return Err(Reject::Version);
@@ -1952,12 +1953,16 @@ pub(crate) fn match_boundary(
 fn native_dependencies(
     records: &[SignedRecord],
     evidence: &[ImportBoundaryAcceptanceV1],
+    reviews_only: bool,
 ) -> Result<(), Reject> {
     if records.len() > 128 {
         return Err(Reject::Bounds);
     }
     let mut previous = None;
     for record in records {
+        if reviews_only {
+            require_review_operation(record)?;
+        }
         match record.format.as_str() {
             "heddle-thread-genesis-v1"
             | "heddle-thread-operation-v1"
@@ -1981,6 +1986,39 @@ fn native_dependencies(
             return Err(Reject::Canonical);
         }
         previous = Some(digest);
+    }
+    Ok(())
+}
+#[derive(serde::Deserialize)]
+struct ReviewOperation {
+    body: ReviewBody,
+}
+#[derive(serde::Deserialize)]
+struct ReviewBody {
+    kind: String,
+    canonical: Vec<u8>,
+}
+#[derive(serde::Deserialize)]
+struct ReviewControl {
+    control: ReviewKind,
+}
+#[derive(serde::Deserialize)]
+struct ReviewKind {
+    kind: String,
+}
+fn require_review_operation(record: &SignedRecord) -> Result<(), Reject> {
+    if record.format != "heddle-thread-operation-v1" {
+        return Err(Reject::Semantic);
+    }
+    let operation: ReviewOperation =
+        rmp_serde::from_slice(&record.canonical_record).map_err(|_| Reject::Semantic)?;
+    if operation.body.kind != "metadata" {
+        return Err(Reject::Semantic);
+    }
+    let control: ReviewControl =
+        rmp_serde::from_slice(&operation.body.canonical).map_err(|_| Reject::Semantic)?;
+    if control.control.kind != "review" {
+        return Err(Reject::Semantic);
     }
     Ok(())
 }
@@ -2019,6 +2057,7 @@ pub fn verify_landing_key_roles(
 }
 
 /// Exact matching and original signatures do not replace native causal/authority/landing checks.
+#[derive(Clone, Copy)]
 pub enum WitnessPayload<'a> {
     Genesis(&'a ImportGenesisWitnessV1),
     Authority(&'a ImportAuthorityWitnessV1),
@@ -2123,7 +2162,7 @@ pub fn verify_witness_payload(
                     .ok_or(Reject::BoundaryAcceptance)?;
                 boundary_original(e, original)?;
             }
-            native_dependencies(&p.dependencies, &p.boundary_acceptances)?;
+            native_dependencies(&p.dependencies, &p.boundary_acceptances, false)?;
             let records = std::iter::once(original)
                 .chain(p.dependencies.iter())
                 .collect::<Vec<_>>();
@@ -2154,7 +2193,7 @@ pub fn verify_witness_payload(
             verify_native(execution, "heddle-thread-operation-v1")?;
             verify_native(source, "heddle-thread-operation-v1")?;
             match_boundary(statement, &[])?;
-            native_dependencies(&p.review_evidence, &[])?;
+            native_dependencies(&p.review_evidence, &[], true)?;
             let signature = request.signature.as_ref().ok_or(Reject::Signature)?;
             if request.signing_identity
                 != format!(
@@ -2363,6 +2402,59 @@ fn validate_bundle_history(
             s.policy_sequence,
             &s.policy_state_hash,
         )?;
+        let envelope = match s.purpose {
+            2 => Some(
+                bundle
+                    .authority_witnesses
+                    .iter()
+                    .find(|p| canonical(*p).is_ok_and(|bytes| bytes == s.canonical_payload))
+                    .ok_or(Reject::Scope)?
+                    .authority_envelope
+                    .as_slice(),
+            ),
+            4 => Some(
+                bundle
+                    .landing_witnesses
+                    .iter()
+                    .find(|p| canonical(*p).is_ok_and(|bytes| bytes == s.canonical_payload))
+                    .ok_or(Reject::Scope)?
+                    .authority_envelope
+                    .as_slice(),
+            ),
+            _ => None,
+        };
+        if let Some(envelope) = envelope {
+            crate::writer_authority::check_witness_writer(
+                s,
+                envelope,
+                &bundle.owner_histories,
+                &bundle.policies,
+                crate::writer_authority::spool_account_for_statement(
+                    s,
+                    bundle
+                        .delegations
+                        .iter()
+                        .filter_map(|d| d.body.as_ref()?.identity.as_ref())
+                        .chain(
+                            bundle
+                                .genesis_authorities
+                                .iter()
+                                .filter_map(|g| g.body.as_ref()?.identity.as_ref()),
+                        ),
+                    &bundle.ownership_transfers,
+                )?,
+                bundle
+                    .authority_witnesses
+                    .iter()
+                    .find(|p| {
+                        (p.kind == 2 || p.kind == 3)
+                            && canonical(*p).is_ok_and(|v| v == s.canonical_payload)
+                    })
+                    .and_then(|p| p.original.as_ref())
+                    .map(|r| r.signatures.as_slice())
+                    .unwrap_or(&[]),
+            )?;
+        }
     }
     sorted(&bundle.manifests, manifest_digest)?;
     if let Some(p) = &bundle.member_permission
@@ -2505,15 +2597,32 @@ fn validate_bundle_history(
     }
     Ok(())
 }
-/// Reference completeness only. Native verification must authenticate every
-/// selected policy, its owner context and the receipt before using its time.
+/// Authenticate policy contents against their committed hashes and enforce the
+/// governance contract's grow-only revocations. All carried bodies are checked
+/// before the zero-head shortcut, so no writer lookup can read unchecked data.
+/// Native verification still
+/// authenticates owner signatures/context and the receipt observation time.
 pub(crate) fn require_policy_history(
     policies: &[SignedSpoolPolicyRecord],
     spool: &[u8],
     mut sequence: u64,
     state_hash: &[u8],
 ) -> Result<(), Reject> {
+    let mut previous: Option<(&[u8], u64)> = None;
+    for signed in policies {
+        let policy = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        let digest = policy_state_digest(policy)?;
+        if digest != policy.policy_state_hash {
+            return Err(Reject::Canonical);
+        }
+        let current = (policy.spool_uuid.as_slice(), policy.sequence);
+        if previous.is_some_and(|prev| prev >= current) {
+            return Err(Reject::Canonical);
+        }
+        previous = Some(current);
+    }
     let mut state_hash = state_hash.to_vec();
+    let mut successor_revoked: Option<&[Vec<u8>]> = None;
     for _ in 0..=policies.len() {
         width(&state_hash, 32)?;
         if sequence == 0 {
@@ -2527,9 +2636,16 @@ pub(crate) fn require_policy_history(
             p.spool_uuid == spool && p.sequence == sequence && p.policy_state_hash == state_hash
         });
         let policy = matches.next().ok_or(Reject::Scope)?;
-        if matches.next().is_some() {
-            return Err(Reject::Canonical);
+        // policy_state_digest above already requires an authenticated body.
+        let revoked = policy
+            .policy
+            .as_ref()
+            .map(|p| p.revoked_key_ids.as_slice())
+            .unwrap_or(&[]);
+        if successor_revoked.is_some_and(|next| revoked.iter().any(|id| !next.contains(id))) {
+            return Err(Reject::Scope);
         }
+        successor_revoked = Some(revoked);
         let head = policy.expected_head.as_ref().ok_or(Reject::Canonical)?;
         if head.sequence.checked_add(1) != Some(sequence) {
             return Err(Reject::Scope);
@@ -2538,6 +2654,57 @@ pub(crate) fn require_policy_history(
         state_hash = head.state_hash.clone();
     }
     Err(Reject::Scope)
+}
+/// Canonical SignedPolicyBody fields 1–10; protobuf is never the signed encoding.
+pub fn policy_state_digest(p: &SignedPolicyBody) -> Result<Vec<u8>, Reject> {
+    use crate::hybrid_codec::counted;
+    if p.format_version != 1 || !p.merge_parent_state_hashes.is_empty() {
+        return Err(Reject::Version);
+    }
+    width(&p.spool_uuid, 16)?;
+    width(&p.owner_id, 32)?;
+    width(&p.owner_state_hash, 32)?;
+    let head = p.expected_head.as_ref().ok_or(Reject::Canonical)?;
+    width(&head.state_hash, 32)?;
+    let policy = p.policy.as_ref().ok_or(Reject::Canonical)?;
+    if p.merge_policies.len() != 2
+        || p.merge_policies[0].setting_key != "max_audience"
+        || p.merge_policies[0].semantics != 1
+        || p.merge_policies[1].setting_key != "revoked_key_ids"
+        || p.merge_policies[1].semantics != 2
+    {
+        return Err(Reject::Canonical);
+    }
+    let mut out = p.format_version.to_be_bytes().to_vec();
+    counted(&mut out, &p.spool_uuid)?;
+    counted(&mut out, &head.state_hash)?;
+    out.extend_from_slice(&head.sequence.to_be_bytes());
+    out.extend_from_slice(&p.sequence.to_be_bytes());
+    out.extend_from_slice(&0u32.to_be_bytes());
+    out.extend_from_slice(&(policy.revoked_key_ids.len() as u32).to_be_bytes());
+    for (i, id) in policy.revoked_key_ids.iter().enumerate() {
+        width(id, 32)?;
+        if i > 0 && policy.revoked_key_ids[i - 1] >= *id {
+            return Err(Reject::Canonical);
+        }
+        counted(&mut out, id)?;
+    }
+    out.push(u8::from(policy.max_audience.is_some()));
+    if let Some(audience) = policy.max_audience {
+        if !(1..=3).contains(&audience) {
+            return Err(Reject::Canonical);
+        }
+        out.extend_from_slice(&(audience as u32).to_be_bytes());
+    }
+    out.extend_from_slice(&2u32.to_be_bytes());
+    for rule in &p.merge_policies {
+        counted(&mut out, rule.setting_key.as_bytes())?;
+        out.extend_from_slice(&(rule.semantics as u32).to_be_bytes());
+    }
+    counted(&mut out, &p.owner_id)?;
+    counted(&mut out, &p.owner_state_hash)?;
+    out.extend_from_slice(&p.ownership_transfer_sequence.to_be_bytes());
+    Ok(hash(&[b"heddle-spool-signed-policy-v2", &out]))
 }
 pub(crate) fn native_id(record: &SignedRecord) -> Vec<u8> {
     let mut h = blake3::Hasher::new();

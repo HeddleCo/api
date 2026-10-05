@@ -94,14 +94,14 @@ pub fn verify_genesis_authority(
         return Err(Reject::GenesisBinding);
     }
     match (&g.owner, b.owner_kind) {
-        (NativeOwner::Account(account), 1)
-            if *account == id.owner_account_uuid && !envelope.is_empty() =>
-        {
-            let authority: api::ThreadControlAuthority =
-                crate::hybrid_codec::strict_decode(envelope, import::MAX_RECORD_BYTES)?;
-            if authority.format != 1 {
-                return Err(Reject::Version);
-            }
+        (NativeOwner::Account(account), 1) if !envelope.is_empty() => {
+            let authority = crate::writer_authority::decode_authority(envelope)?;
+            crate::writer_authority::verify_account_binding(
+                &authority,
+                account,
+                &id.owner_account_uuid,
+                &id.owner_id,
+            )?;
         }
         (NativeOwner::LocalKey(key), 2) if key == &g.creator && envelope.is_empty() => (),
         _ => return Err(Reject::GenesisBinding),
@@ -173,6 +173,7 @@ fn authority_payload_digest(p: &api::ImportAuthorityWitnessV1) -> Result<Vec<u8>
 /// Presence is never permission. Call verify_bundle_witnesses with a
 /// separately authenticated fresh set, then native owner/model verification.
 pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), Reject> {
+    crate::writer_authority::validate_owner_histories(&b.owner_histories)?;
     if b.format_version != 1 {
         return Err(Reject::Version);
     }
@@ -370,6 +371,20 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                     .find(|p| canonical(*p).is_ok_and(|v| v == s.canonical_payload))
                     .ok_or(Reject::Scope)?;
                 verify_genesis_payload(s, p)?;
+                crate::writer_authority::check_witness_writer(
+                    s,
+                    &p.creator_authority_envelope,
+                    &b.owner_histories,
+                    &b.policies,
+                    crate::writer_authority::spool_account_for_statement(
+                        s,
+                        b.genesis_witnesses
+                            .iter()
+                            .filter_map(|p| p.binding.as_ref()?.body.as_ref()?.identity.as_ref()),
+                        &b.ownership_transfers,
+                    )?,
+                    &[],
+                )?;
             }
             2 => {
                 let p = b
@@ -378,6 +393,24 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                     .find(|p| canonical(*p).is_ok_and(|v| v == s.canonical_payload))
                     .ok_or(Reject::Scope)?;
                 import::verify_witness_payload(s, import::WitnessPayload::Authority(p))?;
+                crate::writer_authority::check_witness_writer(
+                    s,
+                    &p.authority_envelope,
+                    &b.owner_histories,
+                    &b.policies,
+                    crate::writer_authority::spool_account_for_statement(
+                        s,
+                        b.genesis_witnesses
+                            .iter()
+                            .filter_map(|p| p.binding.as_ref()?.body.as_ref()?.identity.as_ref()),
+                        &b.ownership_transfers,
+                    )?,
+                    p.original
+                        .as_ref()
+                        .filter(|_| p.kind == 2 || p.kind == 3)
+                        .map(|r| r.signatures.as_slice())
+                        .unwrap_or(&[]),
+                )?;
             }
             4 => {
                 let p = b
@@ -386,6 +419,20 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
                     .find(|p| canonical(*p).is_ok_and(|v| v == s.canonical_payload))
                     .ok_or(Reject::Scope)?;
                 import::verify_witness_payload(s, import::WitnessPayload::Landing(p))?;
+                crate::writer_authority::check_witness_writer(
+                    s,
+                    &p.authority_envelope,
+                    &b.owner_histories,
+                    &b.policies,
+                    crate::writer_authority::spool_account_for_statement(
+                        s,
+                        b.genesis_witnesses
+                            .iter()
+                            .filter_map(|p| p.binding.as_ref()?.body.as_ref()?.identity.as_ref()),
+                        &b.ownership_transfers,
+                    )?,
+                    &[],
+                )?;
             }
             _ => return Err(Reject::Version),
         }

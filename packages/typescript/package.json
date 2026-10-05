@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.31.0-alpha.34",
+  "version": "0.31.0-alpha.35",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {
@@ -56,6 +56,7 @@
     "./v2/import-authority": "./dist/v1alpha2/import-authority.js",
     "./v2/witness-trust": "./dist/v1alpha2/witness-trust.js",
     "./v2/native-witness": "./dist/v1alpha2/native-witness.js",
+    "./v2/writer-authority": "./dist/v1alpha2/writer-authority.js",
     "./v2/evidence": "./dist/v1alpha2/evidence.js"
   },
   "dependencies": {

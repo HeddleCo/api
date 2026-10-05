@@ -85,10 +85,12 @@ pub fn normalize_invitation_recipient(
         .ok_or(InvitationError::RecipientRequired)?
     {
         Recipient::Email(value) => {
+            if value.len() > 320 {
+                return Err(InvitationError::InvalidEmail);
+            }
             let normalized = value.trim().to_ascii_lowercase();
             let parts: Vec<_> = normalized.split('@').collect();
-            if value.len() > 320
-                || parts.len() != 2
+            if parts.len() != 2
                 || parts.iter().any(|p| p.is_empty())
                 || normalized
                     .chars()
@@ -99,9 +101,11 @@ pub fn normalize_invitation_recipient(
             Ok(Recipient::Email(normalized))
         }
         Recipient::Handle(value) => {
+            if value.len() > 256 {
+                return Err(InvitationError::InvalidHandle);
+            }
             let normalized = value.trim().to_ascii_lowercase();
-            if value.len() > 256
-                || normalized.is_empty()
+            if normalized.is_empty()
                 || normalized
                     .chars()
                     .any(|c| c.is_whitespace() || c.is_control())
@@ -154,7 +158,7 @@ pub fn resolve_invitation_recipient(
 }
 
 /// Create rejects every server projection field. The host additionally checks
-/// reference validity, authorization, future expiry, account lifecycle and quotas.
+/// reference validity, authorization, future expiry, explicit human UUIDs and quotas.
 pub fn validate_create_invitation(record: &InvitationRecord) -> Result<(), InvitationError> {
     normalize_invitation_recipient(record)?;
     if !record.version.is_empty()

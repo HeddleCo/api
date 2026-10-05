@@ -114,6 +114,60 @@
       "code": 5,
       "reason": 302,
       "field": "invitation.handle"
+    },
+    {
+      "name": "AVAILABLE is not publicly claimed",
+      "kind": "handle",
+      "value": "public-shape-available",
+      "resolved": null,
+      "code": 5,
+      "reason": 302,
+      "field": "invitation.handle"
+    },
+    {
+      "name": "HELD is not publicly claimed",
+      "kind": "handle",
+      "value": "public-shape-held",
+      "resolved": null,
+      "code": 5,
+      "reason": 302,
+      "field": "invitation.handle"
+    },
+    {
+      "name": "RESERVED is not publicly claimed",
+      "kind": "handle",
+      "value": "public-shape-reserved",
+      "resolved": null,
+      "code": 5,
+      "reason": 302,
+      "field": "invitation.handle"
+    },
+    {
+      "name": "CONFUSABLE is not publicly claimed",
+      "kind": "handle",
+      "value": "public-shape-confusable",
+      "resolved": null,
+      "code": 5,
+      "reason": 302,
+      "field": "invitation.handle"
+    },
+    {
+      "name": "TOMBSTONED is not publicly claimed",
+      "kind": "handle",
+      "value": "public-shape-tombstoned",
+      "resolved": null,
+      "code": 5,
+      "reason": 302,
+      "field": "invitation.handle"
+    },
+    {
+      "name": "UNAVAILABLE is not publicly claimed",
+      "kind": "handle",
+      "value": "public-shape-unavailable",
+      "resolved": null,
+      "code": 5,
+      "reason": 302,
+      "field": "invitation.handle"
     }
   ],
   "response": [

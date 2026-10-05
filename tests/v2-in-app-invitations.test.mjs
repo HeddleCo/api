@@ -7,6 +7,7 @@ import {
   CreateInvitationRequestSchema, CreateInvitationResponseSchema,
 } from '../packages/typescript/dist/v1alpha2/administration_pb.js';
 import { NotificationRecordSchema, AttentionItemSchema } from '../packages/typescript/dist/v1alpha2/activity_pb.js';
+import { ActionAvailabilitySchema, Capability } from '../packages/typescript/dist/v1alpha2/common_pb.js';
 import {
   InvitationError, resolveInvitationRecipient, planInvitationResponse, validateCreateInvitation, validateCreateInvitationResponse,
   SPOOL_INVITATION, SPOOL_INVITATION_DECLINED,
@@ -31,6 +32,8 @@ function refusal(fn, v) {
   assert.throws(fn, error => {
     assert.ok(error instanceof InvitationError);
     const failure = error.failure();
+    if (v.reason === 302) assert.equal(failure.message, 'no such user');
+    if (v.reason === 300) assert.equal(failure.message, 'invitation unavailable');
     assert.equal(failure.code, v.code, v.name);
     assert.equal(failure.error.reason, v.reason, v.name);
     assert.equal(failure.error.field, v.field, v.name);
@@ -91,16 +94,27 @@ test('inbox and attention reuse typed invitation subject and projection without 
     role: 2, state: InvitationState.PENDING, spoolName: 'Example',
     inviter: { handle: 'alice', displayName: 'Alice' }, inviterViaAgentLabel: 'helper',
   });
+  const actions = [
+    ['AcceptInvitation', Capability.ACCEPT_INVITATION],
+    ['DeclineInvitation', Capability.DECLINE_INVITATION],
+  ].map(([method, capability]) => create(ActionAvailabilitySchema, {
+    method: `/heddle.api.v1alpha2.SpoolService/${method}`, capability,
+    implemented: true, authorized: true,
+    endpoint: { publicKey: new Uint8Array(32).fill(1), kind: 1 },
+    target: { entity: { case: 'invitation', value: invitation.ref } },
+  }));
   for (const [schema, data] of [
     [NotificationRecordSchema, { kind: SPOOL_INVITATION, title: 'Invited to Example as writer by alice', invitation }],
     [AttentionItemSchema, { kind: SPOOL_INVITATION, headline: 'Invited to Example as writer by alice', invitation }],
   ]) {
-    const wire = toBinary(schema, create(schema, { ...data, subject: { entity: { case: 'invitation', value: invitation.ref } } }));
+    const wire = toBinary(schema, create(schema, { ...data, actions, subject: { entity: { case: 'invitation', value: invitation.ref } } }));
     assert.equal(Buffer.from(wire).includes(Buffer.from(account)), false);
     const decoded = fromBinary(schema, wire);
     assert.equal(decoded.subject.entity.case, 'invitation');
     assert.equal(decoded.invitation.recipient.case, 'handle');
     assert.equal(decoded.invitation.inviter.handle, 'alice');
+    assert.deepEqual(decoded.actions.map(a => [a.method, a.capability]), actions.map(a => [a.method, a.capability]));
+    assert.equal(decoded.actions.every(a => a.target.entity.case === 'invitation'), true);
   }
 });
 

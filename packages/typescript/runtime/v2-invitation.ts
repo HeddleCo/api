@@ -48,16 +48,21 @@ const accountUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 export function normalizeInvitationRecipient(record: InvitationRecord): InvitationRecord['recipient'] {
   const recipient = record.recipient;
   if (recipient.case === undefined) throw new InvitationError('RecipientRequired');
+  const bound = recipient.case === 'email' ? 320 : recipient.case === 'handle' ? 256 : 36;
+  if (recipient.value.length > bound || utf8.encode(recipient.value).length > bound) {
+    throw new InvitationError(recipient.case === 'email' ? 'InvalidEmail' :
+      recipient.case === 'handle' ? 'InvalidHandle' : 'InvalidAccountId');
+  }
   const value = asciiLower(trimWhitespace(recipient.value));
   switch (recipient.case) {
     case 'email': {
       const parts = value.split('@');
-      if (utf8.encode(recipient.value).length > 320 || parts.length !== 2 || parts.some(p => p === '') ||
+      if (parts.length !== 2 || parts.some(p => p === '') ||
           /[\p{White_Space}\p{Cc}]/u.test(value)) throw new InvitationError('InvalidEmail');
       return { case: 'email', value };
     }
     case 'handle':
-      if (utf8.encode(recipient.value).length > 256 || value === '' || /[\p{White_Space}\p{Cc}/@#]/u.test(value)) {
+      if (value === '' || /[\p{White_Space}\p{Cc}/@#]/u.test(value)) {
         throw new InvitationError('InvalidHandle');
       }
       return { case: 'handle', value };

@@ -23,6 +23,12 @@ fn recipient(v: &Value) -> Option<Recipient> {
 }
 fn refusal(error: InvitationError, v: &Value) {
     let failure = error.failure();
+    if v["reason"] == 302 {
+        assert_eq!(failure.message, "no such user");
+    }
+    if v["reason"] == 300 {
+        assert_eq!(failure.message, "invitation unavailable");
+    }
     assert_eq!(
         failure.code as i64,
         v["code"].as_i64().expect("code"),

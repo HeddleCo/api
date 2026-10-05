@@ -29,7 +29,7 @@ export function validateInvitationCodeResponse(
 }
 
 function validTimestamp(time: Timestamp): boolean {
-  return time.seconds >= -62135596800n && time.seconds <= 253402300799n &&
+  return typeof time.seconds === "bigint" && time.seconds >= -62135596800n && time.seconds <= 253402300799n &&
     Number.isInteger(time.nanos) && time.nanos >= 0 && time.nanos < 1000000000;
 }
 
@@ -38,7 +38,8 @@ function validateCodeResponse(
   invitation: SignupInvitation | InvitationRecord,
   context: InvitationCodeReadContext,
 ): void {
-  if (context.callerSubject === "" || context.creatorSubject === "" ||
+  if (typeof context.callerSubject !== "string" || typeof context.creatorSubject !== "string" ||
+      context.callerSubject === "" || context.creatorSubject === "" ||
       context.callerSubject !== context.creatorSubject) {
     throw new Error("Creator: invitation code read requires the original creator");
   }

@@ -20,6 +20,10 @@ const timestamp = (t) => t === null ? undefined : create(TimestampSchema, { seco
 function check(v) {
   const context = { callerSubject: v.caller, creatorSubject: v.creator, now: timestamp(v.now) };
   const state = { redeemed: v.redeemed, revoked: v.revoked, expiresAt: timestamp(v.expires_at) };
+  if (v.runtime_seconds) {
+    context.now.seconds = v.runtime_seconds[0];
+    state.expiresAt.seconds = v.runtime_seconds[1];
+  }
   const bytes = Uint8Array.from(Buffer.from(v.secret_hex, "hex"));
   for (const [validate, responseSchema, invitationSchema] of [
     [validateInvitationCodeResponse, GetInvitationCodeResponseSchema, InvitationRecordSchema],
@@ -46,6 +50,18 @@ test("reads after redeem, revoke or expiry must be empty", () => {
 test("shared vectors cover repeated reads, legacy codes and timestamp validation", () => {
   assert.equal(fixture.cases.length, 22);
   fixture.cases.forEach(check);
+});
+
+test("missing or non-string subjects cannot satisfy creator equality", () => {
+  for (const subject of [undefined, null, 1]) {
+    check({ ...fixture.cases[0], caller: subject, creator: subject, error: "Creator" });
+  }
+});
+
+test("timestamps must use bigint seconds, preventing lexical expiry comparisons", () => {
+  for (const seconds of [["10", "9"], [10, 9]]) {
+    check({ ...fixture.cases[0], runtime_seconds: seconds, error: "Expiry" });
+  }
 });
 
 test("code responses round-trip original bytes and the empty terminal shape", () => {

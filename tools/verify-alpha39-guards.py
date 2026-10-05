@@ -22,6 +22,8 @@ elif language == "ts":
     path = Path("packages/typescript/dist/v1alpha2/invitation-code.js")
     cases = [
         ("creator", "context.callerSubject !== context.creatorSubject", "false"),
+        ("subject_types", 'typeof context.callerSubject !== "string" || typeof context.creatorSubject !== "string"', "false"),
+        ("timestamp_type", 'typeof time.seconds === "bigint"', "true"),
         ("redeemed", "invitation.redeemed || invitation.revoked || expired", "false || invitation.revoked || expired"),
         ("revoked", "invitation.redeemed || invitation.revoked || expired", "invitation.redeemed || false || expired"),
         ("expired", "invitation.redeemed || invitation.revoked || expired", "invitation.redeemed || invitation.revoked || false"),

@@ -160,6 +160,7 @@ impl Receiver {
                 &native,
                 &selected_set(f)?,
                 1_200_001,
+                &[],
             )?;
             if native.foreign_dependencies.is_empty() && native.landing_witnesses.is_empty() {
                 verify_native_witness_vectors(&context)?;
@@ -417,6 +418,7 @@ impl Receiver {
                 &native,
                 &selected_set(f)?,
                 1_200_001,
+                &[],
             )?;
             (&native.foreign_dependencies, &native.landing_witnesses)
         } else {
@@ -435,6 +437,7 @@ impl Receiver {
                     &record(f, stage)?,
                     &selected_set(f)?,
                     1_200_001,
+                &[],
                 )?;
             }
         }

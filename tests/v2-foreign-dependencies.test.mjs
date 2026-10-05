@@ -33,7 +33,7 @@ const pinned=JSON.parse(readFileSync(new URL('./fixtures/import-authority-host-w
 const independent=fromBinary(imp.ImportPublicProofBundleV1Schema,bytes(pinned.wire_vectors.complete_export.wire_hex));
 const nativeId=(format,data)=>{const size=new Uint8Array(8);new DataView(size.buffer).setBigUint64(0,BigInt(data.length),true);return blake3(join(utf8.encode(format),size,Uint8Array.of(0),data));};
 const pin={authority:'https://weft.example.test',rootId:'descriptor-root-1',publicKey:bytes(f.keys.root.public_key_hex),epoch:1n};
-async function nativeWitnesses(b){const set=await verifyWitnessSet(wire('mixed_set',SignedHostedWitnessSetV1Schema),{authority:pin.authority,rootId:pin.rootId,rootPublicKey:pin.publicKey,rootEpoch:1n,nowUnixMillis:1200001n,clockFloorUnixMillis:1000000n,knownJobKeys:[bytes(f.keys.job.public_key_hex)]});await native.verifyNativeBundleWitnesses(b,set,1200001n);}
+async function nativeWitnesses(b,forbiddenLandingKeys=[]){const set=await verifyWitnessSet(wire('mixed_set',SignedHostedWitnessSetV1Schema),{authority:pin.authority,rootId:pin.rootId,rootPublicKey:pin.publicKey,rootEpoch:1n,nowUnixMillis:1200001n,clockFloorUnixMillis:1000000n,knownJobKeys:[bytes(f.keys.job.public_key_hex)]});await native.verifyNativeBundleWitnesses(b,set,1200001n,forbiddenLandingKeys);}
 async function importWitnesses(b,roles){
  const result=await imported.verifyImportBundleWitnesses(b,pin,undefined,1200001n,()=>({identity:independent.delegations[0].body.identity,ownerPublicKey:bytes(f.keys.owner.public_key_hex),ownerChainDigest:imported.ownerChainDigest(independent.ownerChain),authorityExpiresAtSeconds:2000n,effectiveFromUnixSeconds:0n,effectiveUntilUnixSeconds:undefined,forbiddenJobKeys:roles?[]:['owner','device','root','witness'].map(k=>bytes(f.keys[k].public_key_hex)),forbiddenLandingKeys:roles==='import_forbidden'?[bytes(f.keys.device.public_key_hex)]:[],knownJobAssociations:roles==='import_known'?[{key:bytes(f.keys.device.public_key_hex),logicalJobId:independent.delegations[0].body.logicalJobId}]:[]}),bundle=>{
    // Independently pinned accepted owner/policy context for this fixed corpus.
@@ -128,3 +128,24 @@ for(const v of f.receiver_negative)test(`staged receiver REJECT then PASS ${v.id
 
 test('prefix staging bidirectional fresh receiver',async()=>{const r=new Receiver();for(const root of f.fresh_receiver.roots)await r.installPrefix(root);assert.deepEqual([...r.stages],f.fresh_receiver.expected_prefixes);});
 test('prefix staging genuine cycle REJECT then PASS',async()=>{const r=new Receiver(),catalog=f.prefixes.filter(p=>f.cycle_negative.prefixes.includes(p.id));await assert.rejects(()=>r.installPrefix(f.cycle_negative.root,catalog),{reason:'Scope'});await r.installPrefix(f.cycle_negative.control);});
+
+test('native witnesses apply forbidden landing keys',async()=>{
+ const b=wire('import_tip_native_fast_forward');
+ await assert.rejects(()=>nativeWitnesses(b,[bytes(f.keys.device.public_key_hex)]),{reason:'KeyRole'});
+ await nativeWitnesses(b);
+});
+
+test('LocalKey cutoff ignores later claim and resolution in both install orders',async()=>{
+ const original=wire('local_cutoff_original',SignedRecordSchema),prefix=wire('local_cutoff_prefix'),history=wire('local_cutoff_history'),carrier=wire('local_cutoff_dependent');
+ await importWitnesses(carrier);
+ const order=carrier.statements.find(s=>s.body.purpose===2).body.admissionOrder;
+ assert.equal(order,236n);
+ assert.ok(equal(carrier.foreignDependencies[0].signedNativeDigest,imported.signedNativeDigest(original)));
+ for(const histories of [[prefix,history],[history,prefix]]){
+  for(const installed of histories){
+   await nativeWitnesses(installed);
+   assert.equal(native.localWorkCutoff(installed,original,order),carrier.foreignDependencies[0].prefixAdmissionOrder);
+  }
+ }
+ assert.equal(native.localWorkCutoff(history,original,238n),238n);
+});

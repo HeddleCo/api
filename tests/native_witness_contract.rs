@@ -51,7 +51,7 @@ fn verify(f: &Value, b: &api::NativePublicProofBundleV1) -> Result<(), codec::Re
         },
         None,
     )?;
-    native::verify_bundle_witnesses(b, &set, now)
+    native::verify_bundle_witnesses(b, &set, now, &[])
 }
 #[test]
 fn native_positive_bundles() {

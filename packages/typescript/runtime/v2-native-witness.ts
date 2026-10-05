@@ -1,10 +1,11 @@
+import { blake3 } from "@noble/hashes/blake3.js";
 import { ForeignReferences } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./native_witness_pb.js";
 import { ForeignDependencyOrigin, ImportIdentityV1Schema, ImportOwnerChainV1Schema, ImportAuthorityWitnessV1Schema, HostedLandingWitnessV1Schema, type ImportIdentityV1, type ImportPublicProofBundleV1 } from "./import_authority_pb.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
 import type { HostedWitnessStatementV1 } from "../common/hosted_witness_pb.js";
-import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, reject, strictDecode, HybridContractError, verifySignature } from "./_hybrid-codec.js";
+import { canonicalHybridV1, signingDigest, hash, keyId, equal, compare, width, reject, strictDecode, HybridContractError, verifySignature, join } from "./_hybrid-codec.js";
 import { ThreadControlAuthoritySchema } from "./identity_pb.js";
 import { threadGenesisId, type ThreadGenesisSigner } from "./thread-genesis.js";
 import { decode, type Value } from "./_collaboration-msgpack.js";
@@ -158,7 +159,7 @@ export async function validatePublicNativeBundle(b:api.NativePublicProofBundleV1
   foreign.finish();
 }
 /** All statements resolve separately, including exact retirement proofs. */
-export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint):Promise<void> {
+export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV1,set:VerifiedWitnessSet,now:bigint,_forbiddenLandingKeys:Uint8Array[]=[]):Promise<void> {
   b=clone(api.NativePublicProofBundleV1Schema,b);await validatePublicNativeBundle(b);
   for(const p of b.landingWitnesses)verifyLandingKeyRoles(p,set.knownJobKeys);
   // The opaque verified snapshot, rather than the carrier, selects trust.
@@ -171,6 +172,25 @@ export async function verifyNativeBundleWitnesses(b:api.NativePublicProofBundleV
     const proof=b.historyProofs.find(p=>{if(p.purpose!==s.purpose)return false;try{verifyWitnessInclusion(leaf,p,entry);return true;}catch{return false;}})??reject("Proof");
     await resolveWitnessStatement(set,signed,proof,false,now);
   }
+}
+/** Select a LocalKey proof cutoff from independently verified native history.
+ * Native causal/owner checks remain required; the order comes from the exact
+ * authenticated dependent statement. */
+export function localWorkCutoff(b:api.NativePublicProofBundleV1,original:SignedRecord,_dependentAdmissionOrder:bigint):bigint {
+  const subject=thread(original),orders:bigint[]=[],claims:Uint8Array[]=[],resolutions:SignedRecord[]=[];
+  for(const signed of b.statements){
+    const s=signed.body??reject("Canonical");
+    if(s.purpose===1){for(const p of b.genesisWitnesses){const binding=p.binding?.body??reject("Canonical");if(equal(binding.genesisDigest,subject)&&equal(s.canonicalPayload,canonicalHybridV1(api.NativeGenesisWitnessV1Schema,p))){if(binding.ownerKind!==2)reject("Scope");orders.push(s.admissionOrder);}}}
+    else if(s.purpose===2){for(const p of b.authorityWitnesses){if(![2,3].includes(p.kind)||!equal(s.canonicalPayload,canonicalHybridV1(ImportAuthorityWitnessV1Schema,p)))continue;const r=p.original??reject("Canonical");if(!equal(thread(r),subject))continue;orders.push(s.admissionOrder);if(p.kind===2)claims.push(nativeOriginalId(r));else resolutions.push(r);}}
+  }
+  if(resolutions.length===0){if(claims.length!==1)reject("Scope");}
+  else if(resolutions.length===1){const r=selectors(resolutions[0]!);claims.sort(compare);const conflicts=r.conflicting_claims;if(!Array.isArray(conflicts)||claims.length!==conflicts.length||claims.some((c,i)=>!equal(c,octets(conflicts[i],32)))||!claims.some(c=>equal(c,octets(r.winning_claim,32))))reject("Scope");}
+  else reject("Scope");
+  const cutoff=orders.reduce((a,b)=>a>b?a:b,0n);if(cutoff===0n)reject("Scope");return cutoff;
+}
+function nativeOriginalId(r:SignedRecord):Uint8Array {
+  const size=new Uint8Array(8);new DataView(size.buffer).setBigUint64(0,BigInt(r.canonicalRecord.length),true);
+  return blake3(join(new TextEncoder().encode(r.format),size,Uint8Array.of(0),r.canonicalRecord));
 }
 /** Explicit transport arms, never delegation-less fallback. */
 export async function validateNativeWitnessCarriers(imported:ImportPublicProofBundleV1|undefined,native:api.NativePublicProofBundleV1|undefined):Promise<void> {

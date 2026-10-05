@@ -1412,7 +1412,7 @@ fn verify_native_witness_vectors(f: &Value) -> Result<()> {
             },
             None,
         )?;
-        contract::native_witness::verify_bundle_witnesses(&b, &set, now)?;
+        contract::native_witness::verify_bundle_witnesses(&b, &set, now, &[])?;
         let mut geneses = BTreeMap::new();
         for p in &b.genesis_witnesses {
             let g = genesis(p.original_genesis.as_ref().context("original")?)?;

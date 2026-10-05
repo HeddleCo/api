@@ -101,7 +101,7 @@ fn check(f: &Value, name: &str, carrier: &str) -> Result<(), codec::Reject> {
                 },
                 None,
             )?;
-            native::verify_bundle_witnesses(&wire(f, name), &set, 1200001)
+            native::verify_bundle_witnesses(&wire(f, name), &set, 1200001, &[])
         }
         "native" => native::validate_public_bundle(&wire(f, name)),
         "import" => import::validate_public_bundle(&wire(f, name)),
@@ -180,6 +180,7 @@ fn foreign_native_closures_still_recheck_all_witnesses() {
                 &wire(&f, v["id"].as_str().expect("name")),
                 &set,
                 1200001,
+                &[],
             )
             .expect("all P1/P2/P4");
         }
@@ -214,4 +215,49 @@ fn exact_foreign_dependency_proto_surface() {
     ] {
         assert_eq!(message.get_field(tag).expect("field").name(), name);
     }
+}
+
+#[test]
+fn native_witnesses_apply_forbidden_landing_keys() {
+    let f = fixture();
+    let root = bytes(&f["keys"]["root"]["public_key_hex"]);
+    let job = bytes(&f["keys"]["job"]["public_key_hex"]);
+    let set = witness::verify_set(
+        &wire(&f, "mixed_set"),
+        &witness::SetExpectation {
+            authority: "https://weft.example.test",
+            root_id: "descriptor-root-1",
+            root_public_key: &root,
+            root_epoch: 1,
+            now_unix_millis: 1200001,
+            clock_floor_unix_millis: 1000000,
+            known_job_keys: &[job],
+        },
+        None,
+    ).expect("independent witness pin");
+    let b = wire(&f, "import_tip_native_fast_forward");
+    let device = bytes(&f["keys"]["device"]["public_key_hex"]);
+    assert_eq!(native::verify_bundle_witnesses(&b, &set, 1200001, &[device]), Err(codec::Reject::KeyRole));
+    native::verify_bundle_witnesses(&b, &set, 1200001, &[]).expect("ordinary device can land");
+}
+
+#[test]
+fn local_cutoff_ignores_later_claim_and_resolution_in_both_install_orders() {
+    let f = fixture();
+    let original = wire(&f, "local_cutoff_original");
+    let prefix = wire(&f, "local_cutoff_prefix");
+    let history = wire(&f, "local_cutoff_history");
+    let carrier: heddle_api::heddle::api::v1alpha2::ImportPublicProofBundleV1 = wire(&f, "local_cutoff_dependent");
+    import::validate_public_bundle(&carrier).expect("same dependent carrier");
+    let dependent_order = carrier.statements.iter().filter_map(|s| s.body.as_ref()).find(|s| s.purpose == 2).expect("authenticated dependent statement").admission_order;
+    assert_eq!(dependent_order, 236);
+    let reference = &carrier.foreign_dependencies[0];
+    assert_eq!(reference.signed_native_digest, import::signed_native_digest(&original).expect("original"));
+    for histories in [[&prefix, &history], [&history, &prefix]] {
+        for installed in histories {
+            native::validate_public_bundle(installed).expect("ownership history");
+            assert_eq!(native::local_work_cutoff(installed, &original, dependent_order).expect("as-of closure"), reference.prefix_admission_order);
+        }
+    }
+    assert_eq!(native::local_work_cutoff(&history, &original, 238).expect("later resolution"), 238);
 }

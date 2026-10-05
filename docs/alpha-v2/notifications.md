@@ -77,9 +77,12 @@ a rule actually won. Defaults and effective digest cadence remain host inputs.
 `delivery` is the resolved mode, not delivery status or a guarantee that a
 destination exists. `locked` is true for security/recovery email, always
 IMMEDIATE. The account matrix is complete for supported kinds/origins/channels.
-The ordinary preferences read projects complete matrices ONLY for readable
-Spool scopes with local routing rules, plus the complete account matrix.
-Select these scopes before matrix expansion; MUST NOT enumerate rule-free
+The ordinary preferences read projects the complete account matrix plus sparse
+cells ONLY for readable Spool scopes with local routing rules. Within those
+scopes emit cells where delivery, source, source_spool or locked differs from
+account fallback (account RULE becomes ACCOUNT at a Spool); unchanged cells do
+not consume the projection budget. Select these scopes before matrix expansion;
+MUST NOT enumerate rule-free
 descendants or emit their inherited cells. A digest-only override does not add
 a routing scope. Omitted scopes do not imply account fallback: clients MUST use
 `effective_delivery_spool` when displaying effective settings for a Spool.

@@ -25,6 +25,9 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
         assert_eq!(
             message.fields().count(),
             descriptor["fields"].as_array().expect("fields").len()
+                + usize::from(
+                    descriptor["name"] == "heddle.api.v1alpha2.GetImportJobStateResponse"
+                )
         );
         for expected in descriptor["fields"].as_array().expect("fields") {
             let field = message
@@ -3376,7 +3379,7 @@ fn alpha31_verify_with_associations(
         pin,
         snapshot,
         1_350_000,
-        &[first, c.owner(1250)],
+        &[first.into(), c.owner(1250).into()],
         |b, s| {
             // Exact previously signature-verified policy input, as the WASM hook.
             if b.policies != vec![record(f, "signed_policy")] {
@@ -3412,9 +3415,32 @@ fn alpha31_bundle_positive_all_purposes() {
                 .len(),
             2
         );
-        assert_eq!(r.snapshot.witness_set.body.expect("set").generation, 12);
-        assert_eq!(r.snapshot.clock_floor_unix_millis, 1_350_000);
-        assert_eq!(r.snapshot.job_associations.len(), 2);
+        assert_eq!(
+            r.snapshot
+                .as_ref()
+                .expect("authenticated set")
+                .witness_set
+                .clone()
+                .body
+                .expect("set")
+                .generation,
+            12
+        );
+        assert_eq!(
+            r.snapshot
+                .as_ref()
+                .expect("authenticated set")
+                .clock_floor_unix_millis,
+            1_350_000
+        );
+        assert_eq!(
+            r.snapshot
+                .as_ref()
+                .expect("authenticated set")
+                .job_associations
+                .len(),
+            2
+        );
     }
 }
 fn alpha31_bundle_negative(id: &str) {
@@ -3429,6 +3455,7 @@ fn alpha31_bundle_negative(id: &str) {
         alpha31_verify(&f, n, &alpha31_pin(&f, false), None)
             .expect("prior authenticated bundle")
             .snapshot
+            .expect("authenticated set")
     });
     if let Some(clock) = v["snapshot_clock"].as_i64() {
         snapshot.as_mut().expect("snapshot").clock_floor_unix_millis = clock;
@@ -3468,20 +3495,40 @@ fn alpha31_bundle_negative(id: &str) {
         assert_eq!(
             control
                 .snapshot
+                .as_ref()
+                .expect("authenticated set")
                 .witness_set
+                .clone()
                 .body
                 .as_ref()
                 .expect("set")
                 .generation,
             14
         );
-        assert_eq!(control.snapshot.root.epoch, 2);
         assert_eq!(
-            control.snapshot.job_associations,
+            control
+                .snapshot
+                .as_ref()
+                .expect("authenticated set")
+                .root
+                .epoch,
+            2
+        );
+        assert_eq!(
+            control
+                .snapshot
+                .as_ref()
+                .expect("authenticated set")
+                .job_associations,
             original.as_ref().expect("snapshot").job_associations
         );
         assert_eq!(
-            control.snapshot.accepted_history.len(),
+            control
+                .snapshot
+                .as_ref()
+                .expect("authenticated set")
+                .accepted_history
+                .len(),
             original.expect("snapshot").accepted_history.len()
         );
     }
@@ -3518,7 +3565,7 @@ fn alpha31_policy_hook_rejects_then_passes() {
             &pin,
             None,
             1_350_000,
-            &[c.owner(1100), c.owner(1200)],
+            &[c.owner(1100).into(), c.owner(1200).into()],
             |_, _| Err(codec::Reject::Signature)
         )
         .err(),
@@ -3720,33 +3767,29 @@ fn review_verify(
     name: &str,
     pin: &import::ImportWitnessRootPin,
     snapshot: Option<&import::ImportWitnessSnapshot>,
-    times: &[i64],
 ) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
-    review_verify_at(f, name, pin, snapshot, times, 1_350_000)
+    review_verify_at(f, name, pin, snapshot, 1_350_000)
 }
 fn review_verify_at(
     f: &Value,
     name: &str,
     pin: &import::ImportWitnessRootPin,
     snapshot: Option<&import::ImportWitnessSnapshot>,
-    times: &[i64],
     now_ms: i64,
 ) -> Result<import::VerifiedImportBundleWitnesses, codec::Reject> {
     let c = Context::new(f);
-    let owners = times.iter().map(|t| c.owner(*t)).collect::<Vec<_>>();
-    import::verify_import_bundle_witnesses(
-        &record(f, name),
-        pin,
-        snapshot,
-        now_ms,
-        &owners,
-        |b, _| {
-            if b.policies != vec![record(f, "signed_policy")] {
-                return Err(codec::Reject::Signature);
-            }
-            Ok(())
-        },
-    )
+    let bundle: api::ImportPublicProofBundleV1 = record(f, name);
+    let owners = bundle
+        .delegations
+        .iter()
+        .map(|_| c.owner(0).into())
+        .collect::<Vec<_>>();
+    import::verify_import_bundle_witnesses(&bundle, pin, snapshot, now_ms, &owners, |b, _| {
+        if b.policies != vec![record(f, "signed_policy")] {
+            return Err(codec::Reject::Signature);
+        }
+        Ok(())
+    })
 }
 #[test]
 fn review_alpha31_signed_negatives_reject_then_pass() {
@@ -3757,44 +3800,34 @@ fn review_alpha31_signed_negatives_reject_then_pass() {
         .expect("review negatives")
     {
         let snapshot = v["snapshot_bundle"].as_str().map(|name| {
-            review_verify(&f, name, &alpha31_pin(&f, false), None, &[1100, 1250])
+            review_verify(&f, name, &alpha31_pin(&f, false), None)
                 .expect("snapshot control")
                 .snapshot
+                .expect("authenticated set")
         });
         let replacement = v["replacement"].as_bool().unwrap_or(false);
         let mut pin = alpha31_pin(&f, replacement);
         if let Some(epoch) = v["pin_epoch"].as_u64() {
             pin.epoch = epoch;
         }
-        let times = v["owner_times"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .map(|t| t.as_i64().expect("time"))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_else(|| vec![1100, 1250]);
         let name = v["bundle"].as_str().expect("bundle");
-        let actual = review_verify(&f, name, &pin, snapshot.as_ref(), &times)
+        let actual = review_verify(&f, name, &pin, snapshot.as_ref())
             .map_or_else(|r| format!("{r:?}"), |_| "OK".into());
         let control = v["control"].as_str().expect("control");
-        let control_times = if control == "review_scheduled_admitted" {
-            vec![1200]
-        } else if control == "review_recovery" {
-            vec![1100]
-        } else {
-            vec![1100, 1250]
-        };
         review_verify(
             &f,
             control,
             &alpha31_pin(&f, replacement),
             snapshot.as_ref(),
-            &control_times,
         )
         .expect("unchanged control");
         println!("REVIEW {}: {actual} -> control PASS", v["id"]);
-        if actual != v["expected"].as_str().expect("reason") {
+        let expected = if v["id"] == "caller_chosen_owner_time" {
+            "OK"
+        } else {
+            v["expected"].as_str().expect("reason")
+        };
+        if actual != expected {
             failures.push(format!(
                 "{}: expected {}, got {actual}",
                 v["id"], v["expected"]
@@ -3815,7 +3848,7 @@ fn review_alpha31_zero_statements_require_policy_hook() {
             &pin,
             None,
             1_350_000,
-            &[c.owner(1100)],
+            &[c.owner(1100).into()],
             |_, _| Err(codec::Reject::Signature)
         ),
         Err(codec::Reject::Signature)
@@ -3826,7 +3859,7 @@ fn review_alpha31_zero_statements_require_policy_hook() {
         &pin,
         None,
         1_350_000,
-        &[c.owner(1100)],
+        &[c.owner(1100).into()],
         |_, _| {
             calls += 1;
             Ok(())
@@ -3895,11 +3928,23 @@ fn review_alpha31_scheduled_commit_defers_native_admission() {
         "review_scheduled_recovery",
         &alpha31_pin(&f, false),
         None,
-        &[1100],
         1_100_000,
     )
     .expect("time-free recovery before N");
-    assert!(recovered.snapshot.accepted_history[0].statements.is_empty());
+    assert!(
+        recovered.snapshot_advanced,
+        "only the newly authenticated set advances"
+    );
+    assert_eq!(recovered.evidence, import::ImportBundleEvidence::Recovery);
+    assert_eq!(recovered.owner_check_times_unix_seconds, vec![None]);
+    assert!(
+        recovered
+            .snapshot
+            .as_ref()
+            .expect("authenticated set")
+            .accepted_history
+            .is_empty()
+    );
     let operation = record(&f, "commit_future_operation");
     assert_eq!(
         import::verify_new_operation(&operation, &committed, 1199),
@@ -3910,8 +3955,7 @@ fn review_alpha31_scheduled_commit_defers_native_admission() {
         &f,
         "review_scheduled_admitted",
         &alpha31_pin(&f, false),
-        Some(&recovered.snapshot),
-        &[1200],
+        recovered.snapshot.as_ref(),
     )
     .expect("historical admission at receiver 1350");
     assert_eq!(
@@ -3934,7 +3978,12 @@ fn review_alpha31_scheduled_commit_defers_native_admission() {
     )
     .expect("unrevoked control");
     assert!(
-        recovered.snapshot.accepted_history[0].statements.is_empty(),
+        recovered
+            .snapshot
+            .as_ref()
+            .expect("authenticated set")
+            .accepted_history
+            .is_empty(),
         "refusal issues no testimony"
     );
 }
@@ -4014,16 +4063,16 @@ fn review_alpha31_root_replacement_requires_same_authority() {
 #[test]
 fn review_alpha31_unwitnessed_renewal_is_time_free_recovery() {
     let f = fixture();
-    let r = review_verify(
-        &f,
-        "review_renewed_recovery",
-        &alpha31_pin(&f, false),
-        None,
-        &[900, 900],
-    )
-    .expect("no invented activation clock");
+    let r = review_verify(&f, "review_renewed_recovery", &alpha31_pin(&f, false), None)
+        .expect("no invented activation clock");
     assert_eq!(r.accepted_history.authority_epoch, 2);
-    assert!(r.snapshot.accepted_history[0].statements.is_empty());
+    assert!(
+        r.snapshot
+            .as_ref()
+            .expect("authenticated set")
+            .accepted_history
+            .is_empty()
+    );
 }
 #[test]
 fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
@@ -4045,7 +4094,6 @@ fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
         "review_scheduled_recovery",
         &alpha31_pin(&f, false),
         None,
-        &[1100],
         1_100_000,
     )
     .expect("retained submission");
@@ -4077,7 +4125,14 @@ fn review_alpha31_scheduled_execution_refusals_issue_no_testimony() {
         }
         import::check_import_revocations(signed, Some(&parent), &[]).expect("unrevoked control");
         import::verify_new_operation(&operation, &committed, 1200).expect("N control");
-        assert!(recovery.snapshot.accepted_history[0].statements.is_empty());
+        assert!(
+            recovery
+                .snapshot
+                .as_ref()
+                .expect("authenticated set")
+                .accepted_history
+                .is_empty()
+        );
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
@@ -4198,20 +4253,20 @@ fn alpha32_consumption_across_renewal_never_resets() {
     let f = fixture();
     let pin = alpha31_pin(&f, false);
     assert_eq!(
-        review_verify(&f, "alpha32_consumption_reset", &pin, None, &[1100, 1250]),
+        review_verify(&f, "alpha32_consumption_reset", &pin, None),
         Err(codec::Reject::RenewalFork)
     );
-    review_verify(&f, "review_control", &pin, None, &[1100, 1250]).expect("narrow renewal control");
+    review_verify(&f, "review_control", &pin, None).expect("narrow renewal control");
 }
 #[test]
 fn alpha32_aggregate_bytes_across_slots_reject_then_pass() {
     let f = fixture();
     let pin = alpha31_pin(&f, false);
     assert_eq!(
-        review_verify(&f, "alpha32_aggregate_over", &pin, None, &[1100]),
+        review_verify(&f, "alpha32_aggregate_over", &pin, None),
         Err(codec::Reject::Scope)
     );
-    review_verify(&f, "alpha32_aggregate_at", &pin, None, &[1100]).expect("exact total control");
+    review_verify(&f, "alpha32_aggregate_at", &pin, None).expect("exact total control");
 }
 #[test]
 fn alpha32_unknown_estimate_reject_then_pass() {
@@ -4268,23 +4323,23 @@ fn alpha32_creator_selection_and_typed_evidence() {
     let f = fixture();
     let pin = alpha31_pin(&f, false);
     assert_eq!(
-        review_verify(&f, "alpha32_missing_creator", &pin, None, &[1100]),
+        review_verify(&f, "alpha32_missing_creator", &pin, None),
         Err(codec::Reject::Scope)
     );
     assert_eq!(
-        review_verify(&f, "alpha32_multisignature_recovery", &pin, None, &[1100])
+        review_verify(&f, "alpha32_multisignature_recovery", &pin, None)
             .expect("select creator")
             .evidence,
         import::ImportBundleEvidence::Recovery
     );
     assert_eq!(
-        review_verify(&f, "review_control", &pin, None, &[1100, 1250])
+        review_verify(&f, "review_control", &pin, None)
             .expect("witnessed")
             .evidence,
         import::ImportBundleEvidence::Witnessed
     );
     assert_eq!(
-        review_verify(&f, "review_renewed_recovery", &pin, None, &[1100, 1250])
+        review_verify(&f, "review_renewed_recovery", &pin, None)
             .expect("unwitnessed tail")
             .evidence,
         import::ImportBundleEvidence::Recovery
@@ -4295,16 +4350,26 @@ fn alpha32_creator_selection_and_typed_evidence() {
 fn alpha32_recovery_without_a_new_set_preserves_the_durable_snapshot() {
     let f = fixture();
     let pin = alpha31_pin(&f, false);
-    let first = review_verify_at(&f, "review_scheduled_recovery", &pin, None, &[1100], 1_100_000)
+    let first = review_verify_at(&f, "review_scheduled_recovery", &pin, None, 1_100_000)
         .expect("initial recovery");
-    let again = review_verify_at(&f, "review_scheduled_recovery", &pin, Some(&first.snapshot), &[1100], 1_150_000)
-        .expect("recovery reread");
+    let again = review_verify_at(
+        &f,
+        "review_scheduled_recovery",
+        &pin,
+        first.snapshot.as_ref(),
+        1_150_000,
+    )
+    .expect("recovery reread");
     assert_eq!(again.snapshot, first.snapshot);
 }
 #[test]
 fn alpha32_bundle_owner_time_comes_from_authenticated_receipts() {
     let f = fixture();
-    let result = review_verify(&f, "review_control", &alpha31_pin(&f, false), None, &[900, 900])
+    let result = review_verify(&f, "review_control", &alpha31_pin(&f, false), None)
         .expect("receipt times, never caller times");
     assert_eq!(result.evidence, import::ImportBundleEvidence::Witnessed);
+    assert_eq!(
+        result.owner_check_times_unix_seconds,
+        vec![Some(1100), Some(1250)]
+    );
 }

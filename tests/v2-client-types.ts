@@ -41,3 +41,12 @@ declare const preflightResult: Awaited<ReturnType<typeof preflightPreparedImport
 // @ts-expect-error Signing preflight returns void, never execution authority.
 const executablePreflight: VerifiedImportDelegation = preflightResult;
 void executablePreflight;
+
+import { type ImportBundleOwnerExpectation, type VerifiedImportBundleWitnesses } from "../packages/typescript/dist/v1alpha2/import-authority.js";
+declare const bundleOwnerFacts: ImportBundleOwnerExpectation;
+// @ts-expect-error Historical times are internally derived from authenticated receipts.
+const callerTimedOwner: ImportBundleOwnerExpectation = { ...bundleOwnerFacts, nowUnixSeconds: 1100n };
+declare const verifiedBundle: VerifiedImportBundleWitnesses;
+// @ts-expect-error A recovery with no input or carried set has no durable snapshot.
+const assumedSnapshot: import("../packages/typescript/dist/v1alpha2/import-authority.js").ImportWitnessSnapshot = verifiedBundle.snapshot;
+void callerTimedOwner; void assumedSnapshot;

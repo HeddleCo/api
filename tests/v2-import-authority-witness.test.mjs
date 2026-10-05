@@ -123,7 +123,7 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
   assert.deepEqual(signature,bytes(v.signature_hex));assertCrypto(bytes(v.public_key_hex),input,signature);
 });
 test('frozen descriptor fields and public proof-only lookup',()=>{
-  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length);for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
+  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length+(entry.name==='heddle.api.v1alpha2.GetImportJobStateResponse'?1:0));for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
   for(const descriptor of fixture.enums){const schema=(descriptor.name.includes(".common.")?common:api)[`${descriptor.name.split(".").at(-1)}Schema`];assert.deepEqual(schema.values.map(v=>({name:v.name,number:v.number})),descriptor.values);}
   const expected = ['CancelImportJob', 'CommitImportJob', 'GetHostedWitnessHistoryProof', 'GetImportJobState', 'ImportSource',
     'PrepareImportJob', 'RenewImportJob', 'RetryImportSource', 'SynchronizeRemote']
@@ -701,13 +701,13 @@ for(const v of fixture.stale_manifest_vectors.negative)test(`alpha31 StaleManife
  assert.equal(fresh.renewal.body.replacement.body.scope.maxOperations,1);assert.equal(fresh.renewal.body.replacement.body.scope.maxResultBytes,1000n);
 });
 
-async function reviewVerify(name,pin=alpha31Pin(),snapshot,times=[1100,1250],now=1350000n) {return authority.verifyImportBundleWitnesses(vector(name),pin,snapshot,now,times.map(t=>ownerContext(BigInt(t))),alpha31Policy);}
+async function reviewVerify(name,pin=alpha31Pin(),snapshot,now=1350000n) {return authority.verifyImportBundleWitnesses(vector(name),pin,snapshot,now,vector(name).delegations.map(()=>{const {nowUnixSeconds,...facts}=ownerContext();return facts;}),alpha31Policy);}
 for(const v of fixture.review_alpha31_vectors.negative)test(`review alpha31 REJECT then PASS: ${v.id}`,async()=>{
  const snapshot=v.snapshot_bundle?(await reviewVerify(v.snapshot_bundle)).snapshot:undefined,original=structuredClone(snapshot);
  const pin=alpha31Pin(v.replacement,BigInt(v.pin_epoch??(v.replacement?2:1)));
- await assert.rejects(reviewVerify(v.bundle,pin,snapshot,v.owner_times),expected(v.expected));assert.deepEqual(snapshot,original);
- const times=v.control==='review_scheduled_admitted'?[1200]:v.control==='review_recovery'?[1100]:[1100,1250];
- await reviewVerify(v.control,alpha31Pin(v.replacement),snapshot,times);
+ if(v.id==='caller_chosen_owner_time')assert.deepEqual((await reviewVerify(v.bundle,pin,snapshot)).ownerCheckTimesUnixSeconds,[1100n,1250n]);
+ else await assert.rejects(reviewVerify(v.bundle,pin,snapshot),expected(v.expected));assert.deepEqual(snapshot,original);
+ await reviewVerify(v.control,alpha31Pin(v.replacement),snapshot);
 });
 test('review alpha31 zero statements require a policy hook',async()=>{
  const b=vector('review_recovery'),owners=[ownerContext()];
@@ -730,13 +730,13 @@ test('review alpha31 scheduled Commit defers native admission',async()=>{
  const d=await authority.verifyImportCommitSubmission(request,vector(v.prepared),'github',vector('source_connected'),vector('import_configuration'),ownerContext(1100n));
  authority.validateImportCommitResponse(request,vector(v.response));
  authority.validateImportJobStateResponse(vector('job_state_request'),vector(v.state_read));
- const recovery=await reviewVerify(v.recovery,alpha31Pin(),undefined,[1100],1100000n);assert.equal(recovery.snapshot.acceptedHistory[0].statements.length,0);
+ const recovery=await reviewVerify(v.recovery,alpha31Pin(),undefined,1100000n);assert.equal(recovery.snapshot.acceptedHistory.length,0);assert.equal(recovery.snapshotAdvanced,true);assert.equal(recovery.evidence,'recovery');assert.deepEqual(recovery.ownerCheckTimesUnixSeconds,[undefined]);
  await assert.rejects(authority.verifyNewImportOperation(vector(v.operation),d,1199n),expected('Expired'));
  await authority.verifyNewImportOperation(vector(v.operation),d,1200n);
- await reviewVerify(v.admitted,alpha31Pin(),recovery.snapshot,[1200]);
+ await reviewVerify(v.admitted,alpha31Pin(),recovery.snapshot);
  await assert.rejects(authority.verifyNewImportOperation(vector(v.operation),d,1300n),expected('Expired'));
  assert.throws(()=>authority.checkImportRevocations(request.proof.delegations[0],vector('permission'),[vector('permission').body.cancellationId]),expected('Revoked'));
- authority.checkImportRevocations(request.proof.delegations[0],vector('permission'),[]);assert.equal(recovery.snapshot.acceptedHistory[0].statements.length,0);
+ authority.checkImportRevocations(request.proof.delegations[0],vector('permission'),[]);assert.equal(recovery.snapshot.acceptedHistory.length,0);
 });
 test('review alpha31 refused bytes cannot replay accepted renewal',()=>{
  const v=fixture.review_alpha31_vectors.refused_replay,old=toBinary(api.RenewImportJobRequestSchema,vector(v.request)),accepted=toBinary(api.RenewImportJobRequestSchema,vector(v.accepted));
@@ -754,17 +754,17 @@ test('review alpha31 root replacement requires the same authority',async()=>{
  await witness.verifyWitnessSetAfterRootReplacement(vector('alpha31_replacement_set'),e,old);
 });
 test('review alpha31 unwitnessed renewal is time-free recovery',async()=>{
- const r=await reviewVerify('review_renewed_recovery',alpha31Pin(),undefined,[900,900]);assert.equal(r.acceptedHistory.authorityEpoch,2n);assert.equal(r.snapshot.acceptedHistory[0].statements.length,0);
+ const r=await reviewVerify('review_renewed_recovery',alpha31Pin(),undefined);assert.equal(r.acceptedHistory.authorityEpoch,2n);assert.equal(r.snapshot.acceptedHistory.length,0);
 });
 test('review alpha31 missing runtime policy hook refuses',async()=>{
  const b=vector('review_recovery');await assert.rejects(authority.verifyImportBundleWitnesses(b,alpha31Pin(),undefined,1350000n,[ownerContext()],undefined),expected('Canonical'));
- await reviewVerify('review_recovery',alpha31Pin(),undefined,[1100]);
+ await reviewVerify('review_recovery',alpha31Pin(),undefined);
 });
 for(const n of fixture.review_alpha31_vectors.scheduled.execution_negative)test(`review alpha31 scheduled execution refusal: ${n.id}`,async()=>{
  const request=vector('review_scheduled_commit'),parent=vector('permission'),d=await authority.verifyImportCommitSubmission(request,vector('commit_preparation'),'github',vector('source_connected'),vector('import_configuration'),ownerContext(1100n));
- const recovered=await reviewVerify('review_scheduled_recovery',alpha31Pin(),undefined,[1100],1100000n);
+ const recovered=await reviewVerify('review_scheduled_recovery',alpha31Pin(),undefined,1100000n);
  await assert.rejects(async()=>{authority.checkImportRevocations(request.proof.delegations[0],parent,n.revoked_parent?[parent.body.cancellationId]:[]);await authority.verifyNewImportOperation(vector('commit_future_operation'),d,BigInt(n.at));},expected(n.expected));
- authority.checkImportRevocations(request.proof.delegations[0],parent,[]);await authority.verifyNewImportOperation(vector('commit_future_operation'),d,1200n);assert.equal(recovered.snapshot.acceptedHistory[0].statements.length,0);
+ authority.checkImportRevocations(request.proof.delegations[0],parent,[]);await authority.verifyNewImportOperation(vector('commit_future_operation'),d,1200n);assert.equal(recovered.snapshot.acceptedHistory.length,0);
 });
 
 // alpha.32 uses frozen vectors; no test-time signing or expected-byte regeneration.
@@ -809,8 +809,8 @@ test('alpha32 consumption across renewal never resets',async()=>{
  await reviewVerify('review_control');
 });
 test('alpha32 aggregate bytes across slots reject then pass',async()=>{
- await assert.rejects(reviewVerify('alpha32_aggregate_over',alpha31Pin(),undefined,[1100]),expected('Scope'));
- await reviewVerify('alpha32_aggregate_at',alpha31Pin(),undefined,[1100]);
+ await assert.rejects(reviewVerify('alpha32_aggregate_over',alpha31Pin(),undefined),expected('Scope'));
+ await reviewVerify('alpha32_aggregate_at',alpha31Pin(),undefined);
 });
 test('alpha32 unknown estimate rejects malformed then accepts explicit UNKNOWN',()=>{
  for(const name of ['unknown_nonzero','unknown_enum'])assert.throws(()=>authority.validateRepositorySizeEstimate(vector('alpha32_estimate_'+name)),expected('Canonical'));
@@ -825,20 +825,20 @@ test('alpha32 original window ended is named and cannot regain admission',()=>{
  authority.validateImportRetryStateResponse(vector('job_state_request'),vector('alpha32_original_window_ended'));
 });
 test('alpha32 creator selection and typed recovery vs witnessed evidence',async()=>{
- await assert.rejects(reviewVerify('alpha32_missing_creator',alpha31Pin(),undefined,[1100]),expected('Scope'));
- assert.equal((await reviewVerify('alpha32_multisignature_recovery',alpha31Pin(),undefined,[1100])).evidence,'recovery');
+ await assert.rejects(reviewVerify('alpha32_missing_creator',alpha31Pin(),undefined),expected('Scope'));
+ assert.equal((await reviewVerify('alpha32_multisignature_recovery',alpha31Pin(),undefined)).evidence,'recovery');
  assert.equal((await reviewVerify('review_control')).evidence,'witnessed');
  assert.equal((await reviewVerify('review_renewed_recovery')).evidence,'recovery');
 });
 
 // Consumer regressions: persisting a recovery with no new authenticated set is a no-op.
 test('alpha32 recovery without a new set preserves the durable snapshot',async()=>{
- const first=await reviewVerify('review_scheduled_recovery',alpha31Pin(),undefined,[1100],1100000n);
+ const first=await reviewVerify('review_scheduled_recovery',alpha31Pin(),undefined,1100000n);
  const input=structuredClone(first.snapshot);
- const again=await reviewVerify('review_scheduled_recovery',alpha31Pin(),first.snapshot,[1100],1150000n);
+ const again=await reviewVerify('review_scheduled_recovery',alpha31Pin(),first.snapshot,1150000n);
  assert.deepEqual(again.snapshot,input);
 });
 test('alpha32 bundle owner time comes from authenticated receipts',async()=>{
- const result=await reviewVerify('review_control',alpha31Pin(),undefined,[900,900]);
- assert.equal(result.evidence,'witnessed');
+ const result=await reviewVerify('review_control',alpha31Pin(),undefined);
+ assert.equal(result.evidence,'witnessed');assert.deepEqual(result.ownerCheckTimesUnixSeconds,[1100n,1250n]);
 });

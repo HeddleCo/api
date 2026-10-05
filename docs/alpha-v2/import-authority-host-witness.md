@@ -1655,7 +1655,8 @@ in place. No v2 encoding or compatibility path is introduced.
 `verify_import_bundle_witnesses` / `verifyImportBundleWitnesses` accept the retained
 `ImportPublicProofBundleV1`, an independently installed descriptor pin (authority,
 root ID, public key, epoch), the receiver's durable snapshot, actual verification
-clock, independently verified historical owner contexts in delegation order, and
+clock, independently verified historical owner facts in delegation order (without
+caller-supplied times), and
 a mandatory policy verification hook. Authenticate `GetImportJobState`, validate
 its response/retained closure, independently verify owner histories and original
 native authority/causal/landing context with heddle, then call this composition
@@ -1669,12 +1670,16 @@ When there are zero statements the hook MUST still run once with `None` (Rust) /
 historical timestamp or admission claim. TS MUST reject an undefined/non-function
 hook at runtime, including on this recovery path.
 
-For each delegation with publications, the supplied owner-check time MUST equal
-floor(observed_at_unix_millis / 1000) of its first authenticated publication in
-accepted admission order. For the initial delegation with admissions but no
-publication, use its earliest authenticated genesis admission. A mismatch rejects
-`Root`; neither receiver time nor a signed author's timestamp selects historical
-owner state. Each genesis admission and publication is additionally rechecked at
+For each delegation with publications, the verifier MUST derive its owner-check
+time internally as floor(observed_at_unix_millis / 1000) of its first
+authenticated publication in accepted admission order. For the initial delegation
+with admissions but no publication, it MUST use its earliest authenticated
+genesis admission. `ImportBundleOwnerExpectation` has the independently verified
+owner facts in delegation order and **no caller-supplied time**. The verifier
+returns `owner_check_times_unix_seconds` (Rust) / `ownerCheckTimesUnixSeconds`
+(TS), with `None` / `undefined` for each unwitnessed delegation. Consumers MUST
+NOT reimplement this selection rule. Neither receiver time nor a signed author's
+timestamp selects historical owner state. Each genesis admission and publication is additionally rechecked at
 its own authenticated observation. The policy hook MUST independently select and
 verify the effective owner/native/policy context for every statement at that
 observation, including when different events fall across an owner transition.
@@ -1685,8 +1690,8 @@ owner chain and exact branch genesis, even before admission exists.
 
 Unwitnessed delegations/renewal activations have no authenticated observation:
 verify their original signatures, owner references, window shape, parent
-containment, scope and budget accounting time-free. Their supplied `now` is unused
-for interval checks. This is recovery evidence only, establishing no historical
+containment, scope and budget accounting time-free. There is no historical
+owner-check time or interval check for those certificates. This is recovery evidence only, establishing no historical
 or executable authority; it permits a state read before N or after expiry. Do
 not invent an in-window clock or a witness for Commit/Renew activation.
 
@@ -1700,7 +1705,9 @@ remaining renewal MUST commit the terminal manifest. These checks preserve
 owner-signed cumulative operation/byte budgets and scope narrowing across all
 renewals. Before any publication, absent admission statements confer no historical admission claim.
 It returns the authenticated committed manifest, active predecessor, authority
-epoch, an updated snapshot and the typed `evidence` discriminator:
+epoch, an optional durable snapshot, `snapshot_advanced` (Rust) /
+`snapshotAdvanced` (TS), the derived owner-check times, and the typed `evidence`
+discriminator:
 Rust `ImportBundleEvidence::{Recovery,Witnessed}` / TS `"recovery" | "witnessed"`.
 Witnessed requires an authenticated admission/publication observation for **every**
 accepted delegation. An unwitnessed activation tail returns Recovery even if
@@ -1709,8 +1716,30 @@ for that tail and no current executable authority. Witnessed also requires all
 current execution checks before any new work. Native genesis binding selects the
 signature whose public key equals the exact signed `creator_public_key`; another
 valid earlier signature neither substitutes for the creator nor causes rejection. Compare these with the authenticated read state.
-Persist the result atomically under the receiver's trust/mutation lock; failures
-return no snapshot and cannot advance trust. Never source a persisted snapshot,
+The returned snapshot MAY be persisted atomically under the receiver's
+trust/mutation lock, including for a zero-admission recovery read. Its witness-set
+high-water mark, root pin and clock floor MUST advance ONLY from a set actually
+authenticated under the independently installed pin. If Recovery authenticates
+**no new set** (no carried set, or the same exact set and pin as the input), the
+verifier MUST return the input snapshot unchanged and `snapshot_advanced=false` /
+`snapshotAdvanced=false`. With no input snapshot this returns `None` / `undefined`:
+persisting is a harmless no-op. No carried set is permitted only with zero
+statements; statements without a set reject `Canonical`. A carried set MUST still
+pass signature, root/epoch, freshness, generation, seal/tombstone and clock checks;
+an invalid set MUST NOT silently fall back to recovery.
+
+A new authenticated set MAY advance the set high-water mark and clock floor even
+when `evidence=Recovery`, with `snapshot_advanced=true` / `snapshotAdvanced=true`.
+Recovery preserves the input accepted history and job-key associations; it MUST
+NOT persist unwitnessed certificates or an activation tail as authenticated
+history. This implementation conservatively persists incoming job history and
+new job-key associations only when every delegation is witnessed. Existing
+history rollback checks still apply. `accepted_history` / `acceptedHistory` in
+the result is the verified read's CAS state for review, independent of the durable
+snapshot's admitted history. Witnessed reads may extend authenticated history
+under an unchanged set. The boolean reports actual snapshot change, including
+history or clock-floor changes, independently of the evidence discriminator.
+Failures return no result and cannot advance trust. Never source a persisted snapshot,
 owner context or descriptor pin from the incoming bundle. Snapshot copies in TS
 prevent asynchronous hook mutation from changing verification inputs.
 
@@ -1816,6 +1845,35 @@ remain unchanged. In ONE admission transaction, Retry MUST bind this current
 target to the exact destination, logical job, transitive retry lineage, operation
 CAS, active certificate digest/epoch and current authorization. A stale target
 or concurrent replacement refuses; a target alone grants no execution authority.
+
+Every successful current writer-only state read MUST also include
+`control_availability = 6` (`controlAvailability` in TS), containing required
+`retry`, `renew` and `cancel` `ImportControlAvailabilityV1` values. Each has exactly
+one `available=true` or `unavailable=ImportControlUnavailableReason`; false,
+missing, unspecified or unknown values reject `Canonical`. The host MUST compute
+these for the authenticated caller in the SAME transactional read snapshot.
+They are **advisory** and confer no admission authority. Hosts MUST recheck every
+current authority, policy, PoP, custody, grant, commit, CAS and terminal condition
+at admission even when the read says available.
+
+`import_job_control_availability` / `importJobControlAvailability` classify
+receiver-owned host facts. A terminal logical job makes all controls `TERMINAL`.
+For non-terminal Retry/Renew, a never-admitted original past its exclusive expiry
+is `ORIGINAL_WINDOW_ENDED`; connected non-owners get `NOT_CONNECTION_OWNER`, an
+owner without the exact current grant gets `GRANT_MISSING`, and missing selected
+commits give `COMMIT_UNAVAILABLE`. Retry additionally reports `NO_RETRY_TARGET`,
+`AUTHORITY_EXPIRED` (Renew first), or `AUTHORITY_NOT_YET_VALID`. Renew does not
+require a retry target or a currently unexpired predecessor. Cancel depends only
+on current destination write/PoP and logical terminal state, even after loss of
+source access or expiry. A public-git co-writer needs no connection ownership or
+provider grant. Priority is terminal, original window ended, caller's own source
+relationship, then retry target and active interval. The availability message
+contains only booleans and typed reasons: it MUST NEVER disclose another account's
+identity, connection inventory, grant details or source accessibility. The host's
+internal owner-account comparison is never returned. Unknown/unauthorized reads
+retain uniform `NOT_FOUND`. `validate_control_state_response` /
+`validateImportControlStateResponse` validates current required disclosures;
+older frozen recovery carriers use the existing validators.
 
 Any current destination writer may Cancel with authenticated PoP, exact
 job/destination, the active cancellation ID and expected epoch. Cancel requires

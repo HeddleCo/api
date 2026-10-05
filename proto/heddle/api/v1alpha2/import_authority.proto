@@ -391,6 +391,30 @@ enum ImportRetryUnavailableReason {
   // Renewal cannot replace original genesis authority; start a new logical job.
   IMPORT_RETRY_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED = 7;
 }
+// Caller-relative advisory state, computed from authenticated host facts at read
+// time. Never conveys another account's source/connection/grant details.
+enum ImportControlUnavailableReason {
+  IMPORT_CONTROL_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_NOT_CONNECTION_OWNER = 1;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_GRANT_MISSING = 2;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_TERMINAL = 3;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_ORIGINAL_WINDOW_ENDED = 4;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_NO_RETRY_TARGET = 5;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_COMMIT_UNAVAILABLE = 6;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_AUTHORITY_EXPIRED = 7;
+  IMPORT_CONTROL_UNAVAILABLE_REASON_AUTHORITY_NOT_YET_VALID = 8;
+}
+message ImportControlAvailabilityV1 {
+  oneof availability {
+    bool available = 1; // MUST be true; presence is required.
+    ImportControlUnavailableReason unavailable = 2; // Known nonzero reason.
+  }
+}
+message ImportJobControlAvailabilityV1 {
+  ImportControlAvailabilityV1 retry = 1;
+  ImportControlAvailabilityV1 renew = 2;
+  ImportControlAvailabilityV1 cancel = 3;
+}
 message GetImportJobStateResponse {
   // One transactional snapshot, including an explicit empty manifest before
   // publication. Read -> compute/review remaining scope -> EXACT Prepare. Its
@@ -422,6 +446,12 @@ message GetImportJobStateResponse {
     ImportEligibleRetryTargetV1 eligible_retry_target = 4;
     ImportRetryUnavailableReason retry_unavailable = 5; // Known nonzero reason.
   }
+  // Required on success. Caller-relative Retry/Renew/Cancel availability in the
+  // SAME read snapshot. Advisory only: admission still rechecks all authority,
+  // policy, PoP, custody, grants, commit availability, CAS and terminal state.
+  // Cancel needs destination write only; connected Retry/Renew require ownership
+  // of the EXACT retained connection. Public-git requires no connection owner.
+  ImportJobControlAvailabilityV1 control_availability = 6;
 }
 // Authority activation ONLY: successful receipt.applied uses this request's ID;
 // empty resulting_versions is valid. Creates NO physical attempt. Recover the

@@ -30,3 +30,9 @@ for(const [id,sha] of Object.entries(hostMax.unchanged_metadata))assert.equal(di
 assert.deepEqual(fixture.alpha32_vectors,hostMax.alpha32_metadata);
 for(const [path,sha] of Object.entries(hostMax.unaffected_files))assert.equal(digest(readFileSync(path)),sha,`host maximum: unaffected file ${path}`);
 console.log(`host maximum continuity vs ${hostMax.baseline}: ${retained} unchanged records, ${Object.keys(hostMax.unaffected_files).length} unchanged fixture files, ${added} added records, ${hostMax.retired.length} retired negative`);
+
+// Consumer additions are isolated: every pre-existing fixture remains byte-exact.
+const consumer=JSON.parse(readFileSync('breaking/0.31.0-alpha.32-consumer-vectors.json'));
+for(const [path,sha] of Object.entries(consumer.unchanged_files))assert.equal(digest(readFileSync(path)),sha,`consumer additions: existing fixture ${path}`);
+assert.equal(digest(readFileSync(consumer.new_fixture)),consumer.new_fixture_sha256,'consumer additions: frozen new corpus');
+console.log(`consumer continuity vs ${consumer.baseline}: ${Object.keys(consumer.unchanged_files).length} byte-identical existing fixture files; ${consumer.unchanged_signed_and_wire_records} signed/wire records unchanged; one new shared corpus`);

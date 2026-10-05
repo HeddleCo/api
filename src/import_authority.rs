@@ -1057,6 +1057,42 @@ pub struct ImportOwnerExpectation<'a> {
     pub forbidden_job_keys: &'a [Vec<u8>], // Every user/root/witness key, including tombstones.
     pub known_job_associations: &'a [(Vec<u8>, Vec<u8>)], // key -> logical job.
 }
+/// Independently verified owner facts for retained bundle verification. Historical
+/// check times are selected internally from authenticated receipts, never callers.
+#[derive(Clone, Copy)]
+pub struct ImportBundleOwnerExpectation<'a> {
+    pub identity: &'a ImportIdentityV1,
+    pub owner_public_key: &'a [u8],
+    pub owner_chain_digest: &'a [u8],
+    pub authority_expires_at_seconds: i64,
+    pub forbidden_job_keys: &'a [Vec<u8>],
+    pub known_job_associations: &'a [(Vec<u8>, Vec<u8>)],
+}
+impl<'a> From<ImportOwnerExpectation<'a>> for ImportBundleOwnerExpectation<'a> {
+    fn from(owner: ImportOwnerExpectation<'a>) -> Self {
+        Self {
+            identity: owner.identity,
+            owner_public_key: owner.owner_public_key,
+            owner_chain_digest: owner.owner_chain_digest,
+            authority_expires_at_seconds: owner.authority_expires_at_seconds,
+            forbidden_job_keys: owner.forbidden_job_keys,
+            known_job_associations: owner.known_job_associations,
+        }
+    }
+}
+impl<'a> ImportBundleOwnerExpectation<'a> {
+    fn at(self, time: i64, associations: &'a [(Vec<u8>, Vec<u8>)]) -> ImportOwnerExpectation<'a> {
+        ImportOwnerExpectation {
+            identity: self.identity,
+            owner_public_key: self.owner_public_key,
+            owner_chain_digest: self.owner_chain_digest,
+            authority_expires_at_seconds: self.authority_expires_at_seconds,
+            now_unix_seconds: time,
+            forbidden_job_keys: self.forbidden_job_keys,
+            known_job_associations: associations,
+        }
+    }
+}
 /// Inputs MUST come from the selected, independently verified effective state.
 /// Historical verification selects the state at its authenticated observation.
 pub fn effective_owner_authority_expiry(
@@ -3295,22 +3331,28 @@ pub enum ImportBundleEvidence {
 pub struct VerifiedImportBundleWitnesses {
     pub evidence: ImportBundleEvidence,
     pub accepted_history: ImportJobCasStateV1,
-    pub snapshot: ImportWitnessSnapshot,
+    pub snapshot: Option<ImportWitnessSnapshot>,
+    pub snapshot_advanced: bool,
+    pub owner_check_times_unix_seconds: Vec<Option<i64>>,
 }
 /// Verify retained evidence after authenticating the state RPC. Owner contexts
-/// are independently verified in delegation order at the first authenticated
-/// publication time, or the initial admission time if no publication exists.
+/// are independently verified in delegation order. The verifier derives times
+/// from the first authenticated publication, else initial admission.
 /// Unwitnessed certificates are time-free recovery only.
 /// The mandatory hook verifies the selected policy chain and owner/native context
 /// at each authenticated statement time (heddle capability-verifier / WASM).
 /// With no statements it receives None and verifies time-free policy closure.
-/// No snapshot is returned on any failure. Persist the result under the trust lock.
+/// No result is returned on failure. Recovery without a new authenticated set
+/// returns the input snapshot unchanged. Recovery with a new set advances only
+/// set trust and clock, never unwitnessed job history. None remains None when no
+/// set is carried and no input exists. Persist under the trust lock; inspect
+/// snapshot_advanced for actual durable change, independently of evidence.
 pub fn verify_import_bundle_witnesses(
     bundle: &ImportPublicProofBundleV1,
     pin: &ImportWitnessRootPin,
     snapshot: Option<&ImportWitnessSnapshot>,
     now_ms: i64,
-    owners: &[ImportOwnerExpectation<'_>],
+    owners: &[ImportBundleOwnerExpectation<'_>],
     mut verify_policy: impl FnMut(
         &ImportPublicProofBundleV1,
         Option<&crate::heddle::api::common::HostedWitnessStatementV1>,
@@ -3382,26 +3424,36 @@ pub fn verify_import_bundle_witnesses(
     } else {
         None
     };
-    let carried = bundle.witness_set.as_ref().ok_or(Reject::Canonical)?;
+    let carried = bundle.witness_set.as_ref();
+    if carried.is_none() && !bundle.statements.is_empty() {
+        return Err(Reject::Canonical);
+    }
+    let new_set =
+        carried.is_some_and(|c| snapshot.is_none_or(|s| s.root != *pin || s.witness_set != *c));
     let selected = expectation(
         pin,
         snapshot.map_or(0, |s| s.clock_floor_unix_millis),
         now_ms,
         &job_keys,
     );
-    let set = if snapshot.is_some_and(|s| s.root != *pin) {
-        trust::verify_set_after_root_replacement(
-            carried,
-            &selected,
-            previous.as_ref().ok_or(Reject::StaleContext)?,
-        )?
-    } else {
-        trust::verify_set(carried, &selected, previous.as_ref())?
-    };
+    let set = carried
+        .map(|carried| {
+            if snapshot.is_some_and(|s| s.root != *pin) {
+                trust::verify_set_after_root_replacement(
+                    carried,
+                    &selected,
+                    previous.as_ref().ok_or(Reject::StaleContext)?,
+                )
+            } else {
+                trust::verify_set(carried, &selected, previous.as_ref())
+            }
+        })
+        .transpose()?;
     // Authenticate statements before using their observation times or policies.
     let mut resolved = Vec::new();
     for signed in &bundle.statements {
         let s = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        let set = set.as_ref().ok_or(Reject::Canonical)?;
         let entry = set
             .body()
             .entries
@@ -3416,7 +3468,7 @@ pub fn verify_import_bundle_witnesses(
         } else {
             None
         };
-        let context = trust::resolve_statement(&set, signed, proof, false, now_ms)?;
+        let context = trust::resolve_statement(set, signed, proof, false, now_ms)?;
         verify_policy(bundle, Some(s))?;
         resolved.push((context, proof));
     }
@@ -3473,13 +3525,7 @@ pub fn verify_import_bundle_witnesses(
     for (i, d) in bundle.delegations.iter().enumerate() {
         let body = d.body.as_ref().ok_or(Reject::Canonical)?;
         let parent = resolve_bundle_permission(bundle, &body.parent_permission_digest)?;
-        let owner = ImportOwnerExpectation {
-            known_job_associations: &associations,
-            ..owners[i]
-        };
-        if times[i].is_some_and(|(_, time)| owner.now_unix_seconds != time) {
-            return Err(Reject::Root);
-        }
+        let owner = owners[i].at(times[i].map_or(0, |(_, time)| time), &associations);
         let token = if i == 0 {
             verify_delegation_inner(d, parent, &owner, times[i].is_some())?
         } else {
@@ -3546,11 +3592,7 @@ pub fn verify_import_bundle_witnesses(
         match s.purpose {
             1 => {
                 // Every original admission must independently satisfy [N,E).
-                let owner = ImportOwnerExpectation {
-                    now_unix_seconds: s.observed_at_unix_millis / 1000,
-                    known_job_associations: &associations,
-                    ..owners[0]
-                };
+                let owner = owners[0].at(s.observed_at_unix_millis / 1000, &associations);
                 verify_delegation(
                     &bundle.delegations[0],
                     resolve_bundle_permission(bundle, &initial.body.parent_permission_digest)?,
@@ -3594,11 +3636,7 @@ pub fn verify_import_bundle_witnesses(
                     .ok_or(Reject::Scope)?;
                 let d = &bundle.delegations[*index];
                 let body = d.body.as_ref().ok_or(Reject::Canonical)?;
-                let owner = ImportOwnerExpectation {
-                    now_unix_seconds: s.observed_at_unix_millis / 1000,
-                    known_job_associations: &associations,
-                    ..owners[*index]
-                };
+                let owner = owners[*index].at(s.observed_at_unix_millis / 1000, &associations);
                 let delegation = verify_delegation(
                     d,
                     resolve_bundle_permission(bundle, &body.parent_permission_digest)?,
@@ -3609,14 +3647,19 @@ pub fn verify_import_bundle_witnesses(
                     &delegation,
                     manifest,
                     signed,
-                    &set,
+                    set.as_ref().ok_or(Reject::Canonical)?,
                     *proof,
                     now_ms,
                 )?;
             }
             _ => return Err(Reject::Version),
         }
-        trust::recheck_context(context, &set, signed, now_ms)?;
+        trust::recheck_context(
+            context,
+            set.as_ref().ok_or(Reject::Canonical)?,
+            signed,
+            now_ms,
+        )?;
     }
     // Operations are accepted publication order, while manifest slots are sorted.
     let mut progressive = ImportResultManifestV1 {
@@ -3786,12 +3829,43 @@ pub fn verify_import_bundle_witnesses(
         history.push(bundle.clone());
     }
     let active = bundle.delegations.last().ok_or(Reject::Canonical)?.clone();
+    let witnessed = times.iter().all(Option::is_some);
+    let mut persisted = snapshot.cloned();
+    if witnessed || new_set {
+        let mut persisted_associations =
+            snapshot.map_or_else(Vec::new, |s| s.job_associations.clone());
+        if witnessed {
+            for d in &bundle.delegations {
+                let b = d.body.as_ref().ok_or(Reject::Canonical)?;
+                if !persisted_associations
+                    .iter()
+                    .any(|(key, _)| *key == b.job_public_key)
+                {
+                    persisted_associations
+                        .push((b.job_public_key.clone(), b.logical_job_id.clone()));
+                }
+            }
+        }
+        persisted = Some(ImportWitnessSnapshot {
+            root: pin.clone(),
+            witness_set: carried.ok_or(Reject::Canonical)?.clone(),
+            clock_floor_unix_millis: now_ms,
+            job_associations: persisted_associations,
+            accepted_history: if witnessed {
+                history
+            } else {
+                snapshot.map_or_else(Vec::new, |s| s.accepted_history.clone())
+            },
+        });
+    }
     Ok(VerifiedImportBundleWitnesses {
-        evidence: if times.iter().all(Option::is_some) {
+        evidence: if witnessed {
             ImportBundleEvidence::Witnessed
         } else {
             ImportBundleEvidence::Recovery
         },
+        snapshot_advanced: persisted.as_ref() != snapshot,
+        owner_check_times_unix_seconds: times.iter().map(|t| t.map(|(_, time)| time)).collect(),
         accepted_history: ImportJobCasStateV1 {
             format_version: 1,
             logical_job_id: terminal.logical_job_id.clone(),
@@ -3800,13 +3874,7 @@ pub fn verify_import_bundle_witnesses(
             authority_epoch: bundle.delegations.len() as u64,
             committed_manifest: Some(terminal.clone()),
         },
-        snapshot: ImportWitnessSnapshot {
-            root: pin.clone(),
-            witness_set: carried.clone(),
-            clock_floor_unix_millis: now_ms,
-            job_associations: associations,
-            accepted_history: history,
-        },
+        snapshot: persisted,
     })
 }
 
@@ -3873,6 +3941,121 @@ pub fn check_import_control_caller(
     }
     if !caller.selected_commits_available {
         return Err(Reject::SourceSelection);
+    }
+    Ok(())
+}
+
+/// Current host facts read under the same fence as the writer-only job response.
+pub struct ImportControlAvailabilityContext<'a> {
+    pub read: &'a GetImportJobStateResponse,
+    pub logical_job_terminal: bool,
+    pub original_admitted: bool,
+    pub now_unix_seconds: i64,
+}
+/// Compute caller-relative advice; NEVER use this result as admission authority.
+/// Cancel needs no source relationship. Only the caller's relationship is exposed.
+pub fn import_job_control_availability(
+    context: &ImportControlAvailabilityContext<'_>,
+    caller: &ImportControlCaller<'_>,
+) -> Result<ImportJobControlAvailabilityV1, Reject> {
+    use ImportControlUnavailableReason as Reason;
+    use import_control_availability_v1::Availability;
+    if !caller.authenticated_pop || !caller.destination_writer || caller.caller_account.is_empty() {
+        return Err(Reject::Scope);
+    }
+    let read = context.read;
+    let state = read.state.as_ref().ok_or(Reject::Canonical)?;
+    let active = state
+        .active_predecessor
+        .as_ref()
+        .and_then(|d| d.body.as_ref())
+        .ok_or(Reject::Canonical)?;
+    let scope = active.scope.as_ref().ok_or(Reject::Canonical)?;
+    let retained = read
+        .retained_source
+        .as_ref()
+        .ok_or(Reject::SourceSelection)?;
+    validate_retained_import_source(retained, scope)?;
+    let original = read
+        .retained_proof
+        .as_ref()
+        .and_then(|p| p.delegations.first())
+        .ok_or(Reject::Canonical)?;
+    let window_ended = original_import_retry_unavailable(
+        original,
+        context.original_admitted,
+        context.now_unix_seconds,
+    )?
+    .is_some();
+    let source_reason = if retained.connection.is_some()
+        && caller.connection_owner_account != Some(caller.caller_account)
+    {
+        Some(Reason::NotConnectionOwner)
+    } else if retained.connection.is_some()
+        && (caller.authorized_source != Some(retained) || !caller.exact_grants_current)
+    {
+        Some(Reason::GrantMissing)
+    } else if !caller.selected_commits_available {
+        Some(Reason::CommitUnavailable)
+    } else {
+        None
+    };
+    let shared = if context.logical_job_terminal {
+        Some(Reason::Terminal)
+    } else if window_ended {
+        Some(Reason::OriginalWindowEnded)
+    } else {
+        source_reason
+    };
+    let retry_reason = shared.or({
+        if !matches!(
+            read.retry_availability,
+            Some(get_import_job_state_response::RetryAvailability::EligibleRetryTarget(_))
+        ) {
+            Some(Reason::NoRetryTarget)
+        } else if context.now_unix_seconds >= active.expires_at_unix_seconds {
+            Some(Reason::AuthorityExpired)
+        } else if context.now_unix_seconds < active.not_before_unix_seconds {
+            Some(Reason::AuthorityNotYetValid)
+        } else {
+            None
+        }
+    });
+    let availability = |reason: Option<Reason>| ImportControlAvailabilityV1 {
+        availability: Some(reason.map_or(Availability::Available(true), |r| {
+            Availability::Unavailable(r as i32)
+        })),
+    };
+    Ok(ImportJobControlAvailabilityV1 {
+        retry: Some(availability(retry_reason)),
+        renew: Some(availability(shared)),
+        cancel: Some(availability(
+            context.logical_job_terminal.then_some(Reason::Terminal),
+        )),
+    })
+}
+/// Validate current read disclosures. Historical frozen carriers are validated
+/// separately by validate_job_state_response / validate_retry_state_response.
+pub fn validate_control_state_response(
+    request: &GetImportJobStateRequest,
+    response: &GetImportJobStateResponse,
+) -> Result<(), Reject> {
+    use import_control_availability_v1::Availability;
+    validate_retry_state_response(request, response)?;
+    let controls = response
+        .control_availability
+        .as_ref()
+        .ok_or(Reject::Canonical)?;
+    for control in [&controls.retry, &controls.renew, &controls.cancel] {
+        match control
+            .as_ref()
+            .and_then(|c| c.availability.as_ref())
+            .ok_or(Reject::Canonical)?
+        {
+            Availability::Available(true) => (),
+            Availability::Unavailable(reason) if (1..=8).contains(reason) => (),
+            _ => return Err(Reject::Canonical),
+        }
     }
     Ok(())
 }

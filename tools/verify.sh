@@ -30,6 +30,7 @@ npm run build
 npm run typecheck
 node tools/verify-alpha32-vector-continuity.mjs
 node tools/verify-alpha32-guards.mjs
+node tools/verify-import-consumer-guards.mjs
 node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs
 node tools/verify-treadle-conformance.mjs

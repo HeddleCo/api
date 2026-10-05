@@ -258,8 +258,16 @@ StartThread → publish → fresh Fetch tests remain downstream work.
 ## Imported Git roots
 
 The [IMPORT-only parentless exception](import-authority-host-witness.md#review-round-1-historical-closure-and-frozen-purpose-payloads)
-(owner decision, 2026-10-05) is selected by the operation's authenticated signed
-content, never caller context. Delegated native IMPORT originals preserve
+(owner decision, 2026-10-05) is selected only by the separately authenticated
+IMPORT carrier: the verified import delegation and signed import operation that
+bind this exact operation's operation ID, Thread/genesis, causal frontier and
+delegation scope. Caller context never selects it. A carrier for a different
+operation, Thread or frontier does not unlock it. Standalone validation without
+the verified carrier keeps the strict ordinary rule, so a parentless Capture
+without its carrier rejects. Every path that admits or verifies an imported
+Capture MUST verify its carrier. The signed `ThreadOperation` carries no import
+discriminator; imported Captures use `SourceAuthor::LocalKey`. There is no
+signing or wire-format change. Delegated native IMPORT originals preserve
 converter/Git parent order without duplicates: State parents exactly equal the
 source States of the complete causal operation parents and never include the
 genesis base. Empty State parents are valid if and only if causal parents are

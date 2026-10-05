@@ -1271,7 +1271,15 @@ The frozen "old parentless capture" negative still rejects.
 
 **Owner decision (2026-10-05): delegated native IMPORT originals are an
 IMPORT-only parentless exception.** Select this exception only from the
-operation's authenticated signed content, never from caller context. Their
+separately authenticated IMPORT carrier: the verified import delegation and
+signed import operation that bind this exact operation's operation ID,
+Thread/genesis, causal frontier and delegation scope. Caller context never
+selects it. A carrier for a different operation, Thread or frontier does not
+unlock it. Standalone validation without the verified carrier keeps the strict
+ordinary rule, so a parentless Capture without its carrier rejects. Every path
+that admits or verifies an imported Capture MUST verify its carrier. The signed
+`ThreadOperation` carries no import discriminator; imported Captures use
+`SourceAuthor::LocalKey`. There is no signing or wire-format change. Their
 State parents MUST exactly equal the source States of their complete causal
 operation parents, with no duplicates and with converter/Git parent order
 preserved. The genesis base MUST NOT appear among those State parents. Empty

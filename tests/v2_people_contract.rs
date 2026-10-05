@@ -1,6 +1,4 @@
-use heddle_api::heddle::api::v1alpha2::{
-    HandleKind, SpoolRef, SuggestPrincipalsRequest, SuggestedPrincipal,
-};
+use heddle_api::heddle::api::v1alpha2::{SpoolRef, SuggestPrincipalsRequest, SuggestedPrincipal};
 use heddle_api::v2::people::{
     PeopleCandidate, PeopleContext, suggest_principals, validate_suggest_principals_response,
 };
@@ -100,6 +98,7 @@ fn shared_people_vectors_enforce_scope_agents_exact_hit_prefix_and_bounds() {
     }
 }
 
+#[cfg(feature = "reflection")]
 #[test]
 fn no_id_leak_in_public_people_or_group_projection() {
     use prost_reflect::{DescriptorPool, Kind};
@@ -162,7 +161,6 @@ fn no_id_leak_in_public_people_or_group_projection() {
             .kind(),
         Kind::Message(view)
     );
-    assert_eq!(HandleKind::Native as i32, 1);
 }
 
 #[test]

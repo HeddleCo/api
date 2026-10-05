@@ -56,8 +56,9 @@ message ProviderRepository {
   // HTTPS Git has no cheap estimate and returns UNKNOWN with git_size_kib=0.
   // AVAILABLE may be zero for an empty repository. Unknown enum values refuse.
   ProviderRepositorySizeEstimateState size_estimate_state = 12;
-  // Consumers apply headroom, capped by GetImportConfiguration.limits.
-  // Advisory only: Prepare still requires the exact caller-selected total.
+  // Clients calculate estimate × headroom, capped by GetImportConfiguration
+  // limits; UNKNOWN uses the host maximum. Users never set the total.
+  // Advisory only: Prepare requires the exact client-selected total.
   uint64 git_size_kib = 13;
 }
 

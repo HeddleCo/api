@@ -128,12 +128,12 @@ is exposed: shared Git objects and provider repository size do not offer a cheap
 independent branch measurement. Hosts need not fetch/count objects for discovery.
 
 The estimate is advisory, can be stale, is not converted result bytes, and grants
-nothing. Consumers apply converter-appropriate headroom (including the KiB-to-byte
-conversion using checked/widened arithmetic), capped at
-`GetImportConfiguration.limits.max_result_bytes` and the protocol 1 GiB maximum.
-UNKNOWN requires an explicit caller choice using the current host configuration;
-never treat it as an empty repository or an unlimited budget. The chosen total
-is reviewed and passed exactly to Prepare; hosts never fill it from the estimate.
+nothing. Clients calculate the total as the size estimate × converter-appropriate
+headroom (including the KiB-to-byte conversion and rounding up using checked or
+widened arithmetic), capped at `GetImportConfiguration.limits.max_result_bytes`.
+For UNKNOWN, clients use the current advertised host maximum. Users never set
+this total. The client passes it exactly to Prepare; hosts never fill it from
+the estimate.
 The estimate is outside all signed import scope/authority layouts.
 
 Resolve accepts a selected source **unchanged or refuses it**. The result must
@@ -242,13 +242,16 @@ ordinary Developer/Admin role, mint-root attachment and KeyBinding self-PoP
 cannot satisfy this permission. Existing capability versions/domains do not
 change. Authority from an online role is still checked separately for RPC access.
 
-Permission budgets are explicitly **one logical import**, at most **256 branches,
-256 converted operations/slots, 1 GiB of committed result bytes**. Branch limits
+Permission bounds are explicitly **one logical import**, at most **256 branches
+and 256 converted operations/slots**. Branch limits
 are sorted unique full refs, with one stable slot per branch in this first format.
 There are **no per-branch byte budgets**. `max_result_bytes` is ONE positive
-result-byte total, at most 1073741824 bytes, and `max_operations` is the operation
-total. Stable branch/ref/slot identities remain exact. Certificate
-scope can select a subset and reduce the total and operation count, never add a ref/slot/genesis/target,
+u64 result-byte total, and `max_operations` is the operation total. This signed
+bound authorizes how much a server-held job key may write under the user's
+delegation, limiting the blast radius of a compromised or buggy worker. It is
+not a storage quota; repository storage may grow beyond it and is billed
+separately. The protocol imposes no fixed byte ceiling. Stable branch/ref/slot
+identities remain exact. Certificate scope can select a subset and reduce the total and operation count, never add a ref/slot/genesis/target,
 change initial frontier/source/options/converter/destination version, or expand
 a parent's time window. The parent cannot outlive its verified issuing authority.
 The owner grants permission over branch limits BEFORE genesis authorization
@@ -417,7 +420,12 @@ The selected entry's exact `default_options` octets retain their existing digest
 rules; this marker does not change any signed HYBRID layout or domain.
 
 Positive host limits cover branches, logical-job operations and ONE total result
-byte limit. They cannot exceed 256 branches/operations or 1 GiB total.
+byte authorization limit. Branches/operations cannot exceed 256. The advertised
+byte maximum is an operator-configurable positive u64 and may be very large;
+it is the only admission ceiling on a job total. Prepare and Commit MUST refuse
+a total above the CURRENT advertised maximum, including when that maximum
+was lowered after Prepare. Historical signed authority and durable consumption
+are never enlarged or reset by a configuration change.
 `ImportBudgetLimitsV1.max_branch_result_bytes` (tag 4) is removed/reserved. The caller chooses
 **every** scope field: provider/URL, exact ordered branches and ref disclosure,
 converter/options, stable slot IDs, the total byte limit and operation count, targets and
@@ -534,15 +542,15 @@ fencing/releasing conflicting old reservations.
 `max_result_bytes` and `max_operations` apply **per logical job** across its own
 renewals/retries. They do not pool automatically across siblings. To plan headroom,
 the client may compute `H = ceil(git_size_kib × 1024 × headroom)` with checked or
-widened arithmetic, then explicitly allocate positive totals `B_i` over the
+widened arithmetic, then allocate positive totals `B_i` over the
 actual ref partitions. For example, H = 600 MiB can be reviewed as two 300 MiB
 jobs when each host cap permits it. Each `B_i` MUST be at most the current host
-`max_result_bytes` and 1 GiB; total planned headroom may exceed a single job's
-cap. If allocation hits a cap, the browser must repartition or explicitly review
-a smaller total rather than silently claim the original headroom. Branch counts
+`max_result_bytes`; total planned headroom may exceed a single job's
+cap. If allocation hits a cap, the client must repartition or use the host maximum
+without claiming the original headroom. Branch counts
 are an advisory allocation weight only: shared Git objects give no per-branch
-result estimate. UNKNOWN requires explicit budget choices. Sibling completion or
-unused allowance cannot enlarge another signed job; byte insufficiency needs
+result estimate. For UNKNOWN the client uses the current host maximum per job;
+users never set totals. Sibling completion or unused allowance cannot enlarge another signed job; byte insufficiency needs
 new reviewed authority within its durable original job bounds, or a new job.
 
 Rust/TS `check_import_spool_reservations` / `checkImportSpoolReservations` consume

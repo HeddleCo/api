@@ -77,7 +77,9 @@ message ImportPermissionScopeV1 {
   bytes options_digest = 5;
   string converter_version = 6;
   uint32 max_operations = 7; // Logical-job total; never reset by renewal/retry.
-  uint64 max_result_bytes = 8; // ONE positive logical-job result total, <=1 GiB.
+  // ONE positive u64 logical-job authorization total; narrow-only, never reset.
+  // Bounds server-held job-key writes under delegation; not a storage quota.
+  uint64 max_result_bytes = 8;
 }
 // P2 #1: NEW direct owner -> device permission, unrelated to PURGE, timeline,
 // self-PoP or online Developer/Admin grants. Exactly one logical job/lineage;
@@ -320,7 +322,8 @@ message ImportPreparationRefusalV1 {
   string field = 2; // Bounded request field path; never hidden resource details.
 }
 // An authenticated finite read, separate from provider inventory observation.
-// Configuration is advice, never authority; Prepare rechecks current support.
+// Configuration is advice, never authority; Prepare and Commit recheck current
+// support and refuse totals above the current advertised host maximum.
 message GetImportConfigurationRequest {
   SpoolRef destination = 1;
 }
@@ -335,7 +338,8 @@ message ImportConverterConfigurationV1 {
 message ImportBudgetLimitsV1 {
   uint32 max_branches = 1; // Positive, <=256.
   uint32 max_operations = 2; // Positive, <=256; total per logical job.
-  uint64 max_result_bytes = 3; // Positive, <=1 GiB; total per logical job.
+  // Operator-configurable positive u64 maximum per logical job; no protocol cap.
+  uint64 max_result_bytes = 3;
   reserved 4;
   reserved "max_branch_result_bytes";
 }

@@ -4105,7 +4105,7 @@ fn alpha32_total_above_current_host_max_reject_then_pass() {
             codec::Reject::PreparationRefused(api::ImportPreparationRefusalReason::BudgetExceeded);
         assert_eq!(
             import::prepare_scope(&proposed, &configuration, &proposed.destination_version),
-            Err(refusal.clone())
+            Err(refusal)
         );
         assert_eq!(
             import::validate_commit_request(

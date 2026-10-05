@@ -5,7 +5,8 @@ import { spawnSync } from 'node:child_process';
 const path='packages/typescript/dist/v1alpha2/import-authority.js',original=readFileSync(path,'utf8');
 const directory=process.argv[2]??'/tmp/api-alpha32-guards';mkdirSync(directory,{recursive:true});
 const cases=[
- ['total_over_1gib','alpha32 total over',[['v.maxResultBytes > MAX_RESULT_BYTES','false']]],
+ ['total_over_host_max','alpha32 total above',[['selected.maxResultBytes > l.maxResultBytes','false']]],
+ ['large_total','alpha32 large total', [['v.maxResultBytes >= (1n << 64n)','v.maxResultBytes >= (50n << 30n)']]],
  ['total_widening','alpha32 widening',[['c.maxResultBytes <= p.maxResultBytes','true']]],
  ['total_narrowing','alpha32 widening',[['c.maxResultBytes <= p.maxResultBytes','c.maxResultBytes === p.maxResultBytes']]],
  ['partial_remaining','alpha32 remaining',[['remaining.maxResultBytes -= slot.resultBytes','remaining.maxResultBytes -= 0n']]],

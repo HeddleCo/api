@@ -13,7 +13,6 @@ const sig=(n,input)=>new Uint8Array(sign(null,input,createPrivateKey({key:Buffer
 const v=n=>{const r=f.signed_vectors[n]??f.wire_vectors[n];return fromBinary((r.schema.includes('.common.')?host:api)[r.schema.split('.').at(-1)+'Schema'],bytes(r.wire_hex));};
 const wire=(n,s,value)=>{f.wire_vectors[n]={schema:s.typeName,wire_hex:hex(toBinary(s,value))};return value;};
 function signed(n,bs,b,ss,field,k,domain){const input=a.signingDigest(domain,bs,b),signature={signerKeyId:keyId(key(k)),signature:sig(k,input)},value=create(ss,{body:b,[field]:signature});f.signed_vectors[n]={schema:ss.typeName,body_schema:bs.typeName,wire_hex:hex(toBinary(ss,value)),canonical_hex:hex(a.canonicalHybridV1(bs,b)),signing_input_hex:hex(input),domain,public_key_hex:hex(key(k)),signature_hex:hex(signature.signature)};return value;}
-delete f.wire_vectors.alpha32_total_over_1gib;
 for(const [name,total] of [['large',50n<<30n],['over_host_max',(1n<<40n)+1n],['u64_max',(1n<<64n)-1n]]){
  const scope=v('scope');scope.maxResultBytes=total;wire('alpha32_total_'+name,api.ImportPermissionScopeV1Schema,scope);
  const config=v('import_configuration');config.limits.maxResultBytes=name==='u64_max'?total:1n<<40n;wire('alpha32_configuration_'+name,api.GetImportConfigurationResponseSchema,config);
@@ -21,7 +20,7 @@ for(const [name,total] of [['large',50n<<30n],['over_host_max',(1n<<40n)+1n],['u
  if(name!=='over_host_max'){const manifest=v('partial_manifest');manifest.slots[0].resultBytes=total;wire('alpha32_manifest_'+name,api.ImportResultManifestV1Schema,manifest);}
 }
 const lowered=v('alpha32_configuration_large');lowered.limits.maxResultBytes=49n<<30n;wire('alpha32_configuration_lowered',api.GetImportConfigurationResponseSchema,lowered);
-const largeOwner=v('direct_owner').body;largeOwner.scope=v('alpha32_total_large');signed('alpha32_large_owner',api.ImportJobDelegationV1Schema,largeOwner,api.SignedImportJobDelegationV1Schema,'delegatingSignature','owner',a.DELEGATION_DOMAIN);
+const largeOwner=v('direct_owner').body;largeOwner.scope.maxResultBytes=50n<<30n;signed('alpha32_large_owner',api.ImportJobDelegationV1Schema,largeOwner,api.SignedImportJobDelegationV1Schema,'delegatingSignature','owner',a.DELEGATION_DOMAIN);
 for(const [name,total] of [['widening',2001n],['narrowing',999n]]){const b=v('delegation').body;b.scope.maxResultBytes=total;signed('alpha32_'+name,api.ImportJobDelegationV1Schema,b,api.SignedImportJobDelegationV1Schema,'delegatingSignature','device',a.DELEGATION_DOMAIN);}
 const remaining=v('scope');remaining.branches=remaining.branches.filter(b=>b.refName==='refs/heads/dev');remaining.maxOperations=1;remaining.maxResultBytes-=v('partial_manifest').slots[0].resultBytes;wire('alpha32_remaining',api.ImportPermissionScopeV1Schema,remaining);
 wire('alpha32_consumption_reset',api.ImportPublicProofBundleV1Schema,v('review_cumulative_budget_maxResultBytes'));

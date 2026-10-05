@@ -17,7 +17,6 @@ pub const MAX_BRANCHES: usize = 256;
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub const MAX_BUNDLE_BYTES: usize = 1024 * 1024;
 pub const MAX_COMMIT_REQUEST_BYTES: usize = 2 * MAX_BUNDLE_BYTES;
-pub const MAX_RESULT_BYTES: u64 = 1 << 30;
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
 
 record!(AuthorizationSignature, signer_key_id:b, signature:b);
@@ -592,7 +591,6 @@ pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Resu
         || l.max_operations == 0
         || l.max_operations as usize > MAX_BRANCHES
         || l.max_result_bytes == 0
-        || l.max_result_bytes > MAX_RESULT_BYTES
     {
         return Err(Reject::Bounds);
     }
@@ -1020,7 +1018,6 @@ pub fn validate_scope(value: &ImportPermissionScopeV1) -> Result<(), Reject> {
         || value.max_operations == 0
         || value.max_operations as usize > MAX_BRANCHES
         || value.max_result_bytes == 0
-        || value.max_result_bytes > MAX_RESULT_BYTES
     {
         return Err(Reject::Bounds);
     }
@@ -1522,7 +1519,7 @@ pub fn validate_manifest(m: &ImportResultManifestV1) -> Result<(), Reject> {
         if !s.ref_name.starts_with("refs/heads/") || !s.ref_name.is_ascii() {
             return Err(Reject::Canonical);
         }
-        if s.ref_name.len() > 1024 || s.result_bytes == 0 || s.result_bytes > MAX_RESULT_BYTES {
+        if s.ref_name.len() > 1024 || s.result_bytes == 0 {
             return Err(Reject::Bounds);
         }
         if i > 0 && (&m.slots[i - 1].ref_name, m.slots[i - 1].slot_id) >= (&s.ref_name, s.slot_id) {
@@ -1872,9 +1869,7 @@ pub fn content_digest(content: &ImportContentV1) -> Result<Vec<u8>, Reject> {
     if content.format_version != 1 {
         return Err(Reject::Version);
     }
-    if content.canonical_capture.is_empty()
-        || content.canonical_capture.len() > MAX_RESULT_BYTES as usize
-    {
+    if content.canonical_capture.is_empty() {
         return Err(Reject::Bounds);
     }
     signing_digest("heddle-import-content-v1", content)

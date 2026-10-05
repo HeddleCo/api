@@ -72,6 +72,9 @@ handle invitations MUST have an empty secret and no link capability. Stored
 secrets never enter reads. `validate_create_invitation_response` /
 `validateCreateInvitationResponse` check this split and recipient preservation
 against the original request.
+Hosts MUST run these gates or equivalent validation before emitting a response,
+including operation-receipt replay. Validating after receipt by a client cannot
+undo a UUID already disclosed on the wire.
 
 ## Signed-in Accept and Decline
 
@@ -133,7 +136,10 @@ No terminal state reopens. Use a fresh ID for another invitation. At the exact
 expiry instant (seconds/nanos), pending cannot be accepted, declined or
 redeemed; project EXPIRED before the expiry worker persists it. Accepted and
 declined never later expire. Missing expiry means no deadline. Hosts validate
-Timestamp bounds. Revoke retains spool-admin authorization and CAS: a stale
+Timestamp bounds. Effective expiry does not fabricate a committed version or
+update time: these remain the last stored commit until the expiration
+transaction updates them and emits the ordinary terminal stream update.
+Revoke retains spool-admin authorization and CAS: a stale
 expected_version returns VERSION_CONFLICT; exact receipt retries reauthorize.
 Same-state Revoke under a fresh operation ID requires the current version.
 
@@ -199,7 +205,7 @@ states in People/invitations with live versions and the existing read budget.
 | role / expires_at | 4 / 5 | Offered role and optional acceptance deadline |
 | email / handle / account_id | 8 / 9 / 10 | Only the original normalized recipient arm |
 | state | 11 | Authoritative effective lifecycle status |
-| created_at / updated_at | 12 / 13 | Server creation / last effective transition time |
+| created_at / updated_at | 12 / 13 | Server creation / last committed transition time |
 | inviter | 14 | Optional current PublicOwner, no UUID |
 | inviter_via_agent_label | 15 | Public label only alongside inviter handle |
 | spool_name / spool_address | 16 / 17 | Invitation-scoped display, not authority |

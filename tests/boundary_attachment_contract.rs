@@ -146,12 +146,16 @@ fn check(kind: &str, purpose: i32) {
     );
     assert_eq!(retained(&a, &forged, &admitted), Err(codec::Reject::Root));
     retained(&a, attachment(&a), &admitted).expect("control after forged certificate");
-    let original = writer::decode_authority(original).expect("original authority");
-    assert_eq!(
-        retained(&original, attachment(&original), &admitted),
-        Err(codec::Reject::Root)
-    );
-    retained(&a, attachment(&a), &admitted).expect("control after original substitution");
+    // Import P1's original envelope is delegated import authority, not a
+    // native paired attachment. Preserve that distinct basis-1 contract.
+    if kind != "import" || purpose != 1 {
+        let original = writer::decode_authority(original).expect("original authority");
+        assert_eq!(
+            retained(&original, attachment(&original), &admitted),
+            Err(codec::Reject::Root)
+        );
+        retained(&a, attachment(&a), &admitted).expect("control after original substitution");
+    }
 }
 #[test]
 fn native_p1_rotated_acceptor_attachment() {
@@ -177,9 +181,55 @@ fn acceptance_fixed_octets_require_integer_arrays() {
             for mode in ["binary_publisher", "binary_authority_digest"] {
                 let name = format!("{kind}_p{purpose}_{mode}");
                 let result = if kind == "native" {
-                    native::validate_public_bundle(&wire(&f, &name))
+                    let b: api::NativePublicProofBundleV1 = wire(&f, &name);
+                    let s = b
+                        .statements
+                        .iter()
+                        .find_map(|s| {
+                            s.body
+                                .as_ref()
+                                .filter(|s| s.basis == 2 && s.purpose == purpose)
+                        })
+                        .expect("statement");
+                    let payload = if purpose == 1 {
+                        writer::WriterWitnessPayload::NativeGenesis(&b.genesis_witnesses[0])
+                    } else {
+                        writer::WriterWitnessPayload::Import(import::WitnessPayload::Authority(
+                            &b.authority_witnesses[0],
+                        ))
+                    };
+                    assert_eq!(
+                        writer::admitted_owner_mint_root_attachment(s, payload).err(),
+                        Some(codec::Reject::Canonical),
+                        "{name} admission"
+                    );
+                    native::validate_public_bundle(&b)
                 } else {
-                    import::validate_public_bundle(&wire(&f, &name))
+                    let b: api::ImportPublicProofBundleV1 = wire(&f, &name);
+                    let s = b
+                        .statements
+                        .iter()
+                        .find_map(|s| {
+                            s.body
+                                .as_ref()
+                                .filter(|s| s.basis == 2 && s.purpose == purpose)
+                        })
+                        .expect("statement");
+                    let payload = if purpose == 1 {
+                        import::WitnessPayload::Genesis(&b.genesis_witnesses[0])
+                    } else {
+                        import::WitnessPayload::Authority(&b.authority_witnesses[0])
+                    };
+                    assert_eq!(
+                        writer::admitted_owner_mint_root_attachment(
+                            s,
+                            writer::WriterWitnessPayload::Import(payload)
+                        )
+                        .err(),
+                        Some(codec::Reject::Canonical),
+                        "{name} admission"
+                    );
+                    import::validate_public_bundle(&b)
                 };
                 assert_eq!(result, Err(codec::Reject::Canonical), "{name}");
             }

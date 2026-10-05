@@ -21,7 +21,7 @@ if language == "rust":
     imp = "src/import_authority.rs"
     import_selection = section(imp, "                if s.purpose == 1 {", "                },")
     cases = [
-        ("basis_selection", writer, "statement.basis == 2", "false"),
+        ("basis_selection", writer, "if statement.basis == 2 {", "if false {"),
         ("acceptor_signer", writer, "signed.signatures[0].public_key != acceptance.accepting_publisher", "false"),
         ("acceptor_account_and_owner", writer, account, ""),
         ("acceptor_publisher_cut", writer, "id == publisher_key_id || ", ""),

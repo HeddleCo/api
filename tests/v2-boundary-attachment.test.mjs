@@ -30,11 +30,17 @@ for(const kind of ['native','import'])for(const purpose of [1,2]){
   await verify(a,cert);
   const forged=wire(prefix+'_forged_attachment',SignedOwnerMintRootAttachmentSchema);
   await assert.rejects(()=>verify(a,forged),{reason:'Root'});await verify(a,cert);
+  // Import P1 has delegated original authority, without a native attachment.
+  if(kind!=='import'||purpose!==1){
   const original=decodeWriterAuthority(purpose===1?p.creatorAuthorityEnvelope:p.authorityEnvelope);
   await assert.rejects(()=>verify(original,original.mintRootAssociation.value),{reason:'Root'});await verify(a,cert);
+  }
  });
  for(const mode of ['binary_publisher','binary_authority_digest'])test(`${prefix} strict acceptance ${mode} REJECT then ACCEPT`,async()=>{
   const bad=wire(prefix+'_'+mode,schema),good=wire(prefix+'_control',schema);
+  const selected=bad.statements.find(s=>s.body.basis===2&&s.body.purpose===purpose);
+  await verifySignature(Buffer.from(f.keys.witness.public_key_hex,'hex'),statementSigningDigest(selected.body),selected.signature);
+  await assert.rejects(()=>admittedOwnerMintRootAttachment(selected.body,{kind:purpose===1?(kind==='native'?'native-genesis':'genesis'):'authority',payload:(purpose===1?bad.genesisWitnesses:bad.authorityWitnesses)[0]}),{reason:'Canonical'});
   if(kind==='native'){await assert.rejects(()=>validatePublicNativeBundle(bad),{reason:'Canonical'});await validatePublicNativeBundle(good);}
   else{assert.throws(()=>validatePublicBundle(bad),{reason:'Canonical'});validatePublicBundle(good);}
  });

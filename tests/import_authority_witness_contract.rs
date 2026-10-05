@@ -4290,3 +4290,21 @@ fn alpha32_creator_selection_and_typed_evidence() {
         import::ImportBundleEvidence::Recovery
     );
 }
+
+#[test]
+fn alpha32_recovery_without_a_new_set_preserves_the_durable_snapshot() {
+    let f = fixture();
+    let pin = alpha31_pin(&f, false);
+    let first = review_verify_at(&f, "review_scheduled_recovery", &pin, None, &[1100], 1_100_000)
+        .expect("initial recovery");
+    let again = review_verify_at(&f, "review_scheduled_recovery", &pin, Some(&first.snapshot), &[1100], 1_150_000)
+        .expect("recovery reread");
+    assert_eq!(again.snapshot, first.snapshot);
+}
+#[test]
+fn alpha32_bundle_owner_time_comes_from_authenticated_receipts() {
+    let f = fixture();
+    let result = review_verify(&f, "review_control", &alpha31_pin(&f, false), None, &[900, 900])
+        .expect("receipt times, never caller times");
+    assert_eq!(result.evidence, import::ImportBundleEvidence::Witnessed);
+}

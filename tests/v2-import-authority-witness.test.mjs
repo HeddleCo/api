@@ -830,3 +830,15 @@ test('alpha32 creator selection and typed recovery vs witnessed evidence',async(
  assert.equal((await reviewVerify('review_control')).evidence,'witnessed');
  assert.equal((await reviewVerify('review_renewed_recovery')).evidence,'recovery');
 });
+
+// Consumer regressions: persisting a recovery with no new authenticated set is a no-op.
+test('alpha32 recovery without a new set preserves the durable snapshot',async()=>{
+ const first=await reviewVerify('review_scheduled_recovery',alpha31Pin(),undefined,[1100],1100000n);
+ const input=structuredClone(first.snapshot);
+ const again=await reviewVerify('review_scheduled_recovery',alpha31Pin(),first.snapshot,[1100],1150000n);
+ assert.deepEqual(again.snapshot,input);
+});
+test('alpha32 bundle owner time comes from authenticated receipts',async()=>{
+ const result=await reviewVerify('review_control',alpha31Pin(),undefined,[900,900]);
+ assert.equal(result.evidence,'witnessed');
+});

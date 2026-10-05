@@ -207,7 +207,7 @@ message InvitationRecord {
   string spool_name = 16;
   SpoolAddress spool_address = 17;
   // Secrets are returned only for email CreateInvitation, never observations.
-  // Accept/Redeem create a grant once, preserving an existing role if stronger
+  // Accept/Redeem grant once, preserving an active existing role if stronger
   // and preserving its include_descendants bit; a new grant sets it false.
 }
 message ApprovalGroupRecord {

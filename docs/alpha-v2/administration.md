@@ -98,10 +98,12 @@ use `NOT_FOUND / RESOURCE_NOT_FOUND`, field `invitation`, message
 `invitation unavailable`, empty resource and absent context. Neither the
 inviter nor a spool administrator bypasses recipient matching.
 
-Accept atomically commits ACCEPTED and grants the offered role once. Preserve
-any stronger existing grant role, its expiry and `include_descendants` bit; a
-new grant has `include_descendants = false` and no grant expiry. Invitation
-expiry limits acceptance, not membership. Acceptance never grants owner/purge
+Accept atomically commits ACCEPTED and grants the offered role once. An active
+grant already meeting or exceeding that role remains unchanged, including its
+expiry. Otherwise create/upgrade to the offered role with no grant expiry;
+never revive an expired stronger role. Preserve `include_descendants` on every
+existing-row conflict; a new grant sets it false. Invitation expiry limits
+acceptance, not membership. Acceptance never grants owner/purge
 authority. A retry MUST NOT recreate a subsequently revoked grant. Decline
 commits DECLINED without a grant and emits one `spool_invitation_declined`
 notification to the original human inviter, including if they have left the

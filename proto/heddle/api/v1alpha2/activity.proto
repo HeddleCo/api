@@ -3,6 +3,7 @@ package heddle.api.v1alpha2;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
+import "heddle/api/v1alpha2/administration.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/thread.proto";
 
@@ -31,6 +32,12 @@ message AttentionItem {
   // passes, or earlier when new activity arrives on its subject; the server
   // then clears this field and bumps version.
   google.protobuf.Timestamp snoozed_until = 14;
+  // Invitation-scoped projection for spool_invitation. The recipient's stored
+  // account binding, rather than spool membership, authorizes this item only.
+  InvitationRecord invitation = 15;
+  // Open vocabulary shared with NotificationRecord.kind. spool_invitation is
+  // a direct ask, with AcceptInvitation and DeclineInvitation action advice.
+  string kind = 16;
 }
 message RecordInteractionRequest {
   string client_operation_id = 1;
@@ -79,6 +86,10 @@ message NotificationRecord {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp read_at = 8;
   repeated ActionAvailability actions = 9;
+  // Set for spool_invitation (recipient) and spool_invitation_declined
+  // (inviter). These are invitation-scoped reads, not a spool-access grant.
+  // The existing preferences/outbox/continuity contract still applies.
+  InvitationRecord invitation = 10;
 }
 // Per-channel stored selector. Empty kind or "*" matches all kinds; empty or
 // "any" actor_origin matches both "human" and "agent". CHANNEL_UNSPECIFIED

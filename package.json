@@ -1,6 +1,6 @@
 {
   "name": "heddle-api-workspace",
-  "version": "0.31.0-alpha.38",
+  "version": "0.31.0-alpha.39",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.4.2",

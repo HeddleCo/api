@@ -263,6 +263,10 @@ fn create_response_preserves_handle_and_never_returns_its_binding_or_secret() {
 fn create_input_rejects_server_fields_and_invalid_roles() {
     let input = InvitationRecord {
         recipient: Some(Recipient::Email("mara@example.org".into())),
+        expires_at: Some(Timestamp {
+            seconds: 200,
+            nanos: 0,
+        }),
         role: 2,
         ..Default::default()
     };
@@ -286,5 +290,30 @@ fn create_input_rejects_server_fields_and_invalid_roles() {
             validate_create_invitation(&invalid),
             Err(InvitationError::InvalidRecord)
         );
+    }
+}
+
+#[test]
+fn create_expiry_shared_vectors() {
+    for v in vectors()["create"].as_array().expect("create vectors") {
+        let record = InvitationRecord {
+            recipient: recipient(v),
+            role: 2,
+            expires_at: v["expires_seconds"].as_i64().map(|seconds| Timestamp {
+                seconds,
+                nanos: v["expires_nanos"].as_i64().expect("nanos") as i32,
+            }),
+            ..Default::default()
+        };
+        let result = validate_create_invitation(&record);
+        if v["code"].is_number() {
+            let failure = result.expect_err("expiry required").failure();
+            assert_eq!(failure.code, v["code"].as_i64().expect("code") as i32);
+            let detail = failure.error.expect("typed detail");
+            assert_eq!(detail.reason, v["reason"].as_i64().expect("reason") as i32);
+            assert_eq!(detail.field, v["field"].as_str().expect("field"));
+        } else {
+            result.expect("valid create expiry");
+        }
     }
 }

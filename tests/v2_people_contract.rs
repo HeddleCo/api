@@ -55,7 +55,7 @@ struct Fixture {
 fn shared_people_vectors_enforce_scope_agents_exact_hit_prefix_and_bounds() {
     let fixture: Fixture = serde_json::from_str(include_str!("fixtures/people-suggestions.json"))
         .expect("people vectors");
-    assert_eq!(fixture.cases.len(), 30);
+    assert_eq!(fixture.cases.len(), 36);
     for case in fixture.cases {
         let request = SuggestPrincipalsRequest {
             prefix: case.prefix,

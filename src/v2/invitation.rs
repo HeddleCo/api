@@ -15,6 +15,10 @@ pub const SPOOL_INVITATION_DECLINED: &str = "spool_invitation_declined";
 pub enum InvitationError {
     #[error("recipient required")]
     RecipientRequired,
+    #[error("email invitation expiry required")]
+    ExpiryRequired,
+    #[error("invalid invitation expiry")]
+    InvalidExpiry,
     #[error("invalid email")]
     InvalidEmail,
     #[error("invalid handle")]
@@ -55,13 +59,14 @@ impl InvitationError {
             Self::Unavailable => ErrorReason::ResourceNotFound,
             Self::Unauthenticated => ErrorReason::CredentialMissing,
             Self::Lifecycle => ErrorReason::LifecycleState,
-            Self::RecipientRequired => ErrorReason::FieldRequired,
+            Self::RecipientRequired | Self::ExpiryRequired => ErrorReason::FieldRequired,
             _ => ErrorReason::FieldInvalid,
         }
     }
     pub const fn field(self) -> &'static str {
         match self {
             Self::RecipientRequired => "invitation.recipient",
+            Self::ExpiryRequired | Self::InvalidExpiry => "invitation.expires_at",
             Self::InvalidEmail => "invitation.email",
             Self::InvalidHandle | Self::HandleNotFound => "invitation.handle",
             Self::InvalidAccountId => "invitation.account_id",
@@ -167,7 +172,16 @@ pub fn resolve_invitation_recipient(
 /// Create rejects every server projection field. The host additionally checks
 /// reference validity, authorization, future expiry, explicit human UUIDs and quotas.
 pub fn validate_create_invitation(record: &InvitationRecord) -> Result<(), InvitationError> {
-    normalize_invitation_recipient(record)?;
+    let recipient = normalize_invitation_recipient(record)?;
+    if matches!(recipient, Recipient::Email(_)) && record.expires_at.is_none() {
+        return Err(InvitationError::ExpiryRequired);
+    }
+    if record.expires_at.as_ref().is_some_and(|expiry| {
+        !(-62_135_596_800..=253_402_300_799).contains(&expiry.seconds)
+            || !(0..1_000_000_000).contains(&expiry.nanos)
+    }) {
+        return Err(InvitationError::InvalidExpiry);
+    }
     if !record.version.is_empty()
         || !(1..=3).contains(&record.role)
         || record.state != InvitationState::Unspecified as i32

@@ -55,7 +55,7 @@ struct Fixture {
 fn shared_people_vectors_enforce_scope_agents_exact_hit_prefix_and_bounds() {
     let fixture: Fixture = serde_json::from_str(include_str!("fixtures/people-suggestions.json"))
         .expect("people vectors");
-    assert_eq!(fixture.cases.len(), 23);
+    assert_eq!(fixture.cases.len(), 30);
     for case in fixture.cases {
         let request = SuggestPrincipalsRequest {
             prefix: case.prefix,
@@ -232,5 +232,49 @@ fn non_co_member_never_suggested_and_agents_excluded() {
     assert!(
         response.principals.iter().all(|p| p.handle != "ada-agent"),
         "delegations have no people rows"
+    );
+}
+
+#[test]
+fn handle_kind_mismatches_are_refused() {
+    let fixture: Fixture = serde_json::from_str(include_str!("fixtures/people-suggestions.json"))
+        .expect("people vectors");
+    let memberships = ["shared".into()];
+    let context = PeopleContext {
+        caller_spool_ids: &memberships,
+        members_readable_spool_ids: &memberships,
+        rate_limit_allowed: true,
+    };
+    let request = SuggestPrincipalsRequest {
+        prefix: "al".into(),
+        spool: None,
+    };
+    let errors: Vec<_> = fixture
+        .cases
+        .iter()
+        .filter(|case| {
+            matches!(
+                case.name.as_str(),
+                "native_handle_github_kind"
+                    | "github_handle_native_kind"
+                    | "github_handle_gitlab_kind"
+            )
+        })
+        .map(|case| {
+            let candidates: Vec<_> = case
+                .replacement_candidates
+                .as_ref()
+                .expect("mismatch rows")
+                .iter()
+                .map(Candidate::candidate)
+                .collect();
+            let error = suggest_principals(&request, &candidates, &context).err();
+            println!("{}: {error:?}", case.name);
+            error
+        })
+        .collect();
+    assert_eq!(
+        errors,
+        vec![Some(heddle_api::v2::people::PeopleError::Metadata); 3]
     );
 }

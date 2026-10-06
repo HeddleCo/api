@@ -67,7 +67,7 @@
       "handle_visible": true
     },
     {
-      "handle": "alice",
+      "handle": "gh:alice",
       "display_name": "\u00c9lodie",
       "kind": 2,
       "spool_ids": [
@@ -161,7 +161,7 @@
       ],
       "rate_limit_allowed": true,
       "expected": [
-        "alice"
+        "gh:alice"
       ],
       "error": null,
       "members_readable_spool_ids": [
@@ -179,7 +179,7 @@
       ],
       "rate_limit_allowed": true,
       "expected": [
-        "alice"
+        "gh:alice"
       ],
       "error": null,
       "members_readable_spool_ids": [
@@ -768,6 +768,249 @@
         {
           "handle": "11111111-1111-4111-8111-111111111111",
           "display_name": "Ada no handle",
+          "kind": 1,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "name": "native_handle_github_kind",
+      "prefix": "al",
+      "spool": "shared",
+      "caller_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": "Metadata",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "replacement_candidates": [
+        {
+          "handle": "alice",
+          "display_name": "Alice",
+          "kind": 2,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "name": "github_handle_native_kind",
+      "prefix": "al",
+      "spool": "shared",
+      "caller_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": "Metadata",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "replacement_candidates": [
+        {
+          "handle": "gh:alice",
+          "display_name": "Alice",
+          "kind": 1,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "name": "github_handle_gitlab_kind",
+      "prefix": "al",
+      "spool": "shared",
+      "caller_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": "Metadata",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "replacement_candidates": [
+        {
+          "handle": "gh:alice",
+          "display_name": "Alice",
+          "kind": 3,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "name": "unsupported_host_kind",
+      "prefix": "al",
+      "spool": "shared",
+      "caller_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": "Metadata",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "replacement_candidates": [
+        {
+          "handle": "example.com:alice",
+          "display_name": "Alice",
+          "kind": 3,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "name": "bare_gitlab_qualifier",
+      "prefix": "al",
+      "spool": "shared",
+      "caller_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [],
+      "error": "Metadata",
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "replacement_candidates": [
+        {
+          "handle": "gitlab:alice",
+          "display_name": "Alice",
+          "kind": 3,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "name": "gitlab_handle_gitlab_kind",
+      "prefix": "al",
+      "spool": "shared",
+      "caller_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [
+        "gitlab.com:alice"
+      ],
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "replacement_candidates": [
+        {
+          "handle": "gitlab.com:alice",
+          "display_name": "Alice",
+          "kind": 3,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        }
+      ]
+    },
+    {
+      "name": "qualified_handles_sorted_by_utf8_bytes",
+      "prefix": "ad",
+      "spool": "shared",
+      "caller_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "rate_limit_allowed": true,
+      "expected": [
+        "alice",
+        "gh:alice",
+        "gitlab.com:alice",
+        "jun"
+      ],
+      "error": null,
+      "members_readable_spool_ids": [
+        "shared",
+        "second"
+      ],
+      "replacement_candidates": [
+        {
+          "handle": "jun",
+          "display_name": "Ada",
+          "kind": 1,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        },
+        {
+          "handle": "gitlab.com:alice",
+          "display_name": "Ada",
+          "kind": 3,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        },
+        {
+          "handle": "gh:alice",
+          "display_name": "Ada",
+          "kind": 2,
+          "spool_ids": [
+            "shared"
+          ],
+          "is_agent": false,
+          "is_public": false,
+          "handle_visible": true
+        },
+        {
+          "handle": "alice",
+          "display_name": "Ada",
           "kind": 1,
           "spool_ids": [
             "shared"

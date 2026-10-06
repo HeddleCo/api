@@ -72,6 +72,12 @@ pub fn validate_suggest_principals_request(
 }
 
 pub(crate) fn validate_person(person: &SuggestedPrincipal) -> Result<(), PeopleError> {
+    let expected_kind = match person.handle.split_once(':') {
+        None => HandleKind::Native,
+        Some(("gh", _)) => HandleKind::Github,
+        Some(("gitlab.com", _)) => HandleKind::Gitlab,
+        Some(_) => return Err(PeopleError::Metadata),
+    };
     if person.handle.is_empty()
         || uuid_shaped_handle(&person.handle)
         || person.handle.len() > 256
@@ -79,10 +85,7 @@ pub(crate) fn validate_person(person: &SuggestedPrincipal) -> Result<(), PeopleE
         || person.handle.chars().any(char::is_control)
         || person.display_name.len() > 1024
         || person.display_name.chars().any(char::is_control)
-        || !matches!(
-            HandleKind::try_from(person.kind),
-            Ok(HandleKind::Native | HandleKind::Github | HandleKind::Gitlab)
-        )
+        || HandleKind::try_from(person.kind) != Ok(expected_kind)
     {
         return Err(PeopleError::Metadata);
     }

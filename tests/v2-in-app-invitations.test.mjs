@@ -149,3 +149,13 @@ test('create response privacy gate rejects replacing a handle with its UUID or l
       redemptionSecret: kind === 'email' ? new Uint8Array() : new Uint8Array([1]) }), InvitationError);
   }
 });
+
+test('shared create vectors require email expiry and preserve optional in-app expiry', () => {
+  for (const v of vectors.create) {
+    const record = create(InvitationRecordSchema, { recipient: recipient(v), role: 2,
+      expiresAt: v.expires_seconds === undefined ? undefined :
+        { seconds: BigInt(v.expires_seconds), nanos: v.expires_nanos } });
+    if (v.code) refusal(() => validateCreateInvitation(record), v);
+    else validateCreateInvitation(record);
+  }
+});

@@ -6,7 +6,7 @@ import { type CreateInvitationRequest, type CreateInvitationResponse } from './a
 
 export const SPOOL_INVITATION = 'spool_invitation';
 export const SPOOL_INVITATION_DECLINED = 'spool_invitation_declined';
-export type InvitationViolation = 'RecipientRequired' | 'InvalidEmail' | 'InvalidHandle' |
+export type InvitationViolation = 'RecipientRequired' | 'ExpiryRequired' | 'InvalidExpiry' | 'InvalidEmail' | 'InvalidHandle' |
   'InvalidAccountId' | 'HandleNotFound' | 'Unauthenticated' | 'Unavailable' | 'Lifecycle' | 'InvalidRecord' | 'HumanSessionRequired' | 'InviterAuthorityLost';
 
 export class InvitationError extends Error {
@@ -27,8 +27,9 @@ export class InvitationError extends Error {
       violation === 'Unavailable' ? ErrorReason.RESOURCE_NOT_FOUND :
       violation === 'Unauthenticated' ? ErrorReason.CREDENTIAL_MISSING :
       violation === 'Lifecycle' ? ErrorReason.LIFECYCLE_STATE :
-      violation === 'RecipientRequired' ? ErrorReason.FIELD_REQUIRED : ErrorReason.FIELD_INVALID;
-    this.field = violation === 'RecipientRequired' ? 'invitation.recipient' :
+      ['RecipientRequired', 'ExpiryRequired'].includes(violation) ? ErrorReason.FIELD_REQUIRED : ErrorReason.FIELD_INVALID;
+    this.field = ['ExpiryRequired', 'InvalidExpiry'].includes(violation) ? 'invitation.expires_at' :
+      violation === 'RecipientRequired' ? 'invitation.recipient' :
       violation === 'InvalidEmail' ? 'invitation.email' :
       ['InvalidHandle', 'HandleNotFound'].includes(violation) ? 'invitation.handle' :
       violation === 'InvalidAccountId' ? 'invitation.account_id' :
@@ -93,7 +94,13 @@ export function resolveInvitationRecipient(record: InvitationRecord,
 
 /** Host additionally checks refs, future expiry, authorization and quotas. */
 export function validateCreateInvitation(record: InvitationRecord): void {
-  normalizeInvitationRecipient(record);
+  const recipient = normalizeInvitationRecipient(record);
+  if (recipient.case === 'email' && !record.expiresAt) throw new InvitationError('ExpiryRequired');
+  const expiry = record.expiresAt;
+  if (expiry && (expiry.seconds < -62135596800n || expiry.seconds > 253402300799n ||
+      !Number.isInteger(expiry.nanos) || expiry.nanos < 0 || expiry.nanos >= 1_000_000_000)) {
+    throw new InvitationError('InvalidExpiry');
+  }
   if (record.version.length !== 0 || ![1, 2, 3].includes(record.role) || record.state !== InvitationState.UNSPECIFIED ||
       record.createdAt || record.updatedAt || record.inviter || record.inviterViaAgentLabel !== '' ||
       record.spoolName !== '' || record.spoolAddress) throw new InvitationError('InvalidRecord');

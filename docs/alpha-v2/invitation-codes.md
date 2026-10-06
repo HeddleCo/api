@@ -42,8 +42,12 @@ lookup. Do not accept a creator identity or pending state from request input.
 For a known creator, return the original code only while the invitation is
 unredeemed, unrevoked and `now < expires_at`. Equality at nanosecond precision
 is expired. Newly created code invitations MUST have a finite, valid expiry;
-the host MUST apply its configured maximum lifetime. Missing or malformed
-legacy expiry fails closed to an empty code. A redeemed, revoked or expired
+the host MUST apply its configured `INVITATION_CODE_MAX_LIFETIME_SECS` maximum
+lifetime. Email-recipient CreateInvitation requires explicit `expires_at`;
+omission returns `INVALID_ARGUMENT / ERROR_REASON_FIELD_REQUIRED`, field
+`invitation.expires_at`. Handle/account_id invitations have no code and retain
+optional expiry, as specified in [administration.md](administration.md). Missing
+or malformed legacy expiry fails closed to an empty code. A redeemed, revoked or expired
 invite returns an empty response, including immediately after the transition.
 Hash-only legacy invites and handle-addressed spool invitations without a code
 also return empty; hosts MUST NOT mint a replacement code as a side effect.

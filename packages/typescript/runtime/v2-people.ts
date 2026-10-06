@@ -46,7 +46,7 @@ export function validateSuggestPrincipalsRequest(request: SuggestPrincipalsReque
 export function validateSuggestedPrincipal(person: SuggestedPrincipal): void {
   const qualifier = person.handle.includes(":") ? person.handle.slice(0, person.handle.indexOf(":")) : undefined;
   const expectedKind = qualifier === undefined ? HandleKind.NATIVE :
-    qualifier === "gh" ? HandleKind.GITHUB : qualifier === "gitlab.com" ? HandleKind.GITLAB : undefined;
+    qualifier === "gh" ? HandleKind.GITHUB : validProviderHost(qualifier) ? HandleKind.GITLAB : undefined;
   const allowed = new Set(["$typeName", "handle", "displayName", "kind"]);
   if (Object.keys(person).some(key => !allowed.has(key)) || !person.handle || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(person.handle) || bytes(person.handle).length > 256 ||
     edgeWhitespace.test(person.handle) || controls.test(person.handle) || bytes(person.displayName).length > 1024 ||
@@ -93,4 +93,9 @@ export function validateSuggestPrincipalsResponse(response: SuggestPrincipalsRes
     p.handle !== expected[i].handle || p.displayName !== expected[i].displayName || p.kind !== expected[i].kind)) {
     throw new Error("Projection: suggestion violates scoped people projection");
   }
+}
+
+function validProviderHost(host: string): boolean {
+  return host.length <= 253 && host.includes(".") && host.split(".").every(label =>
+    label.length >= 1 && label.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label));
 }

@@ -75,7 +75,7 @@ pub(crate) fn validate_person(person: &SuggestedPrincipal) -> Result<(), PeopleE
     let expected_kind = match person.handle.split_once(':') {
         None => HandleKind::Native,
         Some(("gh", _)) => HandleKind::Github,
-        Some(("gitlab.com", _)) => HandleKind::Gitlab,
+        Some((host, _)) if valid_provider_host(host) => HandleKind::Gitlab,
         Some(_) => return Err(PeopleError::Metadata),
     };
     if person.handle.is_empty()
@@ -159,5 +159,19 @@ fn uuid_shaped_handle(value: &str) -> bool {
             } else {
                 b.is_ascii_hexdigit()
             }
+        })
+}
+
+fn valid_provider_host(host: &str) -> bool {
+    host.len() <= 253
+        && host.contains('.')
+        && host.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
         })
 }

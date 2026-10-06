@@ -1,6 +1,6 @@
 # Spool invitations and People
 
-This is the normative alpha.40 API contract for hosts and clients. This API
+This is the normative alpha.41 API contract for hosts and clients. This API
 repository ships protobufs, route/signing metadata, portable Rust/TypeScript
 gates and vectors. Hosts implement storage, authentication, transactions and
 delivery; the helpers do not implement weft handlers. The
@@ -14,9 +14,18 @@ governs account rooting and delegation.
 is a required oneof: `email = 8`, `handle = 9`, or `account_id = 10`.
 The old string tag 3 is reserved, with no compatibility path. Old revoked and
 redeemed booleans at tags 6/7 are also reserved; use `state` instead. Create
-accepts only ref, recipient, role and optional future expires_at. All version,
+accepts only ref, recipient, role and expires_at. All version,
 state, timestamps, inviter and spool display fields MUST be unset on create.
 Unknown/unspecified roles are invalid.
+
+Email-recipient CreateInvitation MUST carry an explicit finite, valid
+`invitation.expires_at` later than server time. Omission returns
+`INVALID_ARGUMENT / ERROR_REASON_FIELD_REQUIRED`, field `invitation.expires_at`.
+Email invitations are code invitations: the host MUST enforce its configured
+`INVITATION_CODE_MAX_LIFETIME_SECS`, as specified in
+[invitation-codes.md](invitation-codes.md). Handle/account_id invitations have
+no code and keep optional expiry; when supplied, it MUST be valid and future.
+Only handle/account_id invitations may have no expiry.
 
 Email is trimmed and ASCII-lowercased: maximum 320 UTF-8 bytes before trimming,
 one `@`, nonempty local/domain parts, no internal whitespace/control characters.
@@ -257,7 +266,7 @@ states in People/invitations with live versions and the existing read budget.
 | InvitationRecord field | Tag | Meaning |
 | --- | --- | --- |
 | ref / version | 1 / 2 | Stable invitation/spool identity and opaque CAS version |
-| role / expires_at | 4 / 5 | Offered role and optional acceptance deadline |
+| role / expires_at | 4 / 5 | Offered role and acceptance deadline (required for email; optional for handle/account_id) |
 | email / handle / account_id | 8 / 9 / 10 | Only the original normalized recipient arm |
 | state | 11 | Authoritative effective lifecycle status |
 | created_at / updated_at | 12 / 13 | Server creation / last committed transition time |

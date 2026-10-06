@@ -210,6 +210,7 @@ mod descriptor {
                 ("CAPABILITY_PLATFORM_INVITATION_DIRECTORY".into(), 9),
                 ("CAPABILITY_ACCEPT_INVITATION".into(), 10),
                 ("CAPABILITY_DECLINE_INVITATION".into(), 11),
+                ("CAPABILITY_REVOKE_GRANT".into(), 12),
             ]
         );
         field(

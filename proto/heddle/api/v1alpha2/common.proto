@@ -281,6 +281,11 @@ message Requirement {
   // receipts. The broad kind remains for older clients; use the typed cause
   // for landing presentation. Other operations leave this unset.
   LandingRequirementKind landing_kind = 7;
+  // Typed unmet precondition, with the same semantics/privacy as Blocked.error.
+  // Membership floor advice uses POLICY and the target grant as subject.
+  // On PutGrant, field "grant.role" applies to proposals below ADMINISTRATOR,
+  // not role-preserving edits/upgrades. Never infer this cause from explanation.
+  heddle.api.common.ErrorDetail error = 8;
 }
 
 // Stable semantic affordance, independent of RPC spelling. Never authority.
@@ -300,6 +305,7 @@ enum Capability {
   CAPABILITY_PLATFORM_INVITATION_DIRECTORY = 9;
   CAPABILITY_ACCEPT_INVITATION = 10;
   CAPABILITY_DECLINE_INVITATION = 11;
+  CAPABILITY_REVOKE_GRANT = 12;
 }
 
 message ActionAvailability {

@@ -6,6 +6,7 @@ pub mod custodial_recovery;
 pub mod identity_management;
 pub mod invitation;
 pub mod invitation_code;
+pub mod membership_floor;
 pub mod notifications;
 pub mod passkey_label;
 pub mod people;

@@ -1,6 +1,6 @@
 # Spool invitations and People
 
-This is the normative alpha.38 API contract for hosts and clients. This API
+This is the normative alpha.40 API contract for hosts and clients. This API
 repository ships protobufs, route/signing metadata, portable Rust/TypeScript
 gates and vectors. Hosts implement storage, authentication, transactions and
 delivery; the helpers do not implement weft handlers. The
@@ -278,3 +278,196 @@ row, recipient or inviter. Materialize human account rows only. Delegated
 actions inherit human attribution, optionally qualified by a public agent
 label. Direct grant/account-recipient inputs naming agents MUST be refused,
 including UUID-shaped agent credential identifiers.
+
+## Membership floors (OWNER RULE, 2026-10-06)
+
+This section is normative as of alpha.40. A host MUST refuse a membership-ending
+or membership-reducing transition if its resulting effective membership would
+violate any of these rules, regardless of whether the caller is removing themself
+or another human:
+
+1. The human owner MUST retain access to their own personal spool. Another
+   administrator cannot remove that owner's access either. This protects access,
+   not a particular stored grant: removing one grant is allowed when another
+   applicable live grant still admits the owner.
+2. A spool MUST retain at least one human member.
+3. A spool with human members MUST retain at least one human with effective
+   `ADMINISTRATOR` role. This last-administrator rule is owner-confirmed.
+
+Use `CallFailure.code = FAILED_PRECONDITION (9)` and the following primary
+`ErrorDetail.reason`. When several rules apply, personal owner wins, then last
+member, then last administrator. The last-administrator rule applies only when
+at least one human remains; it does not supersede the last-member reason.
+
+| Rule | ErrorReason | Number |
+| --- | --- | --- |
+| Personal owner access | `PERSONAL_SPOOL_OWNER_ACCESS_REQUIRED` | 506 |
+| Last human member | `SPOOL_LAST_MEMBER` | 507 |
+| Last human administrator | `SPOOL_LAST_ADMINISTRATOR` | 508 |
+
+For **each** reason, `ErrorDetail.field` is `grant` for RevokeGrant, self-removal
+or descendant-coverage/ancestry removal and account grant cascades;
+`grant.role` for a role replacement;
+`grant.expires_at` for an expiry replacement. If one PutGrant changes multiple
+fields, use `grant.expires_at` when the proposed expiry is already effective,
+otherwise `grant.role` when role reduction is responsible, otherwise `grant`.
+Keep `resource` empty and `context` absent. Messages MUST NOT contain identities,
+counts, hidden spool/grant references or a different hidden-state distinction.
+The reasons describe the invariant, not who remains.
+
+**Authorization and privacy:** a host MUST authenticate, resolve the target with
+ordinary hidden-existence rules, and authorize the caller to manage grants on
+EACH affected spool before releasing a floor reason. Operation authorization
+and floor-reason disclosure are separate checks: a denied operation MUST retain
+its existing refusal before membership inspection. An authorized operation with
+healthy resulting floors MUST NOT be blocked merely because the caller cannot
+manage a descendant/shared spool. When a floor would be violated without that
+management permission, return the existing opaque authorization/existence
+refusal; never substitute a floor reason, even on a public spool or self-removal
+path. Advice uses the same gates.
+A hidden grant MUST NOT become an action target or independently prevent removal
+of a different visible grant. Count its effective access as an alternative
+witness, without exposing it. Removing a visible grant that leaves the same
+human's inherited access intact is allowed by these floors. When an ancestor
+mutation would violate a floor on a descendant the caller cannot manage or
+see, refuse with the existing opaque authorization/existence envelope; never
+identify the descendant or emit a membership-floor reason for it. This does not
+permit bypassing the invariant.
+
+### Counting and atomicity
+
+Count distinct human account subjects, never grant rows. Agents and services are
+delegations and MUST NOT count as members or administrators. Pending invitations
+MUST NOT count. Public readability, approval-group eligibility, support-access
+rows, device roots and delegated credential ceilings do not supply membership
+floor witnesses. An administrator here means a human whose maximum applicable
+live grant role is `ADMINISTRATOR`, not owner purge authority or a delegation's
+attenuated effective role.
+
+Count all effective live human grants: direct grants and ancestor grants whose
+`include_descendants = true` covers this spool, including caller-hidden grants
+as alternative access witnesses. An ancestor grant without descendant coverage
+MUST NOT count on a child. Multiple applicable grants to one human count once,
+using the greatest live role. A grant is live only when its role supplies access
+and it has no expiry or `expires_at > server_now`, comparing seconds AND nanos.
+Expiry at exactly now is not live. Use the proposed resulting role, expiry and
+coverage, and reevaluate every affected descendant; do not count a revoked,
+expired, pending or inapplicable ancestor grant as a survivor.
+
+The host MUST evaluate authorization and these floors atomically with the
+mutation, using a serializable transaction or equivalent locking over the
+spool, applicable ancestor grants and affected descendants. Concurrent removals
+or demotions MUST NOT both observe the same surviving administrator/member and
+commit an invalid result. CAS, receipt replay, invitation transitions and
+required stream/outbox effects retain their existing rules. Advice is a
+snapshot, never authority; handlers MUST recheck at commit. A refusal commits
+no membership change or dependent invitation-authority-loss effects.
+
+Time-based expiry is covered too. A host MUST NOT admit a future-expiring floor
+witness unless the invariant is also guaranteed at its deadline. Evaluate the
+proposed effective membership at each affected deadline, including coincident
+expiries, and preserve that guarantee on later mutations. This rejects an unsafe
+expiry at write time rather than silently extending an expired grant. Hosts MUST
+serialize scheduled expiry processing with grant changes and invitation
+acceptance. The portable helper evaluates one timestamp; host scheduling,
+future-deadline validation and transaction/lock integration are host obligations.
+
+### Covered paths in the current contract
+
+- `SpoolService.RevokeGrant`, including a UI leave/self-removal implemented by
+  revoking the caller's grant. There is no separate LeaveSpool RPC in alpha.40.
+- `SpoolService.PutGrant`: access-dropping role replacement, demotion below
+  `ADMINISTRATOR`, setting expiry to past/now, unsafe future expiry, and clearing
+  `include_descendants`. Existing role/input validation still runs; these floors
+  do not make an unspecified/invalid PutGrant role valid.
+- Those same RevokeGrant/PutGrant operations on an ancestor when inherited
+  access/administration would disappear on descendants, plus effective grant
+  expiry processing. Reevaluate every affected surviving spool.
+- `SpoolService.PromoteSpool` changes ancestry while retaining direct grants;
+  removal of inherited grants on the promoted spool or its descendants MUST
+  preserve these floors. Evaluate the full resulting ancestry, including any
+  newly applicable destination-ancestor grants, as one atomic proposal.
+- `IdentityService.DeleteAccount` grant cascades on **surviving shared spools**
+  MUST preserve these floors, with the same grant-management privacy gate. Its
+  existing deletion of account-owned spool resources is resource lifecycle,
+  separate from grant removal; this contract does not change that behavior.
+- `SpoolService.AcceptInvitation` and `RedeemInvitation` grant conflict paths.
+  Their current contract creates/upgrades only, preserves stronger live roles
+  and existing descendant coverage, and never recreates grants on accepted
+  retries. Any implementation that replaces/reduces a grant MUST apply the same
+  floors atomically. Create/Decline/RevokeInvitation and invitation expiry do
+  not remove a membership grant and cannot count a pending offer as a successor.
+- Approval-mediated grant writes, if implemented by a host, MUST pass the same
+  gate. Current `PutApprovalGroup`, `DeleteApprovalGroup`, `PutReviewPolicy` and
+  review/intent approval commands change eligibility/policy, not GrantRecord
+  membership; they are not alternative removal routes or floor witnesses.
+
+`SetSupportAccess` changes support access, not human grant membership, and does
+not satisfy or remove a membership floor witness. `DeleteSpool` is a separate
+resource-lifecycle command, **not** membership removal. Personal spools remain
+undeletable under [weft#2579](https://github.com/HeddleCo/weft/issues/2579); this
+release does not change deletion behavior.
+
+### Per-grant action advice and portable helpers
+
+`SpoolOverview.actions` MUST carry exactly ONE
+`/heddle.api.v1alpha2.SpoolService/RevokeGrant` entry per grant visible to the
+caller in the composed grant projection, including protected grants. Its
+`target.entity` MUST be that grant's `RecordRef`, not the spool or principal.
+Inherited grant targets retain their actual ancestor spool reference. Never
+fabricate entries, placeholders or counts for hidden grants. Refresh advice with
+the matching grant projection/version, including paginated observation updates;
+clients MUST NOT apply a visible-page action list as a complete hidden roster.
+
+Use `CAPABILITY_REVOKE_GRANT (12)`, the host endpoint, implemented/authorized
+flags and the grant's observed version. A protected, authorized grant carries
+an unmet `Requirement` with `kind = POLICY`, `subject = target` and
+`error = ErrorDetail` using the reason/field/precedence above.
+`Requirement.error = 8` reuses `Blocked.error` semantics. An action is available
+only when implemented, authorized and free of unmet requirements. An
+unauthorized entry has `authorized = false` and MUST NOT carry a floor reason.
+A blocked mutation receipt uses the same primary detail in `Blocked.error`;
+transport failures use FAILED_PRECONDITION with that detail.
+
+Likewise include per-grant PutGrant role advice with `CAPABILITY_PUT_GRANT (3)`.
+A POLICY requirement with a floor `error.field = "grant.role"` describes
+proposals **below ADMINISTRATOR** on that target; clients MUST disable those
+role choices and use the typed cause, without disabling role-preserving edits
+or upgrades solely because of that requirement. For last-admin demotion this is
+`SPOOL_LAST_ADMINISTRATOR`. Expiry/access/coverage changes still require their
+own proposal evaluation at commit. Spool-level create-grant advice, if present,
+does not replace any per-grant entries. Advice never grants authority; clients
+MUST stop inferring protection from grant counts, caller identity or role labels.
+
+Rust `v2::membership_floor::{membership_floor, membership_floor_batch,
+membership_floor_actions}` and TS `v2/membership-floor::{membershipFloor,
+membershipFloorBatch, membershipFloorActions}` take trusted
+minimal effective-grant candidates (stable subject, role, human/agent kind,
+personal-owner flag and optional expiry), a resolved proposed replacement and
+host context. The host supplies validated roles/timestamps, applicable ancestor
+coverage, caller-visible action records and its existing authorization refusal.
+`operation_authorized` / `operationAuthorized` is the actual operation's
+ordinary authorization (for example caller-bound DeleteAccount, or source-grant
+administration); `can_manage_grants` / `canManageGrants` is permission to disclose
+a floor on THIS affected spool. An allowed account cascade or ancestry change
+can have the former true and the latter false. For advice, hosts MUST authorize
+each advertised RPC against its target grant's actual spool, batching only
+targets with the same operation-authorization and floor-disclosure flags and
+combining the batches without duplicate entries. Do not add a management
+prerequisite on otherwise healthy affected spools. These helpers do not query
+storage or implement weft handlers. Coverage removal
+is represented as UNSPECIFIED on each affected descendant, preserving the
+source grant on other spools. Use globally qualified RecordRefs for matching.
+Batch helpers evaluate ALL replacements together on one affected spool; checking
+individual removals against the unchanged snapshot is insufficient. Hosts MUST
+normalize applicable grants for the resulting ancestry and include every lost,
+retained and newly applicable grant, using UNSPECIFIED for removed coverage;
+newly applicable grants can be represented by UNSPECIFIED candidate rows with
+live replacements. Batch error field follows the operation/field precedence
+above; replacements MUST be unique per grant.
+
+Both runtimes execute `tests/fixtures/membership-floors.json`. Independent rule
+removal probes in `tools/verify-alpha40-membership-guards.py` require every
+refusal vector for that rule to become allowed, confirm ordinary assertions
+fail, restore the guard, then require passing results. Atomic races, deadline
+scheduling and caller/target visibility require weft integration tests later.

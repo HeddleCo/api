@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.31.0-alpha.39",
+  "version": "0.31.0-alpha.40",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {
@@ -48,6 +48,7 @@
     "./v2/source-targets": "./dist/v1alpha2/source-targets.js",
     "./v2/invitation": "./dist/v1alpha2/invitation.js",
     "./v2/people": "./dist/v1alpha2/people.js",
+    "./v2/membership-floor": "./dist/v1alpha2/membership-floor.js",
     "./v2/approval-groups": "./dist/v1alpha2/approval-groups.js",
     "./v2/invitation-code": "./dist/v1alpha2/invitation-code.js",
     "./v2/notifications": "./dist/v1alpha2/notifications.js",

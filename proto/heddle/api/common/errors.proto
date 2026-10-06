@@ -75,6 +75,16 @@ enum ErrorReason {
   // CommitImportJob: a sibling holds a selected full ref/target/genesis.
   // ALREADY_EXISTS; destroys prepared key custody; not replay-frozen.
   ERROR_REASON_IMPORT_DESTINATION_CONFLICT = 505;
+  // Membership floors, after authorization to manage grants on this spool.
+  // FAILED_PRECONDITION; field "grant" for revoke/leave/coverage/ancestry/cascade,
+  // "grant.role" for role changes, "grant.expires_at" for expiry changes.
+  // Empty resource/context; precedence: personal owner > member > admin.
+  // Otherwise retain the existing refusal without disclosing hidden members.
+  ERROR_REASON_PERSONAL_SPOOL_OWNER_ACCESS_REQUIRED = 506;
+  // The resulting spool would have zero effective live human members.
+  ERROR_REASON_SPOOL_LAST_MEMBER = 507;
+  // The resulting spool has humans but no effective live ADMINISTRATOR.
+  ERROR_REASON_SPOOL_LAST_ADMINISTRATOR = 508;
 
   // Flow control (6xx). RATE_LIMITED / QUOTA_EXCEEDED are retryable;
   // CURSOR_INVALID is a client-fix (restart from a valid cursor), not retryable.

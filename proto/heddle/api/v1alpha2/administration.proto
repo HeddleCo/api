@@ -374,7 +374,8 @@ message ReviseSpoolRequest {
 // slug. UUID, genesis, descendants, and direct grants survive.
 // Bound by the destination ancestry's effective max_audience: refuse promotion
 // that would place a too-wide child under a tighter destination. Birth-parent
-// lock does not follow the promoted spool.
+// lock does not follow the promoted spool. Lost inherited membership MUST pass
+// the atomic membership floors on the promoted spool and all descendants.
 message PromoteSpoolRequest {
   string client_operation_id = 1;
   SpoolRef spool = 2;
@@ -395,11 +396,15 @@ message RemoveSpoolMountRequest {
   SpoolMount mount = 2;
   bytes expected_version = 3;
 }
+// Every membership-reducing proposal MUST enforce the atomic membership floors
+// in administration.md, including expiry and inherited descendant membership.
 message PutGrantRequest {
   string client_operation_id = 1;
   GrantRecord grant = 2;
   bytes expected_version = 3;
 }
+// Includes self-removal: personal owner, last member and last administrator
+// protections are identical for self and other callers; authorization comes first.
 message RevokeGrantRequest {
   string client_operation_id = 1;
   RecordRef grant = 2;

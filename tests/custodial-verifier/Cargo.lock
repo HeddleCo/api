@@ -374,7 +374,7 @@ version = "0.0.0"
 dependencies = [
  "ed25519-dalek 3.0.0",
  "heddle-api 0.31.0-alpha.19",
- "heddle-api 0.31.0-alpha.39",
+ "heddle-api 0.31.0-alpha.40",
  "heddleco-capability-verifier",
  "hex",
  "prost 0.14.1",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "heddle-api"
-version = "0.31.0-alpha.39"
+version = "0.31.0-alpha.40"
 dependencies = [
  "blake3",
  "bytes",

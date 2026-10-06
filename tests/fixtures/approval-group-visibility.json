@@ -1,0 +1,15 @@
+{
+  "principals": [
+    {"subject":"ada-private", "handle":"ada", "role":3, "explicit":false, "visible":true},
+    {"subject":"jun-private", "handle":"jun", "role":1, "explicit":true, "visible":true},
+    {"subject":"hidden-private", "handle":"hidden", "role":3, "explicit":true, "visible":false},
+    {"subject":"absent-private", "handle":"", "role":2, "explicit":true, "visible":true}
+  ],
+  "cases": [
+    {"name":"public reader counts only", "members":false, "admin":false, "resolved":[], "role":[], "explicit":[]},
+    {"name":"member without MEMBERS read counts only", "members":false, "admin":false, "resolved":[], "role":[], "explicit":[]},
+    {"name":"admin without MEMBERS read counts only", "members":false, "admin":true, "resolved":[], "role":[], "explicit":[]},
+    {"name":"MEMBERS reader hides explicit configuration", "members":true, "admin":false, "resolved":["ada"], "role":["ada"], "explicit":[]},
+    {"name":"admin edit preserves ineligible explicit member", "members":true, "admin":true, "resolved":["ada"], "role":["ada"], "explicit":["jun"]}
+  ]
+}

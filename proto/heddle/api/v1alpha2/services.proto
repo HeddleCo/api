@@ -488,6 +488,24 @@ service SpoolService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  // Creator means the immutable authenticated account subject at creation,
+  // never any other current spool administrator. The host MUST check creator,
+  // CURRENT inviter ADMINISTRATOR authority for every offered role, and pending
+  // state before AEAD decryption; see invitation-codes.md for mandatory
+  // encrypted storage, destruction, rate limits and secret-free audit.
+  rpc GetInvitationCode(GetInvitationCodeRequest) returns (GetInvitationCodeResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_SPOOL_ADMINISTRATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   // Email invitations only: link secret or verified matching OAuth email.
   // Acceptance uses the same PENDING -> ACCEPTED transaction and grant rules.
   // Account/handle invitations MUST use AcceptInvitation.
@@ -1080,6 +1098,31 @@ service IdentityService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  // Authenticated scoped people lookup. Before any search or exact public
+  // hit, a populated spool requires current membership, including inherited
+  // membership. Non-member/unknown spool => identical NOT_FOUND refusal.
+  // Rate-limit all attempts per account before lookup; see normative doc.
+  rpc SuggestPrincipals(SuggestPrincipalsRequest) returns (SuggestPrincipalsResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_GRANTS
+      authorization_request_targets: {
+        path: "spool"
+        // Coarse resource guard only: MANDATORY in-handler current membership
+        // check BEFORE any lookup, including exact public hits. Public READER
+        // access is insufficient. Co-member disclosure additionally requires
+        // member-only MEMBERS-section read, also when spool is omitted.
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
   rpc ResolveHandles(ResolveHandlesRequest) returns (ResolveHandlesResponse) {
     option (heddle.api.common.rpc_contract) = {
       signing_identity: STABLE_SIGNING_IDENTITY_NONE
@@ -1129,6 +1172,24 @@ service IdentityService {
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true
+      capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_CALLER_SUBJECT
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Creator means the immutable authenticated account subject at creation,
+  // never any other current spool administrator. The host MUST check creator,
+  // CURRENT inviter ADMINISTRATOR authority for every offered role, and pending
+  // state before AEAD decryption; see invitation-codes.md for mandatory
+  // encrypted storage, destruction, rate limits and secret-free audit.
+  rpc GetSignupInvitationCode(GetSignupInvitationCodeRequest) returns (GetSignupInvitationCodeResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
       capability: CAPABILITY_AREA_IDENTITY_AND_CREDENTIALS
       authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
       authorization_role: AUTHORIZATION_ROLE_CALLER_BOUND

@@ -5,6 +5,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/identity.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
 import "heddle/api/v1alpha2/stream.proto";
 
@@ -210,7 +211,8 @@ message InvitationRecord {
   // membership. This permits no other spool read and does not imply membership.
   string spool_name = 16;
   SpoolAddress spool_address = 17;
-  // Secrets are returned only for email CreateInvitation, never observations.
+  // Secrets are returned only for email CreateInvitation and creator-only
+  // GetInvitationCode, never observations, inbox or receipts.
   // Accept/Redeem grant once, preserving an active existing role if stronger
   // and preserving its include_descendants bit; a new grant sets it false.
 }
@@ -219,7 +221,44 @@ message ApprovalGroupRecord {
   bytes version = 2;
   string name = 3;
   string description = 4;
-  repeated string principal_ids = 5;
+  reserved 5;
+  reserved "principal_ids";
+  // PutApprovalGroup resolves canonical visible human handles server-side after
+  // admin authorization, storing private stable bindings. No ID input or shim.
+  repeated string explicit_member_handles = 7;
+  // UNSPECIFIED adds no role members. Otherwise current effective spool role,
+  // including inheritance, must be >= this threshold. READER is refused with
+  // APPROVAL_ROLE_BELOW_ELIGIBILITY_FLOOR: WRITER (Developer) is the floor.
+  // Membership is re-resolved at landing evaluation, never snapshotted.
+  ResourceRole member_role = 6;
+}
+// ObserveSpool approval-groups snapshot/update projection. Field 5 is reserved
+// so an old principal_ids list can never be interpreted as public metadata.
+message ApprovalGroupView {
+  RecordRef ref = 1;
+  bytes version = 2;
+  string name = 3;
+  string description = 4;
+  reserved 5;
+  reserved "principal_ids";
+  ResourceRole member_role = 6;
+  // MEMBERS-section read (current member-only) is mandatory for BOTH handle
+  // lists below, in addition to approval-group section read. Exclude hidden and
+  // absent handles. Otherwise return counts only, with all handle lists empty.
+  // Current union of explicit and role members, eligible humans only.
+  // Handles/display names; never account IDs. Uses section pagination for groups.
+  repeated SuggestedPrincipal resolved_members = 7;
+  // Subset supplied by member_role, letting UI label "Ada, Mara (admins) and
+  // jun" without exposing explicit principal_ids. Sorted canonical handles.
+  repeated string role_member_handles = 8;
+  // ADMINISTRATOR AND MEMBERS-section read required. Explicit configuration,
+  // including currently ineligible extras, for edit round-trips. Hidden/no-handle
+  // humans excluded; hosts retain their private bindings when editing visible extras.
+  repeated string explicit_member_handles = 9;
+  // Counts are available with approval-group section read alone.
+  uint32 resolved_member_count = 10;
+  uint32 role_member_count = 11;
+  uint32 explicit_member_count = 12;
 }
 message GroupRequirement {
   RecordRef group = 1;
@@ -232,6 +271,9 @@ message ReviewPolicyRecord {
   repeated ThreadRef targets = 4;
   repeated string target_name_patterns = 5;
   uint32 required_approvals = 6;
+  // UNSPECIFIED defaults to WRITER (Developer). PutReviewPolicy refuses
+  // READER with APPROVAL_ROLE_BELOW_ELIGIBILITY_FLOOR, rather than silently
+  // treating it as WRITER. Existing stored READER still evaluates as WRITER.
   ResourceRole minimum_role = 7;
   repeated string required_paths = 8;
   bool forbid_author_approval = 9;
@@ -370,6 +412,21 @@ message CreateInvitationRequest {
   // precedes handle resolution. See docs/alpha-v2/administration.md for the
   // exact public-directory disclosure and typed refusal.
   InvitationRecord invitation = 2;
+}
+// Creator-only re-read; no secret is added to InvitationRecord or any projection.
+// Host storage, lifecycle, audit and rate limits: invitation-codes.md.
+message GetInvitationCodeRequest {
+  // Stable invitation reference, never a capability or creator assertion.
+  RecordRef invitation = 1;
+}
+message GetInvitationCodeResponse {
+  // Original code, only for the authenticated creator with CURRENT inviter
+  // ADMINISTRATOR authority for every offered role, while unredeemed,
+  // unrevoked and strictly before expires_at. Empty after any terminal state
+  // or if no retrievable code exists (legacy/hash-only or handle invitation).
+  // Non-creators and unknown references receive indistinguishable NOT_FOUND.
+  // Never cache, log, observe or embed in a receipt.
+  bytes redemption_secret = 1;
 }
 message CreateInvitationResponse {
   MutationReceipt receipt = 1;

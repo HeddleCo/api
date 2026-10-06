@@ -142,10 +142,10 @@ export function planInvitationResponse(record: InvitationRecord, storedRecipient
       !accountUuid.test(storedRecipientAccount) || asciiLower(authenticatedAccount) !== asciiLower(storedRecipientAccount) ||
       !['handle', 'accountId'].includes(record.recipient.case ?? '')) throw new InvitationError('Unavailable');
   if (action !== 'accept' && action !== 'decline') throw new InvitationError('InvalidRecord');
-  if (action === 'accept') validateInviterAuthority(record.role, inviterRole);
   const state = effectiveInvitationState(record, now);
   const target = action === 'accept' ? InvitationState.ACCEPTED : InvitationState.DECLINED;
   if (state === target) return { state, changed: false, grantRole: false };
+  if (action === 'accept') validateInviterAuthority(record.role, inviterRole);
   if (state !== InvitationState.PENDING) throw new InvitationError('Lifecycle');
   return { state: target, changed: true, grantRole: action === 'accept',
     notificationKind: action === 'decline' ? SPOOL_INVITATION_DECLINED : undefined };
@@ -169,9 +169,10 @@ export function validateInvitationResolution(response: InvitationResolution): vo
 }
 
 /** Trusted current effective role/ceilings under the host transition lock.
- * Use for Accept AND Redeem before replay and to auto-revoke pending invites. */
+ * ADMINISTRATOR is mandatory for every offered role at Create, pending Accept,
+ * Redeem and GetInvitationCode. Accepted retries return authenticated no-ops. */
 export function validateInviterAuthority(offeredRole: number, inviterRole: number): void {
-  if (![1, 2, 3].includes(offeredRole) || ![1, 2, 3].includes(inviterRole) || inviterRole < offeredRole) {
+  if (![1, 2, 3].includes(offeredRole) || inviterRole !== 3) {
     throw new InvitationError('InviterAuthorityLost');
   }
 }
@@ -193,4 +194,13 @@ export function validateNotificationInvitationProjection(record: import('./activ
 }
 export function validateAttentionInvitationProjection(item: import('./activity_pb.js').AttentionItem, original: InvitationRecord['recipient']): void {
   if (item.invitation) validateInvitationRecordProjection(item.invitation, original);
+}
+
+/** SERVER ONLY: load ALL records by immutable inviter subject on this spool.
+ * Persist replacements/new versions, dismiss attention, destroy codes and emit
+ * updates atomically with admin loss, serialized with acceptance. */
+export function planInviterAuthorityLoss(invitations: readonly InvitationRecord[], inviterRole: number, now: import('@bufbuild/protobuf/wkt').Timestamp): InvitationRecord[] {
+  if (inviterRole === 3) return [];
+  return invitations.filter(record => record.state === InvitationState.PENDING)
+    .map(record => ({ ...record, state: InvitationState.REVOKED, updatedAt: now }));
 }

@@ -230,7 +230,7 @@ message SpoolEvent {
     InvitationRecord invitation = 5;
     GrantRecord grant = 6;
     ReviewPolicyRecord policy = 7;
-    ApprovalGroupRecord approval_group = 8;
+    ApprovalGroupView approval_group = 8;
     ContextRecord context = 9;
     OperationRecord operation = 10;
     SectionStatus status = 11;

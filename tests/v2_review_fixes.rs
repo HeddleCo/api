@@ -67,8 +67,8 @@ fn shared_current_inviter_authority_accept_redeem_and_retry_vectors() {
             assert!(detail.resource.is_empty());
             assert!(detail.context.is_none());
         }
-        // The shared gate is the Redeem seam. Accept MUST also invoke it before
-        // both pending transition and accepted receipt/no-op replay.
+        // Pending Accept and Redeem require current admin authority.
+        // Accepted retries are authenticated no-ops even after demotion.
         for state in [1, 2] {
             let invitation = InvitationRecord {
                 role: offered,
@@ -86,10 +86,23 @@ fn shared_current_inviter_authority_accept_redeem_and_retry_vectors() {
                     current
                 )
                 .is_ok(),
-                allowed,
+                state == 2 || allowed,
                 "{}",
                 v["name"]
             );
+            if state == 2 {
+                let plan = plan_invitation_response(
+                    &invitation,
+                    Some(ACCOUNT),
+                    Some(ACCOUNT),
+                    InvitationResponseAction::Accept,
+                    &now(),
+                    true,
+                    current,
+                )
+                .expect("accepted retry");
+                assert!(!plan.changed && !plan.grant_role && plan.notification_kind.is_none());
+            }
         }
     }
     // Decline remains possible when inviter authority is gone.
@@ -375,4 +388,31 @@ fn shared_projection_privacy_gate_covers_all_three_read_surfaces() {
         &original,
     )
     .expect("accepted projection");
+}
+
+#[test]
+fn admin_loss_revokes_all_pending_offered_roles_and_preserves_terminal_records() {
+    let records: Vec<_> = (1..=3)
+        .flat_map(|role| {
+            [1, 2, 3, 4, 5].map(|state| InvitationRecord {
+                role,
+                state,
+                ..record()
+            })
+        })
+        .collect();
+    assert!(plan_inviter_authority_loss(&records, 3, &now()).is_empty());
+    for role in [0, 1, 2, 99] {
+        let revoked = plan_inviter_authority_loss(&records, role, &now());
+        assert_eq!(
+            revoked.iter().map(|r| r.role).collect::<Vec<_>>(),
+            [1, 2, 3]
+        );
+        assert!(
+            revoked
+                .iter()
+                .all(|r| r.state == 4 && r.updated_at == Some(now()))
+        );
+    }
+    assert_eq!(records.iter().filter(|r| r.state == 1).count(), 3);
 }

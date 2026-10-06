@@ -61,6 +61,10 @@ enum ErrorReason {
   ERROR_REASON_FIELD_INVALID = 400;
   ERROR_REASON_FIELD_REQUIRED = 401;
   ERROR_REASON_CHANGE_ID_AMBIGUOUS = 402;
+  // PutApprovalGroup.group.member_role / PutReviewPolicy.policy.minimum_role
+  // is below the WRITER (Developer) review evaluator eligibility floor.
+  // INVALID_ARGUMENT; field identifies the rejected threshold.
+  ERROR_REASON_APPROVAL_ROLE_BELOW_ELIGIBILITY_FLOOR = 403;
 
   // Preconditions & conflicts (5xx)
   ERROR_REASON_LIFECYCLE_STATE = 500;

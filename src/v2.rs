@@ -1,11 +1,14 @@
 //! Shared v2 client behavior. Transport adapters retain key and connection ownership.
 pub mod account_metadata;
+pub mod approval_groups;
 pub mod client;
 pub mod custodial_recovery;
 pub mod identity_management;
 pub mod invitation;
+pub mod invitation_code;
 pub mod notifications;
 pub mod passkey_label;
+pub mod people;
 pub mod read_budget;
 pub mod spool_settings;
 use crate::StreamingShape;

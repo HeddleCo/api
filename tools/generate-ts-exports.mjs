@@ -65,6 +65,7 @@ copyFileSync("packages/typescript/runtime/v2-invitation.ts", join(v2Root, "invit
 copyFileSync("packages/typescript/runtime/v2-invitation-code.ts", join(v2Root, "invitation-code.ts"));
 copyFileSync("packages/typescript/runtime/v2-people.ts", join(v2Root, "people.ts"));
 copyFileSync("packages/typescript/runtime/v2-approval-groups.ts", join(v2Root, "approval-groups.ts"));
+copyFileSync("packages/typescript/runtime/v2-membership-floor.ts", join(v2Root, "membership-floor.ts"));
 copyFileSync("packages/typescript/runtime/v2-passkey-label.ts", join(v2Root, "passkey-label.ts"));
 copyFileSync("packages/typescript/runtime/v2-account-metadata.ts", join(v2Root, "account-metadata.ts"));
 copyFileSync("packages/typescript/runtime/v2-notifications.ts", join(v2Root, "notifications.ts"));

@@ -118,6 +118,10 @@ message SpoolOverview {
   // Caller-filtered projection, never a complete replacement record. Both
   // default_thread and default_review_policy omit deleted/unreadable targets.
   SpoolSettings settings = 6;
+  // One RevokeGrant entry per caller-visible grant, with target.entity=grant.
+  // Protected grants carry POLICY Requirement.error membership-floor advice;
+  // PutGrant entries also advertise below-ADMINISTRATOR role changes per grant.
+  // Never add hidden grant targets. See administration.md for atomic gates.
   repeated ActionAvailability actions = 7;
   repeated SectionStatus sections = 8;
   string slug = 9;

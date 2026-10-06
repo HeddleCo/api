@@ -45,6 +45,8 @@ python3 tools/verify-alpha39-guards.py rust
 python3 tools/verify-alpha39-guards.py ts
 python3 tools/verify-alpha39-people-groups-guards.py rust
 python3 tools/verify-alpha39-people-groups-guards.py ts
+python3 tools/verify-alpha40-membership-guards.py rust
+python3 tools/verify-alpha40-membership-guards.py ts
 node tests/review-probe.mjs
 node tools/verify-owner-authz-cutover.mjs
 node tools/verify-ts-vectors.mjs

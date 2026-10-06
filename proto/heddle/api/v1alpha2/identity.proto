@@ -801,6 +801,8 @@ message RemoveHandleResponse {
 // otherwise carry caller-bound account authority. confirmation_handle MUST
 // exactly equal the account's current handle. Reusing client_operation_id
 // returns the original outcome without deleting or canceling anything twice.
+// Grant cascades on surviving shared spools MUST preserve the membership floors
+// and their grant-management disclosure gate (administration.md).
 message DeleteAccountRequest {
   string client_operation_id = 1;
   string confirmation_handle = 2;

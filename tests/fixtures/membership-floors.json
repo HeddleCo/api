@@ -1,0 +1,1335 @@
+{
+  "now": {
+    "seconds": 100,
+    "nanos": 5
+  },
+  "cases": [
+    {
+      "name": "self_revoke_own_personal_spool",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "owner"
+          },
+          "subject": "owner",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": true,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "other"
+          },
+          "subject": "other",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "owner"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 506,
+      "operation_authorized": true
+    },
+    {
+      "name": "admin_revokes_personal_owner",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "owner"
+          },
+          "subject": "owner",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": true,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "owner"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 506,
+      "operation_authorized": true
+    },
+    {
+      "name": "last_human_member",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "only"
+          },
+          "subject": "only",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "only"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 507,
+      "operation_authorized": true
+    },
+    {
+      "name": "last_administrator_revoke",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "last_administrator_demote",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 2,
+        "field": "grant.role",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "last_administrator_past_expiry",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 3,
+        "field": "grant.expires_at",
+        "expires_at": {
+          "seconds": 99,
+          "nanos": 0
+        }
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "last_administrator_expiry_now",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 3,
+        "field": "grant.expires_at",
+        "expires_at": {
+          "seconds": 100,
+          "nanos": 5
+        }
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "agents_never_count_as_members",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "human"
+          },
+          "subject": "human",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "delegation"
+          },
+          "subject": "delegation",
+          "role": 3,
+          "kind": "agent",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "human"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 507,
+      "operation_authorized": true
+    },
+    {
+      "name": "agents_never_count_as_administrators",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "writer"
+          },
+          "subject": "writer",
+          "role": 2,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "delegation"
+          },
+          "subject": "delegation",
+          "role": 3,
+          "kind": "agent",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 2,
+        "field": "grant.role",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "two_administrators_revoke_allowed",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "one"
+          },
+          "subject": "one",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "two"
+          },
+          "subject": "two",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "one"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "two_administrators_demotion_allowed",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "one"
+          },
+          "subject": "one",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "two"
+          },
+          "subject": "two",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "one"
+        },
+        "role": 2,
+        "field": "grant.role",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "hidden_member_unauthorized_preserves_refusal",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "hidden"
+          },
+          "subject": "hidden",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": false,
+      "reason": 300,
+      "operation_authorized": true,
+      "removed_rule": "508"
+    },
+    {
+      "name": "hidden_administrator_never_advertised",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "hidden"
+          },
+          "subject": "hidden",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "ancestor_grant_covers_descendant",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "direct"
+          },
+          "subject": "direct",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "subject": "inherited",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "direct"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "ancestor_last_admin_demotion",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "subject": "inherited",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "ancestor",
+          "id": "inherited"
+        },
+        "role": 2,
+        "field": "grant.role",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "ancestor_coverage_removed_last_member",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "subject": "inherited",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "ancestor",
+          "id": "inherited"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 507,
+      "operation_authorized": true
+    },
+    {
+      "name": "duplicate_human_grants_one_member",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "direct"
+          },
+          "subject": "same",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "subject": "same",
+          "role": 2,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "direct"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "personal_owner_retains_inherited_access",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "owner"
+          },
+          "subject": "owner",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": true,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "subject": "owner",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": true,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "owner"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "expired_alternate_admin_does_not_count",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "expired"
+          },
+          "subject": "expired",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": {
+            "seconds": 100,
+            "nanos": 5
+          }
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "expiry_one_nanosecond_future_live",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "admin"
+        },
+        "role": 3,
+        "field": "grant.expires_at",
+        "expires_at": {
+          "seconds": 100,
+          "nanos": 6
+        }
+      },
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "member_before_admin_precedence",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "only"
+          },
+          "subject": "only",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "only"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 507,
+      "operation_authorized": true
+    },
+    {
+      "name": "personal_owner_demotion_with_successor_allowed",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "owner"
+          },
+          "subject": "owner",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": true,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "successor"
+          },
+          "subject": "successor",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "owner"
+        },
+        "role": 1,
+        "field": "grant.role",
+        "expires_at": null
+      },
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "promotion_removes_two_inherited_members_atomically",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "one"
+          },
+          "subject": "one",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "two"
+          },
+          "subject": "two",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "ancestor",
+          "id": "one"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "changes": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "one"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "two"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        }
+      ],
+      "can_manage_grants": true,
+      "reason": 507,
+      "operation_authorized": true
+    },
+    {
+      "name": "account_cascade_removes_all_grants_to_last_admin",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "direct"
+          },
+          "subject": "account",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "subject": "account",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "direct"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "changes": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "direct"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        }
+      ],
+      "can_manage_grants": true,
+      "reason": 508,
+      "operation_authorized": true
+    },
+    {
+      "name": "cascade_cannot_remove_personal_owner",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "owner"
+          },
+          "subject": "owner",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": true,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "owner-inherited"
+          },
+          "subject": "owner",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": true,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "successor"
+          },
+          "subject": "successor",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "owner"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "changes": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "owner"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "owner-inherited"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        }
+      ],
+      "can_manage_grants": true,
+      "reason": 506,
+      "operation_authorized": true
+    },
+    {
+      "name": "atomic_administrator_handoff_allowed",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "admin"
+          },
+          "subject": "admin",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "successor"
+          },
+          "subject": "successor",
+          "role": 2,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "ancestor",
+          "id": "admin"
+        },
+        "role": 2,
+        "field": "grant",
+        "expires_at": null
+      },
+      "changes": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "admin"
+          },
+          "role": 2,
+          "field": "grant",
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "successor"
+          },
+          "role": 3,
+          "field": "grant",
+          "expires_at": null
+        }
+      ],
+      "can_manage_grants": true,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "unauthorized_operation_keeps_refusal_before_floor",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "one"
+          },
+          "subject": "one",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "two"
+          },
+          "subject": "two",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "one"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": false,
+      "reason": 300,
+      "operation_authorized": false,
+      "removed_rule": "authorization"
+    },
+    {
+      "name": "authorized_nonadministrator_removal_allowed",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "one"
+          },
+          "subject": "one",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "two"
+          },
+          "subject": "two",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "one"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "can_manage_grants": false,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "authorized_nonadministrator_account_cascade_allowed",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "direct"
+          },
+          "subject": "account",
+          "role": 2,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "subject": "account",
+          "role": 1,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "reader"
+          },
+          "subject": "reader",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "spool",
+          "id": "direct"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "changes": [
+        {
+          "grant": {
+            "spool": "spool",
+            "id": "direct"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "inherited"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        }
+      ],
+      "can_manage_grants": false,
+      "reason": 0,
+      "operation_authorized": true
+    },
+    {
+      "name": "hidden_descendant_floor_violation_keeps_opaque_refusal",
+      "candidates": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "one"
+          },
+          "subject": "one",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "two"
+          },
+          "subject": "two",
+          "role": 3,
+          "kind": "human",
+          "personal_owner": false,
+          "expires_at": null
+        }
+      ],
+      "change": {
+        "grant": {
+          "spool": "ancestor",
+          "id": "one"
+        },
+        "role": 0,
+        "field": "grant",
+        "expires_at": null
+      },
+      "changes": [
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "one"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        },
+        {
+          "grant": {
+            "spool": "ancestor",
+            "id": "two"
+          },
+          "role": 0,
+          "field": "grant",
+          "expires_at": null
+        }
+      ],
+      "can_manage_grants": false,
+      "reason": 300,
+      "operation_authorized": true,
+      "removed_rule": "507"
+    }
+  ]
+}

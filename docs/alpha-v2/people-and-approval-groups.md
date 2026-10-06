@@ -16,6 +16,7 @@ same handle namespace as `ResolveHandles`. IdentityService owns this read
 because identity metadata and the exact public directory lookup belong there,
 and an unscoped request composes membership across spools. SpoolService owns
 spool invitations and policy administration, not a cross-spool directory.
+`handle` is the canonical qualified string: clients pass it verbatim to `CreateInvitation.recipient.handle` / `explicit_member_handles`, and `kind` is presentation-only and must agree with the qualifier.
 
 `prefix` is literal text, not a glob, regex or fuzzy query. Normalize to NFC,
 then Unicode lowercase; compare the similarly normalized handle and display

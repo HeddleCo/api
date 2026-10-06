@@ -44,10 +44,13 @@ export function validateSuggestPrincipalsRequest(request: SuggestPrincipalsReque
 
 /** Public rows must have exactly the ID-free schema, including at JS boundaries. */
 export function validateSuggestedPrincipal(person: SuggestedPrincipal): void {
+  const qualifier = person.handle.includes(":") ? person.handle.slice(0, person.handle.indexOf(":")) : undefined;
+  const expectedKind = qualifier === undefined ? HandleKind.NATIVE :
+    qualifier === "gh" ? HandleKind.GITHUB : qualifier === "gitlab.com" ? HandleKind.GITLAB : undefined;
   const allowed = new Set(["$typeName", "handle", "displayName", "kind"]);
   if (Object.keys(person).some(key => !allowed.has(key)) || !person.handle || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(person.handle) || bytes(person.handle).length > 256 ||
     edgeWhitespace.test(person.handle) || controls.test(person.handle) || bytes(person.displayName).length > 1024 ||
-    controls.test(person.displayName) || ![HandleKind.NATIVE, HandleKind.GITHUB, HandleKind.GITLAB].includes(person.kind)) {
+    controls.test(person.displayName) || expectedKind === undefined || person.kind !== expectedKind) {
     throw new Error("Metadata: invalid public people metadata");
   }
 }

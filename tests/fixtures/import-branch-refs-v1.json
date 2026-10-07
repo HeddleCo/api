@@ -1,0 +1,619 @@
+{
+  "format_version": 1,
+  "max_ref_bytes": 1024,
+  "vectors": [
+    {
+      "id": "main",
+      "ref_name": "refs/heads/main",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 15,
+      "canonical_digest_hex": "15e22b6056d26c3daefb890c630e7befad1a0be97b53345c7701259d9f957416"
+    },
+    {
+      "id": "reported_fff",
+      "ref_name": "refs/heads/feat/mcp=timeout",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 27,
+      "canonical_digest_hex": "282d17c9b467096f2cc77abd459a1510c9b403167ad501431b8af373a85c6dc1"
+    },
+    {
+      "id": "plus",
+      "ref_name": "refs/heads/a+b",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 14,
+      "canonical_digest_hex": "f24991a57f63e48af0153aaf7f254900821cdaba62e495e2025fcdef605f67a3"
+    },
+    {
+      "id": "at",
+      "ref_name": "refs/heads/user@x",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 17,
+      "canonical_digest_hex": "561a934e6d75441cfdccad6d94bb986cbdf07ac710f308d7bc0ba3e74263ad70"
+    },
+    {
+      "id": "comma",
+      "ref_name": "refs/heads/a,b",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 14,
+      "canonical_digest_hex": "d3625b947122eb63a0bf6988c74034531f60871baf57e29386e0137519d5cd29"
+    },
+    {
+      "id": "unicode",
+      "ref_name": "refs/heads/\u00fcnicode",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 19,
+      "canonical_digest_hex": "fbdbff59f2c629476ef82c2a2cd76a9fcae5a189bf5f3235fa2e5b1d15ef8fe9"
+    },
+    {
+      "id": "single_at",
+      "ref_name": "refs/heads/@",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 12,
+      "canonical_digest_hex": "7ef075104c4b050179ca7f7aff5ac41d15036d113e3cda1d0a31279e052c1a82"
+    },
+    {
+      "id": "head_component",
+      "ref_name": "refs/heads/feature/HEAD",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 23,
+      "canonical_digest_hex": "260c6d364d027cfac2733ae074489f62125653142c05e69f1cd2a9c784e51b03"
+    },
+    {
+      "id": "nested_dash",
+      "ref_name": "refs/heads/a/-b",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 15,
+      "canonical_digest_hex": "d617064372444f5957f3a78a6d7d022c3407633bd20077cb54f6938a42dd7afa"
+    },
+    {
+      "id": "nested_dot_suffix",
+      "ref_name": "refs/heads/a./b",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 15,
+      "canonical_digest_hex": "e9556782faff849ad8bd48cc3d826181d5105de7f1132546df99f2f4f4712ecb"
+    },
+    {
+      "id": "lock_case",
+      "ref_name": "refs/heads/a.LOCK",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 17,
+      "canonical_digest_hex": "45682cf88b5db5aa8da2b1e9f23a8290e7ba3ee390dd0c73cb626d9c5449e914"
+    },
+    {
+      "id": "lock_backup",
+      "ref_name": "refs/heads/a.lock.bak",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 21,
+      "canonical_digest_hex": "c36c7640a32b6314a99caadc64ba353471718ce9eb0157778521cf2029560724"
+    },
+    {
+      "id": "closing_bracket",
+      "ref_name": "refs/heads/a]b",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 14,
+      "canonical_digest_hex": "2abb8f6dad15a7851a86f179756270747d8f39a4713055982cff7080f55c7f93"
+    },
+    {
+      "id": "punctuation",
+      "ref_name": "refs/heads/a!#$%&'()+,;=<>`{|}",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 30,
+      "canonical_digest_hex": "3e83c2df619741dde171f3ba61714864e149ee1ab71a29d40326996899661eb8"
+    },
+    {
+      "id": "decomposed",
+      "ref_name": "refs/heads/e\u0301",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 14,
+      "canonical_digest_hex": "77c8b86e6d11e5cfca2a8cd66cdf1f20ef6b117a246fe0cfd84f7723817208bd"
+    },
+    {
+      "id": "composed",
+      "ref_name": "refs/heads/\u00e9",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 13,
+      "canonical_digest_hex": "04a1994c1947f568e8ab2ac9edfcb0376ab03410d08ee7975a38381f45115225"
+    },
+    {
+      "id": "supplementary",
+      "ref_name": "refs/heads/\ud800\udc00",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 15,
+      "canonical_digest_hex": "3b01d58c34f6e8b7055c47fa2a4cf2aabbe267ba56a8f26bcae18edc5f6c4185"
+    },
+    {
+      "id": "emoji",
+      "ref_name": "refs/heads/\ud83d\ude00",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 15,
+      "canonical_digest_hex": "b00180f9926396846d0c16ec448ad9c42050d4f8d675331f1773a46105136959"
+    },
+    {
+      "id": "unicode_control",
+      "ref_name": "refs/heads/a\u0085b",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 15,
+      "canonical_digest_hex": "6beea9b843e59d8f1bb1a8cd48ef6b40a77b16243f6619e4cf13fce3ed9b5ff0"
+    },
+    {
+      "id": "bidi_display",
+      "ref_name": "refs/heads/a\u202eb",
+      "git_valid": true,
+      "expected": "PASS",
+      "utf8_bytes": 16,
+      "canonical_digest_hex": "9e44aa879284c0e65b10c1a074e0de65e3bcd90ed043849071601097ea1ab00c"
+    },
+    {
+      "id": "empty",
+      "ref_name": "refs/heads/",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 11
+    },
+    {
+      "id": "dot",
+      "ref_name": "refs/heads/.",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 12
+    },
+    {
+      "id": "dotdot",
+      "ref_name": "refs/heads/..",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 13
+    },
+    {
+      "id": "double_dot",
+      "ref_name": "refs/heads/a..b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 15
+    },
+    {
+      "id": "reflog",
+      "ref_name": "refs/heads/a@{b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 15
+    },
+    {
+      "id": "checkout_expression",
+      "ref_name": "refs/heads/@{-1}",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 16
+    },
+    {
+      "id": "lock_suffix",
+      "ref_name": "refs/heads/a.lock",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 17
+    },
+    {
+      "id": "lock_component",
+      "ref_name": "refs/heads/a.lock/b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 19
+    },
+    {
+      "id": "leading_dot",
+      "ref_name": "refs/heads/a/.b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 15
+    },
+    {
+      "id": "leading_slash",
+      "ref_name": "refs/heads//a",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 13
+    },
+    {
+      "id": "trailing_slash",
+      "ref_name": "refs/heads/a/",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 13
+    },
+    {
+      "id": "double_slash",
+      "ref_name": "refs/heads/a//b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 15
+    },
+    {
+      "id": "trailing_dot",
+      "ref_name": "refs/heads/a.",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 13
+    },
+    {
+      "id": "leading_dash",
+      "ref_name": "refs/heads/-a",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 13
+    },
+    {
+      "id": "reserved_HEAD",
+      "ref_name": "refs/heads/HEAD",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 15
+    },
+    {
+      "id": "space",
+      "ref_name": "refs/heads/a b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "forbidden_126",
+      "ref_name": "refs/heads/a~b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "forbidden_94",
+      "ref_name": "refs/heads/a^b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "forbidden_58",
+      "ref_name": "refs/heads/a:b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "forbidden_63",
+      "ref_name": "refs/heads/a?b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "forbidden_42",
+      "ref_name": "refs/heads/a*b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "forbidden_91",
+      "ref_name": "refs/heads/a[b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "forbidden_92",
+      "ref_name": "refs/heads/a\\b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_0",
+      "ref_name": "refs/heads/a\u0000b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_1",
+      "ref_name": "refs/heads/a\u0001b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_2",
+      "ref_name": "refs/heads/a\u0002b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_3",
+      "ref_name": "refs/heads/a\u0003b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_4",
+      "ref_name": "refs/heads/a\u0004b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_5",
+      "ref_name": "refs/heads/a\u0005b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_6",
+      "ref_name": "refs/heads/a\u0006b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_7",
+      "ref_name": "refs/heads/a\u0007b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_8",
+      "ref_name": "refs/heads/a\bb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_9",
+      "ref_name": "refs/heads/a\tb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_10",
+      "ref_name": "refs/heads/a\nb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_11",
+      "ref_name": "refs/heads/a\u000bb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_12",
+      "ref_name": "refs/heads/a\fb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_13",
+      "ref_name": "refs/heads/a\rb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_14",
+      "ref_name": "refs/heads/a\u000eb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_15",
+      "ref_name": "refs/heads/a\u000fb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_16",
+      "ref_name": "refs/heads/a\u0010b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_17",
+      "ref_name": "refs/heads/a\u0011b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_18",
+      "ref_name": "refs/heads/a\u0012b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_19",
+      "ref_name": "refs/heads/a\u0013b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_20",
+      "ref_name": "refs/heads/a\u0014b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_21",
+      "ref_name": "refs/heads/a\u0015b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_22",
+      "ref_name": "refs/heads/a\u0016b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_23",
+      "ref_name": "refs/heads/a\u0017b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_24",
+      "ref_name": "refs/heads/a\u0018b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_25",
+      "ref_name": "refs/heads/a\u0019b",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_26",
+      "ref_name": "refs/heads/a\u001ab",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_27",
+      "ref_name": "refs/heads/a\u001bb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_28",
+      "ref_name": "refs/heads/a\u001cb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_29",
+      "ref_name": "refs/heads/a\u001db",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_30",
+      "ref_name": "refs/heads/a\u001eb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_31",
+      "ref_name": "refs/heads/a\u001fb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "control_127",
+      "ref_name": "refs/heads/a\u007fb",
+      "git_valid": false,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "wrong_namespace",
+      "ref_name": "refs/tags/main",
+      "git_valid": true,
+      "expected": "Canonical",
+      "utf8_bytes": 14
+    },
+    {
+      "id": "missing_namespace",
+      "ref_name": "main",
+      "git_valid": true,
+      "expected": "Canonical",
+      "utf8_bytes": 4
+    },
+    {
+      "id": "ascii_at_limit",
+      "ref_name": "refs/heads/",
+      "git_valid": true,
+      "expected": "PASS",
+      "repeat": "a",
+      "repeat_count": 1014,
+      "utf8_bytes": 1025,
+      "canonical_digest_hex": "7e39a7ea0a6785b22f22a7613ceaf5951afc9ce2d0148493bc541e15b9469120"
+    },
+    {
+      "id": "ascii_over_limit",
+      "ref_name": "refs/heads/",
+      "git_valid": true,
+      "expected": "Bounds",
+      "repeat": "a",
+      "repeat_count": 1015,
+      "utf8_bytes": 1026
+    },
+    {
+      "id": "utf8_at_limit",
+      "ref_name": "refs/heads/",
+      "git_valid": true,
+      "expected": "PASS",
+      "repeat": "\u00fc",
+      "repeat_count": 507,
+      "utf8_bytes": 1025,
+      "canonical_digest_hex": "f54170662c0e3f8677bb4851aa2d3215d91fa7e89c4c179d4eaa630f5ab6608a"
+    },
+    {
+      "id": "utf8_over_limit",
+      "ref_name": "refs/heads/",
+      "git_valid": true,
+      "expected": "Bounds",
+      "repeat": "\u00fc",
+      "repeat_count": 508,
+      "utf8_bytes": 1027
+    }
+  ],
+  "ordered_refs": [
+    "refs/heads/a",
+    "refs/heads/e\u0301",
+    "refs/heads/\u00e9",
+    "refs/heads/\ue000",
+    "refs/heads/\ud800\udc00",
+    "refs/heads/\ud83d\ude00"
+  ],
+  "manifest_digest_hex": "081650acc224add9377ca23b1365fe27f87b3875cac7185687720a8965309573"
+}

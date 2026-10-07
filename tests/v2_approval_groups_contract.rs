@@ -248,6 +248,53 @@ const ADMIN_VIEW: ApprovalGroupViewContext = ApprovalGroupViewContext {
 };
 
 #[test]
+fn explicit_member_handles_accept_gitlab_provider() {
+    let group = ApprovalGroupRecord {
+        explicit_member_handles: vec!["gitlab.com:Alice".into()],
+        ..Default::default()
+    };
+    assert_eq!(validate_approval_group(&group), Ok(()));
+}
+
+#[test]
+fn explicit_member_handles_accept_github_provider_host() {
+    let group = ApprovalGroupRecord {
+        explicit_member_handles: vec!["github.com:bob".into()],
+        ..Default::default()
+    };
+    assert_eq!(validate_approval_group(&group), Ok(()));
+}
+
+#[test]
+fn explicit_member_handles_reject_malformed_metadata() {
+    use heddle_api::v2::approval_groups::ApprovalGroupError;
+    for handle in [
+        "",
+        ":alice",
+        "GitLab.COM:x",
+        "gitlab:alice",
+        "gitlab..com:alice",
+        "-gitlab.com:alice",
+        "gitlab.com.:alice",
+        "alice\nsmith",
+        "alice\0",
+        " alice",
+        "alice ",
+        "12345678-1234-1234-1234-123456789abc",
+    ] {
+        let group = ApprovalGroupRecord {
+            explicit_member_handles: vec![handle.into()],
+            ..Default::default()
+        };
+        assert_eq!(
+            validate_approval_group(&group),
+            Err(ApprovalGroupError::Metadata),
+            "{handle:?}"
+        );
+    }
+}
+
+#[test]
 fn group_disclosure_vectors_require_members_read_and_admin_for_explicit_edits() {
     use heddle_api::v2::approval_groups::resolve_approval_group_members;
     let fixture: serde_json::Value =

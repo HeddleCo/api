@@ -250,6 +250,8 @@ service SpoolService {
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };
   }
+  // Deletion requires a per-request WebAuthn passkey assertion bound to the
+  // canonical request bytes, as for every HUMAN_VERIFICATION call.
   rpc DeleteSpool(DeleteSpoolRequest) returns (MutationResponse) {
     option (heddle.api.common.rpc_contract) = {
       deployment_targets: [
@@ -257,7 +259,7 @@ service SpoolService {
         DEPLOYMENT_TARGET_HEDDLE_DAEMON
       ]
       signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
-      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      signing_tier: SIGNING_TIER_HUMAN_VERIFICATION
       effect: RPC_EFFECT_DURABLE_WRITE
       retry_behavior: RETRY_BEHAVIOR_CLIENT_OPERATION_ID
       client_operation_id_required: true

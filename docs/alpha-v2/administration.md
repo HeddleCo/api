@@ -1,6 +1,6 @@
 # Spool invitations and People
 
-This is the normative alpha.43 API contract for hosts and clients. This API
+This is the normative alpha.44 API contract for hosts and clients. This API
 repository ships protobufs, route/signing metadata, portable Rust/TypeScript
 gates and vectors. Hosts implement storage, authentication, transactions and
 delivery; the helpers do not implement weft handlers. The

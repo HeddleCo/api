@@ -17,6 +17,11 @@ because identity metadata and the exact public directory lookup belong there,
 and an unscoped request composes membership across spools. SpoolService owns
 spool invitations and policy administration, not a cross-spool directory.
 `handle` is the canonical qualified string: clients pass it verbatim to `CreateInvitation.recipient.handle` / `explicit_member_handles`, and `kind` is presentation-only and must agree with the qualifier.
+Explicit approval-group handles use the same classification and metadata
+validation: unqualified handles are Native, `gh:name` is GitHub, and canonical
+lowercase DNS provider hosts containing a dot are GitLab kind. Thus both
+`gitlab.com:Alice` and `github.com:bob` are accepted verbatim. Malformed hosts,
+empty or UUID-shaped handles, edge whitespace and control characters are refused.
 
 `prefix` is literal text, not a glob, regex or fuzzy query. Normalize to NFC,
 then Unicode lowercase; compare the similarly normalized handle and display

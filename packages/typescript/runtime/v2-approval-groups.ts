@@ -4,7 +4,7 @@ import { ApprovalGroupViewSchema, ResourceRole } from "./administration_pb.js";
 import type { ApprovalGroupRecord, ApprovalGroupView, ReviewPolicyRecord } from "./administration_pb.js";
 import { SuggestedPrincipalSchema } from "./identity_pb.js";
 import type { SuggestedPrincipal } from "./identity_pb.js";
-import { comparePeopleHandles, validateSuggestedPrincipal } from "./people.js";
+import { classifyHandleKind, comparePeopleHandles, validateSuggestedPrincipal } from "./people.js";
 
 /** Host-resolved effective role over applicable current ancestor grants.
  * Missing/removed membership is UNSPECIFIED. Never use approval-time roles. */
@@ -36,7 +36,7 @@ function validateThreshold(role: ResourceRole): void {
 export function validateApprovalGroup(group: ApprovalGroupRecord): void {
   validateThreshold(group.memberRole);
   if (Object.keys(group).some(key => !["$typeName", "ref", "version", "name", "description", "memberRole", "explicitMemberHandles"].includes(key))) throw new Error("Metadata: invalid group input");
-  group.explicitMemberHandles.forEach(handle => validateSuggestedPrincipal(create(SuggestedPrincipalSchema, { handle, kind: 1 })));
+  group.explicitMemberHandles.forEach(handle => validateSuggestedPrincipal(create(SuggestedPrincipalSchema, { handle, kind: classifyHandleKind(handle) })));
 }
 /** Same reason, policy.minimum_role. */
 export function validateReviewPolicy(policy: ReviewPolicyRecord): void { validateThreshold(policy.minimumRole); }

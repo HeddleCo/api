@@ -71,13 +71,18 @@ pub fn validate_suggest_principals_request(
     Ok(())
 }
 
+/// Canonical handle namespace shared by people metadata and handle-only inputs.
+pub(crate) fn classify_handle_kind(handle: &str) -> Result<HandleKind, PeopleError> {
+    match handle.split_once(':') {
+        None => Ok(HandleKind::Native),
+        Some(("gh", _)) => Ok(HandleKind::Github),
+        Some((host, _)) if valid_provider_host(host) => Ok(HandleKind::Gitlab),
+        Some(_) => Err(PeopleError::Metadata),
+    }
+}
+
 pub(crate) fn validate_person(person: &SuggestedPrincipal) -> Result<(), PeopleError> {
-    let expected_kind = match person.handle.split_once(':') {
-        None => HandleKind::Native,
-        Some(("gh", _)) => HandleKind::Github,
-        Some((host, _)) if valid_provider_host(host) => HandleKind::Gitlab,
-        Some(_) => return Err(PeopleError::Metadata),
-    };
+    let expected_kind = classify_handle_kind(&person.handle)?;
     if person.handle.is_empty()
         || uuid_shaped_handle(&person.handle)
         || person.handle.len() > 256

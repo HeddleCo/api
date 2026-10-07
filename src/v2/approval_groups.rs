@@ -2,7 +2,7 @@
 use crate::heddle::api::v1alpha2::{
     ApprovalGroupRecord, ApprovalGroupView, ResourceRole, ReviewPolicyRecord, SuggestedPrincipal,
 };
-use crate::v2::people::validate_person;
+use crate::v2::people::{classify_handle_kind, validate_person};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
@@ -60,7 +60,7 @@ pub fn validate_approval_group(group: &ApprovalGroupRecord) -> Result<(), Approv
     for handle in &group.explicit_member_handles {
         validate_person(&SuggestedPrincipal {
             handle: handle.clone(),
-            kind: 1,
+            kind: classify_handle_kind(handle).map_err(|_| ApprovalGroupError::Metadata)? as i32,
             ..Default::default()
         })
         .map_err(|_| ApprovalGroupError::Metadata)?;

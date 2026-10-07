@@ -4,6 +4,7 @@ package heddle.api.v1alpha2;
 import "google/protobuf/timestamp.proto";
 import "heddle/api/common/contract.proto";
 import "heddle/api/common/errors.proto";
+import "heddle/api/common/types.proto";
 import "heddle/api/v1alpha2/common.proto";
 import "heddle/api/v1alpha2/import_authority.proto";
 import "heddle/api/v1alpha2/native_witness.proto";
@@ -44,6 +45,12 @@ message TransferSelection {
 }
 message FetchOpen {
   ThreadRef thread = 1;
+  // An exact State. Since alpha.42 it may also name a converted Git ancestor
+  // inside an authenticated HYBRID import floor (an older imported commit that
+  // is not any operation's State). The endpoint then proves membership with
+  // ImportAncestryPage frames (see that message) and the source pack carries
+  // exactly that State's tree closure, so a client can lazily materialize any
+  // older imported commit without re-fetching the whole floor.
   RevisionRef revision = 2;
   TransferSelection selection = 3;
   TransferCheckpoint checkpoint = 4;
@@ -323,6 +330,85 @@ message FetchComplete {
   Coverage closure = 3;
   repeated TransferObject missing = 4;
 }
+// One converted Git ancestor of a HYBRID import tip: the exact canonical State
+// bytes a source pack would carry, and nothing else. No tree or blob travels
+// here; the source pack still holds exactly the selected revision's closure.
+message ImportAncestorState {
+  heddle.api.common.StateId id = 1;
+  bytes canonical_state = 2;
+}
+// Imported Git ancestry of one delegated import tip, paged (alpha.42).
+//
+// A HYBRID import is ONE signed native operation per branch result slot; the
+// converted Git ancestors are States in that tip State's parent closure (the
+// "import floor"), not native operations, so ReplicationOperations cannot
+// carry them and a source pack carries only the selected State. This frame
+// carries the floor's States. The floor is already bound by signature: the
+// import operation's resulting_content_digest commits to the exact tip
+// Capture, the tip State commits to its parent StateIds, and every member
+// commits to its own parents, so the whole set is a Merkle closure rooted at
+// the signed tip. No additional signed floor digest or count exists or is
+// needed; member_count and page_count are endpoint bookkeeping that let the
+// receiver refuse early and detect truncation, never a source of trust.
+//
+// Receiver checks, all before installing anything:
+//  1. TransferReady.import_authority is present and was authenticated
+//     independently (descriptor root, owner, witness); signed_operation_digest
+//     is the digest of one of its `operations`, whose resulting frontier
+//     selects a carried ReplicationOperations original whose Capture State is
+//     `tip`. A page for any other operation, Thread or tip is rejected.
+//  2. Every page of one floor repeats identical thread, tip,
+//     signed_operation_digest, coverage, page_count and member_count; pages
+//     arrive in page_index order 0..page_count-1 with no gap or repeat; the
+//     sum of carried States equals member_count.
+//  3. Every carried State decodes canonically and its content-derived
+//     StateId equals `id` (address check). A duplicate id is rejected.
+//  4. Every carried State is reachable from `tip` through carried States by
+//     State parents. A State outside the floor is rejected, whatever it is.
+//  5. COVERAGE_FLOOR: the closure is complete. Every parent named by `tip` or
+//     by a carried State is either carried or is the source State of one of
+//     the tip operation's causal parent operations (the signed frontier; a
+//     continuation import's parents are exactly those, so its floor is
+//     empty). A missing middle State fails here. This set is exactly the
+//     signed floor, and it is what a fresh clone must install.
+//  6. COVERAGE_PATH: TransferReady.current names a carried State (an older
+//     imported commit); completeness below it is not required. The endpoint
+//     uses this to prove FetchOpen.revision lies inside the floor.
+//  7. The receiver installs the States only after the whole Fetch verified
+//     (the Complete frame), together with the selected revision's closure,
+//     and records the floor so its local visibility walk stops at the import
+//     tip instead of descending through every converted commit.
+//
+// Every delegated import operation in the carried causal ancestry whose tip
+// has parents outside the signed frontier MUST be covered by exactly one
+// page set; an uncovered floor fails the Fetch (a clone that installs only
+// the tip shows nothing but an embargo placeholder).
+//
+// Paging and limits. A page carries at most 4096 States and, like every
+// frame, fits ReadBudget.max_frame_bytes. Pages are charged against the
+// receiver's transfer metadata budget separately from the 100000-object
+// source pack limit, because they are States, not pack objects. A receiver
+// MUST accept at least 131072 States and 256 MiB per Fetch so the largest
+// known HYBRID history (boost, 94794 commits) fits with headroom; endpoints
+// refuse larger imports at Prepare rather than truncating a floor.
+message ImportAncestryPage {
+  ThreadRef thread = 1;
+  heddle.api.common.StateId tip = 2;
+  // Digest of the exact SignedDelegatedImportOperationV1 in
+  // TransferReady.import_authority.operations (heddle-signed-delegated-import-operation-v1).
+  bytes signed_operation_digest = 3;
+  enum Coverage {
+    COVERAGE_UNSPECIFIED = 0;
+    COVERAGE_FLOOR = 1;
+    COVERAGE_PATH = 2;
+  }
+  Coverage coverage = 4;
+  uint32 page_index = 5;
+  uint32 page_count = 6;
+  // Total States across all pages of this floor or path.
+  uint32 member_count = 7;
+  repeated ImportAncestorState states = 8;
+}
 message FetchServerFrame {
   oneof body {
     TransferReady ready = 1;
@@ -340,6 +426,10 @@ message FetchServerFrame {
     ThreadGenesisRecord thread_genesis = 7;
     ProviderInlineChunk provider_inline = 8;
     ProviderOffer provider_offer = 9;
+    // Converted Git ancestors of a HYBRID import tip, States only. Accepted
+    // only when Ready carries an authenticated import_authority; see the
+    // message for the receiver's checks. May arrive anywhere before Complete.
+    ImportAncestryPage import_ancestry = 10;
   }
 }
 // Bulk content availability for an already admitted Thread capture. Metadata

@@ -1144,6 +1144,59 @@ UNKNOWN is always a permitted size estimate, including connected GitHub. A host 
 use the GitHub repository API size; an UNKNOWN answer has git_size_kib=0. Estimates
 are advisory and do not replace the signed logical-job budget or publication sum.
 
+### Fetch carries converted ancestry; inside-floor revisions (alpha.42)
+
+An import publishes ONE native operation per branch; the converted Git
+ancestors are States in the tip State's parent closure (the **import floor**),
+never operations. `ReplicationOperations` therefore cannot carry them and a
+source pack carries only the selected revision's closure. Before alpha.42 a
+fresh receiver got the tip alone and withheld every file as an unresolved
+private ancestor (HeddleCo/weft#2617). `FetchServerFrame.import_ancestry`
+(`ImportAncestryPage`) now carries the floor, States only, paged.
+
+The floor needs no new signed commitment. `resulting_content_digest` commits to
+the exact tip Capture, the tip State commits to its parent StateIds and every
+member to its own, so the set is a Merkle closure rooted at the signed tip.
+The receiver verifies exactly that: each State's content-derived StateId equals
+its `id`; every carried State is reachable from `tip` through carried States;
+under `COVERAGE_FLOOR` every parent named by the tip or a member is carried or
+is the source State of one of the tip operation's causal parents (the signed
+frontier, so a continuation import whose State parents are exactly its causal
+parents' States has an empty floor and no pages); under `COVERAGE_PATH` the
+selected revision is among the carried States. Pages of one floor repeat
+identical `thread`, `tip`, `signed_operation_digest`, `coverage`, `page_count`
+and `member_count`, arrive in index order without gap or repeat, and sum to
+`member_count`. `member_count` and `page_count` are endpoint bookkeeping for
+early refusal and truncation detection, not trust. A page naming a Thread,
+tip or operation digest outside `TransferReady.import_authority.operations`
+and the carried originals is rejected, as is a tip, frontier State or the
+synthetic genesis base among the members.
+
+Every delegated import operation in the carried causal ancestry whose tip has
+parents outside its signed frontier MUST be covered by one `COVERAGE_FLOOR`
+page set, unless the client named that tip in
+`TransferSelection.exclude_revisions`, which declares it already holds and
+recorded the floor. An uncovered floor fails the Fetch; a receiver never
+installs an import tip without its converted ancestry.
+
+`FetchOpen.revision` may name a converted ancestor inside an authenticated
+floor. The endpoint resolves it through its floor membership, sends the tip's
+operation and causal ancestry as usual, proves membership with a
+`COVERAGE_PATH` (or `COVERAGE_FLOOR`) page set rooted at that tip, and the
+source pack carries exactly the selected State's tree closure. The receiver
+validates that closure without the tip's reference proofs or signed entry
+privacy, which belong to the tip's own salted tree, installs it, and records
+source possession of the older commit. Receivers record every verified floor
+(tip plus members, derived from the installed States by walking the tip's
+parents to the frontier) so their local visibility walk stops at the import
+tip exactly as the host's `native_source_state_lineage` does, instead of
+walking every converted commit and giving up at its bound.
+
+Bounds: a page carries at most 4096 States and fits `ReadBudget.max_frame_bytes`;
+pages are charged separately from the 100000-object source pack limit; a
+receiver MUST accept at least 131072 States and 256 MiB of ancestry per Fetch
+so boost's 94794 commits fit. Larger imports are refused at Prepare.
+
 ## Foreign dependencies (alpha.34 hard cut)
 
 A Thread keeps one immutable IMPORT or NATIVE origin for life. Both public

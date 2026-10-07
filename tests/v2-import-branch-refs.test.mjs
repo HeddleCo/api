@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { create } from '@bufbuild/protobuf';
 import * as api from '../packages/typescript/dist/v1alpha2/index.js';
 import * as authority from '../packages/typescript/dist/v1alpha2/import-authority.js';
-import { signingDigest } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
+import { signingDigest, verifySignature } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/import-branch-refs-v1.json', import.meta.url)));
 const bytes = (n, length) => new Uint8Array(length).fill(n);
@@ -36,12 +36,18 @@ for (const v of fixture.vectors) test(`shared Git branch ref: ${v.id}`, () => {
   }
 });
 
-test('shared UTF-8 byte ordering and exact manifest digest', () => {
+test('shared UTF-8 byte ordering and exact signed manifest digest', async () => {
   const refs = fixture.ordered_refs;
   authority.validateImportScope(scope(refs));
   const m = manifest(refs);
   authority.validateImportManifest(m);
   assert.equal(hex(authority.manifestDigest(m)), fixture.manifest_digest_hex);
+  const key = new Uint8Array(Buffer.from(fixture.manifest_public_key_hex, 'hex'));
+  const signature = new Uint8Array(Buffer.from(fixture.manifest_signature_hex, 'hex'));
+  await verifySignature(key, authority.manifestDigest(m), signature);
+  const normalized = manifest(refs);
+  normalized.slots[1].refName = 'refs/heads/é';
+  await assert.rejects(verifySignature(key, authority.manifestDigest(normalized), signature), rejects('Signature'));
   const wrong = [...refs];
   [wrong[3], wrong[4]] = [wrong[4], wrong[3]];
   assert.throws(() => authority.validateImportScope(scope(wrong)), rejects('Canonical'));

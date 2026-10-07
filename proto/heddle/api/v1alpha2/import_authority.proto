@@ -51,7 +51,9 @@ message ImportOwnerChainV1 {
 // Reservation identity is (spool UUID, full ref, slot_id), not slot_id alone.
 // Full refs are exclusive across all non-terminal jobs in the same spool.
 message ImportBranchLimitV1 {
-  string ref_name = 1; // Full refs/heads/...; sorted unique UTF-8 bytes.
+  // Full refs/heads/<branch>; literal Git --branch syntax, max 1024 UTF-8 bytes.
+  // Signed exactly without normalization; sorted unique by unsigned UTF-8 bytes.
+  string ref_name = 1;
   ImportGitHashAlgorithm hash_algorithm = 2;
   ImportRefMode ref_mode = 3;
   bytes pinned_commit_oid = 4; // Raw 20/32 bytes; empty only for OBSERVE.

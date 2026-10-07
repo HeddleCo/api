@@ -44,7 +44,7 @@
     },
     {
       "id": "unicode",
-      "ref_name": "refs/heads/\u00fcnicode",
+      "ref_name": "refs/heads/ünicode",
       "git_valid": true,
       "expected": "PASS",
       "utf8_bytes": 19,
@@ -116,7 +116,7 @@
     },
     {
       "id": "decomposed",
-      "ref_name": "refs/heads/e\u0301",
+      "ref_name": "refs/heads/é",
       "git_valid": true,
       "expected": "PASS",
       "utf8_bytes": 14,
@@ -124,7 +124,7 @@
     },
     {
       "id": "composed",
-      "ref_name": "refs/heads/\u00e9",
+      "ref_name": "refs/heads/é",
       "git_valid": true,
       "expected": "PASS",
       "utf8_bytes": 13,
@@ -132,7 +132,7 @@
     },
     {
       "id": "supplementary",
-      "ref_name": "refs/heads/\ud800\udc00",
+      "ref_name": "refs/heads/𐀀",
       "git_valid": true,
       "expected": "PASS",
       "utf8_bytes": 15,
@@ -140,7 +140,7 @@
     },
     {
       "id": "emoji",
-      "ref_name": "refs/heads/\ud83d\ude00",
+      "ref_name": "refs/heads/😀",
       "git_valid": true,
       "expected": "PASS",
       "utf8_bytes": 15,
@@ -148,7 +148,7 @@
     },
     {
       "id": "unicode_control",
-      "ref_name": "refs/heads/a\u0085b",
+      "ref_name": "refs/heads/ab",
       "git_valid": true,
       "expected": "PASS",
       "utf8_bytes": 15,
@@ -156,7 +156,7 @@
     },
     {
       "id": "bidi_display",
-      "ref_name": "refs/heads/a\u202eb",
+      "ref_name": "refs/heads/a‮b",
       "git_valid": true,
       "expected": "PASS",
       "utf8_bytes": 16,
@@ -549,7 +549,7 @@
     },
     {
       "id": "control_127",
-      "ref_name": "refs/heads/a\u007fb",
+      "ref_name": "refs/heads/ab",
       "git_valid": false,
       "expected": "Canonical",
       "utf8_bytes": 14
@@ -574,9 +574,9 @@
       "git_valid": true,
       "expected": "PASS",
       "repeat": "a",
-      "repeat_count": 1014,
-      "utf8_bytes": 1025,
-      "canonical_digest_hex": "7e39a7ea0a6785b22f22a7613ceaf5951afc9ce2d0148493bc541e15b9469120"
+      "repeat_count": 1013,
+      "utf8_bytes": 1024,
+      "canonical_digest_hex": "86298010f8c9f55ca715c1048e153af43487828d44e210ace9056ced19c95fec"
     },
     {
       "id": "ascii_over_limit",
@@ -584,36 +584,38 @@
       "git_valid": true,
       "expected": "Bounds",
       "repeat": "a",
-      "repeat_count": 1015,
-      "utf8_bytes": 1026
+      "repeat_count": 1014,
+      "utf8_bytes": 1025
     },
     {
       "id": "utf8_at_limit",
-      "ref_name": "refs/heads/",
+      "ref_name": "refs/heads/a",
       "git_valid": true,
       "expected": "PASS",
-      "repeat": "\u00fc",
-      "repeat_count": 507,
-      "utf8_bytes": 1025,
-      "canonical_digest_hex": "f54170662c0e3f8677bb4851aa2d3215d91fa7e89c4c179d4eaa630f5ab6608a"
+      "repeat": "ü",
+      "repeat_count": 506,
+      "utf8_bytes": 1024,
+      "canonical_digest_hex": "04b42eb9143eb171cd69f5b1dd51c3db540885995ca26cea53f5e187fa2537ec"
     },
     {
       "id": "utf8_over_limit",
-      "ref_name": "refs/heads/",
+      "ref_name": "refs/heads/a",
       "git_valid": true,
       "expected": "Bounds",
-      "repeat": "\u00fc",
-      "repeat_count": 508,
-      "utf8_bytes": 1027
+      "repeat": "ü",
+      "repeat_count": 507,
+      "utf8_bytes": 1026
     }
   ],
   "ordered_refs": [
     "refs/heads/a",
-    "refs/heads/e\u0301",
-    "refs/heads/\u00e9",
-    "refs/heads/\ue000",
-    "refs/heads/\ud800\udc00",
-    "refs/heads/\ud83d\ude00"
+    "refs/heads/é",
+    "refs/heads/é",
+    "refs/heads/",
+    "refs/heads/𐀀",
+    "refs/heads/😀"
   ],
-  "manifest_digest_hex": "081650acc224add9377ca23b1365fe27f87b3875cac7185687720a8965309573"
+  "manifest_digest_hex": "081650acc224add9377ca23b1365fe27f87b3875cac7185687720a8965309573",
+  "manifest_public_key_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+  "manifest_signature_hex": "cfe16286ffa053230b2e549e2bbbd56381777e58f2d9400e04d327e0fb13cc22a9464c27fa8c80d6f52b67ae122fbb1004a9af0c060013e46b6820f930910001"
 }

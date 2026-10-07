@@ -9,6 +9,9 @@ gate. Alpha.33 makes the explicit hard cut documented in
 **api → heddle → weft → tapestry**. This contract neither deploys that cascade
 nor establishes that the original runtime defect is fixed.
 
+Alpha.43 accepts Git branch-ref syntax, including non-ASCII UTF-8, with exact
+byte identity and byte ordering; see [the breaking notice](../../breaking/0.31.0-alpha.43.md).
+
 The core conformance bytes are frozen in
 [import-authority-host-witness-v1.json](../../tests/fixtures/import-authority-host-witness-v1.json).
 Whole-repository scenarios add the separate
@@ -92,10 +95,34 @@ as a fallback around the new delegation/publication requirement.
 Canonical HTTPS v1 is conservative: lowercase DNS labels, no userinfo, query,
 fragment, port or percent escapes. Authority is an origin with no slash. Source
 URLs have nonempty ASCII unreserved path segments, no `.`/`..` or trailing slash.
-Provider IDs are lowercase ASCII `[a-z0-9-]{1,64}`; branch refs are full
-`refs/heads/...`, ASCII `[A-Za-z0-9/_-.]`, no empty/dot-leading/`.lock` segments,
-`..`, `@{`, trailing slash/dot or duplicate refs. Converter version is explicit,
-nonempty ASCII, at most 128 bytes. Never silently normalize after signing.
+Provider IDs are lowercase ASCII `[a-z0-9-]{1,64}`. Branch refs are full
+`refs/heads/<branch>` where the literal suffix satisfies
+[`git check-ref-format --branch`](https://git-scm.com/docs/git-check-ref-format),
+without previous-checkout expansion or normalization: nonempty, no leading `-`,
+and not the exact name `HEAD`. No empty, dot-leading or `.lock`-ending path
+components, `..`, `@{`, trailing slash/dot, ASCII bytes 0x00–0x20 or 0x7f,
+or `~^:?*[\` are permitted. `@` alone is a valid branch suffix. Unicode control
+code points outside those ASCII bytes are accepted, as Git accepts them.
+
+Full refs are at most **1024 UTF-8 bytes, including `refs/heads/`**, an explicit
+contract resource bound (Git's syntax check has no length bound). Overlength
+valid refs reject with `Bounds`; invalid syntax rejects with `Canonical`.
+The same rules apply to scope branches and committed manifest slots. Refs
+are byte identities represented by valid UTF-8 protobuf strings; non-UTF-8 Git
+byte names cannot be represented by this wire schema and MUST refuse without
+lossy conversion. TypeScript unpaired surrogates MUST refuse rather than encode
+as U+FFFD. Neither NFC/NFD normalization, case folding, URI decoding nor display
+escaping may change a signed ref. Signatures cover its exact UTF-8 bytes via
+u32-big-endian byte length framing. Scope refs and manifest `(ref, slot_id)`
+keys sort by unsigned UTF-8 bytes, with the numeric slot as a tie breaker.
+UI display safety (including bidi controls), HTML escaping, URL component
+escaping and storage/path encoding are consumers' jobs, never name restrictions.
+The [shared ref corpus](../../tests/fixtures/import-branch-refs-v1.json) is read by
+both validators and checked against Sley and Git; dependency and encoding
+rationale is in the alpha.43 breaking notice.
+
+Converter version is explicit, nonempty ASCII, at most 128 bytes. Never silently
+normalize after signing.
 The launch registry has exactly two provider identities. `github` denotes the
 connected GitHub adapter: an authenticated caller-owned account connection and
 its exact repository/installation grant select credential custody. `public-git`

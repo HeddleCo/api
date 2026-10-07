@@ -13,6 +13,7 @@ pub const OPERATION_DOMAIN: &str = "heddle-delegated-import-operation-v1";
 pub const MANIFEST_DOMAIN: &str = "heddle-import-result-manifest-v1";
 pub const PUBLICATION_DOMAIN: &str = "heddle-import-publication-payload-v1";
 pub const MAX_BRANCHES: usize = 256;
+pub const MAX_REF_BYTES: usize = 1024;
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub const MAX_BUNDLE_BYTES: usize = 1024 * 1024;
 pub const MAX_DELEGATION_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
@@ -188,25 +189,37 @@ fn validity(start: i64, end: i64, now: i64, current: bool) -> Result<(), Reject>
     }
     Ok(())
 }
-fn branch(value: &ImportBranchLimitV1) -> Result<(), Reject> {
-    if !value.ref_name.starts_with("refs/heads/")
-        || value.ref_name.len() > 1024
-        || value.ref_name.ends_with('/')
-        || value.ref_name.ends_with('.')
-        || value.ref_name.contains("..")
-        || value.ref_name.contains("//")
-        || value.ref_name.contains("@{")
-        || value
-            .ref_name
+/// Mirrors sley-refs 0.11.0 check_refname_format plus Git's branch-only
+/// leading-dash/HEAD checks. Sley remains a dev-only reference so the contract
+/// does not pull its filesystem/config/object stack into WASM consumers.
+/// See the shared corpus and differential property tests; never normalize.
+fn branch_ref(name: &str) -> Result<(), Reject> {
+    let short = name.strip_prefix("refs/heads/").ok_or(Reject::Canonical)?;
+    if short.is_empty()
+        || short.starts_with('-')
+        || short == "HEAD"
+        || name.ends_with('/')
+        || name.ends_with('.')
+        || name.contains("..")
+        || name.contains("//")
+        || name.contains("@{")
+        || name
             .split('/')
             .any(|p| p.starts_with('.') || p.ends_with(".lock"))
-        || !value
-            .ref_name
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"/_-.".contains(&b))
+        || name.bytes().any(|b| {
+            b <= b' ' || b == 0x7f || matches!(b, b'~' | b'^' | b':' | b'?' | b'*' | b'[' | b'\\')
+        })
     {
         return Err(Reject::Canonical);
     }
+    if name.len() > MAX_REF_BYTES {
+        return Err(Reject::Bounds);
+    }
+    Ok(())
+}
+
+fn branch(value: &ImportBranchLimitV1) -> Result<(), Reject> {
+    branch_ref(&value.ref_name)?;
     let size = match value.hash_algorithm {
         1 => 20,
         2 => 32,
@@ -1502,10 +1515,8 @@ pub fn validate_manifest(m: &ImportResultManifestV1) -> Result<(), Reject> {
     for (i, s) in m.slots.iter().enumerate() {
         width(&s.signed_operation_digest, 32)?;
         width(&s.resulting_frontier_digest, 32)?;
-        if !s.ref_name.starts_with("refs/heads/") || !s.ref_name.is_ascii() {
-            return Err(Reject::Canonical);
-        }
-        if s.ref_name.len() > 1024 || s.result_bytes == 0 {
+        branch_ref(&s.ref_name)?;
+        if s.result_bytes == 0 {
             return Err(Reject::Bounds);
         }
         if i > 0 && (&m.slots[i - 1].ref_name, m.slots[i - 1].slot_id) >= (&s.ref_name, s.slot_id) {

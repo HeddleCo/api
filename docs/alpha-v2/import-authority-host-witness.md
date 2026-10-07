@@ -1165,7 +1165,8 @@ frontier, so a continuation import whose State parents are exactly its causal
 parents' States has an empty floor and no pages); under `COVERAGE_PATH` the
 selected revision is among the carried States. Pages of one floor repeat
 identical `thread`, `tip`, `signed_operation_digest`, `coverage`, `page_count`
-and `member_count`, arrive in index order without gap or repeat, and sum to
+`member_count` and `floor_tiers`, may arrive in any order, are contiguous
+after sorting by `page_index` without gap or repeat, and sum to
 `member_count`. `member_count` and `page_count` are endpoint bookkeeping for
 early refusal and truncation detection, not trust. A page naming a Thread,
 tip or operation digest outside `TransferReady.import_authority.operations`
@@ -1188,12 +1189,14 @@ validates that closure without the tip's reference proofs or signed entry
 privacy, which belong to the tip's own salted tree, installs it, and records
 source possession of the older commit. Receivers record every verified floor
 (tip plus members, derived from the installed States by walking the tip's
-parents to the frontier) so their local visibility walk stops at the import
-tip exactly as the host's `native_source_state_lineage` does, instead of
+parents to the frontier), together with the whole publication/Thread
+Private/Restricted tier summary (`floor_tiers`). Their local visibility walk
+stops at floor members after applying that summary; the tip's causal parents
+(its frontier) are still walked, matching `native_source_state_lineage`, instead of
 walking every converted commit and giving up at its bound.
 
 Bounds: a page carries at most 4096 States and fits `ReadBudget.max_frame_bytes`;
-pages are charged separately from the 100000-object source pack limit; a
+pages use a separate ancestry budget, charged separately from the 100000-object source pack limit; a
 receiver MUST accept at least 131072 States and 256 MiB of ancestry per Fetch
 so boost's 94794 commits fit. Larger imports are refused at Prepare.
 

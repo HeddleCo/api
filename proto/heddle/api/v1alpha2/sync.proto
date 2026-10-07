@@ -337,6 +337,30 @@ message ImportAncestorState {
   heddle.api.common.StateId id = 1;
   bytes canonical_state = 2;
 }
+// Current disclosure constraints for the complete (publication, Thread) floor,
+// including on COVERAGE_PATH pages. Not signed ancestry proof or authority.
+// The endpoint MUST send every positive native_import_floor_tiers row from
+// weft migration 019: only private/restricted, grouped by (tier, label), with
+// tier_rows counting ALL member tier rows, across all sources/origins. Public,
+// internal and team tiers do not constrain inherited ancestry and are omitted.
+// Send an explicitly present empty summary when no such rows exist. Refuse
+// Fetch when native_import_floor_refs.incomplete_members is nonzero or a
+// member node is incomplete; never represent an incomplete floor as empty.
+// Every page repeats the identical summary, sorted by (tier, label), without
+// duplicate pairs; receivers reject absent summaries and invalid/zero rows.
+message ImportFloorTierSummary {
+  message Row {
+    enum Tier {
+      TIER_UNSPECIFIED = 0;
+      TIER_PRIVATE = 1;
+      TIER_RESTRICTED = 2;
+    }
+    Tier tier = 1;
+    string label = 2;
+    uint64 tier_rows = 3;
+  }
+  repeated Row rows = 1;
+}
 // Imported Git ancestry of one delegated import tip, paged (alpha.42).
 //
 // A HYBRID import is ONE signed native operation per branch result slot; the
@@ -358,11 +382,13 @@ message ImportAncestorState {
 //     selects a carried ReplicationOperations original whose Capture State is
 //     `tip`. A page for any other operation, Thread or tip is rejected.
 //  2. Every page of one floor repeats identical thread, tip,
-//     signed_operation_digest, coverage, page_count and member_count; pages
-//     arrive in page_index order 0..page_count-1 with no gap or repeat; the
+//     signed_operation_digest, coverage, page_count, member_count and floor_tiers;
+//     pages may arrive in any order; after sorting by page_index they are
+//     contiguous 0..page_count-1 with no gap or repeat; the
 //     sum of carried States equals member_count.
 //  3. Every carried State decodes canonically and its content-derived
-//     StateId equals `id` (address check). A duplicate id is rejected.
+//     StateId equals `id` (address check). A duplicate id within one page set
+//     is rejected; different floors may share converted Git States.
 //  4. Every carried State is reachable from `tip` through carried States by
 //     State parents. A State outside the floor is rejected, whatever it is.
 //  5. COVERAGE_FLOOR: the closure is complete. Every parent named by `tip` or
@@ -376,8 +402,9 @@ message ImportAncestorState {
 //     uses this to prove FetchOpen.revision lies inside the floor.
 //  7. The receiver installs the States only after the whole Fetch verified
 //     (the Complete frame), together with the selected revision's closure,
-//     and records the floor so its local visibility walk stops at the import
-//     tip instead of descending through every converted commit.
+//     and records the floor and floor_tiers. The local visibility walk stops
+//     at floor MEMBERS, applying the whole floor tier summary to each member.
+//     The tip's causal parents (its frontier) are still walked.
 //
 // Every delegated import operation in the carried causal ancestry whose tip
 // has parents outside the signed frontier MUST be covered by exactly one
@@ -386,7 +413,7 @@ message ImportAncestorState {
 //
 // Paging and limits. A page carries at most 4096 States and, like every
 // frame, fits ReadBudget.max_frame_bytes. Pages are charged against the
-// receiver's transfer metadata budget separately from the 100000-object
+// receiver's separate ancestry budget, apart from the 100000-object
 // source pack limit, because they are States, not pack objects. A receiver
 // MUST accept at least 131072 States and 256 MiB per Fetch so the largest
 // known HYBRID history (boost, 94794 commits) fits with headroom; endpoints
@@ -408,6 +435,8 @@ message ImportAncestryPage {
   // Total States across all pages of this floor or path.
   uint32 member_count = 7;
   repeated ImportAncestorState states = 8;
+  // Required-present, whole-floor current disclosure summary, even for PATH.
+  ImportFloorTierSummary floor_tiers = 9;
 }
 message FetchServerFrame {
   oneof body {

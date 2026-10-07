@@ -9,6 +9,23 @@ use prost_reflect::{DescriptorPool, Value};
 
 #[test]
 fn spool_deletion_requires_per_request_human_verification_in_both_descriptors() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/unary-signing-human-alpha43.json"))
+            .expect("human signing fixture");
+    assert_eq!(fixture["signing_tier"], "HUMAN_VERIFICATION");
+    let route = fixture["route"].as_str().expect("fixture route");
+    assert_eq!(
+        method_descriptor(route)
+            .expect("fixture method")
+            .signing_tier,
+        SigningTier::HumanVerification,
+    );
+    let frozen: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/unary-signing-v1.json"))
+            .expect("frozen signing fixture");
+    for (key, value) in frozen.as_object().expect("frozen vector object") {
+        assert_eq!(&fixture[key], value, "frozen field {key}");
+    }
     let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
     let extension = pool
         .get_extension_by_name("heddle.api.common.rpc_contract")

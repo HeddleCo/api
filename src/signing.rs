@@ -544,6 +544,7 @@ mod tests {
     struct UnaryVector {
         identity: String,
         route: String,
+        signing_tier: String,
         timestamp_millis: i64,
         nonce_hex: String,
         request_hex: String,
@@ -694,6 +695,13 @@ mod tests {
         let vector: UnaryVector =
             serde_json::from_str(include_str!("../tests/fixtures/unary-signing-v1.json"))
                 .expect("valid fixture");
+        assert_eq!(vector.signing_tier, "HUMAN_VERIFICATION");
+        assert_eq!(
+            crate::v2::method_descriptor(&vector.route)
+                .expect("fixture method")
+                .signing_tier,
+            crate::heddle::api::common::SigningTier::HumanVerification,
+        );
         let actual = unary_bytes(
             &vector.identity,
             &vector.route,

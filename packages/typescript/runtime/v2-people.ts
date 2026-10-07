@@ -42,15 +42,22 @@ export function validateSuggestPrincipalsRequest(request: SuggestPrincipalsReque
   }
 }
 
+/** Canonical handle namespace shared by people metadata and handle-only inputs. */
+export function classifyHandleKind(handle: string): HandleKind {
+  const qualifier = handle.includes(":") ? handle.slice(0, handle.indexOf(":")) : undefined;
+  const kind = qualifier === undefined ? HandleKind.NATIVE :
+    qualifier === "gh" ? HandleKind.GITHUB : validProviderHost(qualifier) ? HandleKind.GITLAB : undefined;
+  if (kind === undefined) throw new Error("Metadata: invalid public people metadata");
+  return kind;
+}
+
 /** Public rows must have exactly the ID-free schema, including at JS boundaries. */
 export function validateSuggestedPrincipal(person: SuggestedPrincipal): void {
-  const qualifier = person.handle.includes(":") ? person.handle.slice(0, person.handle.indexOf(":")) : undefined;
-  const expectedKind = qualifier === undefined ? HandleKind.NATIVE :
-    qualifier === "gh" ? HandleKind.GITHUB : validProviderHost(qualifier) ? HandleKind.GITLAB : undefined;
+  const expectedKind = classifyHandleKind(person.handle);
   const allowed = new Set(["$typeName", "handle", "displayName", "kind"]);
   if (Object.keys(person).some(key => !allowed.has(key)) || !person.handle || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(person.handle) || bytes(person.handle).length > 256 ||
     edgeWhitespace.test(person.handle) || controls.test(person.handle) || bytes(person.displayName).length > 1024 ||
-    controls.test(person.displayName) || expectedKind === undefined || person.kind !== expectedKind) {
+    controls.test(person.displayName) || person.kind !== expectedKind) {
     throw new Error("Metadata: invalid public people metadata");
   }
 }

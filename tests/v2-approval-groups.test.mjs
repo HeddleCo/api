@@ -8,6 +8,20 @@ import { ErrorDetailSchema, ErrorReason } from "../packages/typescript/dist/comm
 import { approvalGroupView, effectiveResourceRole, groupApprovalCount, validateApprovalGroup, validateApprovalGroupView, validateReviewPolicy } from "../packages/typescript/dist/v1alpha2/approval-groups.js";
 
 const adminView = { canReadMembers: true, isAdministrator: true };
+test("explicit_member_handles_accept_gitlab_provider", () => {
+  const group = create(ApprovalGroupRecordSchema, { explicitMemberHandles: ["gitlab.com:Alice"] });
+  assert.doesNotThrow(() => validateApprovalGroup(group));
+});
+test("explicit_member_handles_accept_github_provider_host", () => {
+  const group = create(ApprovalGroupRecordSchema, { explicitMemberHandles: ["github.com:bob"] });
+  assert.doesNotThrow(() => validateApprovalGroup(group));
+});
+test("explicit_member_handles_reject_malformed_metadata", () => {
+  for (const handle of ["", ":alice", "GitLab.COM:x", "gitlab:alice", "gitlab..com:alice", "-gitlab.com:alice", "gitlab.com.:alice", "alice\nsmith", "alice\0", " alice", "alice ", "12345678-1234-1234-1234-123456789abc"]) {
+    const group = create(ApprovalGroupRecordSchema, { explicitMemberHandles: [handle] });
+    assert.throws(() => validateApprovalGroup(group), /Metadata:/, JSON.stringify(handle));
+  }
+});
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/role-approval-groups.json", import.meta.url)));
 for (const v of fixture.cases) {
   test(v.name, () => {

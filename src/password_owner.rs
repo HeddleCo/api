@@ -591,7 +591,7 @@ fn verify_owner_signature(
     key_id.update(b"heddle-key-v1");
     key_id.update(1_u32.to_be_bytes());
     key_id.update(current_owner_public_key);
-    if signature.signer_key_id != key_id.finalize().as_slice() {
+    if signature.signer_key_id != key_id.finalize()[..] {
         return Err(PasswordOwnerError::Signature);
     }
     let signature: &[u8; 64] = signature

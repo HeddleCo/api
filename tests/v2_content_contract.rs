@@ -278,3 +278,85 @@ fn source_search_hits_use_one_exact_typed_location_and_explicit_match_domain() {
         "heddle.api.v1alpha2.PrincipalRef"
     );
 }
+
+#[test]
+fn fetch_carries_hybrid_import_ancestry_as_paged_states_only() {
+    let pool = DescriptorPool::decode(FILE_DESCRIPTOR_SET).expect("compiled descriptor");
+    let frame = pool
+        .get_message_by_name("heddle.api.v1alpha2.FetchServerFrame")
+        .expect("source frame");
+    let ancestry = frame
+        .get_field_by_name("import_ancestry")
+        .expect("converted ancestry of an import tip (alpha.42)");
+    assert_eq!(ancestry.number(), 10);
+    assert_eq!(
+        ancestry
+            .kind()
+            .as_message()
+            .expect("paged ancestry message")
+            .full_name(),
+        "heddle.api.v1alpha2.ImportAncestryPage"
+    );
+    assert!(
+        pool.get_message_by_name("heddle.api.v1alpha2.PublishContentClientFrame")
+            .expect("publication frame")
+            .get_field_by_name("import_ancestry")
+            .is_none(),
+        "a courier never publishes converted history; the import job does"
+    );
+    let page = pool
+        .get_message_by_name("heddle.api.v1alpha2.ImportAncestryPage")
+        .expect("page");
+    for (name, number) in [
+        ("thread", 1),
+        ("tip", 2),
+        ("signed_operation_digest", 3),
+        ("coverage", 4),
+        ("page_index", 5),
+        ("page_count", 6),
+        ("member_count", 7),
+        ("states", 8),
+    ] {
+        let field = page.get_field_by_name(name).expect(name);
+        assert_eq!(field.number(), number, "{name}");
+    }
+    assert_eq!(
+        page.get_field_by_name("tip")
+            .expect("tip")
+            .kind()
+            .as_message()
+            .expect("exact StateId")
+            .full_name(),
+        "heddle.api.common.StateId"
+    );
+    let states = page.get_field_by_name("states").expect("states");
+    assert!(states.is_list());
+    let state = states
+        .kind()
+        .as_message()
+        .expect("ancestor message")
+        .clone();
+    assert_eq!(state.full_name(), "heddle.api.v1alpha2.ImportAncestorState");
+    assert_eq!(
+        state
+            .fields()
+            .map(|f| f.name().to_string())
+            .collect::<Vec<_>>(),
+        ["id", "canonical_state"],
+        "States only: no tree, blob or pack extent travels in an ancestry page"
+    );
+    let coverage = pool
+        .get_enum_by_name("heddle.api.v1alpha2.ImportAncestryPage.Coverage")
+        .expect("coverage enum");
+    assert_eq!(
+        coverage
+            .values()
+            .map(|v| (v.name().to_string(), v.number()))
+            .collect::<Vec<_>>(),
+        [
+            ("COVERAGE_UNSPECIFIED".to_string(), 0),
+            ("COVERAGE_FLOOR".to_string(), 1),
+            ("COVERAGE_PATH".to_string(), 2),
+        ]
+    );
+}

@@ -18,6 +18,12 @@ export const MAX_REF_BYTES=1024;
 export const MAX_BRANCHES=256,MAX_RECORD_BYTES=65536,MAX_BUNDLE_BYTES=1048576;
 export const MAX_DELEGATION_WINDOW_SECONDS=7n*24n*60n*60n;
 export const MAX_COMMIT_REQUEST_BYTES=2*MAX_BUNDLE_BYTES;
+/** Refs in one ResolveImportSource/ProviderRefsRequest page (proto: max 512). */
+export const MAX_IMPORT_SOURCE_REF_PAGE=512;
+/** Branch/tag refs in a host's COMPLETE current discovery checked by Prepare and Commit.
+ * Equals weft's retained-ref cap. Discovered refs are pin evidence, not signed content:
+ * the signed scope still selects at most MAX_BRANCHES. Names are at most MAX_REF_BYTES. */
+export const MAX_IMPORT_SOURCE_REFS=4096;
 export const CANCELLATION_NAMESPACE="heddle-import-cancel-v1";
 export const signedPermissionDigest=(v:api.SignedImportMemberPermissionV1)=>signingDigest("heddle-signed-import-member-permission-v1",api.SignedImportMemberPermissionV1Schema,v);
 export const signedGenesisDigest=(v:api.SignedImportGenesisAuthorityV1)=>signingDigest("heddle-signed-import-genesis-authority-v1",api.SignedImportGenesisAuthorityV1Schema,v);
@@ -113,10 +119,19 @@ function validateRetainedImportSource(selector:api.ImportSourceSelectionV1,scope
   if(resolveImportProvider(source,selector.connection?"github":undefined)!==scope.provider
     ||(!selector.connection&&selector.providerRepositoryId!==scope.sourceUrl))reject("SourceSelection");
 }
+/** One discovery page (at most MAX_IMPORT_SOURCE_REF_PAGE refs). */
 export function validateRepositoryHashAlgorithm(source:ProviderRepository, known:boolean):void {
+  validateSourceRefs(source,known,MAX_IMPORT_SOURCE_REF_PAGE);
+}
+/** A host's complete current discovery for Prepare/Commit: known algorithm, at most MAX_IMPORT_SOURCE_REFS refs. */
+export function validateDiscoveredRepository(source:ProviderRepository):void {
+  validateSourceRefs(source,true,MAX_IMPORT_SOURCE_REFS);
+}
+function validateSourceRefs(source:ProviderRepository, known:boolean, maxRefs:number):void {
   const size=source.hashAlgorithm===1?40:source.hashAlgorithm===2?64:source.hashAlgorithm===0&&!known?undefined:reject("Version");
-  if(source.refs.length>512)reject("Bounds");
+  if(source.refs.length>maxRefs)reject("Bounds");
   source.refs.forEach((r,i)=>{
+    if(utf8.encode(r.name).length>MAX_REF_BYTES)reject("Bounds");
     if(r.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
     if(i&&compare(utf8.encode(source.refs[i-1]!.name),utf8.encode(r.name))>=0)reject("Canonical");
     if(r.headOid){if(size===undefined)reject("Version");if(r.headOid.length!==size)reject("SourceSelection");if(!/^[0-9a-f]+$/.test(r.headOid))reject("Canonical");}
@@ -126,7 +141,7 @@ export function validateDiscoveredImportScope(scope:api.ImportPermissionScopeV1,
   validateDiscoveredImportScopeInner(scope,source);
 }
 function validateDiscoveredImportScopeInner(scope:api.ImportPermissionScopeV1, source:ProviderRepository):void {
-  validateRepositoryHashAlgorithm(source,true);
+  validateDiscoveredRepository(source);
   if(scope.sourceUrl!==source.cloneUrl)reject("SourceSelection");
   for(const b of scope.branches){
     if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
@@ -261,7 +276,7 @@ export async function validateImportCommitRequest(request:CommitImportJobRequest
   const provider=resolveImportProvider(currentSource,currentSource.connection?resolvedProvider:undefined);
   if(provider!==resolvedProvider)reject("SourceSelection");
   validateImportConfiguration(configuration);validateProviderSupport(provider,configuration);
-  validateRepositoryHashAlgorithm(currentSource,true);
+  validateDiscoveredRepository(currentSource);
   if(source.hashAlgorithm!==currentSource.hashAlgorithm)reject("SourceSelection");
   // Frozen pins survive branch movement; known OIDs cannot be hidden in OBSERVE.
   for(const b of scope.branches){

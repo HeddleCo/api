@@ -18,6 +18,14 @@ pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub const MAX_BUNDLE_BYTES: usize = 1024 * 1024;
 pub const MAX_DELEGATION_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
 pub const MAX_COMMIT_REQUEST_BYTES: usize = 2 * MAX_BUNDLE_BYTES;
+/// Refs in one `ResolveImportSource`/`ProviderRefsRequest` page (proto: max 512).
+pub const MAX_IMPORT_SOURCE_REF_PAGE: usize = 512;
+/// Branch/tag refs in a host's COMPLETE current discovery checked by Prepare and
+/// Commit. Equals weft's retained-ref cap, so weft should use this constant.
+/// Discovered refs are pin evidence, not signed content: the signed scope still
+/// selects at most `MAX_BRANCHES`. Each name is at most `MAX_REF_BYTES`, so the
+/// list is bounded at roughly 4096 x 1.1 KiB (about 4.4 MiB) in memory.
+pub const MAX_IMPORT_SOURCE_REFS: usize = 4096;
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
 
 record!(AuthorizationSignature, signer_key_id:b, signature:b);
@@ -388,10 +396,25 @@ fn validate_retained_import_source(
     Ok(())
 }
 
-/// Discovery may report unknown. Preparing/signing requires known=true; no SHA-1 fallback.
+/// One discovery page (at most `MAX_IMPORT_SOURCE_REF_PAGE` refs). Discovery may
+/// report unknown. Preparing/signing requires known=true; no SHA-1 fallback.
 pub fn validate_repository_hash_algorithm(
     source: &ProviderRepository,
     known: bool,
+) -> Result<(), Reject> {
+    validate_source_refs(source, known, MAX_IMPORT_SOURCE_REF_PAGE)
+}
+
+/// A host's complete current discovery for Prepare/Commit: known hash algorithm
+/// and at most `MAX_IMPORT_SOURCE_REFS` sorted, unique refs.
+pub fn validate_discovered_repository(source: &ProviderRepository) -> Result<(), Reject> {
+    validate_source_refs(source, true, MAX_IMPORT_SOURCE_REFS)
+}
+
+fn validate_source_refs(
+    source: &ProviderRepository,
+    known: bool,
+    max_refs: usize,
 ) -> Result<(), Reject> {
     let size = match source.hash_algorithm {
         1 => Some(40),
@@ -399,10 +422,13 @@ pub fn validate_repository_hash_algorithm(
         0 if !known => None,
         _ => return Err(Reject::Version),
     };
-    if source.refs.len() > 512 {
+    if source.refs.len() > max_refs {
         return Err(Reject::Bounds);
     }
     for (i, r) in source.refs.iter().enumerate() {
+        if r.name.len() > MAX_REF_BYTES {
+            return Err(Reject::Bounds);
+        }
         if r.hash_algorithm != source.hash_algorithm {
             return Err(Reject::SourceSelection);
         }
@@ -438,7 +464,7 @@ fn validate_discovered_import_scope_inner(
     scope: &ImportPermissionScopeV1,
     source: &ProviderRepository,
 ) -> Result<(), Reject> {
-    validate_repository_hash_algorithm(source, true)?;
+    validate_discovered_repository(source)?;
     if scope.source_url != source.clone_url {
         return Err(Reject::SourceSelection);
     }
@@ -835,7 +861,7 @@ pub fn validate_commit_request(
     }
     validate_import_configuration(configuration)?;
     validate_provider_support(provider, configuration)?;
-    validate_repository_hash_algorithm(current_source, true)?;
+    validate_discovered_repository(current_source)?;
     if source.hash_algorithm != current_source.hash_algorithm {
         return Err(Reject::SourceSelection);
     }

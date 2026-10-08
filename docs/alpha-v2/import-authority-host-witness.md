@@ -208,6 +208,20 @@ the independently resolved repository supplied to `validate_commit_request` /
 `validateImportCommitRequest`. Clearing incoming refs cannot bypass known-OID
 pinning. A frozen PINNED_COMMIT retains its selected commit when the branch head
 moves after Prepare; Commit never substitutes or requires the new head.
+
+The independently resolved source given to Prepare and Commit is the host's
+**complete** current discovery, not one ResolveImportSource page. It may hold up
+to `MAX_IMPORT_SOURCE_REFS` (**4096**) branch/tag refs, checked by
+`validate_discovered_repository` / `validateDiscoveredRepository`; more refuse
+with `Bounds`. A single discovery page stays bounded by
+`MAX_IMPORT_SOURCE_REF_PAGE` (512) through `validate_repository_hash_algorithm` /
+`validateRepositoryHashAlgorithm`. 4096 is weft's retained-ref cap after
+`refs/pull/*` and other unimported namespaces are dropped; hosts should use the
+exported constant rather than restating it (api#388). Discovered refs are
+pin evidence and never enter a signed record (the signed scope still selects at
+most `MAX_BRANCHES`), so no signature payload grows with them. Every discovered
+ref name is at most 1024 UTF-8 bytes (`MAX_REF_BYTES`, the signed-ref bound) or
+refuses with `Bounds`, so a complete discovery stays below about 4.4 MiB.
 Current source grants, selected-commit availability, revocation and atomic
 mutation remain host responsibilities. Exact accepted replay retains its semantics.
 

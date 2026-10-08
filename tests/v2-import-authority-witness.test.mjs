@@ -319,6 +319,33 @@ for(const v of fixture.source_vectors.prepare_negative)test(`alpha25 Prepare sou
  assert.throws(()=>authority.prepareImportSourceScope(vector(v.request), vector('source_public_sha256'), undefined, vector('import_configuration'), scope.destinationVersion),expected(v.expected));
  authority.prepareImportSourceScope(vector('prepare_public_sha256'), vector('source_public_sha256'), undefined, vector('import_configuration'), scope.destinationVersion);console.log(`ALPHA25 REJECT then PASS prepare.${v.id}: ${v.expected}`);
 });
+// HeddleCo/api#388: complete discovery is bounded by weft's retained-ref cap, not the page size.
+function withRefs(source,count){
+ const r=create(api.ProviderRepositorySchema,source),width=r.hashAlgorithm===1?40:64;
+ r.refs=Array.from({length:count},(_,i)=>create(api.ProviderRefSchema,{name:`refs/tags/v${String(i).padStart(5,'0')}`,headOid:i.toString(16).padStart(width,'0'),kind:2,hashAlgorithm:r.hashAlgorithm}));
+ return r;
+}
+test('api#388 Prepare accepts complete discovery up to MAX_IMPORT_SOURCE_REFS',()=>{
+ assert.equal(authority.MAX_IMPORT_SOURCE_REFS,4096);assert.equal(authority.MAX_IMPORT_SOURCE_REF_PAGE,512);
+ const prepare=source=>authority.prepareImportSourceScope(vector('prepare_public_sha256'),source,undefined,vector('import_configuration'),vector('scope').destinationVersion);
+ const base=vector('source_public_sha256');
+ prepare(withRefs(base,600));prepare(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS));
+ assert.throws(()=>prepare(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS+1)),expected('Bounds'));
+ const unsorted=withRefs(base,authority.MAX_IMPORT_SOURCE_REFS);[unsorted.refs[100],unsorted.refs[101]]=[unsorted.refs[101],unsorted.refs[100]];
+ assert.throws(()=>prepare(unsorted),expected('Canonical'));
+ const duplicate=withRefs(base,authority.MAX_IMPORT_SOURCE_REFS);duplicate.refs[101].name=duplicate.refs[100].name;
+ assert.throws(()=>prepare(duplicate),expected('Canonical'));
+ const long=withRefs(base,600);long.refs.at(-1).name='refs/tags/'+'z'.repeat(authority.MAX_REF_BYTES-10);prepare(long);
+ long.refs.at(-1).name+='z';assert.throws(()=>prepare(long),expected('Bounds'));
+ authority.validateRepositoryHashAlgorithm(withRefs(base,authority.MAX_IMPORT_SOURCE_REF_PAGE),true);
+ assert.throws(()=>authority.validateRepositoryHashAlgorithm(withRefs(base,authority.MAX_IMPORT_SOURCE_REF_PAGE+1),true),expected('Bounds'));
+});
+test('api#388 Commit accepts complete discovery up to MAX_IMPORT_SOURCE_REFS',async()=>{
+ const commit=source=>authority.validateImportCommitRequest(vector('commit_request'),'github',source,vector('import_configuration'));
+ const base=vector('source_connected');
+ await commit(withRefs(base,600));await commit(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS));
+ await assert.rejects(commit(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS+1)),expected('Bounds'));
+});
 test('alpha25 unknown discovery is retryable, optional converter recommendation and SHA256 observe',()=>{
  authority.validateRepositoryHashAlgorithm(vector('source_unknown'),false);
  authority.validateImportConfiguration(vector('configuration_no_default'));

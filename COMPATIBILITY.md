@@ -1,5 +1,14 @@
 # Compatibility policy
 
+HYBRID import Prepare and Commit accept a complete current source discovery of
+up to 4096 branch/tag refs (HeddleCo/api#388), up from 512. The new exported
+constants are `MAX_IMPORT_SOURCE_REFS` (4096, weft's retained-ref cap) and
+`MAX_IMPORT_SOURCE_REF_PAGE` (512), with `validate_discovered_repository` /
+`validateDiscoveredRepository` for complete discovery. One ResolveImportSource
+page stays capped at 512 refs. Every discovered ref name must now be at most
+1024 UTF-8 bytes (`MAX_REF_BYTES`), or the source refuses with `Bounds`. No tags,
+wire bytes or signed records change, and no fixture vector changes.
+
 Content and symbol search index only each Thread's current source tips
 (HeddleCo/weft#2433). `SearchRequest.source_scope` keeps its tags and
 `SEARCH_SOURCE_HISTORY_RETAINED` (2) stays defined, but both retained-history

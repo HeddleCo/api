@@ -61,3 +61,12 @@ for a genuine prior receipt, or `expected_revision` for explicitly typed native
 bootstrap. The bootstrap cannot acknowledge a write. Responses carry actual
 server-derived billing owner, verified Spool-genesis digest and current Sharing
 frontier under the same authorization/source-generation fence.
+
+## Conformance fixture continuity
+
+The Git acceptance feature adds only enum metadata value
+`MANDATORY_PROTOCOL_FEATURE_GIT_PUSH_ACCEPTANCE_V1 = 2` to the shared witness
+fixture. Its alpha.34 continuity manifest classifies enums as changed metadata;
+only that fixture's whole-file digest is refreshed. Every historical signed or
+canonical record hash, unchanged metadata hash, and protocol vector is preserved.
+Descriptor tests still require the exact complete enum inventory.

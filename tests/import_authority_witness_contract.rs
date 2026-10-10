@@ -120,6 +120,23 @@ use heddle_api::{hybrid_codec as codec, import_authority as import, witness_trus
 use prost::Message;
 use serde_json::Value;
 
+#[test]
+fn git_push_acceptance_feature_has_a_stable_additive_wire_value() {
+    assert_eq!(host::MandatoryProtocolFeature::Unspecified as i32, 0);
+    assert_eq!(
+        host::MandatoryProtocolFeature::ImportAuthorityHostWitnessV1 as i32,
+        1
+    );
+    assert_eq!(
+        host::MandatoryProtocolFeature::GitPushAcceptanceV1 as i32,
+        2
+    );
+    assert_eq!(
+        host::MandatoryProtocolFeature::GitPushAcceptanceV1.as_str_name(),
+        "MANDATORY_PROTOCOL_FEATURE_GIT_PUSH_ACCEPTANCE_V1"
+    );
+}
+
 fn bytes(v: &Value) -> Vec<u8> {
     hex::decode(v.as_str().expect("hex string")).expect("fixed hex bytes")
 }

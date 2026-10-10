@@ -590,7 +590,7 @@
         "bundle_vectors": "8362eb49a67fc773215b7c807aa9a5a8b4f1e8d832c09d33b9cecd48396c948a",
         "effective_owner_expiry_vectors": "2c1121b5be237063f7cd3cee93496027f0e65a909609afd37d5838a2a3b2cc76"
       },
-      "sha256": "4d800bcf64bcac322131e1a9579b8f403db140c23c3ded7a9bbadfa5c76b768b"
+      "sha256": "ec1d1460b67f2c77c136beb56f4ff1abeac2da600d3b5b729baa0a698a96e202"
     },
     "tests/fixtures/foreign-dependencies-alpha34.json": {
       "sha256": "56d319976b8e299f0014242b15bcce8f98fa23b3ab8614395b87e8d1e9c0fcc7",

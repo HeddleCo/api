@@ -51,6 +51,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "FetchClientFrame.body",
         "StreamFrame.body",
         "PublishContentClientFrame.body",
+        // This is also one bounded publication carrier: the receiver enforces
+        // frame and cumulative history budgets. Keep the generated wire shape
+        // inline; the lint exception adds no allocation or memory-layout change.
+        "GitPushHistoryFrame.body",
         "FetchServerFrame.body",
         "PublishContentServerFrame.body",
         "CreateSpoolRequest.ownership",

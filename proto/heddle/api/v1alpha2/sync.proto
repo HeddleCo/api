@@ -6,6 +6,7 @@ import "heddle/api/common/contract.proto";
 import "heddle/api/common/errors.proto";
 import "heddle/api/common/types.proto";
 import "heddle/api/v1alpha2/common.proto";
+import "heddle/api/v1alpha2/git_transport.proto";
 import "heddle/api/v1alpha2/import_authority.proto";
 import "heddle/api/v1alpha2/native_witness.proto";
 import "heddle/api/v1alpha2/owner_records.proto";
@@ -311,6 +312,9 @@ message PublicationReceipt {
   ImportPublicProofBundleV1 import_authority = 9;
   // Explicit native arm; reject simultaneous import/native carriers.
   NativePublicProofBundleV1 native_authority = 10;
+  // Present only for an atomic Git command, after every historical source
+  // closure and the expected-old fence committed in the native transaction.
+  GitPushAcceptanceReceipt git_acceptance = 11;
   oneof outcome {
     Applied accepted = 7;
     heddle.api.common.CallFailure rejected = 8;
@@ -489,6 +493,105 @@ message PublishContentOpen {
   ImportPublicProofBundleV1 import_authority = 10;
   // Explicit native arm; reject simultaneous import/native carriers.
   NativePublicProofBundleV1 native_authority = 11;
+  // Opt-in native Git admission. Ordinary source publication remains unchanged.
+  GitPushAcceptance git_acceptance = 12;
+}
+// The native publisher authenticates the complete opening with its own PoP.
+// transport_token authenticates a distinct Git actor; it never supplies native
+// authorship. Fresh session tokens do not change semantic command identity.
+message GitPushAcceptance {
+  bytes expected_revision = 1;
+  bytes expected_git_commit = 2;
+  bytes accepted_git_commit = 3;
+  bytes gateway_publisher = 4;
+  string transport_token = 5;
+  // Parent-before-child, exact independently validated source packs. The main
+  // opening is the final tip; these entries contain every other required
+  // historical revision. The receiver charges all entries to one budget.
+  repeated GitPushHistoryRevision history = 6;
+  // Exact registry-resolved Git scope, compared to the authenticated session.
+  GitTransportScope scope = 7;
+  // Mandatory presence; observed server Thread generation, including zero.
+  // Checked with expected_revision under the native writer row lock.
+  optional int64 expected_native_generation = 8;
+  // Mandatory 32-byte heddle.git.acceptance.originals.v1 digest over the
+  // complete distinct signed operation manifest across every uploaded revision.
+  // Binds exact canonical and signature bytes; transport batching is irrelevant.
+  bytes originals_digest = 9;
+}
+message GitPushHistoryRevision {
+  string client_operation_id = 1;
+  PublishContentOpen open = 2;
+}
+message GitPushHistoryFrame {
+  uint32 index = 1;
+  oneof body {
+    PackChunk pack = 2;
+    TransferSidecar sidecar = 3;
+    PublishContentFinish finish = 4;
+    ReplicationOperations operations = 5;
+    ThreadGenesisRecord thread_genesis = 6;
+  }
+}
+message GitPushAcceptanceReceipt {
+  bytes expected_revision = 1;
+  bytes expected_git_commit = 2;
+  bytes accepted_git_commit = 3;
+  bytes gateway_publisher = 4;
+  string actor_account_id = 5;
+  bytes actor_credential_digest = 6;
+  bytes request_digest = 7;
+  int64 native_generation = 8;
+  // Exact uploaded SourcePack inventories, including the selected tip. These
+  // remain bound to the command even when an ancestor was already retained in
+  // a different physical representation.
+  repeated PublicationReceipt history = 9;
+  // Exact sorted unique blob closure reconstructed by the receiver. Used to
+  // recheck native redaction locks on reads/retries; never caller-authored.
+  repeated bytes blob_ids = 10;
+  // Authoritative source generation at the expected-old native head fence.
+  int64 previous_native_generation = 11;
+  // Server-derived durable native source markers, in exactly the same ordered
+  // Thread/State set as history. Native first inventories and their historical
+  // Sharing frontiers are stable and may differ from a later valid upload.
+  repeated GitHistoryRevision retained_history = 12;
+}
+// POST /git/history/authorize. Exact current disclosure of a durable command's
+// complete history; a response must never be cached as future authorization.
+message GitHistoryAuthorizeRequest {
+  string transport_token = 1;
+  GitTransportScope scope = 2;
+  string client_operation_id = 3;
+  // With no operation ID, authorize an existing native head for first Git
+  // discovery. Exactly one selector is required; this is never push acceptance.
+  bytes expected_revision = 4;
+}
+message GitHistoryAuthorizeResponse {
+  PublicationReceipt receipt = 1;
+  int64 authorization_epoch = 2;
+  int64 source_generation = 3;
+  GitHistoryBootstrap bootstrap = 4;
+  // Current authoritative nearest owning ancestor's account, not Git actor.
+  string billing_owner_account_id = 5;
+  // Verified immutable SignedSpoolOwnerGenesis body digest.
+  bytes spool_genesis = 6;
+  // Current selected Thread Sharing frontier under the same disclosure fence.
+  bytes sharing_policy_version = 7;
+}
+message GitHistoryRevision {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2;
+  ObjectAddress accepted_inventory = 3;
+  bytes sharing_policy_version = 4;
+}
+message GitHistoryBootstrap {
+  ThreadRef thread = 1;
+  RevisionRef head = 2;
+  // Complete retained native source graph, including dependency Threads.
+  // Fetch each revision independently; a tip pack is not historical content.
+  repeated GitHistoryRevision revisions = 3;
+  repeated bytes blob_ids = 4;
+  bytes closure_digest = 5;
 }
 message PublishContentFinish {
   // Names the server's current committed transfer plan, not a caller assertion
@@ -514,6 +617,9 @@ message PublishContentClientFrame {
     // the selected Thread or a required source dependency. A courier cannot
     // replace the creator, enroll an account or implicitly claim local ownership.
     ThreadGenesisRecord thread_genesis = 7;
+    // All history finishes must precede the outer Finish. Receiving this frame
+    // stages bytes only; no intermediate head or source availability commits.
+    GitPushHistoryFrame git_history = 8;
   }
 }
 message PublishContentServerFrame {

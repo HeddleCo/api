@@ -120,6 +120,23 @@ use heddle_api::{hybrid_codec as codec, import_authority as import, witness_trus
 use prost::Message;
 use serde_json::Value;
 
+#[test]
+fn git_push_acceptance_feature_has_a_stable_additive_wire_value() {
+    assert_eq!(host::MandatoryProtocolFeature::Unspecified as i32, 0);
+    assert_eq!(
+        host::MandatoryProtocolFeature::ImportAuthorityHostWitnessV1 as i32,
+        1
+    );
+    assert_eq!(
+        host::MandatoryProtocolFeature::GitPushAcceptanceV1 as i32,
+        2
+    );
+    assert_eq!(
+        host::MandatoryProtocolFeature::GitPushAcceptanceV1.as_str_name(),
+        "MANDATORY_PROTOCOL_FEATURE_GIT_PUSH_ACCEPTANCE_V1"
+    );
+}
+
 fn bytes(v: &Value) -> Vec<u8> {
     hex::decode(v.as_str().expect("hex string")).expect("fixed hex bytes")
 }
@@ -1025,7 +1042,7 @@ fn incompatible_peer_requires_semantic_feature_and_exact_protocol_version() {
         import::require_hybrid_peer(None),
         Err(codec::Reject::Protocol)
     );
-    for (version, features) in [(1, vec![1]), (2, vec![]), (2, vec![1, 2]), (2, vec![1, 1])] {
+    for (version, features) in [(1, vec![1]), (2, vec![]), (2, vec![1, 3]), (2, vec![1, 1])] {
         assert_eq!(
             import::require_hybrid_peer(Some(&host::ProtocolCompatibility {
                 protocol_version: version,
@@ -1039,6 +1056,11 @@ fn incompatible_peer_requires_semantic_feature_and_exact_protocol_version() {
         mandatory_features: vec![1],
     }))
     .expect("explicit compatible peer");
+    import::require_hybrid_peer(Some(&host::ProtocolCompatibility {
+        protocol_version: 2,
+        mandatory_features: vec![1, 2],
+    }))
+    .expect("compatible peer with known mandatory Git acceptance feature");
 }
 
 #[test]

@@ -315,7 +315,7 @@ fn old_peer_advertising_import_methods_never_reaches_transport() {
         }),
         Some(ProtocolCompatibility {
             protocol_version: 2,
-            mandatory_features: vec![1, 2],
+            mandatory_features: vec![1, 3],
         }),
     ] {
         let trace = TestTransport::default();

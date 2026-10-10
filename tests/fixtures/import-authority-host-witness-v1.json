@@ -2525,6 +2525,10 @@
         {
           "name": "MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1",
           "number": 1
+        },
+        {
+          "name": "MANDATORY_PROTOCOL_FEATURE_GIT_PUSH_ACCEPTANCE_V1",
+          "number": 2
         }
       ]
     }

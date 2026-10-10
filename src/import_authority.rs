@@ -1651,7 +1651,9 @@ pub fn require_hybrid_peer(
     protocol: Option<&crate::heddle::api::common::ProtocolCompatibility>,
 ) -> Result<(), Reject> {
     let protocol = protocol.ok_or(Reject::Protocol)?;
-    if protocol.protocol_version != 2 || protocol.mandatory_features != [1] {
+    if protocol.protocol_version != 2
+        || !matches!(protocol.mandatory_features.as_slice(), [1] | [1, 2])
+    {
         return Err(Reject::Protocol);
     }
     Ok(())

@@ -24,6 +24,9 @@ Read the
 [platform administration checks](docs/alpha-v2/platform-admin.md), and
 [v1 review inventory](docs/alpha-v2/v1-disposition.csv).
 
+The coordinated local [Git acceptance extension](docs/alpha-v2/git-acceptance.md)
+is foundation work and has not been labeled a released or deployed surface.
+
 ## Packages
 
 - `heddle-api` — transport-neutral Rust messages, deterministic method

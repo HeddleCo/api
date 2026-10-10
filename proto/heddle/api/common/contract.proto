@@ -95,6 +95,7 @@ message CallContext {
 enum MandatoryProtocolFeature {
   MANDATORY_PROTOCOL_FEATURE_UNSPECIFIED = 0;
   MANDATORY_PROTOCOL_FEATURE_IMPORT_AUTHORITY_HOST_WITNESS_V1 = 1;
+  MANDATORY_PROTOCOL_FEATURE_GIT_PUSH_ACCEPTANCE_V1 = 2;
 }
 message ProtocolCompatibility {
   uint32 protocol_version = 1; // HYBRID peers require exactly 2.

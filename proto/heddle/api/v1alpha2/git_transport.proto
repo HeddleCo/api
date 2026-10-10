@@ -1,0 +1,74 @@
+syntax = "proto3";
+package heddle.api.v1alpha2;
+
+import "heddle/api/v1alpha2/common.proto";
+
+// This audience selects the transport service, not visibility of source data.
+// Only the exact value "git-gateway" is accepted in this version.
+message GitTransportScope {
+  string service_audience = 1;
+  SpoolRef tenant_spool = 2;
+  SpoolRef spool = 3;
+  // Registry-resolved canonical address, checked against the stable spool IDs.
+  string repository_path = 4;
+  ThreadId thread = 5;
+  GitTransportAction action = 6;
+  // Existing disclosure policy (public/internal/team:/restricted:), resolved
+  // from current grants; the string is never itself a grant.
+  string disclosure_audience = 7;
+}
+enum GitTransportAction {
+  GIT_TRANSPORT_ACTION_UNSPECIFIED = 0;
+  GIT_TRANSPORT_ACTION_READ = 1;
+  GIT_TRANSPORT_ACTION_WRITE = 2;
+}
+
+// POST /git/auth/challenge, application/x-protobuf. This does not authenticate
+// the caller. The authority binds a fresh one-use nonce to the exact request.
+message GitTransportChallengeRequest {
+  GitTransportScope scope = 1;
+  bytes credential_digest = 2; // 32-byte git_transport::credential_digest
+  int64 session_expires_at_seconds = 3; // at most 300 seconds from issuance
+}
+message GitTransportChallenge {
+  bytes nonce = 1; // 32 random bytes, consumed atomically at the authority
+  int64 issued_at_seconds = 2;
+  int64 expires_at_seconds = 3; // at most 60 seconds from issuance
+}
+message GitTransportChallengeResponse {
+  GitTransportChallenge challenge = 1;
+}
+
+// POST /git/auth/exchange, application/x-protobuf. The proof covers every
+// field using the versioned canonical encoding in the shared verifier. Current
+// registered-root hosts reject a nonempty grant envelope instead of ignoring it.
+message GitTransportExchangeRequest {
+  GitTransportScope scope = 1;
+  string biscuit = 2;
+  optional string grant_envelope = 3;
+  GitTransportChallenge challenge = 4;
+  int64 session_expires_at_seconds = 5;
+  bytes proof_signature = 6; // Ed25519 signature by the verified effective leaf
+}
+message GitTransportExchangeResponse {
+  // Distinct, opaque Git transport secret; never a native publication credential.
+  // Use as the HTTPS bearer or Git HTTP Basic password; username is "git".
+  string transport_token = 1;
+  int64 expires_at_seconds = 2;
+}
+
+// Internal gateway authorization check. The gateway supplies its trusted
+// catalog-to-canonical-scope mapping, not a caller-controlled actor header.
+// POST /git/auth/authorize, application/x-protobuf; response is never cacheable.
+message GitTransportAuthorizeRequest {
+  string transport_token = 1;
+  GitTransportScope expected_scope = 2;
+}
+// Session authority only. Not proof of complete source-history disclosure,
+// retention, redaction or native publishing authority.
+message GitTransportAuthorizeResponse {
+  PrincipalRef actor = 1;
+  int64 authorization_epoch = 2;
+  int64 expires_at_seconds = 3;
+  bytes credential_digest = 4;
+}

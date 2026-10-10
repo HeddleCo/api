@@ -1025,7 +1025,7 @@ fn incompatible_peer_requires_semantic_feature_and_exact_protocol_version() {
         import::require_hybrid_peer(None),
         Err(codec::Reject::Protocol)
     );
-    for (version, features) in [(1, vec![1]), (2, vec![]), (2, vec![1, 2]), (2, vec![1, 1])] {
+    for (version, features) in [(1, vec![1]), (2, vec![]), (2, vec![1, 3]), (2, vec![1, 1])] {
         assert_eq!(
             import::require_hybrid_peer(Some(&host::ProtocolCompatibility {
                 protocol_version: version,
@@ -1039,6 +1039,11 @@ fn incompatible_peer_requires_semantic_feature_and_exact_protocol_version() {
         mandatory_features: vec![1],
     }))
     .expect("explicit compatible peer");
+    import::require_hybrid_peer(Some(&host::ProtocolCompatibility {
+        protocol_version: 2,
+        mandatory_features: vec![1, 2],
+    }))
+    .expect("compatible peer with known mandatory Git acceptance feature");
 }
 
 #[test]

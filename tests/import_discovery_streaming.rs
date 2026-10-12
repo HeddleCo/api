@@ -71,7 +71,7 @@ fn twenty_thousand_refs_match_shared_rust_ts_digests_and_page_partitions() {
     for vector in recipe["vectors"].as_array().expect("vectors") {
         let algorithm = vector["hash_algorithm"].as_i64().expect("algorithm") as i32;
         let refs = refs(algorithm);
-        let selected: Vec<_> = [0, 8500, 15999].map(|i| selected(&refs[i])).into();
+        let selected: Vec<_> = [0, 4000, 7999].map(|i| selected(&refs[i])).into();
         for page_size in [1, 127, 512] {
             let mut validator = validator(
                 &source(algorithm),
@@ -114,8 +114,6 @@ fn bad_record_fails_on_its_page_and_poisoned_validator_cannot_finish() {
         (1, Reject::Canonical),
         (2, Reject::Bounds),
         (3, Reject::Canonical),
-        (4, Reject::SourceSelection),
-        (5, Reject::Canonical),
     ] {
         let mut refs = refs(2);
         match mutation {
@@ -123,8 +121,7 @@ fn bad_record_fails_on_its_page_and_poisoned_validator_cannot_finish() {
             1 => refs[512].name = refs[511].name.clone(),
             2 => refs[512].name = "z".repeat(1025),
             3 => refs[512].head_oid = "A".repeat(64),
-            4 => refs[512].kind = 2,
-            _ => refs[512].name = "refs/pull/01/head".into(),
+            _ => unreachable!("listed mutations"),
         }
         let mut validator = validator(&source(2), &[], import::DiscoverySelectionMode::Prepare);
         validator.push_page(&refs[..512]).expect("valid first page");
@@ -134,7 +131,7 @@ fn bad_record_fails_on_its_page_and_poisoned_validator_cannot_finish() {
     }
 }
 #[test]
-fn membership_pins_namespace_and_page_bounds_are_enforced() {
+fn pins_evidence_names_and_page_bounds_preserve_legacy_semantics() {
     let refs = refs(2);
     let mut selected = selected(&refs[0]);
     let mut absent = validator(
@@ -143,7 +140,7 @@ fn membership_pins_namespace_and_page_bounds_are_enforced() {
         import::DiscoverySelectionMode::Prepare,
     );
     absent.push_page(&[]).expect("empty page");
-    assert!(matches!(absent.finish(), Err(Reject::SourceSelection)));
+    absent.finish().expect("absent pin remains valid");
     selected.pinned_commit_oid = vec![9; 32];
     let mut prepare = validator(
         &source(2),
@@ -175,10 +172,9 @@ fn membership_pins_namespace_and_page_bounds_are_enforced() {
             kind: 3,
             ..Default::default()
         };
-        assert_eq!(
-            validator(&source(2), &[], import::DiscoverySelectionMode::Prepare).push_page(&[r]),
-            Err(Reject::Canonical)
-        );
+        validator(&source(2), &[], import::DiscoverySelectionMode::Prepare)
+            .push_page(&[r])
+            .expect("neutral evidence");
     }
     let mut off = import::DiscoveryValidator::new(
         &source(2),
@@ -188,7 +184,7 @@ fn membership_pins_namespace_and_page_bounds_are_enforced() {
         import::DiscoverySelectionMode::Prepare,
     )
     .expect("off");
-    assert_eq!(off.push_page(&refs[8000..8001]), Err(Reject::Canonical));
+    off.push_page(&refs[8000..8001]).expect("legacy evidence");
 }
 #[test]
 fn safety_ceiling_accepts_exactly_one_million_and_rejects_next_page() {
@@ -304,6 +300,41 @@ fn incremental_and_former_one_pass_agree_on_every_existing_repository_fixture() 
             count += 1;
         }
     }
+    let mut divergences = Vec::new();
+    for name in [
+        "refs/heads/-x",
+        "refs/heads/HEAD",
+        "refs/tags/-v1",
+        "refs/notes/commits",
+    ] {
+        for kind in [0, 1, 2, 3, 99] {
+            let mut source = source(2);
+            source.refs = vec![api::ProviderRef {
+                name: name.into(),
+                kind,
+                hash_algorithm: 2,
+                ..Default::default()
+            }];
+            for known in [false, true] {
+                let result = import::DiscoveryValidator::new(
+                    &source,
+                    known,
+                    &[],
+                    import::DiscoveryOptions::default(),
+                    import::DiscoverySelectionMode::Prepare,
+                )
+                .and_then(|mut v| {
+                    v.push_page(&source.refs)?;
+                    v.finish().map(|_| ())
+                });
+                let previous = legacy(&source, known);
+                if result != previous {
+                    divergences.push(format!("{name}, kind={kind}, known={known}: streaming={result:?}, alpha45={previous:?}"));
+                }
+            }
+        }
+    }
+    assert!(divergences.is_empty(), "{}", divergences.join("\n"));
     assert!(count > 20, "fixture inventory must be exercised");
 }
 
@@ -449,10 +480,8 @@ fn discovery_options_flow_through_resolve_and_selection_remains_bounded() {
     import::validate_resolve_import_source_response(&request, &response, None)
         .expect("opt-in pull head");
     request.include_pull_request_refs = false;
-    assert_eq!(
-        import::validate_resolve_import_source_response(&request, &response, None),
-        Err(Reject::Canonical)
-    );
+    import::validate_resolve_import_source_response(&request, &response, None)
+        .expect("legacy evidence without option");
     let refs = refs(2);
     let selected: Vec<_> = refs[..256].iter().map(selected).collect();
     let mut v = validator(
@@ -487,5 +516,187 @@ fn discovery_options_flow_through_resolve_and_selection_remains_bounded() {
         validator(&source(2), &[], import::DiscoverySelectionMode::Prepare)
             .push_page(&[unicode_oid]),
         Err(Reject::SourceSelection)
+    );
+}
+
+#[test]
+fn pull_refs_are_evidence_only_on_commit_and_discovery_paths() {
+    let f: Value = serde_json::from_str(heddle_api::IMPORT_AUTHORITY_HOST_WITNESS_V1_FIXTURE_JSON)
+        .expect("fixture");
+    let mut request: api::CommitImportJobRequest = record(&f, "commit_request");
+    let source: api::ProviderRepository = record(&f, "source_connected");
+    let configuration: api::GetImportConfigurationResponse = record(&f, "import_configuration");
+    let scope = request.proof.as_mut().expect("proof").delegations[0]
+        .body
+        .as_mut()
+        .expect("body")
+        .scope
+        .as_mut()
+        .expect("scope");
+    scope.branches[1].ref_name = "refs/pull/42/head".into();
+    assert_eq!(
+        import::validate_commit_request(&request, "github", &source, &configuration),
+        Err(Reject::Canonical)
+    );
+    let selected = &request.proof.as_ref().expect("proof").delegations[0]
+        .body
+        .as_ref()
+        .expect("body")
+        .scope
+        .as_ref()
+        .expect("scope")
+        .branches;
+    for include_pull_request_refs in [false, true] {
+        for mode in [
+            import::DiscoverySelectionMode::Prepare,
+            import::DiscoverySelectionMode::Commit,
+        ] {
+            assert!(
+                matches!(
+                    import::DiscoveryValidator::new(
+                        &source,
+                        true,
+                        selected,
+                        import::DiscoveryOptions {
+                            include_pull_request_refs
+                        },
+                        mode
+                    ),
+                    Err(Reject::Canonical)
+                ),
+                "option={include_pull_request_refs}, mode={mode:?}"
+            );
+        }
+    }
+    let scope = request.proof.as_ref().expect("proof").delegations[0]
+        .body
+        .as_ref()
+        .expect("body")
+        .scope
+        .as_ref()
+        .expect("scope");
+    assert_eq!(import::validate_scope(scope), Err(Reject::Canonical));
+    let mut manifest: api::ImportResultManifestV1 = record(&f, "partial_manifest");
+    import::validate_manifest(&manifest).expect("manifest control");
+    manifest.slots[0].ref_name = "refs/pull/42/head".into();
+    assert_eq!(import::validate_manifest(&manifest), Err(Reject::Canonical));
+}
+
+#[test]
+fn absent_selections_preserve_alpha45_prepare_and_commit_semantics() {
+    let r = api::ProviderRef {
+        name: "refs/heads/main".into(),
+        head_oid: "0".repeat(64),
+        hash_algorithm: 2,
+        kind: 1,
+    };
+    for ref_mode in [2, 1] {
+        let mut b = selected(&r);
+        if ref_mode == 2 {
+            b.ref_mode = 2;
+            b.ref_disclosure = 1;
+            b.pinned_commit_oid.clear();
+        }
+        for mode in [
+            import::DiscoverySelectionMode::Prepare,
+            import::DiscoverySelectionMode::Commit,
+        ] {
+            let result = validator(&source(2), &[b.clone()], mode).finish();
+            assert!(
+                result.is_ok(),
+                "absent ref_mode={ref_mode}, mode={mode:?}: {result:?}"
+            );
+            for known in [false, true] {
+                let mut observed = r.clone();
+                if !known {
+                    observed.head_oid.clear();
+                }
+                let mut v = validator(&source(2), &[b.clone()], mode);
+                let result = v.push_page(&[observed]);
+                if ref_mode == 2 && known {
+                    assert_eq!(result, Err(Reject::RefPinning));
+                } else {
+                    result.expect("present observation follows alpha45 rules");
+                    v.finish().expect("complete");
+                }
+            }
+        }
+    }
+    let f: Value = serde_json::from_str(heddle_api::IMPORT_AUTHORITY_HOST_WITNESS_V1_FIXTURE_JSON)
+        .expect("fixture");
+    let request: api::CommitImportJobRequest = record(&f, "commit_request");
+    let source: api::ProviderRepository = record(&f, "source_connected");
+    let configuration: api::GetImportConfigurationResponse = record(&f, "import_configuration");
+    import::validate_commit_request(&request, "github", &source, &configuration)
+        .expect("unmodified metadata fixture");
+}
+
+#[test]
+fn digest_identifies_source_options_and_neutral_evidence() {
+    let original = source(2);
+    let digest = |s: &api::ProviderRepository, include_pull_request_refs| {
+        import::discover_repository(
+            s,
+            &[],
+            import::DiscoveryOptions {
+                include_pull_request_refs,
+            },
+            import::DiscoverySelectionMode::Prepare,
+        )
+        .expect("evidence")
+        .digest()
+        .to_owned()
+    };
+    let baseline = digest(&original, false);
+    assert_ne!(baseline, digest(&original, true));
+    for mutation in 0..6 {
+        let mut changed = original.clone();
+        match mutation {
+            0 => changed.clone_url.push_str("other"),
+            1 => changed.provider_repository_id = "42".into(),
+            2 => changed.installation_id = "42".into(),
+            3 => {
+                changed.connection = Some(api::RecordRef {
+                    id: "connection".into(),
+                    ..Default::default()
+                })
+            }
+            4 => changed.private = true,
+            _ => changed.hash_algorithm = 1,
+        }
+        assert_ne!(
+            baseline,
+            digest(&changed, false),
+            "source mutation {mutation}"
+        );
+    }
+    let mut neutral = original.clone();
+    neutral.refs = vec![api::ProviderRef {
+        name: "refs/notes/commits".into(),
+        hash_algorithm: 2,
+        kind: 99,
+        ..Default::default()
+    }];
+    let with_ref = digest(&neutral, false);
+    assert_ne!(baseline, with_ref, "neutral ref is hashed");
+    neutral.refs[0].kind = 0;
+    assert_eq!(with_ref, digest(&neutral, false), "neutral kind");
+    let r = api::ProviderRef {
+        name: "refs/heads/main".into(),
+        head_oid: "0".repeat(64),
+        hash_algorithm: 2,
+        kind: 1,
+    };
+    assert_eq!(
+        digest(&original, true),
+        *validator(
+            &original,
+            &[selected(&r)],
+            import::DiscoverySelectionMode::Commit
+        )
+        .finish()
+        .expect("evidence")
+        .digest(),
+        "selection and phase do not change evidence identifier when options match"
     );
 }

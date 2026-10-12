@@ -200,9 +200,6 @@ fn validity(start: i64, end: i64, now: i64, current: bool) -> Result<(), Reject>
 /// does not pull its filesystem/config/object stack into WASM consumers.
 /// See the shared corpus and differential property tests; never normalize.
 fn branch_ref(name: &str) -> Result<(), Reject> {
-    if name.starts_with("refs/pull/") {
-        return pull_request_ref(name);
-    }
     let short = name.strip_prefix("refs/heads/").ok_or(Reject::Canonical)?;
     if short.is_empty() || short.starts_with('-') || short == "HEAD" {
         return Err(Reject::Canonical);
@@ -413,7 +410,7 @@ pub struct DiscoveryOptions {
     pub include_pull_request_refs: bool,
 }
 
-/// Prepare checks current pins; Commit preserves frozen pins after head movement.
+/// Prepare checks current pins; Commit preserves frozen pins after movement/deletion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiscoverySelectionMode {
     Prepare,
@@ -431,6 +428,10 @@ pub struct DiscoveryDigest {
     mode: DiscoverySelectionMode,
 }
 impl DiscoveryDigest {
+    /// SHA-256 identifier of source custody/format, discovery options and the
+    /// complete ordered evidence (names, OIDs, classified kinds, algorithms/count).
+    /// Page boundaries, selections and admission phase do not affect this identifier.
+    /// It is local evidence, never signed content or authorization.
     pub fn digest(&self) -> &[u8; 32] {
         &self.digest
     }
@@ -453,44 +454,25 @@ impl DiscoveryDigest {
     }
 }
 
-fn pull_request_ref(name: &str) -> Result<(), Reject> {
-    let number = name
-        .strip_prefix("refs/pull/")
-        .and_then(|n| n.strip_suffix("/head"))
-        .ok_or(Reject::Canonical)?;
-    if number.is_empty() || number.starts_with('0') || !number.bytes().all(|b| b.is_ascii_digit()) {
-        return Err(Reject::Canonical);
-    }
-    if name.len() > MAX_REF_BYTES {
-        return Err(Reject::Bounds);
-    }
-    Ok(())
-}
-
-fn discovery_ref_name(r: &ProviderRef, options: DiscoveryOptions) -> Result<(), Reject> {
-    if r.name.len() > MAX_REF_BYTES {
-        return Err(Reject::Bounds);
-    }
-    let kind = if r.name.starts_with("refs/heads/") {
-        branch_ref(&r.name)?;
+// Evidence preserves alpha.45 name acceptance; only selected refs use branch_ref.
+// Classify supported discovery namespaces independently of untrusted kind hints.
+fn discovery_ref_kind(r: &ProviderRef, options: DiscoveryOptions) -> i32 {
+    if r.name.starts_with("refs/heads/") {
         1
-    } else if let Some(short) = r.name.strip_prefix("refs/tags/") {
-        // General Git ref rules; tags do not have branch-only HEAD/dash restrictions.
-        git_ref_name(&r.name)?;
-        if short.is_empty() {
-            return Err(Reject::Canonical);
-        }
+    } else if r.name.starts_with("refs/tags/") {
         2
-    } else if options.include_pull_request_refs && r.name.starts_with("refs/pull/") {
-        pull_request_ref(&r.name)?;
+    } else if options.include_pull_request_refs
+        && r.name
+            .strip_prefix("refs/pull/")
+            .and_then(|n| n.strip_suffix("/head"))
+            .is_some_and(|n| {
+                !n.is_empty() && !n.starts_with('0') && n.bytes().all(|b| b.is_ascii_digit())
+            })
+    {
         3
     } else {
-        return Err(Reject::Canonical);
-    };
-    if r.kind != 0 && r.kind != kind {
-        return Err(Reject::SourceSelection);
+        0
     }
-    Ok(())
 }
 
 fn discovery_source_binding(source: &ProviderRepository) -> Result<Vec<u8>, Reject> {
@@ -552,7 +534,6 @@ pub struct DiscoveryValidator {
     oid_size: Option<usize>,
     options: DiscoveryOptions,
     selected: Vec<ImportBranchLimitV1>,
-    seen: Vec<bool>,
     previous: Option<String>,
     ref_count: usize,
     failed: bool,
@@ -580,12 +561,12 @@ impl DiscoveryValidator {
             if b.hash_algorithm != source.hash_algorithm {
                 return Err(Reject::SourceSelection);
             }
-            if b.ref_name.starts_with("refs/pull/") && !options.include_pull_request_refs {
-                return Err(Reject::Canonical);
-            }
         }
+        let source_binding = discovery_source_binding(source)?;
         let mut digest = Sha256::new();
         digest.update(DISCOVERY_DOMAIN.as_bytes());
+        digest.update(&source_binding);
+        digest.update(u32::from(options.include_pull_request_refs).to_be_bytes());
         digest.update((source.hash_algorithm as u32).to_be_bytes());
         Ok(Self {
             digest,
@@ -593,11 +574,10 @@ impl DiscoveryValidator {
             oid_size,
             options,
             selected: selected.to_vec(),
-            seen: vec![false; selected.len()],
             previous: None,
             ref_count: 0,
             failed: false,
-            source_binding: discovery_source_binding(source)?,
+            source_binding,
             selection_binding,
             mode,
         })
@@ -642,7 +622,7 @@ impl DiscoveryValidator {
                     return Err(Reject::Canonical);
                 }
             }
-            discovery_ref_name(r, self.options)?;
+            let kind = discovery_ref_kind(r, self.options);
             if let Ok(i) = self.selected.binary_search_by(|b| b.ref_name.cmp(&r.name)) {
                 let b = &self.selected[i];
                 match self.mode {
@@ -660,7 +640,6 @@ impl DiscoveryValidator {
                         }
                     }
                 }
-                self.seen[i] = true;
             }
             // Canonical discovery encoding: sized UTF-8 name/OID, BE u32 kind and
             // algorithm. A final BE u64 count makes boundaries unambiguous.
@@ -668,7 +647,7 @@ impl DiscoveryValidator {
                 self.digest.update((text.len() as u32).to_be_bytes());
                 self.digest.update(text.as_bytes());
             }
-            self.digest.update((r.kind as u32).to_be_bytes());
+            self.digest.update((kind as u32).to_be_bytes());
             self.digest.update((r.hash_algorithm as u32).to_be_bytes());
             self.previous = Some(r.name.clone());
             self.ref_count += 1;
@@ -679,9 +658,6 @@ impl DiscoveryValidator {
         use sha2::Digest;
         if self.failed {
             return Err(Reject::Canonical);
-        }
-        if self.seen.iter().any(|seen| !seen) {
-            return Err(Reject::SourceSelection);
         }
         self.digest.update((self.ref_count as u64).to_be_bytes());
         Ok(DiscoveryDigest {
@@ -736,7 +712,7 @@ pub fn validate_discovered_repository(source: &ProviderRepository) -> Result<(),
     )
     .map(|_| ())
 }
-/// Compare independent complete discovery before signing, including membership.
+/// Compare independent complete discovery before signing, including known pins.
 pub fn validate_discovered_import_scope(
     scope: &ImportPermissionScopeV1,
     source: &ProviderRepository,

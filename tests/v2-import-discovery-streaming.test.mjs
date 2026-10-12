@@ -20,7 +20,7 @@ function refs(hashAlgorithm){
 const selected=r=>create(api.ImportBranchLimitV1Schema,{refName:r.name,hashAlgorithm:r.hashAlgorithm,refMode:1,pinnedCommitOid:Buffer.from(r.headOid,'hex'),genesisDigest:new Uint8Array(32).fill(1),targetThreadId:new Uint8Array(32).fill(2),expectedFrontierDigest:new Uint8Array(32).fill(3)});
 const validator=(s,selection=[],mode='prepare')=>new authority.DiscoveryValidator(s,true,selection,{includePullRequestRefs:true},mode);
 for(const vector of recipe.vectors)test(`20,000 refs: Rust/TS digest parity SHA${vector.hash_algorithm===1?1:256}`,()=>{
- const list=refs(vector.hash_algorithm),selection=[0,8500,15999].map(i=>selected(list[i]));
+ const list=refs(vector.hash_algorithm),selection=[0,4000,7999].map(i=>selected(list[i]));
  for(const pageSize of [1,127,512]){
   const v=validator(source(vector.hash_algorithm),selection);
   for(let i=0;i<list.length;i+=pageSize)v.pushPage(list.slice(i,i+pageSize));
@@ -35,22 +35,22 @@ test('bad records reject on their page; failed validators cannot finish',()=>{
  for(const [mutate,reason] of [
   [r=>r.hashAlgorithm=1,'SourceSelection'],[r=>r.name='refs/heads/b00511','Canonical'],
   [r=>r.name='z'.repeat(1025),'Bounds'],[r=>r.headOid='A'.repeat(64),'Canonical'],
-  [r=>r.kind=2,'SourceSelection'],[r=>r.name='refs/pull/01/head','Canonical'],[r=>r.headOid='0'.repeat(63)+'\n','Canonical']
+  [r=>r.headOid='0'.repeat(63)+'\n','Canonical']
  ]){
   const list=refs(2),v=validator(source(2));mutate(list[512]);v.pushPage(list.slice(0,512));
   assert.throws(()=>v.pushPage(list.slice(512,1024)),expected(reason));assert.throws(()=>v.pushPage([]),expected('Canonical'));assert.throws(()=>v.finish(),expected('Canonical'));
  }
 });
-test('selected membership, pins, namespace, UTF-8 and page bounds',()=>{
+test('pins, evidence names and page bounds preserve legacy semantics',()=>{
  const list=refs(2),selection=selected(list[0]);
- const absent=validator(source(2),[selection]);absent.pushPage([]);assert.throws(()=>absent.finish(),expected('SourceSelection'));
+ const absent=validator(source(2),[selection]);absent.pushPage([]);absent.finish();
  selection.pinnedCommitOid.fill(9);
  assert.throws(()=>validator(source(2),[selection]).pushPage(list.slice(0,1)),expected('RefPinning'));
  const commit=validator(source(2),[selection],'commit');commit.pushPage(list.slice(0,1));commit.finish();
  assert.throws(()=>validator(source(2)).pushPage(list.slice(0,513)),expected('Bounds'));
  for(const name of ['refs/pull/0/head','refs/pull/01/head','refs/pull/1/merge','refs/pull/-1/head','refs/pull/1/head/x','refs/pull/1/head\n','refs/pull/1/head\u2028','refs/heads/\ud800'])
-  assert.throws(()=>validator(source(2)).pushPage([create(api.ProviderRefSchema,{name,hashAlgorithm:2})]),expected('Canonical'));
- assert.throws(()=>new authority.DiscoveryValidator(source(2),true).pushPage(list.slice(8000,8001)),expected('Canonical'));
+  validator(source(2)).pushPage([create(api.ProviderRefSchema,{name,hashAlgorithm:2})]);
+ new authority.DiscoveryValidator(source(2),true).pushPage(list.slice(8000,8001));
  const unknown=source(0),v=new authority.DiscoveryValidator(unknown,false);v.pushPage([]);v.finish();
  assert.throws(()=>new authority.DiscoveryValidator(unknown,true),expected('Version'));
  // Options and selected protobufs are copied; later mutation grants nothing.
@@ -88,6 +88,13 @@ test('incremental and former one-pass agree on every existing repository fixture
   }),outcome(()=>legacy(s,known)),`${name}: known=${known}`);
   count++;
  }
+ const divergences=[];
+ for(const name of ['refs/heads/-x','refs/heads/HEAD','refs/tags/-v1','refs/notes/commits'])for(const kind of [0,1,2,3,99])for(const known of [false,true]){
+  const s=source(2);s.refs=[create(api.ProviderRefSchema,{name,kind,hashAlgorithm:2})];
+  const current=outcome(()=>{const v=new authority.DiscoveryValidator(s,known);v.pushPage(s.refs);v.finish();}),previous=outcome(()=>legacy(s,known));
+  if(current!==previous)divergences.push(`${name}: kind=${kind}, known=${known}, streaming=${current}, alpha45=${previous}`);
+ }
+ assert.deepEqual(divergences,[]);
  assert.ok(count>20,`fixture inventory must be exercised: ${count}`);console.log(`DISCOVERY FIXTURE PARITY: ${count} repositories, known/unknown modes`);
 });
 function vector(name){const v=fixture.signed_vectors[name]??fixture.wire_vectors[name];return fromBinary(api[`${v.schema.split('.').at(-1)}Schema`],Buffer.from(v.wire_hex,'hex'));}
@@ -115,9 +122,44 @@ test('resolve option accepts PR heads and selections stay bounded at 256',()=>{
  const request=create(api.ResolveImportSourceRequestSchema,{source:create(api.ProviderRepositorySchema,{cloneUrl:resolved.cloneUrl,providerRepositoryId:resolved.providerRepositoryId}),includeRefs:true,includePullRequestRefs:true});
  const response=create(api.ResolveImportSourceResponseSchema,{source:resolved});
  authority.validateResolveImportSourceResponse(request,response);
- request.includePullRequestRefs=false;assert.throws(()=>authority.validateResolveImportSourceResponse(request,response),expected('Canonical'));
+ request.includePullRequestRefs=false;authority.validateResolveImportSourceResponse(request,response);
  const list=refs(2),selection=list.slice(0,256).map(selected),v=validator(source(2),selection);v.pushPage(list.slice(0,256));v.finish();
  assert.throws(()=>validator(source(2),[...selection,selection[0]]),expected('Bounds'));
  const unicodeOid=create(api.ProviderRefSchema,{...list[0],headOid:'é'.repeat(64)});
  assert.throws(()=>validator(source(2)).pushPage([unicodeOid]),expected('SourceSelection'));
+});
+
+test('pull refs are evidence only on commit and discovery paths',async()=>{
+ const request=vector('commit_request'),s=vector('source_connected'),configuration=vector('import_configuration'),scope=request.proof.delegations[0].body.scope;
+ scope.branches[1].refName='refs/pull/42/head';
+ await assert.rejects(authority.validateImportCommitRequest(request,'github',s,configuration),expected('Canonical'));
+ for(const includePullRequestRefs of [false,true])for(const mode of ['prepare','commit'])assert.throws(()=>new authority.DiscoveryValidator(s,true,scope.branches,{includePullRequestRefs},mode),expected('Canonical'));
+ assert.throws(()=>authority.validateImportScope(scope),expected('Canonical'));
+ const manifest=vector('partial_manifest');authority.validateImportManifest(manifest);manifest.slots[0].refName='refs/pull/42/head';
+ assert.throws(()=>authority.validateImportManifest(manifest),expected('Canonical'));
+});
+test('absent selections preserve alpha45 prepare and commit semantics',async()=>{
+ const r=create(api.ProviderRefSchema,{name:'refs/heads/main',headOid:'0'.repeat(64),hashAlgorithm:2,kind:1});
+ for(const refMode of [2,1])for(const mode of ['prepare','commit']){
+  const b=selected(r);if(refMode===2){b.refMode=2;b.refDisclosure=1;b.pinnedCommitOid=new Uint8Array();}
+  assert.doesNotThrow(()=>validator(source(2),[b],mode).finish(),`absent refMode=${refMode}, mode=${mode}`);
+  for(const known of [false,true]){
+   const observed=clone(api.ProviderRefSchema,r);if(!known)observed.headOid='';const v=validator(source(2),[b],mode);
+   if(refMode===2&&known)assert.throws(()=>v.pushPage([observed]),expected('RefPinning'));
+   else {v.pushPage([observed]);v.finish();}
+  }
+ }
+ await authority.validateImportCommitRequest(vector('commit_request'),'github',vector('source_connected'),vector('import_configuration'));
+});
+
+test('digest identifies source options and neutral evidence',()=>{
+ const original=source(2),digest=(s,includePullRequestRefs=false)=>hex(authority.discoverRepository(s,[],{includePullRequestRefs}).digest),baseline=digest(original);
+ assert.notEqual(baseline,digest(original,true));
+ for(const mutate of [s=>s.cloneUrl+='other',s=>s.providerRepositoryId='42',s=>s.installationId='42',s=>s.connection=create(api.RecordRefSchema,{id:'connection'}),s=>s.private=true,s=>s.hashAlgorithm=1]){
+  const changed=clone(api.ProviderRepositorySchema,original);mutate(changed);assert.notEqual(baseline,digest(changed));
+ }
+ const neutral=clone(api.ProviderRepositorySchema,original);neutral.refs=[create(api.ProviderRefSchema,{name:'refs/notes/commits',kind:99,hashAlgorithm:2})];
+ const withRef=digest(neutral);assert.notEqual(baseline,withRef);neutral.refs[0].kind=0;assert.equal(withRef,digest(neutral));
+ const r=create(api.ProviderRefSchema,{name:'refs/heads/main',headOid:'0'.repeat(64),hashAlgorithm:2,kind:1});
+ assert.equal(digest(original,true),hex(validator(original,[selected(r)],'commit').finish().digest));
 });

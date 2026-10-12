@@ -40,7 +40,6 @@ function validity(start:bigint,end:bigint,now:bigint,current:boolean){if(start<0
 // Mirrors sley-refs 0.11.0 check_refname_format plus Git's branch-only rules.
 // UTF-8 bytes are the signed identity; do not normalize or replace surrogates.
 function branchRef(name:string):void {
-  if(name.startsWith("refs/pull/")){pullRequestRef(name);return;}
   const prefix="refs/heads/",short=name.slice(prefix.length);
   if(!name.startsWith(prefix)||!short||short.startsWith("-")||short==="HEAD")reject("Canonical");
   gitRefName(name);
@@ -126,20 +125,18 @@ function validateRetainedImportSource(selector:api.ImportSourceSelectionV1,scope
 /** Opt-in pull-request heads; merge refs are excluded. */
 export interface DiscoveryOptions { readonly includePullRequestRefs?: boolean; }
 export type DiscoverySelectionMode = "prepare" | "commit";
-/** Local evidence, never a signed record or wire carrier. */
+/** Local evidence, never a signed record or wire carrier. The SHA-256 identifier
+ * commits to source custody/format, discovery options and complete ordered refs
+ * (names, OIDs, classified kinds, algorithms/count), independent of page
+ * boundaries, signed selections and admission phase. */
 export interface DiscoveryDigest { readonly digest: Uint8Array; readonly refCount: number; }
 const discoveryBindings=new WeakMap<DiscoveryDigest,{source:Uint8Array;selection:Uint8Array;mode:DiscoverySelectionMode}>();
-function pullRequestRef(name:string):void {
-  if(/^refs\/pull\/[1-9][0-9]*\/head$/.exec(name)?.[0]!==name)reject("Canonical");
-  if(utf8.encode(name).length>MAX_REF_BYTES)reject("Bounds");
-}
-function discoveryRefName(r:ProviderRef,options:DiscoveryOptions):void {
-  let kind:number;
-  if(r.name.startsWith("refs/heads/")){branchRef(r.name);kind=1;}
-  else if(r.name.startsWith("refs/tags/")){gitRefName(r.name);if(r.name==="refs/tags/")reject("Canonical");kind=2;}
-  else if(options.includePullRequestRefs&&r.name.startsWith("refs/pull/")){pullRequestRef(r.name);kind=3;}
-  else reject("Canonical");
-  if(r.kind!==0&&r.kind!==kind)reject("SourceSelection");
+// Evidence preserves alpha.45 acceptance; signed selections use branchRef.
+function discoveryRefKind(r:ProviderRef,options:DiscoveryOptions):number {
+  if(r.name.startsWith("refs/heads/"))return 1;
+  if(r.name.startsWith("refs/tags/"))return 2;
+  if(options.includePullRequestRefs&&/^refs\/pull\/[1-9][0-9]*\/head$/.exec(r.name)?.[0]===r.name)return 3;
+  return 0;
 }
 function discoverySourceBinding(source:ProviderRepository):Uint8Array {
   for(const text of [source.cloneUrl,source.providerRepositoryId,source.installationId])if(utf8.encode(text).length>4096)reject("Bounds");
@@ -170,7 +167,6 @@ export class DiscoveryValidator {
   #oidSize:number|undefined;
   #options:DiscoveryOptions;
   #selected:api.ImportBranchLimitV1[];
-  #seen:boolean[];
   #previous:Uint8Array|undefined;
   #refCount=0;
   #closed=false;
@@ -180,16 +176,16 @@ export class DiscoveryValidator {
   constructor(source:ProviderRepository,known:boolean,selected:readonly api.ImportBranchLimitV1[]=[],options:DiscoveryOptions={},mode:DiscoverySelectionMode="prepare") {
     this.#oidSize=source.hashAlgorithm===1?40:source.hashAlgorithm===2?64:source.hashAlgorithm===0&&!known?undefined:reject("Version");
     this.#selectionBinding=discoverySelectionBinding(selected);
-    for(const b of selected){if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");if(b.refName.startsWith("refs/pull/")&&!options.includePullRequestRefs)reject("Canonical");}
+    for(const b of selected){if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");}
     if(mode!=="prepare"&&mode!=="commit")reject("Canonical");
     this.#hashAlgorithm=source.hashAlgorithm;this.#options={includePullRequestRefs:options.includePullRequestRefs===true};this.#mode=mode;
     // Explicit byte copies also isolate Node Buffers, whose slice() is a view.
     this.#selected=selected.map(b=>{const copy=clone(api.ImportBranchLimitV1Schema,b);
       copy.pinnedCommitOid=new Uint8Array(b.pinnedCommitOid);copy.genesisDigest=new Uint8Array(b.genesisDigest);
       copy.targetThreadId=new Uint8Array(b.targetThreadId);copy.expectedFrontierDigest=new Uint8Array(b.expectedFrontierDigest);return copy;
-    });this.#seen=selected.map(()=>false);
+    });
     this.#sourceBinding=discoverySourceBinding(source);
-    this.#digest.update(utf8.encode(DISCOVERY_DOMAIN)).update(u32(source.hashAlgorithm));
+    this.#digest.update(utf8.encode(DISCOVERY_DOMAIN)).update(this.#sourceBinding).update(u32(this.#options.includePullRequestRefs?1:0)).update(u32(source.hashAlgorithm));
   }
   pushPage(refs:readonly ProviderRef[]):void {
     if(this.#closed)reject("Canonical");
@@ -201,21 +197,23 @@ export class DiscoveryValidator {
         if(r.hashAlgorithm!==this.#hashAlgorithm)reject("SourceSelection");
         if(this.#previous&&compare(this.#previous,name)>=0)reject("Canonical");
         if(r.headOid){if(this.#oidSize===undefined)reject("Version");if(utf8.encode(r.headOid).length!==this.#oidSize)reject("SourceSelection");if(/[^0-9a-f]/.test(r.headOid))reject("Canonical");}
-        discoveryRefName(r,this.#options);
-        const i=this.#selected.findIndex(b=>b.refName===r.name);
+        const kind=discoveryRefKind(r,this.#options);
+        let low=0,high=this.#selected.length;
+        while(low<high){const mid=low+Math.floor((high-low)/2);
+          if(compareRefs(this.#selected[mid]!.refName,r.name)<0)low=mid+1;else high=mid;
+        }
+        const i=low<this.#selected.length&&this.#selected[low]!.refName===r.name?low:-1;
         if(i>=0){const b=this.#selected[i]!;
           if(this.#mode==="prepare")validateImportRefSelection(b,r.headOid?Uint8Array.from(r.headOid.match(/../g)!,v=>parseInt(v,16)):undefined);
           else if(b.refMode===2&&r.headOid)reject("RefPinning");
-          this.#seen[i]=true;
         }
-        this.#digest.update(sized(name)).update(sized(utf8.encode(r.headOid))).update(u32(r.kind)).update(u32(r.hashAlgorithm));
+        this.#digest.update(sized(name)).update(sized(utf8.encode(r.headOid))).update(u32(kind)).update(u32(r.hashAlgorithm));
         this.#previous=name;this.#refCount++;
       }
     } catch(error){this.#closed=true;throw error;}
   }
   finish():DiscoveryDigest {
     if(this.#closed)reject("Canonical");this.#closed=true;
-    if(this.#seen.some(seen=>!seen))reject("SourceSelection");
     const result=Object.freeze({digest:this.#digest.update(integer(BigInt(this.#refCount))).digest(),refCount:this.#refCount});
     discoveryBindings.set(result,{source:this.#sourceBinding,selection:this.#selectionBinding,mode:this.#mode});
     return result;

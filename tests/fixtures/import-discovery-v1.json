@@ -7,11 +7,11 @@
   "vectors": [
     {
       "hash_algorithm": 1,
-      "sha256": "de6599e6d81a5d7d31dd93c32a42c0a99c946c16c2e012e4d0a95c9c882daeb6"
+      "sha256": "fca20aa63cef68876443776ca64489c007a0a83d58f87740a6832ad9f9ddfe5d"
     },
     {
       "hash_algorithm": 2,
-      "sha256": "02a9837ea56b17646bc2c505050ed08fb4314b4fd4c4bba8a250baa74939a8b5"
+      "sha256": "b45279b685ebe3659929250d56c47c55ef3255ef19e8d5b69056ac1e58628ba7"
     }
   ]
 }

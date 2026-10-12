@@ -25,25 +25,14 @@ fn record<T: Message + Default>(f: &Value, name: &str) -> T {
     .expect("fixed wire")
 }
 
-/// Retain selected branch observations and add sorted unique tag refs.
+/// Sorted, unique tag refs that never collide with the signed branch selection.
 fn with_refs(mut source: api::ProviderRepository, count: usize) -> api::ProviderRepository {
     let oid_hex = match source.hash_algorithm {
         1 => 40,
         2 => 64,
         other => panic!("fixture source must have a known algorithm, got {other}"),
     };
-    if source.refs.is_empty() {
-        source.refs = ["dev", "main"]
-            .map(|name| api::ProviderRef {
-                name: format!("refs/heads/{name}"),
-                kind: 1,
-                hash_algorithm: source.hash_algorithm,
-                ..Default::default()
-            })
-            .into();
-    }
-    let selected = source.refs.clone();
-    source.refs = (0..count.saturating_sub(selected.len()))
+    source.refs = (0..count)
         .map(|i| api::ProviderRef {
             name: format!("refs/tags/v{i:05}"),
             head_oid: format!("{i:0oid_hex$x}"),
@@ -51,8 +40,6 @@ fn with_refs(mut source: api::ProviderRepository, count: usize) -> api::Provider
             hash_algorithm: source.hash_algorithm,
         })
         .collect();
-    source.refs.extend(selected);
-    source.refs.sort_by(|a, b| a.name.cmp(&b.name));
     source
 }
 
@@ -69,7 +56,7 @@ impl Prepare {
         let scope: api::ImportPermissionScopeV1 = record(&f, "scope");
         Self {
             request: record(&f, "prepare_public_sha256"),
-            source: with_refs(record(&f, "source_public_sha256"), 2),
+            source: record(&f, "source_public_sha256"),
             configuration: record(&f, "import_configuration"),
             destination_version: scope.destination_version,
         }
@@ -163,7 +150,7 @@ fn resolve_page_keeps_its_512_ref_page_bound() {
 fn commit_accepts_twenty_thousand_refs() {
     let f = fixture();
     let request: api::CommitImportJobRequest = record(&f, "commit_request");
-    let source: api::ProviderRepository = with_refs(record(&f, "source_connected"), 2);
+    let source: api::ProviderRepository = record(&f, "source_connected");
     let configuration: api::GetImportConfigurationResponse = record(&f, "import_configuration");
     let commit = |current: &api::ProviderRepository| {
         import::validate_commit_request(&request, "github", current, &configuration)

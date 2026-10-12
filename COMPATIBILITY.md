@@ -17,16 +17,23 @@ HYBRID import discovery now validates incrementally with bounded state
 independent of retained refs; pages remain at most 512 and names at most 1024
 UTF-8 bytes. `DiscoveryValidator` produces local `DiscoveryDigest` evidence for
 Prepare/Commit without assembling the complete advertisement. Strict global
-UTF-8 ordering proves uniqueness; selected refs (at most 256) must be present.
+UTF-8 ordering proves uniqueness; signed selections remain capped at 256.
+Prepare and Commit preserve alpha.45 absent-ref and pin semantics.
 Hosts authenticate snapshot/cursor continuity and complete coverage. Failed
-validators cannot produce evidence. Discovery now checks namespace/kind agreement.
+validators cannot produce evidence. Discovery preserves alpha.45 name/kind
+acceptance; strict namespace/shape checks apply only to signed selections.
 
 `ProviderRefsRequest.include_pull_request_refs` and
 `ResolveImportSourceRequest.include_pull_request_refs` (both tag 4) opt in to
 `refs/pull/<positive decimal>/head`; no zero, leading zeros or merge refs.
 `ProviderRef.Kind.KIND_PULL_REQUEST` (3) is additive. Omitted/false options keep
-branch/tag discovery. Existing field tags and enum values, signed encodings,
-wire bytes for existing messages and fixture vectors are unchanged.
+alpha.45 discovery validation. Pull heads are evidence only and cannot be selected
+in signed scopes or manifests. Unsupported namespaces use neutral evidence kind.
+The digest commits to source custody/format, options and complete ordered refs.
+Source bindings newly reject clone URLs, repository/installation IDs or encoded
+connections exceeding 4,096 bytes with `Bounds`. Existing field tags and enum
+values, signed encodings, wire bytes for existing messages and fixture vectors
+are unchanged.
 Cargo and npm advance together to `0.31.0-alpha.46`; see
 [the release note](breaking/0.31.0-alpha.46.md). No Buf breaking override is used.
 

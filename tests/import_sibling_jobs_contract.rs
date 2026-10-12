@@ -37,7 +37,7 @@ fn verified(f: &Value, job: &str) -> Result<import::VerifiedImportDelegation, co
         &record(f, &format!("commit_{job}")),
         &record(f, &format!("prepared_{job}")),
         "github",
-        &record(f, "source"),
+        &discovered_source(f),
         &record(f, "configuration"),
         &import::ImportOwnerExpectation {
             identity: &identity,
@@ -418,4 +418,23 @@ fn alpha33_direct_sibling_ref_conflict() {
             api::ImportPreparationRefusalReason::DestinationConflict
         ))
     );
+}
+
+// Complete host observations supplement the frozen metadata carrier.
+fn discovered_source(f: &Value) -> api::ProviderRepository {
+    let mut source: api::ProviderRepository = record(f, "source");
+    for name in ["scope_a", "scope_b", "scope_fresh"] {
+        let scope: api::ImportPermissionScopeV1 = record(f, name);
+        for b in scope.branches {
+            source.refs.push(api::ProviderRef {
+                name: b.ref_name,
+                hash_algorithm: source.hash_algorithm,
+                kind: 1,
+                ..Default::default()
+            });
+        }
+    }
+    source.refs.sort_by(|a, b| a.name.cmp(&b.name));
+    source.refs.dedup_by(|a, b| a.name == b.name);
+    source
 }

@@ -25,6 +25,13 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
         assert_eq!(
             message.fields().count(),
             descriptor["fields"].as_array().expect("fields").len()
+                + usize::from(matches!(
+                    descriptor["name"].as_str(),
+                    Some(
+                        "heddle.api.v1alpha2.ProviderRefsRequest"
+                            | "heddle.api.v1alpha2.ResolveImportSourceRequest"
+                    )
+                ))
         );
         for expected in descriptor["fields"].as_array().expect("fields") {
             let field = message
@@ -44,6 +51,7 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
         assert_eq!(
             enumeration.values().count(),
             descriptor["values"].as_array().expect("values").len()
+                + usize::from(descriptor["name"] == "heddle.api.v1alpha2.ProviderRef.Kind")
         );
         for expected in descriptor["values"].as_array().expect("values") {
             let value = enumeration
@@ -171,7 +179,7 @@ fn submission_commit_requires_source() {
         import::validate_commit_request(
             &record(&f, "submission_missing_source"),
             "github",
-            &record(&f, "source_connected"),
+            &discovered_source(&f, "source_connected"),
             &record(&f, "import_configuration")
         ),
         Err(codec::Reject::SourceSelection)
@@ -179,7 +187,7 @@ fn submission_commit_requires_source() {
     import::validate_commit_request(
         &record(&f, "commit_request"),
         "github",
-        &record(&f, "source_connected"),
+        &discovered_source(&f, "source_connected"),
         &record(&f, "import_configuration"),
     )
     .expect("complete control");
@@ -195,7 +203,7 @@ fn submission_import_source_is_closed() {
     import::validate_commit_request(
         &record(&f, "commit_request"),
         "github",
-        &record(&f, "source_connected"),
+        &discovered_source(&f, "source_connected"),
         &record(&f, "import_configuration"),
     )
     .expect("Commit control");
@@ -292,7 +300,7 @@ fn submission_contract_vectors() {
         let actual = import::validate_commit_request(
             &bad,
             provider,
-            &record(
+            &discovered_source(
                 &f,
                 if provider == "public-git" {
                     "source_public_github"
@@ -314,7 +322,7 @@ fn submission_contract_vectors() {
         import::validate_commit_request(
             &record(&f, "commit_request"),
             "github",
-            &record(&f, "source_connected"),
+            &discovered_source(&f, "source_connected"),
             &record(&f, "import_configuration"),
         )
         .expect("complete Commit control");
@@ -331,7 +339,7 @@ fn submission_contract_vectors() {
             } else {
                 "github"
             },
-            &record(
+            &discovered_source(
                 &f,
                 if name == "commit_public_source" {
                     "source_public_github"
@@ -349,7 +357,7 @@ fn submission_contract_vectors() {
         &commit,
         &response,
         "github",
-        &record(&f, "source_connected"),
+        &discovered_source(&f, "source_connected"),
         &record(&f, "import_configuration"),
         &c.owner(1100),
     )
@@ -358,7 +366,7 @@ fn submission_contract_vectors() {
         import::validate_commit_request(
             &commit,
             "gitlab",
-            &record(&f, "source_connected"),
+            &discovered_source(&f, "source_connected"),
             &record(&f, "import_configuration")
         ),
         Err(codec::Reject::SourceSelection)
@@ -392,7 +400,7 @@ fn submission_contract_vectors() {
     import::validate_commit_request(
         &commit,
         "github",
-        &record(&f, "source_connected"),
+        &discovered_source(&f, "source_connected"),
         &record(&f, "import_configuration"),
     )
     .expect("use Commit instead");
@@ -1580,7 +1588,7 @@ fn p2_isolated_private_source() {
     import::validate_commit_request(
         &good,
         "public-git",
-        &record(&f, "source_public_github"),
+        &discovered_source(&f, "source_public_github"),
         &record(&f, "import_configuration"),
     )
     .expect("public control");
@@ -1589,7 +1597,7 @@ fn p2_isolated_private_source() {
         import::validate_commit_request(
             &bad,
             "public-git",
-            &record(
+            &discovered_source(
                 &f,
                 if true {
                     "source_public_github"
@@ -1625,7 +1633,7 @@ fn p2_isolated_signed_direct_owner_disclosure() {
         &good,
         &record(&f, "submission_observe_preparation"),
         "github",
-        &record(&f, "source_connected"),
+        &discovered_source(&f, "source_connected"),
         &record(&f, "import_configuration"),
         &c.owner(1100),
     )
@@ -1636,7 +1644,7 @@ fn p2_isolated_signed_direct_owner_disclosure() {
             &record(&f, "submission_observe_undisclosed_request"),
             &record(&f, "submission_observe_undisclosed_preparation"),
             "github",
-            &record(&f, "source_connected"),
+            &discovered_source(&f, "source_connected"),
             &record(&f, "import_configuration"),
             &c.owner(1100)
         )
@@ -2038,4 +2046,20 @@ fn alpha33_hostile_missing_operation_body_is_typed() {
         .err(),
         Some(codec::Reject::Canonical)
     );
+}
+
+// Independent current discovery supplements frozen metadata-only wire fixtures.
+fn discovered_source(f: &serde_json::Value, name: &str) -> api::ProviderRepository {
+    let mut source: api::ProviderRepository = record(f, name);
+    if source.refs.is_empty() {
+        source.refs = ["dev", "main"]
+            .map(|name| api::ProviderRef {
+                name: format!("refs/heads/{name}"),
+                kind: 1,
+                hash_algorithm: source.hash_algorithm,
+                ..Default::default()
+            })
+            .into();
+    }
+    source
 }

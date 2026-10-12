@@ -63,7 +63,8 @@ message ProviderRepository {
 }
 
 message ProviderRef {
-  // Fully qualified refs/heads/... or refs/tags/..., unique within a page.
+  // Fully qualified refs/heads/... or refs/tags/...; opt-in refs/pull/<n>/head.
+  // Globally unique and ordered by UTF-8 name bytes across the snapshot.
   string name = 1;
   // Exact lowercase Git object ID of the ref target; tags are not peeled.
   string head_oid = 2;
@@ -71,6 +72,7 @@ message ProviderRef {
     KIND_UNSPECIFIED = 0;
     KIND_BRANCH = 1;
     KIND_TAG = 2;
+    KIND_PULL_REQUEST = 3;
   }
   // Zero/unknown means unknown, never implicitly a branch.
   Kind kind = 3;
@@ -87,6 +89,9 @@ message ProviderRefsRequest {
   // Default 128, maximum 512. Cursor binds caller, connection, repository,
   // accepted bounds and provider snapshot; a changed snapshot invalidates it.
   PageRequest page = 3;
+  // Opt-in refs/pull/<positive decimal>/head; no zero or leading zeros, no merge
+  // refs. False preserves branches/tags only. Cursor binds this option as well.
+  bool include_pull_request_refs = 4;
 }
 // Authenticated bounded discovery for BOTH connected and public HTTPS sources.
 // Public: no connection/installation, private=false, repository ID equals URL
@@ -105,6 +110,9 @@ message ResolveImportSourceRequest {
   // Default 128, max 512. Cursor binds caller, exact custody/source identity,
   // accepted bounds and provider snapshot. Snapshot changes invalidate it.
   PageRequest page = 3;
+  // Opt-in refs/pull/<positive decimal>/head; no zero or leading zeros, no merge
+  // refs. False preserves branches/tags only. Cursor binds this option as well.
+  bool include_pull_request_refs = 4;
 }
 message ResolveImportSourceResponse {
   // Independently resolved, identity-preserving source; <=1 MiB entire response.

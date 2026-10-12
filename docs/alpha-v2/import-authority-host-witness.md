@@ -209,19 +209,66 @@ the independently resolved repository supplied to `validate_commit_request` /
 pinning. A frozen PINNED_COMMIT retains its selected commit when the branch head
 moves after Prepare; Commit never substitutes or requires the new head.
 
-The independently resolved source given to Prepare and Commit is the host's
-**complete** current discovery, not one ResolveImportSource page. It may hold up
-to `MAX_IMPORT_SOURCE_REFS` (**4096**) branch/tag refs, checked by
-`validate_discovered_repository` / `validateDiscoveredRepository`; more refuse
-with `Bounds`. A single discovery page stays bounded by
-`MAX_IMPORT_SOURCE_REF_PAGE` (512) through `validate_repository_hash_algorithm` /
-`validateRepositoryHashAlgorithm`. 4096 is weft's retained-ref cap after
-`refs/pull/*` and other unimported namespaces are dropped; hosts should use the
-exported constant rather than restating it (api#388). Discovered refs are
-pin evidence and never enter a signed record (the signed scope still selects at
-most `MAX_BRANCHES`), so no signature payload grows with them. Every discovered
-ref name is at most 1024 UTF-8 bytes (`MAX_REF_BYTES`, the signed-ref bound) or
-refuses with `Bounds`, so a complete discovery stays below about 4.4 MiB.
+The independently resolved discovery used by Prepare and Commit must cover the
+**complete** current authenticated snapshot, not just one ResolveImportSource
+page. `DiscoveryValidator::new(source_metadata, known, selected, options, mode)` /
+`new DiscoveryValidator(sourceMetadata, known, selected, options, mode)` consumes
+pages with `push_page` / `pushPage`, then `finish()` returns local
+`DiscoveryDigest` evidence. Metadata need not retain any refs. Strict ascending
+UTF-8 name-byte order across page boundaries proves uniqueness with one previous
+name. The running SHA-256, previous name, bounded source identity, at most 256
+copied selections are independent of total refs.
+Absent selections are accepted, as in alpha.45: Prepare treats absence as an
+unknown OID for both ref modes. Prepare checks current known pins; Commit
+preserves frozen pins when heads move or disappear, and
+still refuses OBSERVE if a selected current OID is known. Any failed page
+permanently invalidates the validator. TypeScript also disallows reuse after finish.
+
+`prepare_import_source_scope_with_discovery` /
+`prepareImportSourceScopeWithDiscovery` and `validate_commit_request_with_discovery` /
+`validateImportCommitRequestWithDiscovery` consume this evidence, privately bound
+to source identity/format, exact selection and Prepare/Commit mode. It cannot be
+constructed from incoming wire data. `verify_commit_submission_with_discovery` /
+`verifyImportCommitSubmissionWithDiscovery` also performs complete signed
+submission verification with this evidence. The complete-list `discover_repository` /
+`discoverRepository` adapter and existing validators share the incremental checks.
+Hosts authenticate page cursors, stable snapshot identity and exhausted coverage
+before finish: the validator cannot detect an omitted suffix. Evidence is local
+validation output, never authorization or a substitute for current grants.
+
+`MAX_IMPORT_SOURCE_REFS` is a **1,048,576-ref safety ceiling** on total validation
+work, independent of retained refs. Beyond it refuses `Bounds`. Each page remains
+at most `MAX_IMPORT_SOURCE_REF_PAGE` (512), each name at most `MAX_REF_BYTES`
+(1024 UTF-8 bytes). The ceiling limits hostile CPU work while accepting large
+advertisements without retaining their complete lists. Discovery preserves
+alpha.45 name and kind acceptance; it checks length, ordering, OID format and
+object algorithm. Strict namespace/shape checks apply only to signed selections.
+Source bindings reject clone URLs, repository/installation IDs above 4,096 UTF-8
+bytes and connections whose encoded RecordRef exceeds 4,096 bytes (`Bounds`).
+Unknown hash format remains discovery-only with empty OIDs.
+
+Both `ProviderRefsRequest` and `ResolveImportSourceRequest` have additive tag 4
+`include_pull_request_refs`. False/omitted retains alpha.45 discovery validation;
+true classifies `refs/pull/<positive decimal>/head` as `KIND_PULL_REQUEST` (3).
+Zero, leading zeros, merge refs and other unsupported namespaces are hashed as
+neutral kind 0 in complete host evidence. Cursors bind this option. Pull-request
+heads are source-side evidence only; signed scopes, manifests and every
+non-discovery verification path reject `refs/pull/...` selections. There is no
+native pull-ref destination namespace; a later step maps these heads to native
+threads. Signed layouts and existing fixture bytes do not change; at most
+`MAX_BRANCHES` (256) selections enter the signed scope.
+
+The standalone discovery identifier is SHA-256 over ASCII
+`heddle-import-discovery-v1`, the 32-byte source binding, a BE u32 option (0/1),
+a BE u32 repository hash algorithm, then each ordered ref's BE u32
+byte-length-prefixed UTF-8 name and lowercase ASCII OID, BE u32 classified kind,
+and BE u32 hash algorithm, followed by a BE u64 total ref count. Classified
+kinds are 1 for heads, 2 for tags, 3 for opted-in canonical pull-request heads,
+and 0 otherwise, independent of provider kind hints. Source binding is SHA-256
+of a protobuf ProviderRepository containing only connection, repository ID,
+clone URL, installation ID, private flag and hash algorithm. Page boundaries,
+signed selections and admission phase do not enter the identifier. Private
+bindings additionally protect selection and phase when admitting local evidence.
 Current source grants, selected-commit availability, revocation and atomic
 mutation remain host responsibilities. Exact accepted replay retains its semantics.
 

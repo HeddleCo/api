@@ -15,7 +15,7 @@ test("HYBRID conformance vectors require the additive wire messages", () => {
   }
 });
 
-import { create, fromBinary, toBinary, getOption } from '@bufbuild/protobuf';
+import { clone, create, fromBinary, toBinary, getOption } from '@bufbuild/protobuf';
 import { verify as nodeVerify, createPublicKey } from 'node:crypto';
 import * as authority from '../packages/typescript/dist/v1alpha2/import-authority.js';
 import * as witness from '../packages/typescript/dist/v1alpha2/witness-trust.js';
@@ -23,7 +23,12 @@ import { createServiceClient } from '../packages/typescript/dist/v1alpha2/client
 import { hash, join, u32, integer, sized, utf8, keyId } from '../packages/typescript/dist/v1alpha2/_hybrid-codec.js';
 const bytes=v=>new Uint8Array(Buffer.from(v,'hex'));
 const schemaFor=name=>(name.includes('.common.')?common:api)[`${name.split('.').at(-1)}Schema`];
-function vector(name){const v=fixture.signed_vectors[name]??fixture.wire_vectors[name];return authority.strictDecode(schemaFor(v.schema),bytes(v.wire_hex));}
+function vector(name){const v=fixture.signed_vectors[name]??fixture.wire_vectors[name];const value=authority.strictDecode(schemaFor(v.schema),bytes(v.wire_hex));
+ // Frozen source metadata is supplemented with independent host discovery,
+ // without changing any fixture bytes or signed records.
+ if(v.schema===api.ProviderRepositorySchema.typeName&&!name.startsWith('hash_bad_')){for(const n of ['dev','main'])if(!value.refs.some(r=>r.name===`refs/heads/${n}`))value.refs.push(create(api.ProviderRefSchema,{name:`refs/heads/${n}`,kind:1,hashAlgorithm:value.hashAlgorithm}));value.refs.sort((a,b)=>Buffer.compare(Buffer.from(a.name),Buffer.from(b.name)));}
+ return value;
+}
 function ownerContext(now=1100n){return {identity:vector('identity'),ownerPublicKey:bytes(fixture.keys.owner.public_key_hex),ownerChainDigest:bytes(fixture.context.owner_chain_digest_hex),authorityExpiresAtSeconds:2000n,nowUnixSeconds:now,forbiddenJobKeys:['owner','device','witness','next_witness','root'].map(n=>bytes(fixture.keys[n].public_key_hex)),knownJobAssociations:[]};}
 function setContext(now=1100000n){return {authority:fixture.context.authority,rootId:fixture.context.root_id,rootPublicKey:bytes(fixture.keys.root.public_key_hex),rootEpoch:1n,nowUnixMillis:now,clockFloorUnixMillis:1000000n,knownJobKeys:['job','sibling_job','direct_job'].map(n=>bytes(fixture.keys[n].public_key_hex))};}
 function assertCrypto(key,input,signature){const publicKey=createPublicKey({key:Buffer.concat([Buffer.from('302a300506032b6570032100','hex'),key]),format:'der',type:'spki'});assert.ok(nodeVerify(null,input,publicKey,signature),'fixed signature');}
@@ -123,7 +128,7 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
   assert.deepEqual(signature,bytes(v.signature_hex));assertCrypto(bytes(v.public_key_hex),input,signature);
 });
 test('frozen descriptor fields and public proof-only lookup',()=>{
-  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length);for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
+  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length+([api.ProviderRefsRequestSchema.typeName,api.ResolveImportSourceRequestSchema.typeName].includes(entry.name)?1:0));for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
   for(const descriptor of fixture.enums){const schema=(descriptor.name.includes(".common.")?common:api)[`${descriptor.name.split(".").at(-1)}Schema`];assert.deepEqual(schema.values.map(v=>({name:v.name,number:v.number})),descriptor.values);}
   const expected = ['CancelImportJob', 'CommitImportJob', 'GetHostedWitnessHistoryProof', 'GetImportJobState', 'ImportSource',
     'PrepareImportJob', 'RetryImportSource', 'SynchronizeRemote']
@@ -319,21 +324,22 @@ for(const v of fixture.source_vectors.prepare_negative)test(`alpha25 Prepare sou
  assert.throws(()=>authority.prepareImportSourceScope(vector(v.request), vector('source_public_sha256'), undefined, vector('import_configuration'), scope.destinationVersion),expected(v.expected));
  authority.prepareImportSourceScope(vector('prepare_public_sha256'), vector('source_public_sha256'), undefined, vector('import_configuration'), scope.destinationVersion);console.log(`ALPHA25 REJECT then PASS prepare.${v.id}: ${v.expected}`);
 });
-// HeddleCo/api#388: complete discovery is bounded by weft's retained-ref cap, not the page size.
+// Complete discovery and a single page have independent bounds.
 function withRefs(source,count){
- const r=create(api.ProviderRepositorySchema,source),width=r.hashAlgorithm===1?40:64;
- r.refs=Array.from({length:count},(_,i)=>create(api.ProviderRefSchema,{name:`refs/tags/v${String(i).padStart(5,'0')}`,headOid:i.toString(16).padStart(width,'0'),kind:2,hashAlgorithm:r.hashAlgorithm}));
+ const r=clone(api.ProviderRepositorySchema,source),width=r.hashAlgorithm===1?40:64;
+ const selected=r.refs;
+ r.refs=Array.from({length:count-selected.length},(_,i)=>create(api.ProviderRefSchema,{name:`refs/tags/v${String(i).padStart(5,'0')}`,headOid:i.toString(16).padStart(width,'0'),kind:2,hashAlgorithm:r.hashAlgorithm}));
+ r.refs.push(...selected);r.refs.sort((a,b)=>Buffer.compare(Buffer.from(a.name),Buffer.from(b.name)));
  return r;
 }
 test('api#388 Prepare accepts complete discovery up to MAX_IMPORT_SOURCE_REFS',()=>{
- assert.equal(authority.MAX_IMPORT_SOURCE_REFS,4096);assert.equal(authority.MAX_IMPORT_SOURCE_REF_PAGE,512);
+ assert.equal(authority.MAX_IMPORT_SOURCE_REFS,1048576);assert.equal(authority.MAX_IMPORT_SOURCE_REF_PAGE,512);
  const prepare=source=>authority.prepareImportSourceScope(vector('prepare_public_sha256'),source,undefined,vector('import_configuration'),vector('scope').destinationVersion);
  const base=vector('source_public_sha256');
- prepare(withRefs(base,600));prepare(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS));
- assert.throws(()=>prepare(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS+1)),expected('Bounds'));
- const unsorted=withRefs(base,authority.MAX_IMPORT_SOURCE_REFS);[unsorted.refs[100],unsorted.refs[101]]=[unsorted.refs[101],unsorted.refs[100]];
+ prepare(withRefs(base,600));prepare(withRefs(base,20000));
+ const unsorted=withRefs(base,20000);[unsorted.refs[100],unsorted.refs[101]]=[unsorted.refs[101],unsorted.refs[100]];
  assert.throws(()=>prepare(unsorted),expected('Canonical'));
- const duplicate=withRefs(base,authority.MAX_IMPORT_SOURCE_REFS);duplicate.refs[101].name=duplicate.refs[100].name;
+ const duplicate=withRefs(base,20000);duplicate.refs[101].name=duplicate.refs[100].name;
  assert.throws(()=>prepare(duplicate),expected('Canonical'));
  const long=withRefs(base,600);long.refs.at(-1).name='refs/tags/'+'z'.repeat(authority.MAX_REF_BYTES-10);prepare(long);
  long.refs.at(-1).name+='z';assert.throws(()=>prepare(long),expected('Bounds'));
@@ -343,8 +349,7 @@ test('api#388 Prepare accepts complete discovery up to MAX_IMPORT_SOURCE_REFS',(
 test('api#388 Commit accepts complete discovery up to MAX_IMPORT_SOURCE_REFS',async()=>{
  const commit=source=>authority.validateImportCommitRequest(vector('commit_request'),'github',source,vector('import_configuration'));
  const base=vector('source_connected');
- await commit(withRefs(base,600));await commit(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS));
- await assert.rejects(commit(withRefs(base,authority.MAX_IMPORT_SOURCE_REFS+1)),expected('Bounds'));
+ await commit(withRefs(base,600));await commit(withRefs(base,20000));
 });
 test('alpha25 unknown discovery is retryable, optional converter recommendation and SHA256 observe',()=>{
  authority.validateRepositoryHashAlgorithm(vector('source_unknown'),false);

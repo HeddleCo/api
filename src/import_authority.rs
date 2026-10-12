@@ -2074,6 +2074,33 @@ pub(crate) fn original_signatures(
     }
     Ok(hash(&[b"heddle-hosted-original-signatures-v1", &out]))
 }
+
+#[cfg(test)]
+#[test]
+fn sha2_golden_original_signatures() {
+    let first = SignedRecord {
+        signatures: vec![RecordSignature {
+            public_key: vec![1; 32],
+            signature: vec![2; 64],
+        }],
+        ..Default::default()
+    };
+    let second = SignedRecord {
+        signatures: vec![RecordSignature {
+            public_key: vec![3; 32],
+            signature: vec![4; 64],
+        }],
+        ..Default::default()
+    };
+    let extra = RecordSignature {
+        public_key: vec![5; 32],
+        signature: vec![6; 64],
+    };
+    assert_eq!(
+        hex::encode(original_signatures(&[&first, &second], &[extra]).expect("fixed signatures")),
+        "04bcf713a6a5fdec2bbfae89ee71894db72db54ca75597831fea7192ef9bf3e1"
+    );
+}
 use crate::hybrid_codec::Canonical;
 /// Portable request-role refusal. Receiver facts include known job and forbidden request keys.
 pub fn verify_landing_key_roles(

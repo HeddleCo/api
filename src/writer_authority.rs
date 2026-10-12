@@ -543,3 +543,52 @@ pub(crate) fn verify_retained_owner_mint_root_attachment(
         &signature.signature,
     )
 }
+
+#[cfg(test)]
+#[test]
+fn sha2_golden_retained_attachment() {
+    use prost::Message;
+    let f: serde_json::Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/writer-authority-alpha35.json"
+    ))
+    .expect("fixed writer fixture");
+    let wire = hex::decode(
+        f["vectors"]["paired_after_rotate"]["wire_hex"]
+            .as_str()
+            .expect("hex"),
+    )
+    .expect("bytes");
+    let signed = api::SignedOwnerMintRootAttachment::decode(wire.as_slice()).expect("attachment");
+    let attachment = signed.attachment.as_ref().expect("body");
+    let issuer = RetainedMintRootIssuer {
+        account_uuid: attachment.account_uuid.clone(),
+        state_hash: attachment.owner_state_hash.clone(),
+        sequence: attachment.owner_sequence,
+        public_key: attachment
+            .owner_key
+            .as_ref()
+            .expect("owner")
+            .public_key
+            .clone(),
+    };
+    let admitted = AdmittedMintRootAttachment(signed.clone());
+    assert_eq!(
+        hex::encode(
+            &signed
+                .owner_signature
+                .as_ref()
+                .expect("signature")
+                .signature
+        ),
+        "53ac35d56c3055c5c47ab2c6e3f03408797d69800b2e1ff13e41a2d3ad79127141df365bdc6eea57a837506ec3eeb12be1dd9f527841381f58787ec15e67ea00"
+    );
+    // A fixed valid signature pins the private verifier's exact signed digest.
+    verify_retained_owner_mint_root_attachment(
+        &signed,
+        &attachment.mint_root_key.as_ref().expect("mint").public_key,
+        &issuer,
+        &admitted,
+        1100,
+    )
+    .expect("fixed signed digest");
+}

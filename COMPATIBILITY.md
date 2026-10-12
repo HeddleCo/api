@@ -1,5 +1,16 @@
 # Compatibility policy
 
+The SHA-2 dependency upgrade from `sha2 = "=0.10.9"` to `"=0.11.0"` is
+nonbreaking. SHA-2 and `digest` imports are private implementation details:
+there are no public re-exports, field types, signature types or trait bounds
+from those crates. Public digest helpers still return `[u8; 32]`, `Vec<u8>` or
+`String`, and signed transcripts and identifiers retain their exact bytes.
+Consumers need no symbol migration. The
+[golden-vector inventory](tests/sha2-golden.md) records the baseline and coverage.
+Package versions remain unchanged; Cargo and npm advance together in the next
+separate release. Published verifier/native dependencies may retain SHA-2 0.10
+in their isolated conformance graphs; the local API crate uses only 0.11.
+
 HYBRID import Prepare and Commit accept a complete current source discovery of
 up to 4096 branch/tag refs (HeddleCo/api#388), up from 512. The new exported
 constants are `MAX_IMPORT_SOURCE_REFS` (4096, weft's retained-ref cap) and

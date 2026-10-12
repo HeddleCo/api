@@ -1,0 +1,17 @@
+{
+  "domain": "heddle-import-discovery-v1",
+  "branches": 8000,
+  "pull_requests": 8000,
+  "tags": 4000,
+  "ref_count": 20000,
+  "vectors": [
+    {
+      "hash_algorithm": 1,
+      "sha256": "de6599e6d81a5d7d31dd93c32a42c0a99c946c16c2e012e4d0a95c9c882daeb6"
+    },
+    {
+      "hash_algorithm": 2,
+      "sha256": "02a9837ea56b17646bc2c505050ed08fb4314b4fd4c4bba8a250baa74939a8b5"
+    }
+  ]
+}

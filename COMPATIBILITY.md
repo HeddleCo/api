@@ -7,18 +7,28 @@ from those crates. Public digest helpers still return `[u8; 32]`, `Vec<u8>` or
 `String`, and signed transcripts and identifiers retain their exact bytes.
 Consumers need no symbol migration. The
 [golden-vector inventory](tests/sha2-golden.md) records the baseline and coverage.
-Package versions remain unchanged; Cargo and npm advance together in the next
-separate release. Published verifier/native dependencies may retain SHA-2 0.10
+The dependency upgrade itself required no version change; the alpha.46 import
+revision below advances Cargo and npm together. Published verifier/native
+dependencies may retain SHA-2 0.10
 in their isolated conformance graphs; the local API crate uses only 0.11.
 
-HYBRID import Prepare and Commit accept a complete current source discovery of
-up to 4096 branch/tag refs (HeddleCo/api#388), up from 512. The new exported
-constants are `MAX_IMPORT_SOURCE_REFS` (4096, weft's retained-ref cap) and
-`MAX_IMPORT_SOURCE_REF_PAGE` (512), with `validate_discovered_repository` /
-`validateDiscoveredRepository` for complete discovery. One ResolveImportSource
-page stays capped at 512 refs. Every discovered ref name must now be at most
-1024 UTF-8 bytes (`MAX_REF_BYTES`), or the source refuses with `Bounds`. No tags,
-wire bytes or signed records change, and no fixture vector changes.
+HYBRID import discovery now validates incrementally with bounded state
+(HeddleCo/api#400). `MAX_IMPORT_SOURCE_REFS` is a 1,048,576-ref work ceiling,
+independent of retained refs; pages remain at most 512 and names at most 1024
+UTF-8 bytes. `DiscoveryValidator` produces local `DiscoveryDigest` evidence for
+Prepare/Commit without assembling the complete advertisement. Strict global
+UTF-8 ordering proves uniqueness; selected refs (at most 256) must be present.
+Hosts authenticate snapshot/cursor continuity and complete coverage. Failed
+validators cannot produce evidence. Discovery now checks namespace/kind agreement.
+
+`ProviderRefsRequest.include_pull_request_refs` and
+`ResolveImportSourceRequest.include_pull_request_refs` (both tag 4) opt in to
+`refs/pull/<positive decimal>/head`; no zero, leading zeros or merge refs.
+`ProviderRef.Kind.KIND_PULL_REQUEST` (3) is additive. Omitted/false options keep
+branch/tag discovery. Existing field tags and enum values, signed encodings,
+wire bytes for existing messages and fixture vectors are unchanged.
+Cargo and npm advance together to `0.31.0-alpha.46`; see
+[the release note](breaking/0.31.0-alpha.46.md). No Buf breaking override is used.
 
 Content and symbol search index only each Thread's current source tips
 (HeddleCo/weft#2433). `SearchRequest.source_scope` keeps its tags and

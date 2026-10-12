@@ -1,5 +1,4 @@
-//! HeddleCo/api#388: complete discovery handed to Prepare/Commit is bounded by
-//! `MAX_IMPORT_SOURCE_REFS` (weft's retained-ref cap), not the 512-ref page size.
+//! Complete discovery has a work ceiling independent of the 512-ref page size.
 use heddle_api::heddle::api::v1alpha2 as api;
 use heddle_api::{hybrid_codec as codec, import_authority as import};
 use prost::Message;
@@ -26,14 +25,25 @@ fn record<T: Message + Default>(f: &Value, name: &str) -> T {
     .expect("fixed wire")
 }
 
-/// Sorted, unique tag refs that never collide with the signed branch selection.
+/// Retain selected branch observations and add sorted unique tag refs.
 fn with_refs(mut source: api::ProviderRepository, count: usize) -> api::ProviderRepository {
     let oid_hex = match source.hash_algorithm {
         1 => 40,
         2 => 64,
         other => panic!("fixture source must have a known algorithm, got {other}"),
     };
-    source.refs = (0..count)
+    if source.refs.is_empty() {
+        source.refs = ["dev", "main"]
+            .map(|name| api::ProviderRef {
+                name: format!("refs/heads/{name}"),
+                kind: 1,
+                hash_algorithm: source.hash_algorithm,
+                ..Default::default()
+            })
+            .into();
+    }
+    let selected = source.refs.clone();
+    source.refs = (0..count.saturating_sub(selected.len()))
         .map(|i| api::ProviderRef {
             name: format!("refs/tags/v{i:05}"),
             head_oid: format!("{i:0oid_hex$x}"),
@@ -41,6 +51,8 @@ fn with_refs(mut source: api::ProviderRepository, count: usize) -> api::Provider
             hash_algorithm: source.hash_algorithm,
         })
         .collect();
+    source.refs.extend(selected);
+    source.refs.sort_by(|a, b| a.name.cmp(&b.name));
     source
 }
 
@@ -57,7 +69,7 @@ impl Prepare {
         let scope: api::ImportPermissionScopeV1 = record(&f, "scope");
         Self {
             request: record(&f, "prepare_public_sha256"),
-            source: record(&f, "source_public_sha256"),
+            source: with_refs(record(&f, "source_public_sha256"), 2),
             configuration: record(&f, "import_configuration"),
             destination_version: scope.destination_version,
         }
@@ -84,27 +96,20 @@ fn prepare_accepts_a_mature_repository_with_more_refs_than_one_page() {
 }
 
 #[test]
-fn prepare_accepts_exactly_the_bound_and_rejects_one_more() {
-    assert_eq!(import::MAX_IMPORT_SOURCE_REFS, 4096);
+fn prepare_accepts_twenty_thousand_refs() {
+    assert_eq!(import::MAX_IMPORT_SOURCE_REFS, 1_048_576);
     let p = Prepare::new();
-    let at = with_refs(p.source.clone(), import::MAX_IMPORT_SOURCE_REFS);
-    p.run(&at).expect("4096 refs accepted");
-    let over = with_refs(p.source.clone(), import::MAX_IMPORT_SOURCE_REFS + 1);
-    assert_eq!(p.run(&over), Err(codec::Reject::Bounds));
-    let scope = p.request.proposed_scope.as_ref().expect("scope");
-    assert_eq!(
-        import::validate_discovered_import_scope(scope, &over),
-        Err(codec::Reject::Bounds)
-    );
+    p.run(&with_refs(p.source.clone(), 20_000))
+        .expect("20,000 refs accepted");
 }
 
 #[test]
 fn complete_discovery_still_rejects_unsorted_and_duplicate_refs() {
     let p = Prepare::new();
-    let mut unsorted = with_refs(p.source.clone(), import::MAX_IMPORT_SOURCE_REFS);
+    let mut unsorted = with_refs(p.source.clone(), 20_000);
     unsorted.refs.swap(100, 101);
     assert_eq!(p.run(&unsorted), Err(codec::Reject::Canonical));
-    let mut duplicate = with_refs(p.source.clone(), import::MAX_IMPORT_SOURCE_REFS);
+    let mut duplicate = with_refs(p.source.clone(), 20_000);
     duplicate.refs[101].name = duplicate.refs[100].name.clone();
     assert_eq!(p.run(&duplicate), Err(codec::Reject::Canonical));
 }
@@ -141,6 +146,7 @@ fn resolve_page_keeps_its_512_ref_page_bound() {
         }),
         include_refs: true,
         page: None,
+        include_pull_request_refs: false,
     };
     let response = |source| api::ResolveImportSourceResponse {
         source: Some(source),
@@ -154,19 +160,15 @@ fn resolve_page_keeps_its_512_ref_page_bound() {
 }
 
 #[test]
-fn commit_accepts_complete_discovery_up_to_the_bound() {
+fn commit_accepts_twenty_thousand_refs() {
     let f = fixture();
     let request: api::CommitImportJobRequest = record(&f, "commit_request");
-    let source: api::ProviderRepository = record(&f, "source_connected");
+    let source: api::ProviderRepository = with_refs(record(&f, "source_connected"), 2);
     let configuration: api::GetImportConfigurationResponse = record(&f, "import_configuration");
     let commit = |current: &api::ProviderRepository| {
         import::validate_commit_request(&request, "github", current, &configuration)
     };
     commit(&source).expect("fixture control");
     commit(&with_refs(source.clone(), REAL_REPO_REFS)).expect("600 refs accepted");
-    commit(&with_refs(source.clone(), import::MAX_IMPORT_SOURCE_REFS)).expect("4096 accepted");
-    assert_eq!(
-        commit(&with_refs(source, import::MAX_IMPORT_SOURCE_REFS + 1)),
-        Err(codec::Reject::Bounds)
-    );
+    commit(&with_refs(source, 20_000)).expect("20,000 accepted");
 }

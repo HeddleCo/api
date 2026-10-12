@@ -2020,11 +2020,28 @@ mod tests {
         .expect("completed signed commit");
         let submission: wire::CommitImportJobRequest =
             record(&f, "commit_request").expect("initial submission");
+        // Frozen metadata is supplemented by independent complete host discovery.
+        let mut source: wire::ProviderRepository =
+            record(&f, "source_connected").expect("current source");
+        source.refs = verified
+            .body()
+            .scope
+            .as_ref()
+            .expect("scope")
+            .branches
+            .iter()
+            .map(|b| wire::ProviderRef {
+                name: b.ref_name.clone(),
+                hash_algorithm: b.hash_algorithm,
+                kind: 1,
+                ..Default::default()
+            })
+            .collect();
         import::verify_commit_submission(
             &submission,
             &prepared,
             "github",
-            &record(&f, "source_connected").expect("current source"),
+            &source,
             &record(&f, "import_configuration").expect("configuration"),
             &expectation,
         )

@@ -169,6 +169,20 @@ mod descriptor {
             message("heddle.api.v1alpha2.PageRequest"),
             false,
         );
+        field(
+            "ProviderRefsRequest",
+            "include_pull_request_refs",
+            4,
+            Kind::Bool,
+            false,
+        );
+        field(
+            "ResolveImportSourceRequest",
+            "include_pull_request_refs",
+            4,
+            Kind::Bool,
+            false,
+        );
         field("ProviderRef", "name", 1, Kind::String, false);
         field("ProviderRef", "head_oid", 2, Kind::String, false);
         let kind = pool()
@@ -181,7 +195,8 @@ mod descriptor {
             [
                 ("KIND_UNSPECIFIED".into(), 0),
                 ("KIND_BRANCH".into(), 1),
-                ("KIND_TAG".into(), 2)
+                ("KIND_TAG".into(), 2),
+                ("KIND_PULL_REQUEST".into(), 3)
             ]
         );
         field("ProviderRef", "kind", 3, Kind::Enum(kind), false);

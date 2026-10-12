@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { toBinary } from '@bufbuild/protobuf';
+import { create, toBinary } from '@bufbuild/protobuf';
 import * as api from '../packages/typescript/dist/v1alpha2/index.js';
 import * as a from '../packages/typescript/dist/v1alpha2/import-authority.js';
 const f=JSON.parse(readFileSync(new URL('./fixtures/import-sibling-jobs-alpha32.json',import.meta.url)));
@@ -10,7 +10,12 @@ const bytes=h=>new Uint8Array(Buffer.from(h,'hex'));
 const record=n=>{const r=f.wire_vectors[n]??f.signed_vectors[n];return a.strictDecode(api[r.schema.split('.').at(-1)+'Schema'],bytes(r.wire_hex));};
 const expected=e=>e instanceof a.HybridContractError?(e.reason==='PreparationRefused'?api.ImportPreparationRefusalReason[e.preparationRefusalReason]:e.reason):String(e);
 const context=()=>({identity:record('identity'),ownerPublicKey:bytes(base.keys.owner.public_key_hex),ownerChainDigest:bytes(base.context.owner_chain_digest_hex),authorityExpiresAtSeconds:2000n,nowUnixSeconds:1100n,forbiddenJobKeys:['owner','device','witness','next_witness','root'].map(k=>bytes(base.keys[k].public_key_hex)),knownJobAssociations:[]});
-const verify=job=>a.verifyImportCommitSubmission(record('commit_'+job),record('prepared_'+job),'github',record('source'),record('configuration'),context());
+const discovery=()=>{
+ const source=record('source');
+ for(const name of ['scope_a','scope_b','scope_fresh'])for(const b of record(name).branches)if(!source.refs.some(r=>r.name===b.refName))source.refs.push(create(api.ProviderRefSchema,{name:b.refName,hashAlgorithm:source.hashAlgorithm,kind:1}));
+ source.refs.sort((a,b)=>Buffer.compare(Buffer.from(a.name),Buffer.from(b.name)));return source;
+};
+const verify=job=>a.verifyImportCommitSubmission(record('commit_'+job),record('prepared_'+job),'github',discovery(),record('configuration'),context());
 for(const scenario of f.scenarios)test('alpha32 sibling '+scenario.id,async()=>{
  const inventory=new Map(),id=record('identity').spoolUuid,current=bytes(f.current_destination_hex);
  for(const step of scenario.steps){

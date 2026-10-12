@@ -1,8 +1,9 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import { ForeignReferences, foreignThread } from "./_foreign-dependencies.js";
 import { clone, create, toBinary } from "@bufbuild/protobuf";
 import * as api from "./import_authority_pb.js";
 import { checkWitnessWriter, validateOwnerHistories, spoolAccountForStatement } from "./writer-authority.js";
-import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse, type RetryImportSourceRequest } from "./integration_pb.js";
+import { CommitImportJobRequestSchema, ProviderRepositorySchema, ResolveImportSourceResponseSchema, type CommitImportJobRequest, type ImportSourceRequest, type ProviderRef, type ProviderRepository, type ResolveImportSourceRequest, type ResolveImportSourceResponse, type RetryImportSourceRequest } from "./integration_pb.js";
 import { RecordRefSchema, SpoolRefSchema } from "./common_pb.js";
 import type { HybridImportJobSelector, MutationResponse, OperationRecord, SpoolRef, RecordRef } from "./common_pb.js";
 import { SignedSpoolOwnerGenesisSchema, OwnerHistorySchema, ResourceTransferAuditRecordSchema, SignedSpoolPolicyRecordSchema, type AuthorizationSignature } from "./owner_records_pb.js";
@@ -20,10 +21,9 @@ export const MAX_DELEGATION_WINDOW_SECONDS=7n*24n*60n*60n;
 export const MAX_COMMIT_REQUEST_BYTES=2*MAX_BUNDLE_BYTES;
 /** Refs in one ResolveImportSource/ProviderRefsRequest page (proto: max 512). */
 export const MAX_IMPORT_SOURCE_REF_PAGE=512;
-/** Branch/tag refs in a host's COMPLETE current discovery checked by Prepare and Commit.
- * Equals weft's retained-ref cap. Discovered refs are pin evidence, not signed content:
- * the signed scope still selects at most MAX_BRANCHES. Names are at most MAX_REF_BYTES. */
-export const MAX_IMPORT_SOURCE_REFS=4096;
+/** Safety ceiling on complete discovery work, independent of retained refs. */
+export const MAX_IMPORT_SOURCE_REFS=1048576;
+export const DISCOVERY_DOMAIN="heddle-import-discovery-v1";
 export const CANCELLATION_NAMESPACE="heddle-import-cancel-v1";
 export const signedPermissionDigest=(v:api.SignedImportMemberPermissionV1)=>signingDigest("heddle-signed-import-member-permission-v1",api.SignedImportMemberPermissionV1Schema,v);
 export const signedGenesisDigest=(v:api.SignedImportGenesisAuthorityV1)=>signingDigest("heddle-signed-import-genesis-authority-v1",api.SignedImportGenesisAuthorityV1Schema,v);
@@ -40,9 +40,13 @@ function validity(start:bigint,end:bigint,now:bigint,current:boolean){if(start<0
 // Mirrors sley-refs 0.11.0 check_refname_format plus Git's branch-only rules.
 // UTF-8 bytes are the signed identity; do not normalize or replace surrogates.
 function branchRef(name:string):void {
+  if(name.startsWith("refs/pull/")){pullRequestRef(name);return;}
   const prefix="refs/heads/",short=name.slice(prefix.length);
-  if(!name.startsWith(prefix)||!short||short.startsWith("-")||short==="HEAD"
-    ||name.endsWith("/")||name.endsWith(".")||name.includes("..")||name.includes("//")||name.includes("@{")
+  if(!name.startsWith(prefix)||!short||short.startsWith("-")||short==="HEAD")reject("Canonical");
+  gitRefName(name);
+}
+function gitRefName(name:string):void {
+  if(name.endsWith("/")||name.endsWith(".")||name.includes("..")||name.includes("//")||name.includes("@{")
     ||name.split("/").some(p=>p.startsWith(".")||p.endsWith(".lock"))
     ||/[\x00-\x20\x7f~^:?*\[\\]/.test(name))reject("Canonical");
   const bytes=utf8.encode(name);
@@ -112,51 +116,141 @@ export function validateResolveImportSourceResponse(request:ResolveImportSourceR
     ||!sameSourceSelection(selection,sourceSelection(resolved))
     ||(!resolved.connection&&resolved.providerRepositoryId!==selected.cloneUrl))reject("SourceSelection");
   validateRepositorySizeEstimate(resolved);
-  validateRepositoryHashAlgorithm(resolved,false);
+  validateRepositoryHashAlgorithmWithOptions(resolved,false,{includePullRequestRefs:request.includePullRequestRefs});
 }
 function validateRetainedImportSource(selector:api.ImportSourceSelectionV1,scope:api.ImportPermissionScopeV1):void {
   const source=create(ProviderRepositorySchema,{connection:selector.connection,providerRepositoryId:selector.providerRepositoryId,installationId:selector.installationId,private:selector.private,cloneUrl:scope.sourceUrl});
   if(resolveImportProvider(source,selector.connection?"github":undefined)!==scope.provider
     ||(!selector.connection&&selector.providerRepositoryId!==scope.sourceUrl))reject("SourceSelection");
 }
-/** One discovery page (at most MAX_IMPORT_SOURCE_REF_PAGE refs). */
-export function validateRepositoryHashAlgorithm(source:ProviderRepository, known:boolean):void {
-  validateSourceRefs(source,known,MAX_IMPORT_SOURCE_REF_PAGE);
+/** Opt-in pull-request heads; merge refs are excluded. */
+export interface DiscoveryOptions { readonly includePullRequestRefs?: boolean; }
+export type DiscoverySelectionMode = "prepare" | "commit";
+/** Local evidence, never a signed record or wire carrier. */
+export interface DiscoveryDigest { readonly digest: Uint8Array; readonly refCount: number; }
+const discoveryBindings=new WeakMap<DiscoveryDigest,{source:Uint8Array;selection:Uint8Array;mode:DiscoverySelectionMode}>();
+function pullRequestRef(name:string):void {
+  if(/^refs\/pull\/[1-9][0-9]*\/head$/.exec(name)?.[0]!==name)reject("Canonical");
+  if(utf8.encode(name).length>MAX_REF_BYTES)reject("Bounds");
 }
-/** A host's complete current discovery for Prepare/Commit: known algorithm, at most MAX_IMPORT_SOURCE_REFS refs. */
-export function validateDiscoveredRepository(source:ProviderRepository):void {
-  validateSourceRefs(source,true,MAX_IMPORT_SOURCE_REFS);
+function discoveryRefName(r:ProviderRef,options:DiscoveryOptions):void {
+  let kind:number;
+  if(r.name.startsWith("refs/heads/")){branchRef(r.name);kind=1;}
+  else if(r.name.startsWith("refs/tags/")){gitRefName(r.name);if(r.name==="refs/tags/")reject("Canonical");kind=2;}
+  else if(options.includePullRequestRefs&&r.name.startsWith("refs/pull/")){pullRequestRef(r.name);kind=3;}
+  else reject("Canonical");
+  if(r.kind!==0&&r.kind!==kind)reject("SourceSelection");
 }
-function validateSourceRefs(source:ProviderRepository, known:boolean, maxRefs:number):void {
-  const size=source.hashAlgorithm===1?40:source.hashAlgorithm===2?64:source.hashAlgorithm===0&&!known?undefined:reject("Version");
-  if(source.refs.length>maxRefs)reject("Bounds");
-  source.refs.forEach((r,i)=>{
-    if(utf8.encode(r.name).length>MAX_REF_BYTES)reject("Bounds");
-    if(r.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
-    if(i&&compare(utf8.encode(source.refs[i-1]!.name),utf8.encode(r.name))>=0)reject("Canonical");
-    if(r.headOid){if(size===undefined)reject("Version");if(r.headOid.length!==size)reject("SourceSelection");if(!/^[0-9a-f]+$/.test(r.headOid))reject("Canonical");}
-  });
+function discoverySourceBinding(source:ProviderRepository):Uint8Array {
+  for(const text of [source.cloneUrl,source.providerRepositoryId,source.installationId])if(utf8.encode(text).length>4096)reject("Bounds");
+  if(source.connection&&toBinary(RecordRefSchema,source.connection).length>4096)reject("Bounds");
+  return hash(toBinary(ProviderRepositorySchema,create(ProviderRepositorySchema,{
+    connection:source.connection,providerRepositoryId:source.providerRepositoryId,cloneUrl:source.cloneUrl,
+    installationId:source.installationId,private:source.private,hashAlgorithm:source.hashAlgorithm,
+  })));
 }
-export function validateDiscoveredImportScope(scope:api.ImportPermissionScopeV1, source:ProviderRepository):void {
-  validateDiscoveredImportScopeInner(scope,source);
+function discoverySelectionBinding(selected:readonly api.ImportBranchLimitV1[]):Uint8Array {
+  if(selected.length>MAX_BRANCHES)reject("Bounds");
+  const digest=sha256.create();
+  selected.forEach((b,i)=>{branch(b);if(i&&compareRefs(selected[i-1]!.refName,b.refName)>=0)reject("Canonical");digest.update(canonicalHybridV1(api.ImportBranchLimitV1Schema,b));});
+  return digest.digest();
 }
-function validateDiscoveredImportScopeInner(scope:api.ImportPermissionScopeV1, source:ProviderRepository):void {
-  validateDiscoveredRepository(source);
-  if(scope.sourceUrl!==source.cloneUrl)reject("SourceSelection");
-  for(const b of scope.branches){
-    if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");
-    const text=source.refs.find(r=>r.name===b.refName)?.headOid;
-    const oid=text?Uint8Array.from(text.match(/../g)!,v=>parseInt(v,16)):undefined;
-    validateImportRefSelection(b,oid);
+function checkDiscovery(discovery:DiscoveryDigest,source:ProviderRepository,selected:readonly api.ImportBranchLimitV1[],mode:DiscoverySelectionMode):void {
+  const binding=discoveryBindings.get(discovery);
+  if(!binding||binding.mode!==mode||!equal(binding.source,discoverySourceBinding(source))||!equal(binding.selection,discoverySelectionBinding(selected)))reject("SourceSelection");
+}
+/** Bounded incremental validation: strict UTF-8 ordering proves uniqueness with
+ * one previous name. Hosts authenticate cursor/snapshot continuity and exhausted
+ * coverage before finish(); truncation cannot be detected here. Failed validators
+ * are unusable. State retains one bounded name, at most MAX_BRANCHES bounded
+ * selections and bounded source metadata, independent of total refs/pages. */
+export class DiscoveryValidator {
+  #digest=sha256.create();
+  #hashAlgorithm:number;
+  #oidSize:number|undefined;
+  #options:DiscoveryOptions;
+  #selected:api.ImportBranchLimitV1[];
+  #seen:boolean[];
+  #previous:Uint8Array|undefined;
+  #refCount=0;
+  #closed=false;
+  #sourceBinding:Uint8Array;
+  #selectionBinding:Uint8Array;
+  #mode:DiscoverySelectionMode;
+  constructor(source:ProviderRepository,known:boolean,selected:readonly api.ImportBranchLimitV1[]=[],options:DiscoveryOptions={},mode:DiscoverySelectionMode="prepare") {
+    this.#oidSize=source.hashAlgorithm===1?40:source.hashAlgorithm===2?64:source.hashAlgorithm===0&&!known?undefined:reject("Version");
+    this.#selectionBinding=discoverySelectionBinding(selected);
+    for(const b of selected){if(b.hashAlgorithm!==source.hashAlgorithm)reject("SourceSelection");if(b.refName.startsWith("refs/pull/")&&!options.includePullRequestRefs)reject("Canonical");}
+    if(mode!=="prepare"&&mode!=="commit")reject("Canonical");
+    this.#hashAlgorithm=source.hashAlgorithm;this.#options={includePullRequestRefs:options.includePullRequestRefs===true};this.#mode=mode;
+    // Explicit byte copies also isolate Node Buffers, whose slice() is a view.
+    this.#selected=selected.map(b=>{const copy=clone(api.ImportBranchLimitV1Schema,b);
+      copy.pinnedCommitOid=new Uint8Array(b.pinnedCommitOid);copy.genesisDigest=new Uint8Array(b.genesisDigest);
+      copy.targetThreadId=new Uint8Array(b.targetThreadId);copy.expectedFrontierDigest=new Uint8Array(b.expectedFrontierDigest);return copy;
+    });this.#seen=selected.map(()=>false);
+    this.#sourceBinding=discoverySourceBinding(source);
+    this.#digest.update(utf8.encode(DISCOVERY_DOMAIN)).update(u32(source.hashAlgorithm));
   }
+  pushPage(refs:readonly ProviderRef[]):void {
+    if(this.#closed)reject("Canonical");
+    try {
+      if(refs.length>MAX_IMPORT_SOURCE_REF_PAGE||refs.length>MAX_IMPORT_SOURCE_REFS-this.#refCount)reject("Bounds");
+      for(const r of refs){
+        const name=utf8.encode(r.name);
+        if(name.length>MAX_REF_BYTES)reject("Bounds");
+        if(r.hashAlgorithm!==this.#hashAlgorithm)reject("SourceSelection");
+        if(this.#previous&&compare(this.#previous,name)>=0)reject("Canonical");
+        if(r.headOid){if(this.#oidSize===undefined)reject("Version");if(utf8.encode(r.headOid).length!==this.#oidSize)reject("SourceSelection");if(/[^0-9a-f]/.test(r.headOid))reject("Canonical");}
+        discoveryRefName(r,this.#options);
+        const i=this.#selected.findIndex(b=>b.refName===r.name);
+        if(i>=0){const b=this.#selected[i]!;
+          if(this.#mode==="prepare")validateImportRefSelection(b,r.headOid?Uint8Array.from(r.headOid.match(/../g)!,v=>parseInt(v,16)):undefined);
+          else if(b.refMode===2&&r.headOid)reject("RefPinning");
+          this.#seen[i]=true;
+        }
+        this.#digest.update(sized(name)).update(sized(utf8.encode(r.headOid))).update(u32(r.kind)).update(u32(r.hashAlgorithm));
+        this.#previous=name;this.#refCount++;
+      }
+    } catch(error){this.#closed=true;throw error;}
+  }
+  finish():DiscoveryDigest {
+    if(this.#closed)reject("Canonical");this.#closed=true;
+    if(this.#seen.some(seen=>!seen))reject("SourceSelection");
+    const result=Object.freeze({digest:this.#digest.update(integer(BigInt(this.#refCount))).digest(),refCount:this.#refCount});
+    discoveryBindings.set(result,{source:this.#sourceBinding,selection:this.#selectionBinding,mode:this.#mode});
+    return result;
+  }
+}
+/** Convenience adapter for callers that already retain a complete discovery. */
+export function discoverRepository(source:ProviderRepository,selected:readonly api.ImportBranchLimitV1[]=[],options:DiscoveryOptions={},mode:DiscoverySelectionMode="prepare"):DiscoveryDigest {
+  const validator=new DiscoveryValidator(source,true,selected,options,mode);
+  for(let i=0;i<source.refs.length;i+=MAX_IMPORT_SOURCE_REF_PAGE)validator.pushPage(source.refs.slice(i,i+MAX_IMPORT_SOURCE_REF_PAGE));
+  return validator.finish();
+}
+export function validateRepositoryHashAlgorithm(source:ProviderRepository,known:boolean):void {
+  validateRepositoryHashAlgorithmWithOptions(source,known,{});
+}
+export function validateRepositoryHashAlgorithmWithOptions(source:ProviderRepository,known:boolean,options:DiscoveryOptions):void {
+  const validator=new DiscoveryValidator(source,known,[],options);validator.pushPage(source.refs);validator.finish();
+}
+export function validateDiscoveredRepository(source:ProviderRepository):void {discoverRepository(source);}
+export function validateDiscoveredImportScope(scope:api.ImportPermissionScopeV1,source:ProviderRepository):void {
+  if(scope.sourceUrl!==source.cloneUrl)reject("SourceSelection");discoverRepository(source,scope.branches);
 }
 /** Host rechecks current grants and selected-commit availability. Retained state
  * comes from an authenticated read or durable host state, bound to the verified token. */
 export function prepareImportSourceScope(request:api.PrepareImportJobRequest,currentSource:ProviderRepository,connectionProvider:string|undefined,configuration:api.GetImportConfigurationResponse,currentDestinationVersion:Uint8Array):api.ImportPermissionScopeV1 {
+  return prepareImportSourceScopeInner(request,currentSource,connectionProvider,configuration,currentDestinationVersion);
+}
+export function prepareImportSourceScopeWithDiscovery(request:api.PrepareImportJobRequest,currentSource:ProviderRepository,connectionProvider:string|undefined,configuration:api.GetImportConfigurationResponse,currentDestinationVersion:Uint8Array,discovery:DiscoveryDigest):api.ImportPermissionScopeV1 {
+  return prepareImportSourceScopeInner(request,currentSource,connectionProvider,configuration,currentDestinationVersion,discovery);
+}
+function prepareImportSourceScopeInner(request:api.PrepareImportJobRequest,currentSource:ProviderRepository,connectionProvider:string|undefined,configuration:api.GetImportConfigurationResponse,currentDestinationVersion:Uint8Array,discovery?:DiscoveryDigest):api.ImportPermissionScopeV1 {
   const selector=request.source??reject("SourceSelection"),scope=request.proposedScope??reject("Canonical");
   if(!sameRecordRef(selector.connection,currentSource.connection)||(selector.providerRepositoryId!==currentSource.providerRepositoryId&&(selector.connection!==undefined||selector.providerRepositoryId!==""))||selector.installationId!==currentSource.installationId||selector.private!==currentSource.private)reject("SourceSelection");
   if(scope.provider!==resolveImportProvider(currentSource,connectionProvider))reject("SourceSelection");
-  validateDiscoveredImportScope(scope,currentSource);
+  if(scope.sourceUrl!==currentSource.cloneUrl)reject("SourceSelection");
+  if(discovery)checkDiscovery(discovery,currentSource,scope.branches,"prepare");else validateDiscoveredImportScope(scope,currentSource);
   return prepareImportScope(scope,configuration,currentDestinationVersion);
 }
 
@@ -259,7 +353,13 @@ export function validateImportPreparationResponse(request:api.PrepareImportJobRe
 
 /** Provider identity comes from an authenticated resolver, never projection hints.
  * Native base decoding/identity, source grants and atomic activation remain host gates. */
-export async function validateImportCommitRequest(request:CommitImportJobRequest, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse):Promise<void> {
+export async function validateImportCommitRequest(request:CommitImportJobRequest,resolvedProvider:string,currentSource:ProviderRepository,configuration:api.GetImportConfigurationResponse):Promise<void> {
+  return validateImportCommitRequestInner(request,resolvedProvider,currentSource,configuration);
+}
+export async function validateImportCommitRequestWithDiscovery(request:CommitImportJobRequest,resolvedProvider:string,currentSource:ProviderRepository,configuration:api.GetImportConfigurationResponse,discovery:DiscoveryDigest):Promise<void> {
+  return validateImportCommitRequestInner(request,resolvedProvider,currentSource,configuration,discovery);
+}
+async function validateImportCommitRequestInner(request:CommitImportJobRequest, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse,discovery?:DiscoveryDigest):Promise<void> {
   validateImportCommitRequestBounds(request);
   request=clone(CommitImportJobRequestSchema,request);
   const source=request.source??reject("SourceSelection"),proof=request.proof??reject("Canonical");
@@ -276,13 +376,9 @@ export async function validateImportCommitRequest(request:CommitImportJobRequest
   const provider=resolveImportProvider(currentSource,currentSource.connection?resolvedProvider:undefined);
   if(provider!==resolvedProvider)reject("SourceSelection");
   validateImportConfiguration(configuration);validateProviderSupport(provider,configuration);
-  validateDiscoveredRepository(currentSource);
+  if(discovery)checkDiscovery(discovery,currentSource,scope.branches,"commit");
+  else discoverRepository(currentSource,scope.branches,{},"commit");
   if(source.hashAlgorithm!==currentSource.hashAlgorithm)reject("SourceSelection");
-  // Frozen pins survive branch movement; known OIDs cannot be hidden in OBSERVE.
-  for(const b of scope.branches){
-    if(b.hashAlgorithm!==currentSource.hashAlgorithm)reject("SourceSelection");
-    if(b.refMode===2&&currentSource.refs.some(r=>r.name===b.refName&&r.headOid!==""))reject("RefPinning");
-  }
   prepareImportScope(scope,configuration,scope.destinationVersion);
   if (proof.originalGeneses.length!==scope.branches.length || proof.creatorAuthorityEnvelopes.length!==scope.branches.length || proof.genesisAuthorities.length!==scope.branches.length || d.branchManifest.length!==scope.branches.length) reject("GenesisBinding");
   for (const [i,b] of scope.branches.entries()) {
@@ -297,8 +393,14 @@ export function validateImportSource(_request:ImportSourceRequest):never { retur
 /** Complete initial validation; native model/owner history and live transaction
  * checks remain the hosted implementation's responsibility. */
 export async function verifyImportCommitSubmission(request:CommitImportJobRequest, prepared:api.PrepareImportJobResponse, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse, e:ImportOwnerExpectation):Promise<VerifiedImportDelegation> {
+  return verifyImportCommitSubmissionInner(request,prepared,resolvedProvider,currentSource,configuration,e);
+}
+export async function verifyImportCommitSubmissionWithDiscovery(request:CommitImportJobRequest, prepared:api.PrepareImportJobResponse, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse, e:ImportOwnerExpectation,discovery:DiscoveryDigest):Promise<VerifiedImportDelegation> {
+  return verifyImportCommitSubmissionInner(request,prepared,resolvedProvider,currentSource,configuration,e,discovery);
+}
+async function verifyImportCommitSubmissionInner(request:CommitImportJobRequest, prepared:api.PrepareImportJobResponse, resolvedProvider:string, currentSource:ProviderRepository, configuration:api.GetImportConfigurationResponse, e:ImportOwnerExpectation,discovery?:DiscoveryDigest):Promise<VerifiedImportDelegation> {
   request=clone(CommitImportJobRequestSchema,request);prepared=clone(api.PrepareImportJobResponseSchema,prepared);e=snapshotExpectation(e);
-  await validateImportCommitRequest(request,resolvedProvider,currentSource,configuration);
+  await validateImportCommitRequestInner(request,resolvedProvider,currentSource,configuration,discovery);
   const proof=request.proof!,member=proof.memberPermission;
   return verifyPreparedImportDelegation(prepared,proof.delegations[0]!,member,proof.genesisAuthorities,e);
 }

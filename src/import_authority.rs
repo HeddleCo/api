@@ -20,12 +20,10 @@ pub const MAX_DELEGATION_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
 pub const MAX_COMMIT_REQUEST_BYTES: usize = 2 * MAX_BUNDLE_BYTES;
 /// Refs in one `ResolveImportSource`/`ProviderRefsRequest` page (proto: max 512).
 pub const MAX_IMPORT_SOURCE_REF_PAGE: usize = 512;
-/// Branch/tag refs in a host's COMPLETE current discovery checked by Prepare and
-/// Commit. Equals weft's retained-ref cap, so weft should use this constant.
-/// Discovered refs are pin evidence, not signed content: the signed scope still
-/// selects at most `MAX_BRANCHES`. Each name is at most `MAX_REF_BYTES`, so the
-/// list is bounded at roughly 4096 x 1.1 KiB (about 4.4 MiB) in memory.
-pub const MAX_IMPORT_SOURCE_REFS: usize = 4096;
+/// Safety ceiling on complete discovery work, independent of retained refs.
+/// Validation retains only one previous name and at most `MAX_BRANCHES` selections.
+pub const MAX_IMPORT_SOURCE_REFS: usize = 1_048_576;
+pub const DISCOVERY_DOMAIN: &str = "heddle-import-discovery-v1";
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
 
 record!(AuthorizationSignature, signer_key_id:b, signature:b);
@@ -202,11 +200,18 @@ fn validity(start: i64, end: i64, now: i64, current: bool) -> Result<(), Reject>
 /// does not pull its filesystem/config/object stack into WASM consumers.
 /// See the shared corpus and differential property tests; never normalize.
 fn branch_ref(name: &str) -> Result<(), Reject> {
+    if name.starts_with("refs/pull/") {
+        return pull_request_ref(name);
+    }
     let short = name.strip_prefix("refs/heads/").ok_or(Reject::Canonical)?;
-    if short.is_empty()
-        || short.starts_with('-')
-        || short == "HEAD"
-        || name.ends_with('/')
+    if short.is_empty() || short.starts_with('-') || short == "HEAD" {
+        return Err(Reject::Canonical);
+    }
+    git_ref_name(name)
+}
+
+fn git_ref_name(name: &str) -> Result<(), Reject> {
+    if name.ends_with('/')
         || name.ends_with('.')
         || name.contains("..")
         || name.contains("//")
@@ -370,7 +375,13 @@ pub fn validate_resolve_import_source_response(
         return Err(Reject::SourceSelection);
     }
     validate_repository_size_estimate(resolved)?;
-    validate_repository_hash_algorithm(resolved, false)
+    validate_repository_hash_algorithm_with_options(
+        resolved,
+        false,
+        DiscoveryOptions {
+            include_pull_request_refs: request.include_pull_request_refs,
+        },
+    )
 }
 
 /// Structural binding to signed provider/URL; durable custody association is a host invariant.
@@ -396,92 +407,350 @@ fn validate_retained_import_source(
     Ok(())
 }
 
-/// One discovery page (at most `MAX_IMPORT_SOURCE_REF_PAGE` refs). Discovery may
-/// report unknown. Preparing/signing requires known=true; no SHA-1 fallback.
+/// Opt-in discovery of pull-request heads. Merge refs are deliberately excluded.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DiscoveryOptions {
+    pub include_pull_request_refs: bool,
+}
+
+/// Prepare checks current pins; Commit preserves frozen pins after head movement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiscoverySelectionMode {
+    Prepare,
+    Commit,
+}
+
+/// Local validation evidence, never a signed record or a wire carrier.
+/// Private bindings prevent reuse for another source, selection or admission phase.
+#[derive(Debug)]
+pub struct DiscoveryDigest {
+    digest: [u8; 32],
+    ref_count: usize,
+    source_binding: Vec<u8>,
+    selection_binding: Vec<u8>,
+    mode: DiscoverySelectionMode,
+}
+impl DiscoveryDigest {
+    pub fn digest(&self) -> &[u8; 32] {
+        &self.digest
+    }
+    pub fn ref_count(&self) -> usize {
+        self.ref_count
+    }
+    fn check(
+        &self,
+        source: &ProviderRepository,
+        selected: &[ImportBranchLimitV1],
+        mode: DiscoverySelectionMode,
+    ) -> Result<(), Reject> {
+        if self.mode != mode
+            || self.source_binding != discovery_source_binding(source)?
+            || self.selection_binding != discovery_selection_binding(selected)?
+        {
+            return Err(Reject::SourceSelection);
+        }
+        Ok(())
+    }
+}
+
+fn pull_request_ref(name: &str) -> Result<(), Reject> {
+    let number = name
+        .strip_prefix("refs/pull/")
+        .and_then(|n| n.strip_suffix("/head"))
+        .ok_or(Reject::Canonical)?;
+    if number.is_empty() || number.starts_with('0') || !number.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(Reject::Canonical);
+    }
+    if name.len() > MAX_REF_BYTES {
+        return Err(Reject::Bounds);
+    }
+    Ok(())
+}
+
+fn discovery_ref_name(r: &ProviderRef, options: DiscoveryOptions) -> Result<(), Reject> {
+    if r.name.len() > MAX_REF_BYTES {
+        return Err(Reject::Bounds);
+    }
+    let kind = if r.name.starts_with("refs/heads/") {
+        branch_ref(&r.name)?;
+        1
+    } else if let Some(short) = r.name.strip_prefix("refs/tags/") {
+        // General Git ref rules; tags do not have branch-only HEAD/dash restrictions.
+        git_ref_name(&r.name)?;
+        if short.is_empty() {
+            return Err(Reject::Canonical);
+        }
+        2
+    } else if options.include_pull_request_refs && r.name.starts_with("refs/pull/") {
+        pull_request_ref(&r.name)?;
+        3
+    } else {
+        return Err(Reject::Canonical);
+    };
+    if r.kind != 0 && r.kind != kind {
+        return Err(Reject::SourceSelection);
+    }
+    Ok(())
+}
+
+fn discovery_source_binding(source: &ProviderRepository) -> Result<Vec<u8>, Reject> {
+    use prost::Message;
+    // Bind custody/format only, excluding observations and all ref pages.
+    for text in [
+        &source.clone_url,
+        &source.provider_repository_id,
+        &source.installation_id,
+    ] {
+        if text.len() > 4096 {
+            return Err(Reject::Bounds);
+        }
+    }
+    if source
+        .connection
+        .as_ref()
+        .is_some_and(|c| c.encoded_len() > 4096)
+    {
+        return Err(Reject::Bounds);
+    }
+    let metadata = ProviderRepository {
+        connection: source.connection.clone(),
+        provider_repository_id: source.provider_repository_id.clone(),
+        clone_url: source.clone_url.clone(),
+        installation_id: source.installation_id.clone(),
+        private: source.private,
+        hash_algorithm: source.hash_algorithm,
+        ..Default::default()
+    };
+    Ok(hash(&[&metadata.encode_to_vec()]))
+}
+
+fn discovery_selection_binding(selected: &[ImportBranchLimitV1]) -> Result<Vec<u8>, Reject> {
+    use sha2::{Digest, Sha256};
+    if selected.len() > MAX_BRANCHES {
+        return Err(Reject::Bounds);
+    }
+    let mut digest = Sha256::new();
+    for (i, b) in selected.iter().enumerate() {
+        branch(b)?;
+        if i > 0 && selected[i - 1].ref_name >= b.ref_name {
+            return Err(Reject::Canonical);
+        }
+        digest.update(canonical(b)?);
+    }
+    Ok(digest.finalize().to_vec())
+}
+
+/// Bounded incremental validation of an authenticated, complete source snapshot.
+/// Pages MUST be globally ordered by UTF-8 ref-name bytes; strict order proves
+/// uniqueness with one previous name. Hosts must verify snapshot/cursor continuity
+/// and exhausted coverage before finish; this validator cannot detect truncation.
+/// State retains one bounded name, at most MAX_BRANCHES bounded selections and
+/// bounded source metadata, independent of total refs/pages.
+pub struct DiscoveryValidator {
+    digest: sha2::Sha256,
+    hash_algorithm: i32,
+    oid_size: Option<usize>,
+    options: DiscoveryOptions,
+    selected: Vec<ImportBranchLimitV1>,
+    seen: Vec<bool>,
+    previous: Option<String>,
+    ref_count: usize,
+    failed: bool,
+    source_binding: Vec<u8>,
+    selection_binding: Vec<u8>,
+    mode: DiscoverySelectionMode,
+}
+impl DiscoveryValidator {
+    pub fn new(
+        source: &ProviderRepository,
+        known: bool,
+        selected: &[ImportBranchLimitV1],
+        options: DiscoveryOptions,
+        mode: DiscoverySelectionMode,
+    ) -> Result<Self, Reject> {
+        use sha2::{Digest, Sha256};
+        let oid_size = match source.hash_algorithm {
+            1 => Some(40),
+            2 => Some(64),
+            0 if !known => None,
+            _ => return Err(Reject::Version),
+        };
+        let selection_binding = discovery_selection_binding(selected)?;
+        for b in selected {
+            if b.hash_algorithm != source.hash_algorithm {
+                return Err(Reject::SourceSelection);
+            }
+            if b.ref_name.starts_with("refs/pull/") && !options.include_pull_request_refs {
+                return Err(Reject::Canonical);
+            }
+        }
+        let mut digest = Sha256::new();
+        digest.update(DISCOVERY_DOMAIN.as_bytes());
+        digest.update((source.hash_algorithm as u32).to_be_bytes());
+        Ok(Self {
+            digest,
+            hash_algorithm: source.hash_algorithm,
+            oid_size,
+            options,
+            selected: selected.to_vec(),
+            seen: vec![false; selected.len()],
+            previous: None,
+            ref_count: 0,
+            failed: false,
+            source_binding: discovery_source_binding(source)?,
+            selection_binding,
+            mode,
+        })
+    }
+    pub fn push_page(&mut self, refs: &[ProviderRef]) -> Result<(), Reject> {
+        if self.failed {
+            return Err(Reject::Canonical);
+        }
+        let result = self.push_page_inner(refs);
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+    fn push_page_inner(&mut self, refs: &[ProviderRef]) -> Result<(), Reject> {
+        use sha2::Digest;
+        if refs.len() > MAX_IMPORT_SOURCE_REF_PAGE
+            || refs.len() > MAX_IMPORT_SOURCE_REFS - self.ref_count
+        {
+            return Err(Reject::Bounds);
+        }
+        for r in refs {
+            if r.name.len() > MAX_REF_BYTES {
+                return Err(Reject::Bounds);
+            }
+            if r.hash_algorithm != self.hash_algorithm {
+                return Err(Reject::SourceSelection);
+            }
+            if self.previous.as_ref().is_some_and(|p| p >= &r.name) {
+                return Err(Reject::Canonical);
+            }
+            if !r.head_oid.is_empty() {
+                let size = self.oid_size.ok_or(Reject::Version)?;
+                if r.head_oid.len() != size {
+                    return Err(Reject::SourceSelection);
+                }
+                if !r
+                    .head_oid
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                {
+                    return Err(Reject::Canonical);
+                }
+            }
+            discovery_ref_name(r, self.options)?;
+            if let Ok(i) = self.selected.binary_search_by(|b| b.ref_name.cmp(&r.name)) {
+                let b = &self.selected[i];
+                match self.mode {
+                    DiscoverySelectionMode::Prepare => {
+                        let oid = if r.head_oid.is_empty() {
+                            None
+                        } else {
+                            Some(hex::decode(&r.head_oid).map_err(|_| Reject::Canonical)?)
+                        };
+                        validate_ref_selection(b, oid.as_deref())?;
+                    }
+                    DiscoverySelectionMode::Commit => {
+                        if b.ref_mode == 2 && !r.head_oid.is_empty() {
+                            return Err(Reject::RefPinning);
+                        }
+                    }
+                }
+                self.seen[i] = true;
+            }
+            // Canonical discovery encoding: sized UTF-8 name/OID, BE u32 kind and
+            // algorithm. A final BE u64 count makes boundaries unambiguous.
+            for text in [&r.name, &r.head_oid] {
+                self.digest.update((text.len() as u32).to_be_bytes());
+                self.digest.update(text.as_bytes());
+            }
+            self.digest.update((r.kind as u32).to_be_bytes());
+            self.digest.update((r.hash_algorithm as u32).to_be_bytes());
+            self.previous = Some(r.name.clone());
+            self.ref_count += 1;
+        }
+        Ok(())
+    }
+    pub fn finish(mut self) -> Result<DiscoveryDigest, Reject> {
+        use sha2::Digest;
+        if self.failed {
+            return Err(Reject::Canonical);
+        }
+        if self.seen.iter().any(|seen| !seen) {
+            return Err(Reject::SourceSelection);
+        }
+        self.digest.update((self.ref_count as u64).to_be_bytes());
+        Ok(DiscoveryDigest {
+            digest: self.digest.finalize().into(),
+            ref_count: self.ref_count,
+            source_binding: self.source_binding,
+            selection_binding: self.selection_binding,
+            mode: self.mode,
+        })
+    }
+}
+
+/// Convenience adapter for callers that already have a complete list. Streaming
+/// hosts pass metadata to new(), discard each page after push_page(), then finish().
+pub fn discover_repository(
+    source: &ProviderRepository,
+    selected: &[ImportBranchLimitV1],
+    options: DiscoveryOptions,
+    mode: DiscoverySelectionMode,
+) -> Result<DiscoveryDigest, Reject> {
+    let mut validator = DiscoveryValidator::new(source, true, selected, options, mode)?;
+    for page in source.refs.chunks(MAX_IMPORT_SOURCE_REF_PAGE) {
+        validator.push_page(page)?;
+    }
+    validator.finish()
+}
+
+/// One discovery page, optionally unknown format; no SHA-1 fallback.
 pub fn validate_repository_hash_algorithm(
     source: &ProviderRepository,
     known: bool,
 ) -> Result<(), Reject> {
-    validate_source_refs(source, known, MAX_IMPORT_SOURCE_REF_PAGE)
+    validate_repository_hash_algorithm_with_options(source, known, DiscoveryOptions::default())
 }
-
-/// A host's complete current discovery for Prepare/Commit: known hash algorithm
-/// and at most `MAX_IMPORT_SOURCE_REFS` sorted, unique refs.
-pub fn validate_discovered_repository(source: &ProviderRepository) -> Result<(), Reject> {
-    validate_source_refs(source, true, MAX_IMPORT_SOURCE_REFS)
-}
-
-fn validate_source_refs(
+pub fn validate_repository_hash_algorithm_with_options(
     source: &ProviderRepository,
     known: bool,
-    max_refs: usize,
+    options: DiscoveryOptions,
 ) -> Result<(), Reject> {
-    let size = match source.hash_algorithm {
-        1 => Some(40),
-        2 => Some(64),
-        0 if !known => None,
-        _ => return Err(Reject::Version),
-    };
-    if source.refs.len() > max_refs {
-        return Err(Reject::Bounds);
-    }
-    for (i, r) in source.refs.iter().enumerate() {
-        if r.name.len() > MAX_REF_BYTES {
-            return Err(Reject::Bounds);
-        }
-        if r.hash_algorithm != source.hash_algorithm {
-            return Err(Reject::SourceSelection);
-        }
-        if i > 0 && source.refs[i - 1].name >= r.name {
-            return Err(Reject::Canonical);
-        }
-        if !r.head_oid.is_empty() {
-            let size = size.ok_or(Reject::Version)?;
-            if r.head_oid.len() != size {
-                return Err(Reject::SourceSelection);
-            }
-            if !r
-                .head_oid
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            {
-                return Err(Reject::Canonical);
-            }
-        }
-    }
-    Ok(())
+    let mut validator =
+        DiscoveryValidator::new(source, known, &[], options, DiscoverySelectionMode::Prepare)?;
+    validator.push_page(&source.refs)?;
+    validator.finish().map(|_| ())
 }
-
-/// Compare independent repository discovery before signing, including known-OID pinning.
+/// Complete discovery uses the same incremental checks without retaining refs.
+pub fn validate_discovered_repository(source: &ProviderRepository) -> Result<(), Reject> {
+    discover_repository(
+        source,
+        &[],
+        DiscoveryOptions::default(),
+        DiscoverySelectionMode::Prepare,
+    )
+    .map(|_| ())
+}
+/// Compare independent complete discovery before signing, including membership.
 pub fn validate_discovered_import_scope(
     scope: &ImportPermissionScopeV1,
     source: &ProviderRepository,
 ) -> Result<(), Reject> {
-    validate_discovered_import_scope_inner(scope, source)
-}
-
-fn validate_discovered_import_scope_inner(
-    scope: &ImportPermissionScopeV1,
-    source: &ProviderRepository,
-) -> Result<(), Reject> {
-    validate_discovered_repository(source)?;
     if scope.source_url != source.clone_url {
         return Err(Reject::SourceSelection);
     }
-    for b in &scope.branches {
-        if b.hash_algorithm != source.hash_algorithm {
-            return Err(Reject::SourceSelection);
-        }
-        let oid = source
-            .refs
-            .iter()
-            .find(|r| r.name == b.ref_name)
-            .filter(|r| !r.head_oid.is_empty())
-            .map(|r| hex::decode(&r.head_oid).map_err(|_| Reject::Canonical))
-            .transpose()?;
-        validate_ref_selection(b, oid.as_deref())?;
-    }
-    Ok(())
+    discover_repository(
+        source,
+        &scope.branches,
+        DiscoveryOptions::default(),
+        DiscoverySelectionMode::Prepare,
+    )
+    .map(|_| ())
 }
 
 /// Host resolves the selector anew and checks current grants and selected-commit
@@ -494,6 +763,41 @@ pub fn prepare_import_source_scope(
     connection_provider: Option<&str>,
     configuration: &GetImportConfigurationResponse,
     current_destination_version: &[u8],
+) -> Result<ImportPermissionScopeV1, Reject> {
+    prepare_import_source_scope_inner(
+        request,
+        current_source,
+        connection_provider,
+        configuration,
+        current_destination_version,
+        None,
+    )
+}
+/// Admit a completed local paged discovery without assembling all source refs.
+pub fn prepare_import_source_scope_with_discovery(
+    request: &PrepareImportJobRequest,
+    current_source: &ProviderRepository,
+    connection_provider: Option<&str>,
+    configuration: &GetImportConfigurationResponse,
+    current_destination_version: &[u8],
+    discovery: &DiscoveryDigest,
+) -> Result<ImportPermissionScopeV1, Reject> {
+    prepare_import_source_scope_inner(
+        request,
+        current_source,
+        connection_provider,
+        configuration,
+        current_destination_version,
+        Some(discovery),
+    )
+}
+fn prepare_import_source_scope_inner(
+    request: &PrepareImportJobRequest,
+    current_source: &ProviderRepository,
+    connection_provider: Option<&str>,
+    configuration: &GetImportConfigurationResponse,
+    current_destination_version: &[u8],
+    discovery: Option<&DiscoveryDigest>,
 ) -> Result<ImportPermissionScopeV1, Reject> {
     let selector = request.source.as_ref().ok_or(Reject::SourceSelection)?;
     if selector.connection != current_source.connection
@@ -509,7 +813,18 @@ pub fn prepare_import_source_scope(
     if scope.provider != provider {
         return Err(Reject::SourceSelection);
     }
-    validate_discovered_import_scope(scope, current_source)?;
+    if scope.source_url != current_source.clone_url {
+        return Err(Reject::SourceSelection);
+    }
+    if let Some(discovery) = discovery {
+        discovery.check(
+            current_source,
+            &scope.branches,
+            DiscoverySelectionMode::Prepare,
+        )?;
+    } else {
+        validate_discovered_import_scope(scope, current_source)?;
+    }
     validate_import_configuration(configuration)?;
     prepare_scope(scope, configuration, current_destination_version)
 }
@@ -788,6 +1103,37 @@ pub fn validate_commit_request(
     current_source: &ProviderRepository,
     configuration: &GetImportConfigurationResponse,
 ) -> Result<(), Reject> {
+    validate_commit_request_inner(
+        request,
+        resolved_provider,
+        current_source,
+        configuration,
+        None,
+    )
+}
+/// Commit counterpart for completed local paged discovery; frozen pins survive movement.
+pub fn validate_commit_request_with_discovery(
+    request: &CommitImportJobRequest,
+    resolved_provider: &str,
+    current_source: &ProviderRepository,
+    configuration: &GetImportConfigurationResponse,
+    discovery: &DiscoveryDigest,
+) -> Result<(), Reject> {
+    validate_commit_request_inner(
+        request,
+        resolved_provider,
+        current_source,
+        configuration,
+        Some(discovery),
+    )
+}
+fn validate_commit_request_inner(
+    request: &CommitImportJobRequest,
+    resolved_provider: &str,
+    current_source: &ProviderRepository,
+    configuration: &GetImportConfigurationResponse,
+    discovery: Option<&DiscoveryDigest>,
+) -> Result<(), Reject> {
     use prost::Message;
     validate_commit_request_bounds(request)?;
     let source = request.source.as_ref().ok_or(Reject::SourceSelection)?;
@@ -861,24 +1207,22 @@ pub fn validate_commit_request(
     }
     validate_import_configuration(configuration)?;
     validate_provider_support(provider, configuration)?;
-    validate_discovered_repository(current_source)?;
+    if let Some(discovery) = discovery {
+        discovery.check(
+            current_source,
+            &scope.branches,
+            DiscoverySelectionMode::Commit,
+        )?;
+    } else {
+        discover_repository(
+            current_source,
+            &scope.branches,
+            DiscoveryOptions::default(),
+            DiscoverySelectionMode::Commit,
+        )?;
+    }
     if source.hash_algorithm != current_source.hash_algorithm {
         return Err(Reject::SourceSelection);
-    }
-    // A frozen pin names the selected commit, even if the branch head moves.
-    // OBSERVE still cannot hide a currently known selected OID by clearing hints.
-    for b in &scope.branches {
-        if b.hash_algorithm != current_source.hash_algorithm {
-            return Err(Reject::SourceSelection);
-        }
-        if b.ref_mode == 2
-            && current_source
-                .refs
-                .iter()
-                .any(|r| r.name == b.ref_name && !r.head_oid.is_empty())
-        {
-            return Err(Reject::RefPinning);
-        }
     }
     // Current converter/options/budget support is also rechecked at activation.
     prepare_scope(scope, configuration, &scope.destination_version)?;
@@ -929,7 +1273,54 @@ pub fn verify_commit_submission(
     configuration: &GetImportConfigurationResponse,
     expected: &ImportOwnerExpectation<'_>,
 ) -> Result<VerifiedImportDelegation, Reject> {
-    validate_commit_request(request, resolved_provider, current_source, configuration)?;
+    verify_commit_submission_inner(
+        request,
+        prepared,
+        resolved_provider,
+        current_source,
+        configuration,
+        expected,
+        None,
+    )
+}
+
+/// Complete signed submission using finished local discovery evidence.
+pub fn verify_commit_submission_with_discovery(
+    request: &CommitImportJobRequest,
+    prepared: &PrepareImportJobResponse,
+    resolved_provider: &str,
+    current_source: &ProviderRepository,
+    configuration: &GetImportConfigurationResponse,
+    expected: &ImportOwnerExpectation<'_>,
+    discovery: &DiscoveryDigest,
+) -> Result<VerifiedImportDelegation, Reject> {
+    verify_commit_submission_inner(
+        request,
+        prepared,
+        resolved_provider,
+        current_source,
+        configuration,
+        expected,
+        Some(discovery),
+    )
+}
+
+fn verify_commit_submission_inner(
+    request: &CommitImportJobRequest,
+    prepared: &PrepareImportJobResponse,
+    resolved_provider: &str,
+    current_source: &ProviderRepository,
+    configuration: &GetImportConfigurationResponse,
+    expected: &ImportOwnerExpectation<'_>,
+    discovery: Option<&DiscoveryDigest>,
+) -> Result<VerifiedImportDelegation, Reject> {
+    validate_commit_request_inner(
+        request,
+        resolved_provider,
+        current_source,
+        configuration,
+        discovery,
+    )?;
     let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
     let member = proof.member_permission.as_ref();
     verify_prepared_delegation(

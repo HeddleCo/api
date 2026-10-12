@@ -61,6 +61,9 @@ message TraceContext {
 // body stay in the operation-stream envelope because both are inputs to
 // routing and canonical request signing.
 message CallContext {
+  reserved 11;
+  reserved "protocol";
+
   google.protobuf.Timestamp deadline = 1;
   bytes bearer_capability = 2;
   BearerProof bearer_proof = 3;
@@ -87,7 +90,6 @@ message CallContext {
   // against its independently pinned owner and current revocations. This
   // evidence cannot establish a new trusted owner or broaden any caveat.
   bytes bearer_authority_proof = 10;
-  ProtocolCompatibility protocol = 11;
 }
 
 // Semantic support, independent of package/release version. Missing/unknown

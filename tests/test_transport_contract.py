@@ -37,6 +37,14 @@ class TransportContractTest(unittest.TestCase):
         self.assertIn("CallFailureCode code = 1", source)
         self.assertNotIn("grpc_code", source)
 
+    def test_removed_call_protocol_tag_and_name_cannot_be_reused(self) -> None:
+        source = CONTRACT.read_text()
+        body = re.search(r"(?ms)^message CallContext \{(.*?)^\}", source)
+        self.assertIsNotNone(body)
+        self.assertNotRegex(body.group(1), r"\bprotocol\s*=")
+        self.assertRegex(body.group(1), r"\breserved\s+11\s*;")
+        self.assertRegex(body.group(1), r'\breserved\s+"protocol"\s*;')
+
     def test_production_alpn_and_cross_product_fixture_are_checked_in(self) -> None:
         transport = (ROOT / "src/transport.rs").read_text()
         self.assertIn('b"heddle-api/1"', transport)

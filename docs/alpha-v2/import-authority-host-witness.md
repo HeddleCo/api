@@ -856,15 +856,17 @@ Per the **OWNER DECISION of 2026-10-03**, `ProtocolCompatibility` requires
 **protocol_version = 2** and the sorted unique mandatory feature list containing
 exactly **IMPORT_AUTHORITY_HOST_WITNESS_V1 (1)** on these eight
 **IntegrationService** RPCs only: **ImportSource**, **RetryImportSource**,
-**CancelImportJob** and **GetHostedWitnessHistoryProof**. Missing/unknown
-version/features reject with FAILED_PRECONDITION / incompatible peer BEFORE
-staging or mutation, not merely after ignored additive proof fields.
+**SynchronizeRemote**, **PrepareImportJob**, **CommitImportJob**,
+**CancelImportJob**, **GetImportJobState** and **GetHostedWitnessHistoryProof**.
+Clients reject missing/unknown endpoint version/features as an incompatible peer
+before encoding or transport.
 `RpcContract` and the generated Rust `MethodDescriptor` declare that exact gate
 set; Rust `Client` and TS `createServiceClient` check negotiated support before
-transport. `MethodDescriptor.verify_protocol` provides the server dispatch gate
-before body parsing. HTTPS equivalents advertise/require
-`Heddle-Protocol-Version: 2` and
-`Heddle-Mandatory-Features: import-authority-host-witness-v1` on those import routes.
+transport. `CallContext` has no per-call protocol declaration, and hosts MUST NOT
+require one, including via equivalent per-call HTTPS headers. Hosts enforce
+required request structure, canonical encodings, signed preparation/delegation
+bytes and stream-opening protocol validation. Endpoint descriptions and
+stream openings retain `ProtocolCompatibility`.
 Capability/method listing alone does not establish semantic support.
 
 **SyncService Fetch, PublishContent and ReplicateThread do not declare a

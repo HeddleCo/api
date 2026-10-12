@@ -1,5 +1,23 @@
 # Compatibility policy
 
+The unreleased `0.31.0-alpha.46` removes the per-call `CallContext.protocol`
+declaration (tag 11) and Rust `MethodDescriptor::verify_protocol`
+(HeddleCo/api#404). The tag and name `protocol` are reserved. Hosts must not
+require a per-call declaration; they enforce required request structure,
+canonical encodings, signed preparation/delegation bytes and stream openings.
+Clients still refuse incompatible hosts before encoding mandatory-feature
+methods through `require_hybrid_peer` / `requireHybridPeer` and still validate
+stream-opening protocol support. `ProtocolCompatibility`,
+`MandatoryProtocolFeature`, per-method `mandatory_features`, endpoint-description
+protocol fields and stream-opening protocol fields remain unchanged.
+
+Versions stay at `0.31.0-alpha.46`; no package bump or release is made. Buf
+breaking against main is expected to report only the removal of field 11 from
+`heddle.api.common.CallContext`. This is the named pre-1.0 compatibility override
+for the unreleased alpha, recorded in [the breaking note](breaking/0.31.0-alpha.46.md);
+no Buf rule is disabled. The hosted-call golden leaves field 11 unset, so no
+golden vectors change. Signed import encodings remain byte-identical.
+
 The SHA-2 dependency upgrade from `sha2 = "=0.10.9"` to `"=0.11.0"` is
 nonbreaking. SHA-2 and `digest` imports are private implementation details:
 there are no public re-exports, field types, signature types or trait bounds
@@ -35,7 +53,8 @@ connections exceeding 4,096 bytes with `Bounds`. Existing field tags and enum
 values, signed encodings, wire bytes for existing messages and fixture vectors
 are unchanged.
 Cargo and npm advance together to `0.31.0-alpha.46`; see
-[the release note](breaking/0.31.0-alpha.46.md). No Buf breaking override is used.
+[the release note](breaking/0.31.0-alpha.46.md). The discovery additions need no
+Buf breaking override; the per-call field removal above is the alpha exception.
 
 Content and symbol search index only each Thread's current source tips
 (HeddleCo/weft#2433). `SearchRequest.source_scope` keeps its tags and

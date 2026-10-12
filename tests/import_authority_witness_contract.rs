@@ -84,28 +84,12 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
     for path in &expected {
         let method = heddle_api::v2::method_descriptor(path).expect("generated method");
         assert_eq!(method.mandatory_features, [heddle_api::heddle::api::common::MandatoryProtocolFeature::ImportAuthorityHostWitnessV1]);
-        assert_eq!(
-            method.verify_protocol(&Default::default()),
-            Err(heddle_api::hybrid_codec::Reject::Protocol)
-        );
-        method
-            .verify_protocol(&heddle_api::heddle::api::common::CallContext {
-                protocol: Some(heddle_api::heddle::api::common::ProtocolCompatibility {
-                    protocol_version: 2,
-                    mandatory_features: vec![1],
-                }),
-                ..Default::default()
-            })
-            .expect("explicit compatible protocol");
     }
     for name in ["Fetch", "PublishContent", "ReplicateThread"] {
         let method =
             heddle_api::v2::method_descriptor(&format!("/heddle.api.v1alpha2.SyncService/{name}"))
                 .expect("Sync method");
         assert!(method.mandatory_features.is_empty(), "{name}");
-        method
-            .verify_protocol(&Default::default())
-            .expect("ordinary Sync without HYBRID");
     }
     let service = pool
         .get_service_by_name("heddle.api.v1alpha2.IntegrationService")

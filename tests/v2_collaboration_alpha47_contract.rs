@@ -238,3 +238,30 @@ fn alpha47_mention_bounds_and_coordinates() {
         Err(heddle_api::hybrid_codec::Reject::Scope)
     );
 }
+
+#[test]
+fn alpha47_total_mention_bytes_match_delivery_and_canonical_validation() {
+    let mut source = entity("source_state");
+    if let Some(api::entity_ref::Entity::Source(s)) = &mut source.entity {
+        s.path = "é".repeat(2048);
+        s.symbol_id = "s".repeat(4096);
+    }
+    assert!(
+        canonical_mention(&source).is_ok(),
+        "each field is within its bound"
+    );
+    let below = vec![source.clone(); 31];
+    assert!(canonical_mentions(&below).is_ok());
+    assert!(validate_mentions(&below).is_ok());
+    for count in [32, 128] {
+        let mentions = vec![source.clone(); count];
+        assert_eq!(
+            canonical_mentions(&mentions),
+            Err(heddle_api::hybrid_codec::Reject::Bounds)
+        );
+        assert_eq!(
+            validate_mentions(&mentions),
+            Err(heddle_api::hybrid_codec::Reject::Bounds)
+        );
+    }
+}

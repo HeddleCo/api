@@ -2,6 +2,27 @@
 use contract::heddle::api::v1alpha2 as wire;
 use prost::Message;
 #[test]
+fn older_native_decoder_refuses_new_signed_collaboration_forms() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/collaboration-alpha47.json"
+    ))
+    .expect("fixture");
+    for name in ["edit_tags", "open_tags", "principal_open"] {
+        let bytes = hex::decode(
+            fixture["vectors"][name]["record_wire_hex"]
+                .as_str()
+                .expect("wire"),
+        )
+        .expect("hex");
+        let record = thread_api::contract::SignedRecord::decode(bytes.as_slice()).expect("record");
+        assert!(
+            thread_api::replication::decode_record(record).is_err(),
+            "thread-api 0.28.7 must refuse {name} rather than discard signed fields"
+        );
+    }
+}
+
+#[test]
 fn collaboration_alpha47_mentions_and_signatures() {
     let fixture: serde_json::Value = serde_json::from_str(include_str!(
         "../../../tests/fixtures/collaboration-alpha47.json"

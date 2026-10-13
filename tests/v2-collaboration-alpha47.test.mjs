@@ -87,3 +87,19 @@ test('valid signatures cannot conceal malformed new mention or tag forms from th
     await assert.rejects(verifyCollaboration(record));
   }
 });
+
+test('aggregate mention bytes are bounded in delivery, signing and verification', async () => {
+  const maximal = create(SourceMentionSchema, { ...source(true), path: 'é'.repeat(2048), symbolId: 's'.repeat(4096) });
+  const ref = create(EntityRefSchema, { entity: { case: 'source', value: maximal } });
+  const mention = { kind: 'source', source: maximal };
+  validateEntityMentions(Array(31).fill(ref));
+  await signDiscussion({ ...command(open), mentions: [mention] }, [], signer);
+  let calls = 0;
+  const counting = { ...signer, sign: async bytes => { calls++; return signer.sign(bytes); } };
+  for (const count of [32, 128]) {
+    assert.throws(() => validateEntityMentions(Array(count).fill(ref)), /mention.*bytes/i);
+    await assert.rejects(signDiscussion({ ...command(open), mentions: Array(count).fill(mention) }, [], counting), /mention.*bytes/i);
+    await assert.rejects(signContext({ ...shared, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [], mentions: Array(count).fill(mention) }, [], counting), /mention.*bytes/i);
+  }
+  assert.equal(calls, 0, 'aggregate bound is checked before invoking the signer');
+});

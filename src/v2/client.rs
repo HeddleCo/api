@@ -67,6 +67,8 @@ pub enum ClientError<E: std::error::Error> {
     Metadata(#[from] crate::RequestMetadataError),
     #[error("transport failure: {0}")]
     Transport(E),
+    #[error("invalid request variant: {0}")]
+    RequestFeature(#[from] crate::hybrid_codec::Reject),
     #[error("invalid protobuf response: {0}")]
     Decode(#[from] prost::DecodeError),
 }
@@ -109,6 +111,7 @@ impl<T: RpcTransport> Client<T> {
                 .map_err(|_| ClientError::Protocol(method.path))?;
         }
         let bytes = request.encode_to_vec();
+        super::protocol::validate_request_features(method.path, &bytes, self.protocol.as_ref())?;
         validate_stream_protocol(method, &bytes, true, true)
             .map_err(|_| ClientError::Protocol(method.path))?;
         if method.client_operation_id_required {

@@ -59,3 +59,27 @@ Rust `v2::content` and TypeScript `./v2/content` provide matching outline input,
 row and completion validators and bound constants. These helpers check structure;
 hosts independently enforce exact file/index bindings, source line counts, paging,
 work limits and disclosure.
+
+
+## Endpoint negotiation (alpha.48)
+
+Hosts implementing outlines advertise
+`MANDATORY_PROTOCOL_FEATURE_CONTENT_OUTLINE_V1` (4) in
+`DescribeEndpointResponse.protocol.mandatory_features`, merged into the
+existing sorted, unique feature set. Advertise it only after implementing the
+complete outline semantics above. Do not add it to `ReadContent`'s per-method
+`mandatory_features`: tree, blob, diff, provenance and state reads remain usable
+when outline support is absent.
+
+Clients check Rust `v2::protocol::host_supports(peer, ContentOutlineV1)` or
+TypeScript `hostSupports(peer, MandatoryProtocolFeature.CONTENT_OUTLINE_V1)`
+before offering outline selections. The corresponding require helpers return
+`Reject::MissingFeature(ContentOutlineV1)` / throw
+`MissingProtocolFeatureError` with `feature = CONTENT_OUTLINE_V1`.
+Rust `validate_outline_read(read, peer)` requires a final
+`Option<&ProtocolCompatibility>`; TypeScript `validateOutlineRead(read, peer)`
+accepts an optional final negotiated peer. Missing negotiation refuses outlines.
+Typed clients automatically consult their stored peer when a `ReadContent`
+request contains any outline selection, before transport. Re-negotiate after
+endpoint/connection replacement. Output-row and status validators remain
+structural and do not require a peer. Existing protobuf bytes are unchanged.

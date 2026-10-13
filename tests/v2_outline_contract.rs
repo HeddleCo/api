@@ -12,7 +12,7 @@ fn paged_outline_rows_preserve_revision_and_have_explicit_coverage() {
             after_page: vec![],
         }),
     };
-    validate_outline_read(&read).expect("bounded selection");
+    validate_outline_read(&read, Some(&peer())).expect("bounded selection");
     let selection = api::ContentRead {
         selection_id: "outline".into(),
         selection: Some(api::content_read::Selection::Outline(read)),
@@ -91,21 +91,27 @@ fn outline_validation_enforces_indivisible_row_and_path_bounds() {
         "é".repeat(2049),
     ] {
         assert!(
-            validate_outline_read(&api::OutlineRead {
-                path,
-                ..Default::default()
-            })
+            validate_outline_read(
+                &api::OutlineRead {
+                    path,
+                    ..Default::default()
+                },
+                Some(&peer())
+            )
             .is_err()
         );
     }
     assert!(
-        validate_outline_read(&api::OutlineRead {
-            path: "main.rs".into(),
-            page: Some(api::PageRequest {
-                size: 257,
-                ..Default::default()
-            })
-        })
+        validate_outline_read(
+            &api::OutlineRead {
+                path: "main.rs".into(),
+                page: Some(api::PageRequest {
+                    size: 257,
+                    ..Default::default()
+                })
+            },
+            Some(&peer())
+        )
         .is_err()
     );
     let good = api::OutlineSymbol {
@@ -186,4 +192,11 @@ fn additive_tags_mentions_and_outline_are_in_the_descriptor() {
     )
     .expect("method");
     assert_eq!(route.authorization.targets[0].path, "discussion.spool");
+}
+
+fn peer() -> heddle_api::heddle::api::common::ProtocolCompatibility {
+    heddle_api::heddle::api::common::ProtocolCompatibility {
+        protocol_version: 2,
+        mandatory_features: vec![1, 2, 3, 4],
+    }
 }

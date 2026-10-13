@@ -1,6 +1,6 @@
 {
   "name": "@heddleco/api",
-  "version": "0.31.0-alpha.47",
+  "version": "0.31.0-alpha.48",
   "description": "Generated TypeScript types for the Heddle public API",
   "license": "Apache-2.0",
   "repository": {
@@ -36,6 +36,7 @@
     "./v2/spool-settings": "./dist/v1alpha2/spool-settings.js",
     "./v2/observation": "./dist/v1alpha2/observation.js",
     "./v2/timeline-upload": "./dist/v1alpha2/timeline-upload.js",
+    "./v2/protocol": "./dist/v1alpha2/protocol.js",
     "./v2/client": "./dist/v1alpha2/client.js",
     "./v2/owner-certificates": "./dist/v1alpha2/owner-certificates.js",
     "./v2/password-owner": "./dist/v1alpha2/password-owner.js",

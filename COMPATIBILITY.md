@@ -1,5 +1,15 @@
 # Compatibility policy
 
+`0.31.0-alpha.48` adds endpoint-advertised variant support (api#410):
+`COLLABORATION_MENTIONS_V1 = 2`, `DISCUSSION_TAGS_V1 = 3` and
+`CONTENT_OUTLINE_V1 = 4`. Clients gate only commands carrying those variants;
+existing method requirements and signed bytes remain unchanged. Encode-side
+helpers take negotiated peer compatibility and fail with a typed missing-feature
+error. Existing HYBRID support is checked by membership so the additional
+advertisements remain compatible. Cargo and npm advance together; Buf breaking
+against main needs no override. See [the release note](breaking/0.31.0-alpha.48.md)
+and the negotiation sections of the contracts below.
+
 `0.31.0-alpha.47` adds collaboration principal/pinned-source mentions, mentions
 on opening turns and contexts, discussion tags/versioned tag edits/query filters,
 and bounded paged exact-revision content outlines (api#407 and api#406). Existing

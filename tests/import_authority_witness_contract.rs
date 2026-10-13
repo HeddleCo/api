@@ -52,6 +52,8 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
             enumeration.values().count(),
             descriptor["values"].as_array().expect("values").len()
                 + usize::from(descriptor["name"] == "heddle.api.v1alpha2.ProviderRef.Kind")
+                // Alpha.48 appends endpoint feature values; frozen values below stay exact.
+                + 3 * usize::from(descriptor["name"] == "heddle.api.common.MandatoryProtocolFeature")
         );
         for expected in descriptor["values"].as_array().expect("values") {
             let value = enumeration
@@ -1017,7 +1019,7 @@ fn incompatible_peer_requires_semantic_feature_and_exact_protocol_version() {
         import::require_hybrid_peer(None),
         Err(codec::Reject::Protocol)
     );
-    for (version, features) in [(1, vec![1]), (2, vec![]), (2, vec![1, 2]), (2, vec![1, 1])] {
+    for (version, features) in [(1, vec![1]), (2, vec![]), (2, vec![1, 99]), (2, vec![1, 1])] {
         assert_eq!(
             import::require_hybrid_peer(Some(&host::ProtocolCompatibility {
                 protocol_version: version,

@@ -315,7 +315,7 @@ fn old_peer_advertising_import_methods_never_reaches_transport() {
         }),
         Some(ProtocolCompatibility {
             protocol_version: 2,
-            mandatory_features: vec![1, 2],
+            mandatory_features: vec![1, 99],
         }),
     ] {
         let trace = TestTransport::default();
@@ -517,4 +517,37 @@ fn sync_without_hybrid_encodes_openings_and_accepts_ready() {
             }
         );
     }
+}
+
+#[test]
+fn alpha48_typed_client_refuses_unadvertised_variants_before_transport() {
+    use heddle_api::heddle::api::common::MandatoryProtocolFeature;
+    use heddle_api::heddle::api::v1alpha2::{
+        EntityRef, OpenDiscussionRequest, PrincipalRef, entity_ref,
+    };
+    use heddle_api::hybrid_codec::Reject;
+    let transport = TestTransport::default();
+    let trace = transport.calls.clone();
+    let client = Client::new(
+        transport,
+        ["/heddle.api.v1alpha2.CollaborationService/OpenDiscussion".into()],
+    );
+    let result = completed(client.call::<rpc::CollaborationServiceOpenDiscussion>(
+        &OpenDiscussionRequest {
+            client_operation_id: "op".into(),
+            mentions: vec![EntityRef {
+                entity: Some(entity_ref::Entity::Principal(PrincipalRef {
+                    id: "00000000-0000-0000-0000-000000000001".into(),
+                })),
+            }],
+            ..Default::default()
+        },
+    ));
+    assert!(matches!(
+        result,
+        Err(ClientError::RequestFeature(Reject::MissingFeature(
+            MandatoryProtocolFeature::CollaborationMentionsV1
+        )))
+    ));
+    assert!(trace.lock().expect("trace mutex").is_empty());
 }

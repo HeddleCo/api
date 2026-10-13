@@ -1,3 +1,5 @@
+import { MandatoryProtocolFeature as Feature, type ProtocolCompatibility } from "../common/contract_pb.js";
+import { requireFeature } from "./protocol.js";
 import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
@@ -84,11 +86,15 @@ export interface ContextCommand extends SharedCommand {
 /** Sign immutable collaboration from the original observed frontier records.
  * A version token or causal ID alone is deliberately insufficient. Receiving
  * hosts still authorize the actor and admit the causal graph independently. */
-export async function signDiscussion(command: DiscussionCommand, parents: readonly SignedRecord[], signer: CollaborationSigner): Promise<SignedRecord> {
+export async function signDiscussion(command: DiscussionCommand, parents: readonly SignedRecord[], signer: CollaborationSigner, peer?: ProtocolCompatibility): Promise<SignedRecord> {
   command = structuredClone(command);
+  for (const mention of command.mentions ?? []) {
+    if (mention.kind === "principal" || mention.kind === "source") requireFeature(peer, Feature.COLLABORATION_MENTIONS_V1);
+  }
   const metadata = metadataValue(command);
   discussionId(command.discussionId);
   text(command.clientOperationId, 512);
+  if (command.action.kind === "edit_tags" || (command.action.kind === "open" && command.action.tags?.length)) requireFeature(peer, Feature.DISCUSSION_TAGS_V1);
   const body = actionValue(command.action);
   if ((command.action.kind === "open") !== (parents.length === 0)) throw new Error("Only discussion root operations use an empty causal frontier");
   const frontier = await verifyParents(command.scope, parents, "discussion", command.discussionId);
@@ -103,8 +109,11 @@ export async function signDiscussion(command: DiscussionCommand, parents: readon
   return signOperation(command.scope.threadId, frontier.outer, "discussion", inner, signer);
 }
 
-export async function signContext(command: ContextCommand, parents: readonly SignedRecord[], signer: CollaborationSigner): Promise<SignedRecord> {
+export async function signContext(command: ContextCommand, parents: readonly SignedRecord[], signer: CollaborationSigner, peer?: ProtocolCompatibility): Promise<SignedRecord> {
   command = structuredClone(command);
+  for (const mention of command.mentions ?? []) {
+    if (mention.kind === "principal" || mention.kind === "source") requireFeature(peer, Feature.COLLABORATION_MENTIONS_V1);
+  }
   const metadata = metadataValue(command);
   const id = uuid(command.contextId);
   if (command.supersedes === command.contextId) throw new Error("Context cannot supersede itself");
@@ -561,10 +570,15 @@ function annotationSourceValue(reference: AnnotationSourceReference): MapValue {
   return { scope: { spool, thread: thread ? Array.from(fixed(thread.id!.value, 32)) : null }, source: map(anchorValue(anchor).source) };
 }
 /** Same conversion for opening turns, replies, context drafts and entity tags. */
-export function canonicalMention(ref: EntityRef): Uint8Array {
+export function canonicalMention(ref: EntityRef, peer?: ProtocolCompatibility): Uint8Array {
+  requireMentionFeature(ref, peer);
   return encode(annotationEntityValue(ref));
 }
-export function validateEntityMentions(mentions: readonly EntityRef[]): void {
+function requireMentionFeature(ref: EntityRef, peer?: ProtocolCompatibility): void {
+  if (ref.entity.case === "principal" || ref.entity.case === "source") requireFeature(peer, Feature.COLLABORATION_MENTIONS_V1);
+}
+export function validateEntityMentions(mentions: readonly EntityRef[], peer?: ProtocolCompatibility): void {
+  for (const ref of mentions) requireMentionFeature(ref, peer);
   if (mentions.length > MAX_COLLABORATION_MENTIONS) throw new Error("Too many collaboration mentions");
   validateMentionList(mentions.map(annotationEntityValue));
 }

@@ -1,7 +1,7 @@
 use ed25519_dalek::{Signer, SigningKey};
 use heddle_api::heddle::api::v1alpha2 as api;
 use heddle_api::v2::collaboration::{
-    canonical_annotation_tags, canonical_discussion_tag_edit, canonical_mention,
+    canonical_discussion_open_tags, canonical_discussion_tag_edit, canonical_mention,
     canonical_mentions, validate_mentions,
 };
 use prost::Message;
@@ -101,7 +101,9 @@ fn vectors() -> serde_json::Value {
                 .1
                 .set(
                     "mentions",
-                    decode(&canonical_mentions(&mentions).expect("bounded mentions")),
+                    decode(
+                        &canonical_mentions(&mentions, Some(&peer())).expect("bounded mentions"),
+                    ),
                 );
         }
         if name == "open_tags"
@@ -113,14 +115,14 @@ fn vectors() -> serde_json::Value {
                 .1
                 .set(
                     "tags",
-                    decode(&canonical_annotation_tags(&tags()).expect("tags")),
+                    decode(&canonical_discussion_open_tags(&tags(), Some(&peer())).expect("tags")),
                 );
         }
         if name == "edit_tags" || name == "clear_tags" {
             let tag_list = if name == "clear_tags" { vec![] } else { tags() };
             inner.set(
                 "body",
-                decode(&canonical_discussion_tag_edit(&tag_list).expect("tag edit")),
+                decode(&canonical_discussion_tag_edit(&tag_list, Some(&peer())).expect("tag edit")),
             );
             let open = baseline("open");
             let open_content = decode(&open).get("body").get("canonical").bytes();
@@ -165,7 +167,7 @@ fn vectors() -> serde_json::Value {
             }],
         };
         result.insert(name.into(), serde_json::json!({ "canonical_hex": hex::encode(&canonical), "signature_hex": hex::encode(signature.to_bytes()), "operation_id_hex": hex::encode(hash("heddle-thread-operation-v1", &canonical)), "record_wire_hex": hex::encode(record.encode_to_vec()),
-            "mentions": mentions.iter().map(|m| serde_json::json!({"entity_wire_hex": hex::encode(m.encode_to_vec()), "canonical_hex": hex::encode(canonical_mention(m).expect("mention"))})).collect::<Vec<_>>() }));
+            "mentions": mentions.iter().map(|m| serde_json::json!({"entity_wire_hex": hex::encode(m.encode_to_vec()), "canonical_hex": hex::encode(canonical_mention(m, Some(&peer())).expect("mention"))})).collect::<Vec<_>>() }));
     }
     serde_json::json!({"format":"collaboration-alpha47", "public_key_hex":hex::encode(key.verifying_key().to_bytes()), "vectors":result})
 }
@@ -189,9 +191,9 @@ fn alpha47_signed_golden_vectors() {
 #[test]
 fn alpha47_mention_bounds_and_coordinates() {
     let principal = entity("principal");
-    assert!(validate_mentions(&vec![principal.clone(); 128]).is_ok());
+    assert!(validate_mentions(&vec![principal.clone(); 128], Some(&peer())).is_ok());
     assert_eq!(
-        validate_mentions(&vec![principal; 129]),
+        validate_mentions(&vec![principal; 129], Some(&peer())),
         Err(heddle_api::hybrid_codec::Reject::Bounds)
     );
     let valid = entity("source_state");
@@ -208,7 +210,7 @@ fn alpha47_mention_bounds_and_coordinates() {
                 s.symbol_id = bad;
             }
         }
-        assert!(canonical_mention(&e).is_err());
+        assert!(canonical_mention(&e, Some(&peer())).is_err());
     }
     for (start, end) in [
         (Some(0), Some(1)),
@@ -221,7 +223,7 @@ fn alpha47_mention_bounds_and_coordinates() {
             s.start_line = start;
             s.end_line = end;
         }
-        assert!(canonical_mention(&e).is_err());
+        assert!(canonical_mention(&e, Some(&peer())).is_err());
     }
     let mut cross = valid;
     if let Some(api::entity_ref::Entity::Source(s)) = &mut cross.entity {
@@ -234,7 +236,7 @@ fn alpha47_mention_bounds_and_coordinates() {
             .id = "00000000-0000-0000-0000-000000000007".into();
     }
     assert_eq!(
-        canonical_mention(&cross),
+        canonical_mention(&cross, Some(&peer())),
         Err(heddle_api::hybrid_codec::Reject::Scope)
     );
 }
@@ -247,21 +249,214 @@ fn alpha47_total_mention_bytes_match_delivery_and_canonical_validation() {
         s.symbol_id = "s".repeat(4096);
     }
     assert!(
-        canonical_mention(&source).is_ok(),
+        canonical_mention(&source, Some(&peer())).is_ok(),
         "each field is within its bound"
     );
     let below = vec![source.clone(); 31];
-    assert!(canonical_mentions(&below).is_ok());
-    assert!(validate_mentions(&below).is_ok());
+    assert!(canonical_mentions(&below, Some(&peer())).is_ok());
+    assert!(validate_mentions(&below, Some(&peer())).is_ok());
     for count in [32, 128] {
         let mentions = vec![source.clone(); count];
         assert_eq!(
-            canonical_mentions(&mentions),
+            canonical_mentions(&mentions, Some(&peer())),
             Err(heddle_api::hybrid_codec::Reject::Bounds)
         );
         assert_eq!(
-            validate_mentions(&mentions),
+            validate_mentions(&mentions, Some(&peer())),
             Err(heddle_api::hybrid_codec::Reject::Bounds)
         );
+    }
+}
+
+fn peer() -> heddle_api::heddle::api::common::ProtocolCompatibility {
+    heddle_api::heddle::api::common::ProtocolCompatibility {
+        protocol_version: 2,
+        mandatory_features: vec![1, 2, 3, 4],
+    }
+}
+
+#[test]
+fn alpha48_variant_features_gate_before_encoding() {
+    use heddle_api::heddle::api::common::MandatoryProtocolFeature as F;
+    use heddle_api::hybrid_codec::Reject;
+    use heddle_api::v2::protocol::{host_supports, require_feature};
+    let missing = heddle_api::heddle::api::common::ProtocolCompatibility {
+        protocol_version: 2,
+        mandatory_features: vec![1],
+    };
+    for feature in [
+        F::CollaborationMentionsV1,
+        F::DiscussionTagsV1,
+        F::ContentOutlineV1,
+    ] {
+        assert!(host_supports(Some(&peer()), feature));
+        require_feature(Some(&peer()), feature).expect("advertised feature");
+        for absent in [None, Some(&missing)] {
+            assert!(!host_supports(absent, feature));
+            assert_eq!(
+                require_feature(absent, feature),
+                Err(Reject::MissingFeature(feature))
+            );
+        }
+    }
+    for absent in [None, Some(&missing)] {
+        for name in ["principal", "source_state", "source_git"] {
+            let r = entity(name);
+            assert_eq!(
+                canonical_mention(&r, absent),
+                Err(Reject::MissingFeature(F::CollaborationMentionsV1))
+            );
+            assert_eq!(
+                validate_mentions(&[r], absent),
+                Err(Reject::MissingFeature(F::CollaborationMentionsV1))
+            );
+        }
+        assert_eq!(
+            canonical_discussion_open_tags(&tags(), absent),
+            Err(Reject::MissingFeature(F::DiscussionTagsV1))
+        );
+        for tags in [vec![], tags()] {
+            assert_eq!(
+                canonical_discussion_tag_edit(&tags, absent),
+                Err(Reject::MissingFeature(F::DiscussionTagsV1))
+            );
+        }
+        canonical_discussion_open_tags(&[], absent).expect("empty opening tags need no feature");
+        canonical_mentions(&[], absent).expect("no mentions need no feature");
+        let legacy = api::EntityRef {
+            entity: Some(api::entity_ref::Entity::Spool(api::SpoolRef {
+                id: "00000000-0000-0000-0000-000000000001".into(),
+            })),
+        };
+        assert_eq!(
+            canonical_mention(&legacy, absent).expect("old variant"),
+            canonical_mention(&legacy, Some(&peer())).expect("old variant")
+        );
+        // Context annotation tags existed before discussion tags.
+        heddle_api::v2::collaboration::canonical_annotation_tags(&tags()).expect("context tags");
+    }
+    heddle_api::import_authority::require_hybrid_peer(Some(&peer()))
+        .expect("additional features do not break HYBRID");
+}
+
+#[test]
+fn alpha48_feature_enum_and_method_requirements_are_stable() {
+    use heddle_api::heddle::api::common::MandatoryProtocolFeature as F;
+    for (feature, value) in [
+        (F::Unspecified, 0),
+        (F::ImportAuthorityHostWitnessV1, 1),
+        (F::CollaborationMentionsV1, 2),
+        (F::DiscussionTagsV1, 3),
+        (F::ContentOutlineV1, 4),
+    ] {
+        assert_eq!(feature as i32, value);
+        assert_eq!(F::try_from(value), Ok(feature));
+    }
+    for method in heddle_api::v2::ALL_METHODS {
+        assert!(
+            method
+                .mandatory_features
+                .iter()
+                .all(|f| ![2, 3, 4].contains(&(*f as i32))),
+            "variant features must not gate {}",
+            method.path
+        );
+    }
+}
+
+#[test]
+fn alpha48_delivery_gate_covers_open_reply_context_extract_tags_and_outline() {
+    use heddle_api::heddle::api::common::MandatoryProtocolFeature as F;
+    use heddle_api::hybrid_codec::Reject;
+    use heddle_api::v2::protocol::validate_request_features as validate;
+    let mention = entity("principal");
+    let context = api::ContextDraft {
+        mentions: vec![mention.clone()],
+        ..Default::default()
+    };
+    let outline = api::OutlineRead {
+        path: "main.rs".into(),
+        ..Default::default()
+    };
+    let cases = [
+        (
+            "CollaborationService/OpenDiscussion",
+            api::OpenDiscussionRequest {
+                mentions: vec![mention.clone()],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            F::CollaborationMentionsV1,
+        ),
+        (
+            "CollaborationService/AppendTurn",
+            api::AppendDiscussionRequest {
+                mentions: vec![mention],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            F::CollaborationMentionsV1,
+        ),
+        (
+            "CollaborationService/PutContext",
+            api::PutContextRequest {
+                context: Some(context.clone()),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            F::CollaborationMentionsV1,
+        ),
+        (
+            "CollaborationService/ResolveDiscussion",
+            api::ResolveDiscussionRequest {
+                resolution: Some(api::resolve_discussion_request::Resolution::ExtractContext(
+                    context,
+                )),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            F::CollaborationMentionsV1,
+        ),
+        (
+            "CollaborationService/OpenDiscussion",
+            api::OpenDiscussionRequest {
+                tags: tags(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            F::DiscussionTagsV1,
+        ),
+        (
+            "CollaborationService/EditDiscussionTags",
+            api::EditDiscussionTagsRequest::default().encode_to_vec(),
+            F::DiscussionTagsV1,
+        ),
+        (
+            "ContentService/ReadContent",
+            api::ReadContentRequest {
+                selections: vec![api::ContentRead {
+                    selection: Some(api::content_read::Selection::Outline(outline)),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            F::ContentOutlineV1,
+        ),
+    ];
+    for (method, bytes, feature) in cases {
+        let path = format!("/heddle.api.v1alpha2.{method}");
+        assert_eq!(
+            validate(&path, &bytes, None),
+            Err(Reject::MissingFeature(feature))
+        );
+        let supported = heddle_api::heddle::api::common::ProtocolCompatibility {
+            protocol_version: 2,
+            mandatory_features: vec![feature as i32],
+        };
+        validate(&path, &bytes, Some(&supported)).expect("only the used feature is required");
+        if feature != F::DiscussionTagsV1 || !method.ends_with("EditDiscussionTags") {
+            validate(&path, &[], None).expect("old empty command needs no variant feature");
+        }
     }
 }

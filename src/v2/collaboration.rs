@@ -1,9 +1,26 @@
 //! Canonical signed mention/tag components for portable collaboration operations.
 //! Hosts still verify the enclosing original operation, actor, causal frontier,
 //! request correspondence and live authority. References never grant access.
+use super::protocol::require_feature;
+use crate::heddle::api::common::{MandatoryProtocolFeature as Feature, ProtocolCompatibility};
 use crate::heddle::api::v1alpha2 as api;
 use crate::hybrid_codec::Reject;
 use serde::Serialize;
+
+fn require_mentions(
+    values: &[api::EntityRef],
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<(), Reject> {
+    if values.iter().any(|v| {
+        matches!(
+            v.entity,
+            Some(api::entity_ref::Entity::Principal(_) | api::entity_ref::Entity::Source(_))
+        )
+    }) {
+        require_feature(peer, Feature::CollaborationMentionsV1)?;
+    }
+    Ok(())
+}
 
 pub const MAX_COLLABORATION_MENTIONS: usize = 128;
 /// Per command: bytes of the complete canonical named MessagePack mention array,
@@ -193,7 +210,11 @@ fn source(value: &api::SourceMention) -> Result<SourceReference<'_>, Reject> {
     )
 }
 /// Validate pinned coordinates, exact revision, bounds and optional Thread scope.
-pub fn validate_source_mention(value: &api::SourceMention) -> Result<(), Reject> {
+pub fn validate_source_mention(
+    value: &api::SourceMention,
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<(), Reject> {
+    require_feature(peer, Feature::CollaborationMentionsV1)?;
     source(value).map(|_| ())
 }
 fn endpoint(value: &api::EndpointRef) -> Result<&[u8], Reject> {
@@ -289,15 +310,26 @@ fn encode(value: &impl Serialize) -> Result<Vec<u8>, Reject> {
     Ok(bytes)
 }
 /// Exact named MessagePack map used in SharedCommand.metadata.mentions.
-pub fn canonical_mention(value: &api::EntityRef) -> Result<Vec<u8>, Reject> {
+pub fn canonical_mention(
+    value: &api::EntityRef,
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<Vec<u8>, Reject> {
+    require_mentions(std::slice::from_ref(value), peer)?;
     encode(&mention(value)?)
 }
-pub fn validate_mentions(values: &[api::EntityRef]) -> Result<(), Reject> {
-    canonical_mentions(values).map(|_| ())
+pub fn validate_mentions(
+    values: &[api::EntityRef],
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<(), Reject> {
+    canonical_mentions(values, peer).map(|_| ())
 }
 /// Preserve caller ordering; mention arrays are not sets and are never sorted.
 /// Enforce both the per-command count and complete encoded-array byte bounds.
-pub fn canonical_mentions(values: &[api::EntityRef]) -> Result<Vec<u8>, Reject> {
+pub fn canonical_mentions(
+    values: &[api::EntityRef],
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<Vec<u8>, Reject> {
+    require_mentions(values, peer)?;
     if values.len() > MAX_COLLABORATION_MENTIONS {
         return Err(Reject::Bounds);
     }
@@ -504,7 +536,11 @@ pub fn canonical_annotation_tags(values: &[api::AnnotationTag]) -> Result<Vec<u8
 }
 /// New action in schema-version-2 discussion content. Its enclosing immutable
 /// operation carries actor, timestamp and original observed causal parents.
-pub fn canonical_discussion_tag_edit(values: &[api::AnnotationTag]) -> Result<Vec<u8>, Reject> {
+pub fn canonical_discussion_tag_edit(
+    values: &[api::AnnotationTag],
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<Vec<u8>, Reject> {
+    require_feature(peer, Feature::DiscussionTagsV1)?;
     #[derive(Serialize)]
     struct Edit<'a> {
         kind: &'static str,
@@ -514,4 +550,15 @@ pub fn canonical_discussion_tag_edit(values: &[api::AnnotationTag]) -> Result<Ve
         kind: "edit_tags",
         tags: tags(values)?,
     })
+}
+
+/// Opening tags use the existing context encoding; empty lists omit the signed key.
+pub fn canonical_discussion_open_tags(
+    values: &[api::AnnotationTag],
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<Vec<u8>, Reject> {
+    if !values.is_empty() {
+        require_feature(peer, Feature::DiscussionTagsV1)?;
+    }
+    canonical_annotation_tags(values)
 }

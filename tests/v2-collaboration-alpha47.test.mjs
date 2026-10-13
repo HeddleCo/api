@@ -1,3 +1,4 @@
+import { ProtocolCompatibilitySchema } from "../packages/typescript/dist/common/contract_pb.js";
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -28,13 +29,13 @@ const tags = [textAnnotationTag('decision'), create(AnnotationTagSchema, { tag: 
 
 test('seven new signed cases match independent Rust canonical bytes, signatures, IDs and wire corpus', async () => {
   const records = {
-    principal_open: await signDiscussion({ ...command(open), mentions: [principal] }, [], signer),
-    source_state_open: await signDiscussion({ ...command(open), mentions: [{ kind: 'source', source: source(true) }] }, [], signer),
-    source_git_append: await signDiscussion({ ...command({ kind: 'append', body: 'See the reviewed state' }), mentions: [{ kind: 'source', source: source(false) }] }, [old.open], signer),
-    context_mentions: await signContext({ ...shared, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [textAnnotationTag('decision')], mentions: [principal, { kind: 'source', source: source(false) }] }, [], signer),
-    open_tags: await signDiscussion(command({ ...open, tags }), [], signer),
-    edit_tags: await signDiscussion(command({ kind: 'edit_tags', tags }), [old.open], signer),
-    clear_tags: await signDiscussion(command({ kind: 'edit_tags', tags: [] }), [old.open], signer),
+    principal_open: await signDiscussion({ ...command(open), mentions: [principal] }, [], signer, peer),
+    source_state_open: await signDiscussion({ ...command(open), mentions: [{ kind: 'source', source: source(true) }] }, [], signer, peer),
+    source_git_append: await signDiscussion({ ...command({ kind: 'append', body: 'See the reviewed state' }), mentions: [{ kind: 'source', source: source(false) }] }, [old.open], signer, peer),
+    context_mentions: await signContext({ ...shared, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [textAnnotationTag('decision')], mentions: [principal, { kind: 'source', source: source(false) }] }, [], signer, peer),
+    open_tags: await signDiscussion(command({ ...open, tags }), [], signer, peer),
+    edit_tags: await signDiscussion(command({ kind: 'edit_tags', tags }), [old.open], signer, peer),
+    clear_tags: await signDiscussion(command({ kind: 'edit_tags', tags: [] }), [old.open], signer, peer),
   };
   assert.deepEqual(Object.keys(records).sort(), Object.keys(fixture.vectors).sort());
   for (const [name, record] of Object.entries(records)) {
@@ -45,8 +46,8 @@ test('seven new signed cases match independent Rust canonical bytes, signatures,
     assert.equal(Buffer.from((await verifyCollaboration(record)).operationId).toString('hex'), v.operation_id_hex, name);
     for (const m of v.mentions) {
       const ref = fromBinary(EntityRefSchema, Buffer.from(m.entity_wire_hex, 'hex'));
-      validateEntityMentions([ref]);
-      assert.equal(Buffer.from(canonicalMention(ref)).toString('hex'), m.canonical_hex);
+      validateEntityMentions([ref], peer);
+      assert.equal(Buffer.from(canonicalMention(ref, peer)).toString('hex'), m.canonical_hex);
     }
   }
 });
@@ -56,21 +57,21 @@ test('opening mentions round-trip with the same entity list as context drafts an
   assert.deepEqual(fromBinary(OpenDiscussionRequestSchema, toBinary(OpenDiscussionRequestSchema, request)).mentions, mentions);
   const draft = create(ContextDraftSchema, { mentions });
   assert.deepEqual(fromBinary(ContextDraftSchema, toBinary(ContextDraftSchema, draft)).mentions, mentions);
-  assert.deepEqual((await signDiscussion(command({ ...open, tags: [] }), [], signer)).canonicalRecord, new Uint8Array(old.open.canonicalRecord));
+  assert.deepEqual((await signDiscussion(command({ ...open, tags: [] }), [], signer, peer)).canonicalRecord, new Uint8Array(old.open.canonicalRecord));
 });
 test('mention count, UTF-8 bounds, canonical paths, exact revisions and inclusive lines are checked before signing', async () => {
   let calls = 0;
   const counting = { ...signer, sign: async bytes => { calls++; return signer.sign(bytes); } };
-  await assert.rejects(signDiscussion({ ...command(open), mentions: Array(129).fill(principal) }, [], counting));
+  await assert.rejects(signDiscussion({ ...command(open), mentions: Array(129).fill(principal) }, [], counting, peer));
   const valid = source(true);
   for (const patch of [{ path: 'x'.repeat(4097) }, { symbolId: 'é'.repeat(2049) }, { path: '../main.rs' }, { startLine: 0 }, { startLine: 19 }, { startLine: undefined }, { endLine: undefined }, { endLine: 4294967296 }, { revision: { ...valid.revision, revision: { case: 'gitCommitOid', value: 'main' } } }, { thread: { ...valid.thread, spool: { id: principal.principalId } } }]) {
-    await assert.rejects(signDiscussion({ ...command(open), mentions: [{ kind: 'source', source: create(SourceMentionSchema, { ...valid, ...patch }) }] }, [], counting));
+    await assert.rejects(signDiscussion({ ...command(open), mentions: [{ kind: 'source', source: create(SourceMentionSchema, { ...valid, ...patch }) }] }, [], counting, peer));
   }
   assert.equal(calls, 0);
-  await signDiscussion({ ...command(open), mentions: Array(128).fill(principal) }, [], signer);
+  await signDiscussion({ ...command(open), mentions: Array(128).fill(principal) }, [], signer, peer);
   const ref = create(EntityRefSchema, { entity: { case: 'source', value: create(SourceMentionSchema, { ...valid, path: 'é'.repeat(2048), symbolId: 's'.repeat(4096) }) } });
-  validateEntityMentions([ref]);
-  assert.throws(() => validateEntityMentions(Array(129).fill(ref)));
+  validateEntityMentions([ref], peer);
+  assert.throws(() => validateEntityMentions(Array(129).fill(ref), peer));
 });
 test('valid signatures cannot conceal malformed new mention or tag forms from the verifier', async () => {
   for (const [name, mutate] of [
@@ -92,14 +93,38 @@ test('aggregate mention bytes are bounded in delivery and before signing', async
   const maximal = create(SourceMentionSchema, { ...source(true), path: 'é'.repeat(2048), symbolId: 's'.repeat(4096) });
   const ref = create(EntityRefSchema, { entity: { case: 'source', value: maximal } });
   const mention = { kind: 'source', source: maximal };
-  validateEntityMentions(Array(31).fill(ref));
-  await signDiscussion({ ...command(open), mentions: [mention] }, [], signer);
+  validateEntityMentions(Array(31).fill(ref), peer);
+  await signDiscussion({ ...command(open), mentions: [mention] }, [], signer, peer);
   let calls = 0;
   const counting = { ...signer, sign: async bytes => { calls++; return signer.sign(bytes); } };
   for (const count of [32, 128]) {
-    assert.throws(() => validateEntityMentions(Array(count).fill(ref)), /mention.*byte/i);
-    await assert.rejects(signDiscussion({ ...command(open), mentions: Array(count).fill(mention) }, [], counting), /mention.*byte/i);
-    await assert.rejects(signContext({ ...shared, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [], mentions: Array(count).fill(mention) }, [], counting), /mention.*byte/i);
+    assert.throws(() => validateEntityMentions(Array(count).fill(ref), peer), /mention.*byte/i);
+    await assert.rejects(signDiscussion({ ...command(open), mentions: Array(count).fill(mention) }, [], counting, peer), /mention.*byte/i);
+    await assert.rejects(signContext({ ...shared, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [], mentions: Array(count).fill(mention) }, [], counting, peer), /mention.*byte/i);
   }
   assert.equal(calls, 0, 'aggregate bound is checked before invoking the signer');
+});
+
+const peer = create(ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1, 2, 3, 4] });
+
+test('alpha48 signing refuses missing mention/tag support before invoking the signer', async () => {
+  const { MissingProtocolFeatureError } = await import('../packages/typescript/dist/v1alpha2/protocol.js');
+  const missing = create(ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1] });
+  let calls = 0;
+  const counting = { ...signer, sign: async bytes => { calls++; return signer.sign(bytes); } };
+  for (const absent of [undefined, missing]) {
+    for (const mentions of [[principal], [{ kind: 'source', source: source(true) }], [{ kind: 'source', source: source(false) }]]) {
+      const error = e => e instanceof MissingProtocolFeatureError && e.feature === 2;
+      await assert.rejects(signDiscussion({ ...command(open), mentions }, [], counting, absent), error);
+      await assert.rejects(signDiscussion({ ...command({ kind: 'append', body: 'Reply' }), mentions }, [old.open], counting, absent), error);
+      await assert.rejects(signContext({ ...shared, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Context', tags: [], mentions }, [], counting, absent), error);
+    }
+    for (const action of [{ ...open, tags }, { kind: 'edit_tags', tags }, { kind: 'edit_tags', tags: [] }]) {
+      await assert.rejects(signDiscussion(command(action), action.kind === 'open' ? [] : [old.open], counting, absent), e => e instanceof MissingProtocolFeatureError && e.feature === 3);
+    }
+  }
+  assert.equal(calls, 0);
+  assert.deepEqual((await signDiscussion(command({ ...open, tags: [] }), [], signer)).canonicalRecord, new Uint8Array(old.open.canonicalRecord));
+  assert.deepEqual((await signDiscussion({ ...command({ kind: 'append', body: 'See the reviewed state' }), mentions: [{ kind: 'state', spoolId: scope.spoolId, id: new Uint8Array(32).fill(5) }] }, [old.open], signer)).canonicalRecord, new Uint8Array(old.append.canonicalRecord));
+  assert.deepEqual((await signContext({ ...shared, contextId: '00000000-0000-0000-0000-000000000009', anchor: { kind: 'repository' }, content: 'Design rationale', tags: [textAnnotationTag('decision')] }, [], signer)).canonicalRecord, new Uint8Array(old.context.canonicalRecord));
 });

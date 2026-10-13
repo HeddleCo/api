@@ -47,6 +47,8 @@ class AdditiveBundleContractTest(unittest.TestCase):
                 ("signed_operation", 7),
                 ("audience", 8),
                 ("audience_label", 9),
+                ("mentions", 10),
+                ("tags", 11),
             ],
         )
         request = body(COLLABORATION, "message", "OpenDiscussionRequest")

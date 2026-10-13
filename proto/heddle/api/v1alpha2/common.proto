@@ -115,6 +115,20 @@ message BookmarkRef {
   }
 }
 
+// Exact source mention, aligned with SourceAnchor's original coordinates.
+// No tracking: the revision is immutable. A reference grants no source access.
+// Path and symbol_id are at most 4096 UTF-8 bytes; path is nonempty and
+// repository-relative. Lines are one-based, inclusive, both present or absent.
+message SourceMention {
+  RevisionRef revision = 1;
+  string path = 2;
+  string symbol_id = 3;
+  optional uint32 start_line = 4;
+  optional uint32 end_line = 5;
+  // Optional owning Thread, with the same Spool as revision.
+  ThreadRef thread = 6;
+}
+
 message EntityRef {
   oneof entity {
     SpoolRef spool = 1;
@@ -156,6 +170,7 @@ message EntityRef {
     RecordRef passkey = 36;
     PrincipalRef principal = 37;
     AgentRef agent = 38;
+    SourceMention source = 39;
   }
 }
 

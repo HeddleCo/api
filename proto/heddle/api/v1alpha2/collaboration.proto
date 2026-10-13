@@ -206,6 +206,8 @@ message DiscussionRecord {
   // distinct by causal_id. include_history also includes past resolutions,
   // including those followed by reopen. Only disclose reader-visible originals.
   repeated DiscussionResolutionRecord resolutions = 13;
+  // Current causal tag register, at most 128 typed tags.
+  repeated AnnotationTag tags = 14;
 }
 
 message DiscussionTurn {
@@ -327,6 +329,7 @@ message ContextRecord {
   // Same live display-name semantics as DiscussionTurn.author_display_name.
   // Historical context revisions resolve at observation time, not admission.
   string author_display_name = 15;
+  repeated EntityRef mentions = 16;
 }
 
 // Write input. Actor attribution is carried by the signed canonical operation;
@@ -338,6 +341,7 @@ message ContextDraft {
   repeated AnnotationTag tags = 4;
   RecordRef supersedes = 5;
   RecordRef extracted_from = 6;
+  repeated EntityRef mentions = 7;
 }
 
 message ObserveCollaborationRequest {
@@ -360,6 +364,9 @@ message ObserveCollaborationRequest {
   // omission uses that Thread's unique current source head. NamedThread and
   // PinnedRevision bindings retain their explicit policies.
   repeated SourceTargetView source_views = 11;
+  // Presence selects discussions only, including an empty match-all query.
+  // Mutually exclusive with annotations. Same per-revision typed predicates.
+  AnnotationQuery discussion_tags = 12;
 }
 
 message CollaborationEvent {
@@ -389,6 +396,13 @@ message OpenDiscussionRequest {
   // other audiences require an empty label. Sharing never widens this audience.
   Audience audience = 8;
   string audience_label = 9;
+  // Same list as AppendTurn, retained on the opening DiscussionTurn. At most
+  // 128 mentions, matching the signed operation's metadata. Notification kind
+  // "mention" is delivered only to principals who can read this anchor and
+  // its discussion/context audience. Inaccessible mentions are refused or
+  // dropped from projections/notifications and never disclosed to recipients.
+  repeated EntityRef mentions = 10;
+  repeated AnnotationTag tags = 11;
 }
 
 message AppendDiscussionRequest {
@@ -433,4 +447,15 @@ message PutContextRequest {
   SignedRecord signed_operation = 4;
   // Empty expected version creates; existing records require the observed
   // version. History is appended, never replaced by editing an old revision.
+}
+
+// Absolute tag replacement, like a new PutContext revision. Require the observed
+// aggregate version and signed causal frontier; preserve concurrent edits.
+// Hosts compare all request fields with the original signed operation.
+message EditDiscussionTagsRequest {
+  string client_operation_id = 1;
+  RecordRef discussion = 2;
+  bytes expected_version = 3;
+  repeated AnnotationTag tags = 4;
+  SignedRecord signed_operation = 5;
 }

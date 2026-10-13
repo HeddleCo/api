@@ -1,4 +1,5 @@
 //! Bounded per-file outline inputs, rows and terminal coverage.
+use crate::heddle::api::common::SymbolKind;
 use crate::heddle::api::v1alpha2::{
     Coverage, OutlineRead, OutlineSymbol, SectionStatus, SectionStatusReason,
 };
@@ -37,7 +38,8 @@ pub fn validate_outline_symbol(value: &OutlineSymbol) -> Result<(), Reject> {
     text(&value.name, true)?;
     text(&value.container, false)?;
     text(&value.symbol_id, true)?;
-    if !(1..=10).contains(&value.kind) || value.start_line == 0 || value.end_line < value.start_line
+    let kind = SymbolKind::try_from(value.kind).map_err(|_| Reject::Canonical)?;
+    if kind == SymbolKind::Unspecified || value.start_line == 0 || value.end_line < value.start_line
     {
         return Err(Reject::Canonical);
     }

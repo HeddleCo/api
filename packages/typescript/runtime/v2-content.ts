@@ -1,6 +1,7 @@
 import { toBinary } from "@bufbuild/protobuf";
 import { type OutlineRead, type OutlineSymbol, OutlineSymbolSchema } from "./content_pb.js";
 import { Coverage, SectionStatusReason, type SectionStatus } from "./common_pb.js";
+import { SymbolKind, SymbolKindSchema } from "../common/repository_pb.js";
 
 export const DEFAULT_OUTLINE_PAGE_SIZE = 100;
 export const MAX_OUTLINE_PAGE_SIZE = 256;
@@ -16,7 +17,7 @@ export function validateOutlineRead(read: OutlineRead): void {
 }
 export function validateOutlineSymbol(symbol: OutlineSymbol): void {
   bounded(symbol.name, true); bounded(symbol.container); bounded(symbol.symbolId, true);
-  if (symbol.kind < 1 || symbol.kind > 10 || symbol.startLine < 1 || symbol.endLine < symbol.startLine
+  if (symbol.kind === SymbolKind.UNSPECIFIED || !SymbolKindSchema.values.some(value => value.number === symbol.kind) || symbol.startLine < 1 || symbol.endLine < symbol.startLine
       || !Number.isInteger(symbol.startLine) || !Number.isInteger(symbol.endLine) || symbol.endLine > 4294967295) throw new Error("Invalid outline symbol");
   if (toBinary(OutlineSymbolSchema, symbol).length > MAX_OUTLINE_SYMBOL_BYTES) throw new Error("Outline symbol exceeds bounds");
 }

@@ -3,6 +3,23 @@ use contract::heddle::api::v1alpha2 as wire;
 use prost::Message;
 #[test]
 fn older_native_decoder_refuses_new_signed_collaboration_forms() {
+    let baseline = include_str!("../../../tests/fixtures/collaboration-v2-rust.txt")
+        .lines()
+        .find(|line| line.starts_with("open "))
+        .expect("legacy opening");
+    let fields: Vec<_> = baseline.split(' ').collect();
+    let legacy = wire::SignedRecord {
+        format: "heddle-thread-operation-v1".into(),
+        canonical_record: hex::decode(fields[2]).expect("legacy canonical"),
+        signatures: vec![wire::RecordSignature {
+            public_key: hex::decode(fields[1]).expect("legacy public key"),
+            signature: hex::decode(fields[3]).expect("legacy signature"),
+        }],
+    };
+    let native = thread_api::contract::SignedRecord::decode(legacy.encode_to_vec().as_slice())
+        .expect("legacy record");
+    thread_api::replication::decode_record(native)
+        .expect("same older decoder accepts legacy opening");
     let fixture: serde_json::Value = serde_json::from_str(include_str!(
         "../../../tests/fixtures/collaboration-alpha47.json"
     ))

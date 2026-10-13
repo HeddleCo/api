@@ -9,6 +9,8 @@ has the same call-level existence-hiding response; no readiness metadata leaks.
 
 Each `ContentEvent.outline_symbol` gives name, `SymbolKind`, container (empty
 at top level), opaque stable symbol ID and one-based inclusive start/end lines.
+Rust and TypeScript validate kinds against the generated `SymbolKind` enum,
+rejecting `UNSPECIFIED` and unknown values rather than hard-coding a numeric range.
 Use the index's symbol address also used for source anchors; never replace it
 with a semantic meaning hash. Stability is within the exact indexed revision,
 including retries/pages and unchanged projections. Renames/moves across

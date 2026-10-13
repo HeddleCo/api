@@ -7,6 +7,9 @@ import { Audience } from "./common_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
 
 export const MAX_COLLABORATION_MENTIONS = 128;
+/** Per command: complete canonical named MessagePack mention array, including
+ * its header and reference maps, rather than the protobuf delivery list. */
+export const MAX_COLLABORATION_MENTION_BYTES = 256 * 1024;
 export const MAX_MENTION_PATH_BYTES = 4096;
 export const MAX_MENTION_SYMBOL_ID_BYTES = 4096;
 const FORMAT = "heddle-thread-operation-v1";
@@ -208,10 +211,12 @@ async function signOperation(thread: Uint8Array, parents: number[][], kind: stri
 function metadataValue(command: SharedCommand): MapValue {
   const mentions = command.mentions ?? [];
   if (mentions.length > MAX_COLLABORATION_MENTIONS) throw new Error("Too many collaboration mentions");
+  const canonicalMentions = mentions.map(mentionValue);
+  validateMentionList(canonicalMentions);
   if (command.actor.agentId !== undefined) text(command.actor.agentId, 512, true);
   return { scope: { spool: uuid(command.scope.spoolId), thread: Array.from(fixed(command.scope.threadId, 32)) },
     actor: { principal_id: uuid(command.actor.principalId), agent_id: command.actor.agentId ?? null },
-    mentions: mentions.map(mentionValue) };
+    mentions: canonicalMentions };
 }
 function mentionValue(mention: CollaborationMention): MapValue {
   const kind = mention.kind;
@@ -386,9 +391,7 @@ function validateInner(inner: MapValue, kind: "discussion" | "context") {
   if (typeof occurred !== "number" && typeof occurred !== "bigint") throw new Error("Invalid collaboration timestamp");
   timestamp(BigInt(occurred));
   const metadata = map(inner.metadata);
-  for (const item of metadata.mentions as Value[]) {
-    validateMention(item);
-  }
+  validateMentionList(metadata.mentions);
   if (kind === "context") {
     validateAnchor(inner.anchor);
     text(string(inner.content), 256 * 1024);
@@ -487,6 +490,17 @@ function validateAnchor(value: Value | undefined) {
   anchorValue({ kind: "source", revision: typedRevision, path: string(source.path), symbolId: string(source.symbol_id), startLine: line(source.start_line), endLine: line(source.end_line), pathKind: source.path_kind as "file" | "directory" | undefined });
 }
 
+function validateMentionList(values: Value | undefined): void {
+  if (!Array.isArray(values) || values.length > MAX_COLLABORATION_MENTIONS) throw new Error("Invalid collaboration mentions");
+  // Sum individually bounded encodings so the enclosing record codec's byte
+  // bound cannot mask this per-command bound. Up to 128 items use fixarray/array16.
+  let bytes = values.length <= 15 ? 1 : 3;
+  for (const value of values) {
+    validateMention(value);
+    bytes += encode(value).length;
+    if (bytes > MAX_COLLABORATION_MENTION_BYTES) throw new Error("Collaboration mention payload exceeds byte bound");
+  }
+}
 function validateMention(item: Value) {
     const mention = map(item);
     const kind = string(mention.kind);
@@ -552,7 +566,7 @@ export function canonicalMention(ref: EntityRef): Uint8Array {
 }
 export function validateEntityMentions(mentions: readonly EntityRef[]): void {
   if (mentions.length > MAX_COLLABORATION_MENTIONS) throw new Error("Too many collaboration mentions");
-  for (const mention of mentions) validateMention(annotationEntityValue(mention));
+  validateMentionList(mentions.map(annotationEntityValue));
 }
 function annotationEntityValue(ref: EntityRef): MapValue {
   const entity = ref.entity;

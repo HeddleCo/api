@@ -130,6 +130,34 @@ fn outline_validation_enforces_indivisible_row_and_path_bounds() {
 }
 #[cfg(feature = "reflection")]
 #[test]
+fn outline_kinds_follow_the_generated_enum() {
+    let pool =
+        prost_reflect::DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("descriptor");
+    let kinds = pool
+        .get_enum_by_name("heddle.api.common.SymbolKind")
+        .expect("symbol kinds");
+    let mut row = api::OutlineSymbol {
+        name: "run".into(),
+        symbol_id: "run".into(),
+        start_line: 1,
+        end_line: 2,
+        ..Default::default()
+    };
+    for value in kinds.values() {
+        row.kind = value.number();
+        assert_eq!(
+            validate_outline_symbol(&row).is_ok(),
+            row.kind != common::SymbolKind::Unspecified as i32
+        );
+    }
+    for kind in [-1, i32::MAX] {
+        row.kind = kind;
+        assert!(validate_outline_symbol(&row).is_err());
+    }
+}
+
+#[cfg(feature = "reflection")]
+#[test]
 fn additive_tags_mentions_and_outline_are_in_the_descriptor() {
     let pool =
         prost_reflect::DescriptorPool::decode(heddle_api::FILE_DESCRIPTOR_SET).expect("descriptor");

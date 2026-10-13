@@ -6,6 +6,9 @@ use crate::hybrid_codec::Reject;
 use serde::Serialize;
 
 pub const MAX_COLLABORATION_MENTIONS: usize = 128;
+/// Per command: bytes of the complete canonical named MessagePack mention array,
+/// including its header and all reference maps (not the protobuf delivery list).
+pub const MAX_COLLABORATION_MENTION_BYTES: usize = 256 * 1024;
 pub const MAX_MENTION_PATH_BYTES: usize = 4096;
 pub const MAX_MENTION_SYMBOL_ID_BYTES: usize = 4096;
 
@@ -280,7 +283,7 @@ fn mention(value: &api::EntityRef) -> Result<Mention<'_>, Reject> {
 }
 fn encode(value: &impl Serialize) -> Result<Vec<u8>, Reject> {
     let bytes = rmp_serde::to_vec_named(value).map_err(|_| Reject::Canonical)?;
-    if bytes.len() > 256 * 1024 {
+    if bytes.len() > MAX_COLLABORATION_MENTION_BYTES {
         return Err(Reject::Bounds);
     }
     Ok(bytes)
@@ -290,17 +293,14 @@ pub fn canonical_mention(value: &api::EntityRef) -> Result<Vec<u8>, Reject> {
     encode(&mention(value)?)
 }
 pub fn validate_mentions(values: &[api::EntityRef]) -> Result<(), Reject> {
+    canonical_mentions(values).map(|_| ())
+}
+/// Preserve caller ordering; mention arrays are not sets and are never sorted.
+/// Enforce both the per-command count and complete encoded-array byte bounds.
+pub fn canonical_mentions(values: &[api::EntityRef]) -> Result<Vec<u8>, Reject> {
     if values.len() > MAX_COLLABORATION_MENTIONS {
         return Err(Reject::Bounds);
     }
-    for value in values {
-        mention(value)?;
-    }
-    Ok(())
-}
-/// Preserve caller ordering; mention arrays are not sets and are never sorted.
-pub fn canonical_mentions(values: &[api::EntityRef]) -> Result<Vec<u8>, Reject> {
-    validate_mentions(values)?;
     encode(&values.iter().map(mention).collect::<Result<Vec<_>, _>>()?)
 }
 

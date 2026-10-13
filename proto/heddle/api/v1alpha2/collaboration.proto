@@ -206,6 +206,8 @@ message DiscussionRecord {
   // distinct by causal_id. include_history also includes past resolutions,
   // including those followed by reopen. Only disclose reader-visible originals.
   repeated DiscussionResolutionRecord resolutions = 13;
+  // Current causal tag register, at most 128 typed tags.
+  repeated AnnotationTag tags = 14;
 }
 
 message DiscussionTurn {
@@ -214,6 +216,12 @@ message DiscussionTurn {
   string body = 3;
   string principal_id = 4;
   string agent_id = 5;
+  // Principal ids remain opaque and unchanged from signed metadata in every
+  // projection; principal access never causes refusal or stripping. Only mention
+  // notification delivery is gated by anchor/audience read access at delivery
+  // time, with no author-visible delivery field or status. Source mentions may
+  // be refused when the author cannot read the source.
+  // See docs/alpha-v2/collaboration-mentions-tags.md for bounds and disclosure.
   repeated EntityRef mentions = 6;
   google.protobuf.Timestamp created_at = 7;
   // Immutable replication-operation identity and dependencies, shared across replicas.
@@ -327,6 +335,13 @@ message ContextRecord {
   // Same live display-name semantics as DiscussionTurn.author_display_name.
   // Historical context revisions resolve at observation time, not admission.
   string author_display_name = 15;
+  // Principal ids remain opaque and unchanged from signed metadata in every
+  // projection; principal access never causes refusal or stripping. Only mention
+  // notification delivery is gated by anchor/audience read access at delivery
+  // time, with no author-visible delivery field or status. Source mentions may
+  // be refused when the author cannot read the source.
+  // See docs/alpha-v2/collaboration-mentions-tags.md for bounds and disclosure.
+  repeated EntityRef mentions = 16;
 }
 
 // Write input. Actor attribution is carried by the signed canonical operation;
@@ -338,6 +353,15 @@ message ContextDraft {
   repeated AnnotationTag tags = 4;
   RecordRef supersedes = 5;
   RecordRef extracted_from = 6;
+  // At most 128 mentions and 256 KiB of canonical MessagePack mention-array
+  // bytes per command, including the array header and all reference maps.
+  // Principal ids remain opaque and unchanged in every projection; principal
+  // access never causes refusal or stripping. Only notification delivery is
+  // gated by anchor/audience read access at delivery time, with no author-visible
+  // delivery field or status. Source mentions may be refused when the author
+  // cannot read the source.
+  // See docs/alpha-v2/collaboration-mentions-tags.md for bounds and disclosure.
+  repeated EntityRef mentions = 7;
 }
 
 message ObserveCollaborationRequest {
@@ -360,6 +384,9 @@ message ObserveCollaborationRequest {
   // omission uses that Thread's unique current source head. NamedThread and
   // PinnedRevision bindings retain their explicit policies.
   repeated SourceTargetView source_views = 11;
+  // Presence selects discussions only, including an empty match-all query.
+  // Mutually exclusive with annotations. Same per-revision typed predicates.
+  AnnotationQuery discussion_tags = 12;
 }
 
 message CollaborationEvent {
@@ -389,6 +416,17 @@ message OpenDiscussionRequest {
   // other audiences require an empty label. Sharing never widens this audience.
   Audience audience = 8;
   string audience_label = 9;
+  // Same list as AppendDiscussionRequest, retained on the opening DiscussionTurn.
+  // At most 128 mentions and 256 KiB of canonical MessagePack mention-array
+  // bytes per command, including the array header and all reference maps.
+  // Principal ids remain opaque and unchanged in every projection; principal
+  // access never causes refusal or stripping. Only notification delivery is
+  // gated by anchor/audience read access at delivery time, with no author-visible
+  // delivery field or status. Source mentions may be refused when the author
+  // cannot read the source.
+  // See docs/alpha-v2/collaboration-mentions-tags.md for bounds and disclosure.
+  repeated EntityRef mentions = 10;
+  repeated AnnotationTag tags = 11;
 }
 
 message AppendDiscussionRequest {
@@ -397,6 +435,14 @@ message AppendDiscussionRequest {
   // Heads the author observed; concurrent appends are retained.
   repeated bytes causal_parents = 3;
   string body = 4;
+  // At most 128 mentions and 256 KiB of canonical MessagePack mention-array
+  // bytes per command, including the array header and all reference maps.
+  // Principal ids remain opaque and unchanged in every projection; principal
+  // access never causes refusal or stripping. Only notification delivery is
+  // gated by anchor/audience read access at delivery time, with no author-visible
+  // delivery field or status. Source mentions may be refused when the author
+  // cannot read the source.
+  // See docs/alpha-v2/collaboration-mentions-tags.md for bounds and disclosure.
   repeated EntityRef mentions = 5;
   SignedRecord signed_operation = 6;
 }
@@ -433,4 +479,15 @@ message PutContextRequest {
   SignedRecord signed_operation = 4;
   // Empty expected version creates; existing records require the observed
   // version. History is appended, never replaced by editing an old revision.
+}
+
+// Absolute tag replacement, like a new PutContext revision. Require the observed
+// aggregate version and signed causal frontier; preserve concurrent edits.
+// Hosts compare all request fields with the original signed operation.
+message EditDiscussionTagsRequest {
+  string client_operation_id = 1;
+  RecordRef discussion = 2;
+  bytes expected_version = 3;
+  repeated AnnotationTag tags = 4;
+  SignedRecord signed_operation = 5;
 }

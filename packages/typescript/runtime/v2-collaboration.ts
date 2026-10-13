@@ -1,11 +1,17 @@
 import { create } from "@bufbuild/protobuf";
 import { blake3 } from "@noble/hashes/blake3.js";
 import { SignedRecordSchema, type SignedRecord } from "./common_pb.js";
-import { AnnotationSourceReferenceSchema, SourceTargetReferenceSchema, AnnotationTagSchema, SourcePathKind, SourcePathKindSource, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference, type SourceAnchor } from "./collaboration_pb.js";
-import type { EntityRef } from "./common_pb.js";
+import { AnnotationSourceReferenceSchema, SourceTargetReferenceSchema, AnnotationTagSchema, SourcePathKind, SourcePathKindSource, type AnnotationTag, type AnnotationSourceReference, type AnnotationValue, type SourceTargetReference, type SourceAnchor, SourceAnchorSchema } from "./collaboration_pb.js";
+import type { EntityRef, SourceMention } from "./common_pb.js";
 import { Audience } from "./common_pb.js";
 import { encode, decode, equal, type Value } from "./_collaboration-msgpack.js";
 
+export const MAX_COLLABORATION_MENTIONS = 128;
+/** Per command: complete canonical named MessagePack mention array, including
+ * its header and reference maps, rather than the protobuf delivery list. */
+export const MAX_COLLABORATION_MENTION_BYTES = 256 * 1024;
+export const MAX_MENTION_PATH_BYTES = 4096;
+export const MAX_MENTION_SYMBOL_ID_BYTES = 4096;
 const FORMAT = "heddle-thread-operation-v1";
 const utf8 = new TextEncoder();
 type MapValue = { [key: string]: Value };
@@ -22,7 +28,9 @@ export type CollaborationMention =
   | { kind: "git_commit"; spoolId: string; oid: string }
   | { kind: "checkout"; spoolId: string; device: Uint8Array; id: string }
   | { kind: "record"; spoolId?: string; recordKind: string; id: string }
-  | { kind: "device"; key: Uint8Array };
+  | { kind: "device"; key: Uint8Array }
+  | { kind: "principal"; principalId: string }
+  | { kind: "source"; source: SourceMention };
 export type PortableCollaborationAnchor =
   | { kind: "repository" }
   | { kind: "source"; revision: { kind: "state"; stateId: Uint8Array } | { kind: "git_commit"; oid: string };
@@ -45,12 +53,13 @@ export function collaborationVisibility(audience: Audience, label = ""): Collabo
   throw new Error("Discussion audience must be explicit");
 }
 export type DiscussionAction =
-  | { kind: "open"; blocking: boolean; title: string; anchor: PortableCollaborationAnchor; visibility: CollaborationVisibility; body: string }
+  | { kind: "open"; blocking: boolean; title: string; anchor: PortableCollaborationAnchor; visibility: CollaborationVisibility; body: string; tags?: AnnotationTag[] }
   | { kind: "append"; body: string }
   | { kind: "resolve"; resolution: { kind: "dismissed"; reason: string } | { kind: "addressed_by_state"; stateId: Uint8Array }
       | { kind: "annotation"; annotationId: string } }
-  | { kind: "reopen"; reason: string };
-interface SharedCommand {
+  | { kind: "reopen"; reason: string }
+  | { kind: "edit_tags"; tags: AnnotationTag[] };
+export interface SharedCommand {
   scope: CollaborationScope;
   actor: CollaborationActor;
   mentions?: CollaborationMention[];
@@ -156,7 +165,7 @@ export async function verifyCollaboration(record: SignedRecord): Promise<Verifie
   keys(actor, ["principal_id", "agent_id"]);
   uuidString(actor.principal_id);
   if (actor.agent_id !== null) text(string(actor.agent_id), 512, true);
-  if (!Array.isArray(metadata.mentions) || metadata.mentions.length > 128) throw new Error("Invalid collaboration mentions");
+  if (!Array.isArray(metadata.mentions) || metadata.mentions.length > MAX_COLLABORATION_MENTIONS) throw new Error("Invalid collaboration mentions");
   validateInner(inner, body.kind);
   const recordId = body.kind === "discussion" ? discussionId(string(inner.discussion_id)) : uuidString(inner.id);
   const outerParents = hashes(operation.parents);
@@ -201,14 +210,20 @@ async function signOperation(thread: Uint8Array, parents: number[][], kind: stri
 }
 function metadataValue(command: SharedCommand): MapValue {
   const mentions = command.mentions ?? [];
-  if (mentions.length > 128) throw new Error("Too many collaboration mentions");
+  if (mentions.length > MAX_COLLABORATION_MENTIONS) throw new Error("Too many collaboration mentions");
+  const canonicalMentions = mentions.map(mentionValue);
+  validateMentionList(canonicalMentions);
   if (command.actor.agentId !== undefined) text(command.actor.agentId, 512, true);
   return { scope: { spool: uuid(command.scope.spoolId), thread: Array.from(fixed(command.scope.threadId, 32)) },
     actor: { principal_id: uuid(command.actor.principalId), agent_id: command.actor.agentId ?? null },
-    mentions: mentions.map(mentionValue) };
+    mentions: canonicalMentions };
 }
 function mentionValue(mention: CollaborationMention): MapValue {
   const kind = mention.kind;
+  if (kind === "principal") return { kind, principal_id: uuid(mention.principalId) };
+  if (kind === "source") return { kind, target: annotationSourceValue(create(AnnotationSourceReferenceSchema, {
+    source: create(SourceAnchorSchema, { revision: mention.source.revision, path: mention.source.path, symbolId: mention.source.symbolId, startLine: mention.source.startLine, endLine: mention.source.endLine, thread: mention.source.thread }),
+  })) };
   if (kind === "device") return { kind, key: Array.from(fixed(mention.key, 32)) };
   if (kind === "record") {
     if (!RECORD_KINDS.has(mention.recordKind)) throw new Error("Unknown collaboration record kind");
@@ -308,8 +323,9 @@ function actionValue(action: DiscussionAction): MapValue {
       if (!action.visibility.label.trim()) throw new Error("Private discussion audience requires a label");
       visibility = { Private: { scope_label: action.visibility.label } };
     } else throw new Error("Visibility has no native discussion audience representation");
-    return { kind: "open", blocking: action.blocking, title: action.title, anchor: anchorValue(action.anchor), visibility, turn: turn(action.body) };
+    return { kind: "open", blocking: action.blocking, title: action.title, anchor: anchorValue(action.anchor), visibility, turn: turn(action.body), ...(action.tags?.length ? { tags: annotationTagsValue(action.tags) } : {}) };
   }
+  if (action.kind === "edit_tags") return { kind: "edit_tags", tags: annotationTagsValue(action.tags) };
   if (action.kind === "append") return { kind: "append_turn", turn: turn(action.body) };
   if (action.kind === "reopen") { text(action.reason, 256 * 1024); return { kind: "reopen", reason: action.reason }; }
   const resolution = action.resolution;
@@ -375,9 +391,7 @@ function validateInner(inner: MapValue, kind: "discussion" | "context") {
   if (typeof occurred !== "number" && typeof occurred !== "bigint") throw new Error("Invalid collaboration timestamp");
   timestamp(BigInt(occurred));
   const metadata = map(inner.metadata);
-  for (const item of metadata.mentions as Value[]) {
-    validateMention(item);
-  }
+  validateMentionList(metadata.mentions);
   if (kind === "context") {
     validateAnchor(inner.anchor);
     text(string(inner.content), 256 * 1024);
@@ -405,7 +419,7 @@ function validateInner(inner: MapValue, kind: "discussion" | "context") {
   if ((body.kind === "open") !== (parents.length === 0)) throw new Error("Only discussion roots use an empty causal frontier");
   switch (body.kind) {
     case "open": {
-      keys(body, ["kind", "blocking", "title", "anchor", "visibility", "turn", ...(Object.hasOwn(body, "thread_ref") ? ["thread_ref"] : [])]);
+      keys(body, ["kind", "blocking", "title", "anchor", "visibility", "turn", ...(Object.hasOwn(body, "thread_ref") ? ["thread_ref"] : []), ...(Object.hasOwn(body, "tags") ? ["tags"] : [])]);
       if (typeof body.blocking !== "boolean") throw new Error("Invalid discussion blocking flag");
       text(string(body.title), 256 * 1024); validateAnchor(body.anchor);
       if (body.thread_ref !== undefined) text(string(body.thread_ref), 256 * 1024);
@@ -415,8 +429,16 @@ function validateInner(inner: MapValue, kind: "discussion" | "context") {
         keys(visibility, [label]); const scope = map(visibility[label]); const field = label === "TeamScoped" ? "team_id" : "scope_label";
         keys(scope, [field]); text(string(scope[field]), 512);
       }
+      if (Object.hasOwn(body, "tags")) {
+        if (!Array.isArray(body.tags) || body.tags.length === 0) throw new Error("Empty opening tags must be omitted");
+        validateAnnotationTags(body.tags);
+      }
       validateTurn(body.turn); break;
     }
+    case "edit_tags":
+      keys(body, ["kind", "tags"]);
+      if (!Array.isArray(body.tags)) throw new Error("Invalid discussion tags");
+      validateAnnotationTags(body.tags); break;
     case "append_turn": keys(body, ["kind", "turn"]); validateTurn(body.turn); break;
     case "reopen": keys(body, ["kind", "reason"]); text(string(body.reason), 256 * 1024); break;
     case "resolve": {
@@ -433,7 +455,7 @@ function validateInner(inner: MapValue, kind: "discussion" | "context") {
         const metadata = map(context.metadata), parentMetadata = map(inner.metadata);
         keys(metadata, ["scope", "actor", "mentions"]);
         if (!equal(encode(metadata.scope!), encode(parentMetadata.scope!)) || !equal(encode(metadata.actor!), encode(parentMetadata.actor!)) || context.extracted_from !== inner.discussion_id) throw new Error("Extracted context differs from original discussion scope or actor");
-        if (!Array.isArray(metadata.mentions) || metadata.mentions.length > 128) throw new Error("Invalid context mentions");
+        if (!Array.isArray(metadata.mentions) || metadata.mentions.length > MAX_COLLABORATION_MENTIONS) throw new Error("Invalid context mentions");
         validateInner(context, "context");
       }
       else throw new Error("Unsupported collaboration resolution");
@@ -468,9 +490,26 @@ function validateAnchor(value: Value | undefined) {
   anchorValue({ kind: "source", revision: typedRevision, path: string(source.path), symbolId: string(source.symbol_id), startLine: line(source.start_line), endLine: line(source.end_line), pathKind: source.path_kind as "file" | "directory" | undefined });
 }
 
+function validateMentionList(values: Value | undefined): void {
+  if (!Array.isArray(values) || values.length > MAX_COLLABORATION_MENTIONS) throw new Error("Invalid collaboration mentions");
+  // Sum individually bounded encodings so the enclosing record codec's byte
+  // bound cannot mask this per-command bound. Up to 128 items use fixarray/array16.
+  let bytes = values.length <= 15 ? 1 : 3;
+  for (const value of values) {
+    validateMention(value);
+    bytes += encode(value).length;
+    if (bytes > MAX_COLLABORATION_MENTION_BYTES) throw new Error("Collaboration mention payload exceeds byte bound");
+  }
+}
 function validateMention(item: Value) {
     const mention = map(item);
     const kind = string(mention.kind);
+    if (kind === "principal") { keys(mention, ["kind", "principal_id"]); uuidString(mention.principal_id); return; }
+    if (kind === "source") {
+      keys(mention, ["kind", "target"]); validateAnnotationSource(mention.target);
+      keys(map(map(mention.target).source), ["revision", "path", "symbol_id", "start_line", "end_line"]);
+      return;
+    }
     const fields: Record<string, string[]> = {
       spool: ["kind", "spool"], thread: ["kind", "spool", "thread"], state: ["kind", "spool", "state"],
       git_commit: ["kind", "spool", "oid"], checkout: ["kind", "spool", "device", "id"],
@@ -521,6 +560,14 @@ function annotationSourceValue(reference: AnnotationSourceReference): MapValue {
   if ((source.startLine === undefined) !== (source.endLine === undefined)) throw new Error("Annotation lines require both endpoints");
   return { scope: { spool, thread: thread ? Array.from(fixed(thread.id!.value, 32)) : null }, source: map(anchorValue(anchor).source) };
 }
+/** Same conversion for opening turns, replies, context drafts and entity tags. */
+export function canonicalMention(ref: EntityRef): Uint8Array {
+  return encode(annotationEntityValue(ref));
+}
+export function validateEntityMentions(mentions: readonly EntityRef[]): void {
+  if (mentions.length > MAX_COLLABORATION_MENTIONS) throw new Error("Too many collaboration mentions");
+  validateMentionList(mentions.map(annotationEntityValue));
+}
 function annotationEntityValue(ref: EntityRef): MapValue {
   const entity = ref.entity;
   switch (entity.case) {
@@ -542,7 +589,9 @@ function annotationEntityValue(ref: EntityRef): MapValue {
       const r = entity.value; if (!r.spool || !r.device || r.device.kind !== 2) throw new Error("Checkout requires spool and device");
       return mentionValue({ kind: "checkout", spoolId: r.spool.id, device: r.device.publicKey, id: r.id });
     }
-    case undefined: case "bookmark": case "principal": case "agent": throw new Error("Unsupported annotation entity reference");
+    case "principal": return mentionValue({ kind: "principal", principalId: entity.value.id });
+    case "source": return mentionValue({ kind: "source", source: entity.value });
+    case undefined: case "bookmark": case "agent": throw new Error("Unsupported annotation entity reference");
     default: {
       const kind = entity.case.replace(/[A-Z]/g, c => "_" + c.toLowerCase());
       if (!RECORD_KINDS.has(kind)) throw new Error("Unsupported annotation record reference");

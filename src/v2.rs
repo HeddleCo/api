@@ -2,6 +2,8 @@
 pub mod account_metadata;
 pub mod approval_groups;
 pub mod client;
+pub mod collaboration;
+pub mod content;
 pub mod custodial_recovery;
 pub mod identity_management;
 pub mod invitation;

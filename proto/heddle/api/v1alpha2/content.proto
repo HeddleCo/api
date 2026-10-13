@@ -83,6 +83,29 @@ message ProvenanceRead {
   uint32 line_count = 3;
 }
 
+// Exact-revision per-file outline. Default page size 100, maximum 256.
+// Bound cursors to caller, Thread, revision, path and accepted budget. Recheck
+// live content/entry visibility before index lookup, rows, counts or paging.
+// Outline selections require minimum effective ReadBudget: 4 items, 65536
+// frame bytes, 65536 snapshot bytes. Encoded rows <= 16384 bytes; reserve 8192
+// completion bytes plus 1024 framing bytes. See docs/alpha-v2/content-outline.md.
+message OutlineRead {
+  string path = 1; // Nonempty normalized relative file path, <= 4096 UTF-8 bytes.
+  PageRequest page = 2;
+}
+
+// Name, container and symbol_id are each at most 4096 UTF-8 bytes.
+message OutlineSymbol {
+  string name = 1;
+  heddle.api.common.SymbolKind kind = 2;
+  string container = 3; // Empty for top-level symbols.
+  // Opaque semantic-index symbol address, stable across unchanged projections
+  // and pages at this revision. Never substitute a meaning hash for identity.
+  string symbol_id = 4;
+  uint32 start_line = 5; // One-based, inclusive.
+  uint32 end_line = 6;
+}
+
 message ContentRead {
   string selection_id = 1;
   oneof selection {
@@ -91,6 +114,7 @@ message ContentRead {
     DiffRead diff = 4;
     ProvenanceRead provenance = 5;
     StateRead state = 6;
+    OutlineRead outline = 7;
   }
 }
 
@@ -131,6 +155,10 @@ message ContentEvent {
     heddle.api.common.StateSummary state = 8;
     // Exactly once, first event before selection payloads/completions.
     ReadBudget accepted_budget = 9;
+    // One row per symbol; completion uses section "outline", exact computed_for
+    // and PageInfo. COMPLETE is page coverage; exhausted alone ends paging.
+    // PARTIAL/UNAVAILABLE carry a safe reason, never a complete empty fallback.
+    OutlineSymbol outline_symbol = 10;
   }
   // Each requested selection ends with selection_complete. Missing completion
   // before FIN means interruption, not an empty file or exhausted collection.

@@ -1,5 +1,14 @@
 # Compatibility policy
 
+`0.31.0-alpha.47` adds collaboration principal/pinned-source mentions, mentions
+on opening turns and contexts, discussion tags/versioned tag edits/query filters,
+and bounded paged exact-revision content outlines (api#407 and api#406). Existing
+protobuf tags and signed canonical bytes remain unchanged; empty opening tags
+omit the new signed key. Rust and TypeScript share seven new signed golden
+vectors. No Buf override is required. See [the additive release note](breaking/0.31.0-alpha.47.md),
+[collaboration contract](docs/alpha-v2/collaboration-mentions-tags.md) and
+[outline contract](docs/alpha-v2/content-outline.md).
+
 The unreleased `0.31.0-alpha.46` removes the per-call `CallContext.protocol`
 declaration (tag 11) and Rust `MethodDescriptor::verify_protocol`
 (HeddleCo/api#404). The tag and name `protocol` are reserved. Hosts must not

@@ -1,5 +1,15 @@
 # Owner-authorization conformance gate
 
+The additive alpha.47 collaboration corpus is
+[`collaboration-alpha47.json`](../tests/fixtures/collaboration-alpha47.json): seven
+full signed cases covering principal/source mentions, context mentions, opening
+tags, tag replacement and clearing. Rust/TS tests reproduce canonical bytes,
+signatures and IDs; `tools/hybrid-native/tests/collaboration.rs` checks signatures
+and mention components, plus byte identity with all existing native mention
+variants. The pinned capability verifier has no collaboration-command slice;
+its owner/control capability formats and this owner corpus remain unchanged.
+See [the collaboration contract](../docs/alpha-v2/collaboration-mentions-tags.md).
+
 ## Cutover A1 transport corpus
 
 `node tools/verify-owner-authz-cutover.mjs` runs the retained purge and owner

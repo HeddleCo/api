@@ -12,6 +12,7 @@ pub mod membership_floor;
 pub mod notifications;
 pub mod passkey_label;
 pub mod people;
+pub mod protocol;
 pub mod read_budget;
 pub mod spool_settings;
 use crate::StreamingShape;

@@ -1,3 +1,4 @@
+import { ProtocolCompatibilitySchema } from "../packages/typescript/dist/common/contract_pb.js";
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
@@ -7,7 +8,7 @@ import { validateOutlineRead, validateOutlineSymbol, validateOutlineStatus } fro
 import { SymbolKind, SymbolKindSchema } from '../packages/typescript/dist/common/repository_pb.js';
 const revision = { spool: { id: '00000000-0000-0000-0000-000000000001' }, revision: { case: 'gitCommitOid', value: 'a'.repeat(40) } };
 test('exact-revision paged outline selections and symbol rows round trip', () => {
-  const read = create(OutlineReadSchema, { path: 'src/main.rs', page: { size: 100 } }); validateOutlineRead(read);
+  const read = create(OutlineReadSchema, { path: 'src/main.rs', page: { size: 100 } }); validateOutlineRead(read, peer);
   const selection = create(ContentReadSchema, { selectionId: 'file-outline', selection: { case: 'outline', value: read } });
   assert.deepEqual(fromBinary(ContentReadSchema, toBinary(ContentReadSchema, selection)), selection);
   const symbol = create(OutlineSymbolSchema, { name: 'run', kind: 1, container: 'App', symbolId: 'App::run', startLine: 12, endLine: 18 }); validateOutlineSymbol(symbol);
@@ -18,8 +19,8 @@ test('exact-revision paged outline selections and symbol rows round trip', () =>
   }
 });
 test('outline bounds and coverage cannot claim an unavailable index is a complete empty file', () => {
-  for (const path of ['', '/main.rs', '../main.rs', 'src//main.rs', 'é'.repeat(2049)]) assert.throws(() => validateOutlineRead(create(OutlineReadSchema, { path })));
-  assert.throws(() => validateOutlineRead(create(OutlineReadSchema, { path: 'main.rs', page: { size: 257 } })));
+  for (const path of ['', '/main.rs', '../main.rs', 'src//main.rs', 'é'.repeat(2049)]) assert.throws(() => validateOutlineRead(create(OutlineReadSchema, { path }), peer));
+  assert.throws(() => validateOutlineRead(create(OutlineReadSchema, { path: 'main.rs', page: { size: 257 } }), peer));
   const symbol = create(OutlineSymbolSchema, { name: 'run', kind: 1, symbolId: 'run', startLine: 1, endLine: 2 });
   for (const patch of [{ startLine: 0 }, { endLine: 0 }, { symbolId: '' }, { symbolId: 's'.repeat(4097) }, { name: 'é'.repeat(2049) }, { kind: 0 }]) assert.throws(() => validateOutlineSymbol(create(OutlineSymbolSchema, { ...symbol, ...patch })));
   for (const patch of [{ coverage: Coverage.UNAVAILABLE }, { reason: SectionStatusReason.COVERAGE_INCOMPLETE }, { computedFor: undefined }, { page: { exhausted: true, nextPage: new Uint8Array([1]) } }]) {
@@ -36,3 +37,5 @@ test('outline kinds follow the generated enum and reject unspecified or unknown 
   }
   for (const kind of [-1, 1.5, 2147483647]) assert.throws(() => validateOutlineSymbol(create(OutlineSymbolSchema, { ...symbol, kind })));
 });
+
+const peer = create(ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [4] });

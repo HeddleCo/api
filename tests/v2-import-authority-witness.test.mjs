@@ -129,7 +129,12 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
 });
 test('frozen descriptor fields and public proof-only lookup',()=>{
   for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length+([api.ProviderRefsRequestSchema.typeName,api.ResolveImportSourceRequestSchema.typeName].includes(entry.name)?1:0));for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
-  for(const descriptor of fixture.enums){const schema=(descriptor.name.includes(".common.")?common:api)[`${descriptor.name.split(".").at(-1)}Schema`];assert.deepEqual(schema.values.map(v=>({name:v.name,number:v.number})),descriptor.values);}
+  for (const descriptor of fixture.enums) {
+    const schema = (descriptor.name.includes(".common.") ? common : api)[`${descriptor.name.split(".").at(-1)}Schema`];
+    // Preserve the frozen values while allowing alpha.48 endpoint-feature additions.
+    const values = schema.values.map(v => ({ name: v.name, number: v.number }));
+    assert.deepEqual(descriptor.name === "heddle.api.common.MandatoryProtocolFeature" ? values.filter(v => v.number <= 1) : values, descriptor.values);
+  }
   const expected = ['CancelImportJob', 'CommitImportJob', 'GetHostedWitnessHistoryProof', 'GetImportJobState', 'ImportSource',
     'PrepareImportJob', 'RetryImportSource', 'SynchronizeRemote']
     .map(name => `/heddle.api.v1alpha2.IntegrationService/${name}`);
@@ -187,7 +192,7 @@ test('mandatory import protocol/version gate blocks every incompatible client be
   for (const protocol of [undefined,
     create(common.ProtocolCompatibilitySchema, { protocolVersion: 1, mandatoryFeatures: [1] }),
     create(common.ProtocolCompatibilitySchema, { protocolVersion: 2 }),
-    create(common.ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1, 2] }),
+    create(common.ProtocolCompatibilitySchema, { protocolVersion: 2, mandatoryFeatures: [1, 99] }),
   ]) {
     assert.throws(() => authority.requireHybridPeer(protocol), expected('Protocol'));
     const client = createServiceClient(api.IntegrationService, transport, implemented, protocol);

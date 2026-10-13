@@ -66,6 +66,45 @@ concurrent tags; other request selectors intersect normally. Visibility applies
 before predicates, counts and page boundaries. Source predicates describe
 original signed evidence and do not imply automatic source-target tracking.
 
+## Endpoint negotiation (alpha.48)
+
+Hosts advertise implemented semantic support in
+`DescribeEndpointResponse.protocol.mandatory_features`, sorted and unique:
+`MANDATORY_PROTOCOL_FEATURE_COLLABORATION_MENTIONS_V1` (2) for principal and
+source mentions on opening turns, replies and contexts, and
+`MANDATORY_PROTOCOL_FEATURE_DISCUSSION_TAGS_V1` (3) for opening tags and
+`EditDiscussionTags`, including empty replacement lists. Merge these into the
+host's existing feature set; a host implementing HYBRID, mentions, tags and
+outlines advertises `[1, 2, 3, 4]`. Advertise a feature only after implementing
+its complete semantics. Signed-record format advertisement does not imply it.
+These values are **not** per-method `mandatory_features`: ordinary discussion
+and context commands remain usable on hosts that do not advertise them.
+
+Clients use Rust `v2::protocol::{host_supports, require_feature}` or TypeScript
+`./v2/protocol`'s `hostSupports` / `requireFeature` with the authenticated
+endpoint's negotiated `ProtocolCompatibility`. Missing negotiation is missing
+support. Discard it when the endpoint/connection changes. Gate UI controls
+before constructing variants, then let the encode helpers enforce the same
+check. Rust refusal is `Reject::MissingFeature(feature)`; TypeScript throws
+`MissingProtocolFeatureError` with its typed `feature` property.
+
+Rust mention encoders/validators and `canonical_discussion_tag_edit` now take
+`peer: Option<&ProtocolCompatibility>` as their final argument. Use
+`canonical_discussion_open_tags(tags, peer)` for opening tags; the older
+`canonical_annotation_tags` remains for existing context tags. TypeScript
+`signDiscussion`, `signContext`, `canonicalMention` and `validateEntityMentions`
+take an optional final `peer` argument. Omitting it refuses new variants, so
+old callers remain compatible but cannot accidentally assume new support.
+The signers check before invoking the signing callback. Empty opening tags,
+legacy mention variants and existing context tags need no new feature.
+`EditDiscussionTags` always requires tag support, even when clearing all tags.
+The typed clients consult their stored negotiated peer automatically for
+opening, append, context, extracted-context and tag-edit delivery requests
+before transport (TypeScript also checks before protobuf encoding). Rust
+surfaces these failures as `ClientError::RequestFeature(Reject::MissingFeature(...))`.
+Hosts still compare delivery fields with the original signed command and refuse
+unsupported signed forms; negotiation never grants authority or changes bytes.
+
 ## Canonical compatibility and conformance
 
 Extend the existing signed mention union and the existing protobuf `EntityRef`;

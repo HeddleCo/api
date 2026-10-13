@@ -853,8 +853,11 @@ assumptions, not whole-replica compromise. Fence issuance, replace the root out 
 band and fail closed on unprovable history; isolate the issuer after launch.
 
 Per the **OWNER DECISION of 2026-10-03**, `ProtocolCompatibility` requires
-**protocol_version = 2** and the sorted unique mandatory feature list containing
-exactly **IMPORT_AUTHORITY_HOST_WITNESS_V1 (1)** on these eight
+**protocol_version = 2** and the sorted unique negotiated feature list containing
+**IMPORT_AUTHORITY_HOST_WITNESS_V1 (1)**. Alpha.48 endpoint advertisements may
+also contain the recognized collaboration/outline features (2, 3, 4); unknown,
+unsorted or duplicate features still fail closed. The per-method requirement
+remains exactly **IMPORT_AUTHORITY_HOST_WITNESS_V1 (1)** on these eight
 **IntegrationService** RPCs only: **ImportSource**, **RetryImportSource**,
 **SynchronizeRemote**, **PrepareImportJob**, **CommitImportJob**,
 **CancelImportJob**, **GetImportJobState** and **GetHostedWitnessHistoryProof**.

@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum Reject {
+    #[error("peer does not advertise protocol feature {0:?}")]
+    MissingFeature(crate::heddle::api::common::MandatoryProtocolFeature),
     #[error("unsupported format")]
     Version,
     #[error("noncanonical or missing field")]

@@ -2018,7 +2018,19 @@ pub fn require_hybrid_peer(
     protocol: Option<&crate::heddle::api::common::ProtocolCompatibility>,
 ) -> Result<(), Reject> {
     let protocol = protocol.ok_or(Reject::Protocol)?;
-    if protocol.protocol_version != 2 || protocol.mandatory_features != [1] {
+    if protocol.protocol_version != 2
+        || !protocol.mandatory_features.contains(&1)
+        || protocol
+            .mandatory_features
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        || protocol.mandatory_features.iter().any(|&feature| {
+            crate::heddle::api::common::MandatoryProtocolFeature::try_from(feature)
+                .map_or(true, |f| {
+                    f == crate::heddle::api::common::MandatoryProtocolFeature::Unspecified
+                })
+        })
+    {
         return Err(Reject::Protocol);
     }
     Ok(())

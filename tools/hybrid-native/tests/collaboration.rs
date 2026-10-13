@@ -77,7 +77,8 @@ fn collaboration_alpha47_mentions_and_signatures() {
             .expect("entity");
             assert_eq!(
                 hex::encode(
-                    contract::v2::collaboration::canonical_mention(&r).expect("bounded new case")
+                    contract::v2::collaboration::canonical_mention(&r, Some(&peer()))
+                        .expect("bounded new case")
                 ),
                 mention["canonical_hex"].as_str().expect("canonical")
             );
@@ -134,7 +135,7 @@ fn existing_mention_encodings_match_published_native() {
                 .expect("old wire");
         let native = thread_api::collaboration::mention(&old).expect("native mention");
         assert_eq!(
-            contract::v2::collaboration::canonical_mention(&r).expect("canonical"),
+            contract::v2::collaboration::canonical_mention(&r, Some(&peer())).expect("canonical"),
             rmp_serde::to_vec_named(&native).expect("native canonical")
         );
     }
@@ -207,4 +208,11 @@ fn discussion_tags_reuse_published_context_tag_encodings() {
         contract::v2::collaboration::canonical_annotation_tags(&tags).expect("tags"),
         rmp_serde::to_vec_named(&native).expect("native encoding")
     );
+}
+
+fn peer() -> contract::heddle::api::common::ProtocolCompatibility {
+    contract::heddle::api::common::ProtocolCompatibility {
+        protocol_version: 2,
+        mandatory_features: vec![1, 2, 3, 4],
+    }
 }

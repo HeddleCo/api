@@ -2,6 +2,7 @@ import {
   create, fromBinary, getOption, toBinary,
   type DescMethod, type DescService, type MessageInitShape, type MessageShape,
 } from "@bufbuild/protobuf";
+import { validateRequestFeatures } from "./protocol.js";
 import { requireHybridPeer } from "./import-authority.js";
 import type { ProtocolCompatibility } from "../common/contract_pb.js";
 import { rpc_contract } from "../common/contract_pb.js";
@@ -64,6 +65,7 @@ export function createServiceClient<S extends DescService>(
       if (!implemented.has(path)) throw new ContractClientError("not_implemented", path);
       if (contract.mandatoryFeatures.length) requireHybridPeer(negotiatedProtocol);
       const message = create(method.input, input);
+      validateRequestFeatures(path, message, negotiatedProtocol);
       streamProtocol(message, true, first);
       if (first && contract.clientOperationIdRequired) {
         const id = Reflect.get(message, "clientOperationId");
@@ -84,9 +86,11 @@ export function createServiceClient<S extends DescService>(
     ) {
       if (!implemented.has(path)) throw new ContractClientError("not_implemented", path);
       if (contract.mandatoryFeatures.length) requireHybridPeer(negotiatedProtocol);
+      const opening = method.methodKind === "server_streaming"
+        ? encode(input as MessageInitShape<typeof method.input>, true) : undefined;
       const requests = async function* () {
-        if (method.methodKind === "server_streaming") {
-          yield encode(input as MessageInitShape<typeof method.input>, true);
+        if (opening !== undefined) {
+          yield opening;
         } else {
           let first = true;
           for await (const message of input as AsyncIterable<MessageInitShape<typeof method.input>>) {

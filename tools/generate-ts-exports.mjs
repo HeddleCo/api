@@ -46,6 +46,7 @@ copyFileSync("packages/typescript/runtime/v2-read-budget.ts", join(v2Root, "read
 copyFileSync("packages/typescript/runtime/v2-spool-settings.ts", join(v2Root, "spool-settings.ts"));
 copyFileSync("packages/typescript/runtime/v2-timeline-upload.ts", join(v2Root, "timeline-upload.ts"));
 copyFileSync("packages/typescript/runtime/v2-client.ts", join(v2Root, "client.ts"));
+copyFileSync("packages/typescript/runtime/v2-protocol.ts", join(v2Root, "protocol.ts"));
 copyFileSync("packages/typescript/runtime/v2-owner-certificates.ts", join(v2Root, "owner-certificates.ts"));
 copyFileSync("packages/typescript/runtime/v2-password-owner.ts", join(v2Root, "password-owner.ts"));
 copyFileSync("packages/typescript/runtime/v2-mint-root-association.ts", join(v2Root, "mint-root-association.ts"));

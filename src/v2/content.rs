@@ -1,5 +1,7 @@
 //! Bounded per-file outline inputs, rows and terminal coverage.
+use super::protocol::require_feature;
 use crate::heddle::api::common::SymbolKind;
+use crate::heddle::api::common::{MandatoryProtocolFeature, ProtocolCompatibility};
 use crate::heddle::api::v1alpha2::{
     Coverage, OutlineRead, OutlineSymbol, SectionStatus, SectionStatusReason,
 };
@@ -18,7 +20,11 @@ fn text(value: &str, nonempty: bool) -> Result<(), Reject> {
     }
     Ok(())
 }
-pub fn validate_outline_read(value: &OutlineRead) -> Result<(), Reject> {
+pub fn validate_outline_read(
+    value: &OutlineRead,
+    peer: Option<&ProtocolCompatibility>,
+) -> Result<(), Reject> {
+    require_feature(peer, MandatoryProtocolFeature::ContentOutlineV1)?;
     text(&value.path, true)?;
     if value.path.contains(['\\', ':'])
         || value.path.split('/').any(|s| matches!(s, "" | "." | ".."))

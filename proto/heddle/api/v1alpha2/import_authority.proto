@@ -229,6 +229,8 @@ message ForeignDependencyV1 {
 message ImportPublicProofBundleV1 {
   reserved 8, 18;
   reserved "renewals", "member_permissions";
+  // 1: frozen positional Commit envelopes, 1 MiB. 2: digest-addressed unique
+  // envelope table, 4 MiB; signed records/domains remain format 1.
   uint32 format_version = 1;
   SignedSpoolOwnerGenesis owner_genesis = 2;
   repeated OwnerHistory owner_histories = 3;
@@ -243,6 +245,8 @@ message ImportPublicProofBundleV1 {
   repeated heddle.api.common.HostedWitnessHistoryProofV1 history_proofs = 13;
   repeated SignedSpoolPolicyRecord policies = 14;
   repeated SignedRecord original_geneses = 15;
+  // Format 2: strictly SHA-256-digest-sorted, unique, all used. Branch manifest
+  // -> signed genesis authority -> creator_authority_envelope_digest selects it.
   repeated bytes creator_authority_envelopes = 16;
   ImportOwnerChainV1 owner_chain = 17;
   // Digest-sorted unique cumulative publication manifests; field 10 selects an exact entry.
@@ -341,7 +345,7 @@ message ImportConverterConfigurationV1 {
   bytes default_options = 4; // MUST equal one exact canonical_options entry.
 }
 message ImportBudgetLimitsV1 {
-  uint32 max_branches = 1; // Positive, <=256.
+  uint32 max_branches = 1; // Positive, <=25 for proof format 2; frozen format 1 <=256.
   uint32 max_operations = 2; // Positive, <=256; total per logical job.
   // Operator-configurable positive u64 maximum per logical job; no protocol cap.
   uint64 max_result_bytes = 3;
@@ -369,6 +373,10 @@ message GetImportConfigurationResponse {
   // Optional host recommendation; if present, nonempty and MUST reference one
   // advertised converter. Absent -> explicit chooser; lexical order is not rank.
   optional string default_converter_version = 4;
+  // 0/1: frozen format-1 jobs (256 count ceiling, actual byte caps still apply).
+  // 2: supports format-2 jobs; advertise max_branches <=25, proof <=4 MiB.
+  // Unknown values reject; clients never retry with a different format.
+  uint32 import_proof_bundle_format_version = 5;
 }
 // Destination-writer-only, authenticated finite read. No listing, pagination or
 // seed/custody/bearer secrets. Unknown and unauthorized jobs use uniform NOT_FOUND.

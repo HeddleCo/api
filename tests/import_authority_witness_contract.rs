@@ -30,6 +30,7 @@ fn hybrid_messages_and_rpc_are_present_in_the_descriptor() {
                     Some(
                         "heddle.api.v1alpha2.ProviderRefsRequest"
                             | "heddle.api.v1alpha2.ResolveImportSourceRequest"
+                            | "heddle.api.v1alpha2.GetImportConfigurationResponse"
                     )
                 ))
         );

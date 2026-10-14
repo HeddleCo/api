@@ -1,4 +1,10 @@
-# HYBRID import authority and host witness, format 1
+# HYBRID import authority and host witness
+
+Alpha.49 introduces explicitly advertised proof carrier format 2, 25-branch
+jobs and real-encoder partitioning. Signed records remain format 1. The
+[partition contract](import-partition.md) specifies version selection, unchanged
+format-1 verification, limits arithmetic and golden-vector evidence. The limits
+below distinguish current jobs from frozen format-1 flows.
 
 This is the api#296 contract, revised in place by api#318 and api#321, for [weft#2479 at
 8d427f8c1](https://github.com/HeddleCo/weft/pull/2479/changes/8d427f8c12006c63c5cad43cce260fd91a5e77a5).
@@ -826,10 +832,10 @@ endpoint. Mirror/backup the public archive independently of Thread storage.
 | Item | Maximum / required bound |
 | --- | --- |
 | Canonical signed import body / witness payload | 64 KiB |
-| Signed set, complete public proof bundle | 1 MiB each; reject, never truncate |
+| Signed set / public proof bundle | Set 1 MiB; proof format 1: 1 MiB, format 2: 4 MiB; reject, never truncate |
 | Witness entries | 4096 |
-| Import branches/operations | 256 each; one result slot per branch in v1 |
-| Policy records / original geneses / creator envelopes | 256 each |
+| Import branches/operations | Format-2 jobs: 25 branches; frozen format-1 scopes: 256; operations/history: 256 |
+| Policy records / original geneses / creator envelopes | Policies: 256; format-2 geneses/envelopes: 25; format 1: 256 |
 | Member permission / publication manifest snapshots | ONE optional / 256, digest-sorted unique |
 | Typed genesis/authority/landing payload sidecars | 256 each, inside the bundle byte budget |
 | Witness dependencies / retirement proofs | 1024 each, also inside bundle byte budget |

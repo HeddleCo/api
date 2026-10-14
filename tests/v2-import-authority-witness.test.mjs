@@ -128,7 +128,7 @@ for(const [name,v] of Object.entries(fixture.signed_vectors))test(`fixed canonic
   assert.deepEqual(signature,bytes(v.signature_hex));assertCrypto(bytes(v.public_key_hex),input,signature);
 });
 test('frozen descriptor fields and public proof-only lookup',()=>{
-  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length+([api.ProviderRefsRequestSchema.typeName,api.ResolveImportSourceRequestSchema.typeName].includes(entry.name)?1:0));for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
+  for(const entry of fixture.descriptors){const schema=schemaFor(entry.name);assert.equal(schema.fields.length,entry.fields.length+([api.ProviderRefsRequestSchema.typeName,api.ResolveImportSourceRequestSchema.typeName,api.GetImportConfigurationResponseSchema.typeName].includes(entry.name)?1:0));for(const f of entry.fields){const actual=schema.fields.find(a=>a.number===f.number);assert.equal(actual?.name,f.name);assert.equal(actual?.message?.typeName??actual?.enum?.typeName??String(actual?.scalar),f.type);assert.equal(actual?.fieldKind==='list',f.list);}}
   for (const descriptor of fixture.enums) {
     const schema = (descriptor.name.includes(".common.") ? common : api)[`${descriptor.name.split(".").at(-1)}Schema`];
     // Preserve the frozen values while allowing alpha.48 endpoint-feature additions.

@@ -2281,6 +2281,20 @@ mod tests {
         verify_export(&f, &record(&f, "complete_export").expect("export"))
             .expect("historical gate");
     }
+
+    #[test]
+    fn format_two_export_preserves_native_originals_and_authority() {
+        let f = fixture();
+        let mut bundle: wire::ImportPublicProofBundleV1 =
+            record(&f, "complete_export").expect("frozen signed export");
+        bundle.format_version = 2;
+        bundle
+            .creator_authority_envelopes
+            .sort_by_key(|e| codec::hash(&[e]));
+        bundle.creator_authority_envelopes.dedup();
+        import::validate_public_bundle(&bundle).expect("format 2 closure");
+        verify_export(&f, &bundle).expect("unchanged native originals and owner authority");
+    }
     #[test]
     fn old_parentless_capture_is_rejected_by_native_ancestry() {
         let old: Value = serde_json::from_str(include_str!(

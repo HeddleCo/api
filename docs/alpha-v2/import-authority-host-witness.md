@@ -532,8 +532,7 @@ account-scoped connection and exact repository/installation IDs.
 The proof's `original_geneses` and `genesis_authorities` are ordered one-to-one
 with the signed branch manifest. Format 1 orders `creator_authority_envelopes`
 the same way; format 2 resolves them from its unique digest-sorted table through
-the signed genesis authority. In either format,
-with exactly one initial delegation and its exact parent permission (or direct
+the signed genesis authority. Both carry exactly one initial delegation and its exact parent permission (or direct
 owner). This is the single branch carrier. Preserve each original creator
 signature and verify native IDs, envelope commitments and manifest bindings.
 Do not regenerate geneses or submit another branches payload. The optional base

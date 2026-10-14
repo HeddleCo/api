@@ -16,9 +16,56 @@ export const PERMISSION_DOMAIN="heddle-import-member-permission-v1",GENESIS_DOMA
 export { canonicalHybridV1, signingDigest, strictDecode, HybridContractError } from "./_hybrid-codec.js";
 
 export const MAX_REF_BYTES=1024;
-export const MAX_BRANCHES=256,MAX_RECORD_BYTES=65536,MAX_BUNDLE_BYTES=1048576;
+export const MAX_BRANCHES=25,LEGACY_MAX_BRANCHES=256,MAX_RECORD_BYTES=65536;
+export const LEGACY_MAX_BUNDLE_BYTES=1048576,MAX_BUNDLE_BYTES=4194304,MAX_COMMIT_CONTEXT_BYTES=65536;
 export const MAX_DELEGATION_WINDOW_SECONDS=7n*24n*60n*60n;
 export const MAX_COMMIT_REQUEST_BYTES=2*MAX_BUNDLE_BYTES;
+
+function bundleByteLimit(version:number):number {return version===1?LEGACY_MAX_BUNDLE_BYTES:version===2?MAX_BUNDLE_BYTES:reject("Version");}
+export function resolveCreatorAuthorityEnvelope(bundle:api.ImportPublicProofBundleV1,digest:Uint8Array):Uint8Array {
+  width(digest,32);return bundle.creatorAuthorityEnvelopes.find(e=>equal(hash(e),digest))??reject("GenesisBinding");
+}
+function validateCreatorAuthorityTable(bundle:api.ImportPublicProofBundleV1):void {
+  let previous:Uint8Array|undefined;
+  for(const envelope of bundle.creatorAuthorityEnvelopes){
+    if(!envelope.length||envelope.length>MAX_RECORD_BYTES)reject("Bounds");
+    const digest=hash(envelope);
+    if(previous&&compare(previous,digest)>=0)reject("Canonical");
+    if(!bundle.genesisAuthorities.some(g=>g.body&&equal(g.body.creatorAuthorityEnvelopeDigest,digest)))reject("GenesisBinding");
+    previous=digest;
+  }
+  for(const g of bundle.genesisAuthorities)resolveCreatorAuthorityEnvelope(bundle,(g.body??reject("Canonical")).creatorAuthorityEnvelopeDigest);
+}
+export interface ImportPartitionLimits {
+  maxBranches:number;maxRecordBytes:number;maxBundleBytes:number;
+  /** Complete candidate proof with signatures or exact-width placeholders.
+   * The builder must rebind scoped permission/envelope/genesis material per job. */
+  buildJob:(branches:readonly api.ImportBranchLimitV1[])=>api.ImportPublicProofBundleV1;
+}
+/** Preserve exact UTF-8 order and greedily split by count, real canonical
+ * signed-record bytes and real protobuf Commit proof bytes; inclusive bounds. */
+export function partitionImportBranches(selection:readonly api.ImportBranchLimitV1[],limits:ImportPartitionLimits):api.ImportPublicProofBundleV1[] {
+  for(const [value,max] of [[limits.maxBranches,MAX_BRANCHES],[limits.maxRecordBytes,MAX_RECORD_BYTES],[limits.maxBundleBytes,MAX_BUNDLE_BYTES]] as const)
+    if(!Number.isSafeInteger(value)||value<=0||value>max)reject("Bounds");
+  selection.forEach((b,i)=>{branch(b);if(i&&compareRefs(selection[i-1]!.refName,b.refName)>=0)reject("Canonical");if(selection.slice(0,i).some(p=>equal(p.genesisDigest,b.genesisDigest)||equal(p.targetThreadId,b.targetThreadId)))reject("Scope");});
+  const fits=(branches:readonly api.ImportBranchLimitV1[])=>{
+    const proof=clone(api.ImportPublicProofBundleV1Schema,limits.buildJob(branches));
+    if(proof.formatVersion!==2)reject("Version");validateBundleBounds(proof);
+    const signed=proof.delegations[0]!,body=signed.body??reject("Canonical"),scope=body.scope??reject("Canonical");
+    if(body.branchManifest.length!==branches.length||proof.genesisAuthorities.length!==branches.length||proof.originalGeneses.length!==branches.length||scope.branches.length!==branches.length||scope.branches.some((b,i)=>!equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,b),canonicalHybridV1(api.ImportBranchLimitV1Schema,branches[i]!)))||proof.operations.length||proof.terminalManifest||proof.manifests.length)reject("Scope");
+    validateImportScope(scope);
+    if(canonicalHybridV1(api.SignedImportJobDelegationV1Schema,signed).length>limits.maxRecordBytes||(proof.memberPermission&&canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,proof.memberPermission).length>limits.maxRecordBytes)||toBinary(api.ImportPublicProofBundleV1Schema,proof).length>limits.maxBundleBytes)reject("Bounds");
+    for(const binding of proof.genesisAuthorities)if(canonicalHybridV1(api.SignedImportGenesisAuthorityV1Schema,binding).length>limits.maxRecordBytes)reject("Bounds");
+    for(const original of proof.originalGeneses)if(!original.canonicalRecord.length||original.canonicalRecord.length>MAX_RECORD_BYTES||!original.signatures.length||original.signatures.length>16)reject("Bounds");
+    validateImportCommitRequestBounds(create(CommitImportJobRequestSchema,{proof}));return proof;
+  };
+  const jobs:api.ImportPublicProofBundleV1[]=[];let start=0,accepted:api.ImportPublicProofBundleV1|undefined;
+  for(let end=1;end<=selection.length;end++){
+    try{if(end-start>limits.maxBranches)reject("Bounds");accepted=fits(selection.slice(start,end));}
+    catch(error){if(!(error instanceof HybridContractError)||error.reason!=="Bounds"||!accepted)throw error;jobs.push(accepted);start=end-1;accepted=fits(selection.slice(start,end));}
+  }
+  if(accepted)jobs.push(accepted);return jobs;
+}
 /** Refs in one ResolveImportSource/ProviderRefsRequest page (proto: max 512). */
 export const MAX_IMPORT_SOURCE_REF_PAGE=512;
 /** Safety ceiling on complete discovery work, independent of retained refs. */
@@ -54,7 +101,7 @@ function gitRefName(name:string):void {
 }
 const compareRefs=(a:string,b:string)=>compare(utf8.encode(a),utf8.encode(b));
 function branch(v:api.ImportBranchLimitV1){branchRef(v.refName);const size=v.hashAlgorithm===1?20:v.hashAlgorithm===2?32:reject("Version");if(v.refMode===1){width(v.pinnedCommitOid,size);if(v.refDisclosure!==0)reject("RefDisclosure");}else if(v.refMode===2&&!v.pinnedCommitOid.length){if(v.refDisclosure!==1)reject("RefDisclosure");}else reject("Semantic");for(const b of [v.genesisDigest,v.targetThreadId,v.expectedFrontierDigest])width(b,32);}
-export function validateImportScope(v:api.ImportPermissionScopeV1){canonicalHttps(v.sourceUrl);if(!/^[a-z0-9-]{1,64}$/.test(v.provider)||!v.converterVersion||v.converterVersion.length>128||!/^[\x00-\x7f]+$/.test(v.converterVersion))reject("Canonical");width(v.destinationVersion,32);width(v.optionsDigest,32);if(!v.branches.length||v.branches.length>MAX_BRANCHES||v.maxOperations<=0||v.maxOperations>MAX_BRANCHES||v.maxResultBytes<=0n||v.maxResultBytes>=(1n<<64n))reject("Bounds");if(v.maxOperations<v.branches.length)reject("Scope");v.branches.forEach((b,i)=>{branch(b);if(v.branches.slice(0,i).some(other=>equal(other.targetThreadId,b.targetThreadId)||equal(other.genesisDigest,b.genesisDigest)))reject("Scope");if(i&&compareRefs(v.branches[i-1]!.refName,b.refName)>=0)reject("Canonical");});}
+export function validateImportScope(v:api.ImportPermissionScopeV1){canonicalHttps(v.sourceUrl);if(!/^[a-z0-9-]{1,64}$/.test(v.provider)||!v.converterVersion||v.converterVersion.length>128||!/^[\x00-\x7f]+$/.test(v.converterVersion))reject("Canonical");width(v.destinationVersion,32);width(v.optionsDigest,32);if(!v.branches.length||v.branches.length>LEGACY_MAX_BRANCHES||v.maxOperations<=0||v.maxOperations>LEGACY_MAX_BRANCHES||v.maxResultBytes<=0n||v.maxResultBytes>=(1n<<64n))reject("Bounds");if(v.maxOperations<v.branches.length)reject("Scope");v.branches.forEach((b,i)=>{branch(b);if(v.branches.slice(0,i).some(other=>equal(other.targetThreadId,b.targetThreadId)||equal(other.genesisDigest,b.genesisDigest)))reject("Scope");if(i&&compareRefs(v.branches[i-1]!.refName,b.refName)>=0)reject("Canonical");});}
 function branchSubset(c:api.ImportBranchLimitV1,p:api.ImportBranchLimitV1):boolean{return equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,c),canonicalHybridV1(api.ImportBranchLimitV1Schema,p));}
 
 /** Compare independently observed OID knowledge before preparing/signing.
@@ -107,7 +154,7 @@ export function validateRepositorySizeEstimate(source:ProviderRepository):void {
 }
 /** Exact identity preservation; network/redirect policy and current grants are host gates. */
 export function validateResolveImportSourceResponse(request:ResolveImportSourceRequest,response:ResolveImportSourceResponse,connectionProvider?:string):void {
-  if(toBinary(ResolveImportSourceResponseSchema,response).length>MAX_BUNDLE_BYTES)reject("Bounds");
+  if(toBinary(ResolveImportSourceResponseSchema,response).length>LEGACY_MAX_BUNDLE_BYTES)reject("Bounds");
   const selected=request.source??reject("SourceSelection"),resolved=response.source??reject("SourceSelection");
   const provider=resolveImportProvider(selected,connectionProvider),selection=sourceSelection(selected);
   if(!selection.connection&&!selection.providerRepositoryId)selection.providerRepositoryId=selected.cloneUrl;
@@ -147,7 +194,7 @@ function discoverySourceBinding(source:ProviderRepository):Uint8Array {
   })));
 }
 function discoverySelectionBinding(selected:readonly api.ImportBranchLimitV1[]):Uint8Array {
-  if(selected.length>MAX_BRANCHES)reject("Bounds");
+  if(selected.length>LEGACY_MAX_BRANCHES)reject("Bounds");
   const digest=sha256.create();
   selected.forEach((b,i)=>{branch(b);if(i&&compareRefs(selected[i-1]!.refName,b.refName)>=0)reject("Canonical");digest.update(canonicalHybridV1(api.ImportBranchLimitV1Schema,b));});
   return digest.digest();
@@ -257,7 +304,7 @@ function validateProviderSupport(provider:string,configuration:api.GetImportConf
 }
 
 export function validateImportConfiguration(v:api.GetImportConfigurationResponse):void {
-  if (toBinary(api.GetImportConfigurationResponseSchema,v).length > MAX_BUNDLE_BYTES || !v.converters.length || v.converters.length > 32) reject("Bounds");
+  if (toBinary(api.GetImportConfigurationResponseSchema,v).length > LEGACY_MAX_BUNDLE_BYTES || !v.converters.length || v.converters.length > 32) reject("Bounds");
   v.converters.forEach((c,i) => {
     for (const text of [c.converterVersion,c.optionsEncoding]) {
       if (!text || text.length > 128 || !/^[\x00-\x7f]+$/.test(text)) reject("Canonical");
@@ -273,8 +320,9 @@ export function validateImportConfiguration(v:api.GetImportConfigurationResponse
     if(p.sourceModes.length!==1||p.sourceModes[0]!==mode)reject("SourceSelection");
   });
   if(v.defaultConverterVersion!==undefined&&!v.converters.some(c=>c.converterVersion===v.defaultConverterVersion))reject("Canonical");
+  if(![0,1,2].includes(v.importProofBundleFormatVersion))reject("Version");
   const l=v.limits??reject("Canonical");
-  if (l.maxBranches<=0 || l.maxBranches>MAX_BRANCHES || l.maxOperations<=0 || l.maxOperations>MAX_BRANCHES || l.maxResultBytes<=0n || l.maxResultBytes>=(1n<<64n)) reject("Bounds");
+  if (l.maxBranches<=0 || l.maxBranches>(v.importProofBundleFormatVersion===2?MAX_BRANCHES:LEGACY_MAX_BRANCHES) || l.maxOperations<=0 || l.maxOperations>LEGACY_MAX_BRANCHES || l.maxResultBytes<=0n || l.maxResultBytes>=(1n<<64n)) reject("Bounds");
 }
 
 /** Host negotiation against CURRENT configuration and the current destination CAS. */
@@ -363,8 +411,10 @@ async function validateImportCommitRequestInner(request:CommitImportJobRequest, 
   const source=request.source??reject("SourceSelection"),proof=request.proof??reject("Canonical");
   if (!request.clientOperationId || utf8.encode(request.clientOperationId).length>128 || !request.destination?.id) reject("Canonical");
   if (request.initialBaseState.length>4096 || toBinary(api.ImportPublicProofBundleV1Schema,proof).length>MAX_BUNDLE_BYTES) reject("Bounds");
-  if (proof.formatVersion!==1 || proof.delegations.length!==1 || proof.operations.length || proof.terminalManifest || proof.manifests.length) reject("Canonical");
+  validateBundleBounds(proof);
+  if (proof.delegations.length!==1 || proof.operations.length || proof.terminalManifest || proof.manifests.length) reject("Canonical");
   const d=proof.delegations[0]!.body??reject("Canonical"),scope=d.scope??reject("Canonical");validateImportScope(scope);
+  if(proof.formatVersion===2&&configuration.importProofBundleFormatVersion!==2)reject("Version");
   identity(d.identity);
   const uuid=Array.from(d.identity.spoolUuid,b=>b.toString(16).padStart(2,"0")).join("");
   const destinationId=`${uuid.slice(0,8)}-${uuid.slice(8,12)}-${uuid.slice(12,16)}-${uuid.slice(16,20)}-${uuid.slice(20)}`;
@@ -378,9 +428,9 @@ async function validateImportCommitRequestInner(request:CommitImportJobRequest, 
   else discoverRepository(currentSource,scope.branches,{},"commit");
   if(source.hashAlgorithm!==currentSource.hashAlgorithm)reject("SourceSelection");
   prepareImportScope(scope,configuration,scope.destinationVersion);
-  if (proof.originalGeneses.length!==scope.branches.length || proof.creatorAuthorityEnvelopes.length!==scope.branches.length || proof.genesisAuthorities.length!==scope.branches.length || d.branchManifest.length!==scope.branches.length) reject("GenesisBinding");
+  if (proof.originalGeneses.length!==scope.branches.length || (proof.formatVersion===1&&proof.creatorAuthorityEnvelopes.length!==scope.branches.length) || proof.genesisAuthorities.length!==scope.branches.length || d.branchManifest.length!==scope.branches.length) reject("GenesisBinding");
   for (const [i,b] of scope.branches.entries()) {
-    const original=proof.originalGeneses[i]!,binding=proof.genesisAuthorities[i]!,g=binding.body??reject("GenesisBinding"),m=d.branchManifest[i]!,envelope=proof.creatorAuthorityEnvelopes[i]!;
+    const original=proof.originalGeneses[i]!,binding=proof.genesisAuthorities[i]!,g=binding.body??reject("GenesisBinding"),m=d.branchManifest[i]!,envelope=proof.formatVersion===1?proof.creatorAuthorityEnvelopes[i]!:resolveCreatorAuthorityEnvelope(proof,g.creatorAuthorityEnvelopeDigest);
     if (!equal(nativeOctetsId(original.format,original.canonicalRecord),b.genesisDigest) || !equal(g.genesisDigest,b.genesisDigest) || !m.limit || !equal(canonicalHybridV1(api.ImportBranchLimitV1Schema,m.limit),canonicalHybridV1(api.ImportBranchLimitV1Schema,b)) || !equal(m.genesisAuthorityDigest,signedGenesisDigest(binding)) || !equal(g.creatorAuthorityEnvelopeDigest,hash(envelope)) || !envelope.length || envelope.length>MAX_RECORD_BYTES || !original.signatures.some(s=>equal(s.publicKey,g.creatorPublicKey)&&equal(s.signature,g.originalCreatorSignature))) reject("GenesisBinding");
     await verifyNativeRecord(original,"heddle-thread-genesis-v1");
   }
@@ -489,7 +539,7 @@ async function verifyPreparedInner(prepared:api.PrepareImportJobResponse,signed:
 export async function verifyImportGenesisAuthority(signed:api.SignedImportGenesisAuthorityV1,delegation:VerifiedImportDelegation,genesisDigest:Uint8Array,originalSignature:Uint8Array,envelopeDigest:Uint8Array){const g=signed.body,d=read(delegation).body;if(!g)reject("Canonical");if(g.formatVersion!==1)reject("Version");width(g.originalCreatorSignature,64);for(const b of [g.genesisDigest,g.creatorPublicKey,g.creatorAuthorityEnvelopeDigest,g.parentPermissionDigest,g.ownerChainDigest])width(b,32);if(!g.identity||!sameIdentity(g.identity,d.identity!)||!equal(g.creatorPublicKey,d.delegatingPublicKey)||!equal(g.parentPermissionDigest,d.parentPermissionDigest)||!equal(g.ownerChainDigest,d.ownerChainDigest)||!equal(g.genesisDigest,genesisDigest)||!equal(g.originalCreatorSignature,originalSignature)||!equal(g.creatorAuthorityEnvelopeDigest,envelopeDigest)||!d.branchManifest.some(m=>m.limit&&equal(m.limit.genesisDigest,g.genesisDigest)&&equal(m.genesisAuthorityDigest,signedGenesisDigest(signed))))reject("Scope");await auth(g.creatorPublicKey,GENESIS_DOMAIN,api.ImportGenesisAuthorityV1Schema,g,signed.creatorSignature);}
 export async function verifyDelegatedImportOperation(signed:api.SignedDelegatedImportOperationV1,delegation:VerifiedImportDelegation){const o=signed.body,{body:d,digest}=read(delegation);if(!o)reject("Canonical");if(o.formatVersion!==1)reject("Version");width(o.physicalOperationId,16);for(const b of [o.spoolGenesisDigest,o.delegationDigest,o.genesisDigest,o.targetThreadId,o.expectedFrontierDigest,o.resultingFrontierDigest,o.resultingContentDigest,o.optionsDigest])width(b,32);width(o.spoolUuid,16);width(o.logicalJobId,16);width(o.retryLineageId,16);const s=d.scope!,b=s.branches.find(b=>b.refName===o.refName&&b.slotId===o.slotId);if(!b)reject("Scope");width(o.observedCommitOid,o.hashAlgorithm===1?20:o.hashAlgorithm===2?32:reject("Version"));if(!equal(o.spoolUuid,d.identity!.spoolUuid)||!equal(o.spoolGenesisDigest,d.identity!.spoolGenesisDigest)||!equal(o.logicalJobId,d.logicalJobId)||!equal(o.retryLineageId,d.retryLineageId)||!equal(o.delegationDigest,digest)||o.hashAlgorithm!==b.hashAlgorithm||(b.refMode===1&&!equal(o.observedCommitOid,b.pinnedCommitOid))||!equal(o.genesisDigest,b.genesisDigest)||!equal(o.targetThreadId,b.targetThreadId)||!equal(o.expectedFrontierDigest,b.expectedFrontierDigest)||o.resultBytes>d.scope!.maxResultBytes||o.resultBytes===0n||!equal(o.optionsDigest,s.optionsDigest)||o.converterVersion!==s.converterVersion)reject("Scope");await auth(d.jobPublicKey,OPERATION_DOMAIN,api.DelegatedImportOperationV1Schema,o,signed.jobSignature);}
 export async function verifyNewImportOperation(signed:api.SignedDelegatedImportOperationV1,d:VerifiedImportDelegation,now:bigint,committedBefore:api.ImportResultManifestV1){const b=read(d).body;interval(b.notBeforeUnixSeconds,b.expiresAtUnixSeconds,now);await checkImportPublicationBudget(signed,d,committedBefore);}
-export function validateImportManifest(m:api.ImportResultManifestV1){if(m.formatVersion!==1)reject("Version");width(m.logicalJobId,16);width(m.retryLineageId,16);if(m.slots.length>MAX_BRANCHES)reject("Bounds");m.slots.forEach((s,i)=>{width(s.signedOperationDigest,32);width(s.resultingFrontierDigest,32);branchRef(s.refName);if(s.resultBytes<=0n||s.resultBytes>=(1n<<64n))reject("Bounds");const p=m.slots[i-1];if(p&&(compareRefs(p.refName,s.refName)>0||(p.refName===s.refName&&p.slotId>=s.slotId)))reject("Canonical");});}
+export function validateImportManifest(m:api.ImportResultManifestV1){if(m.formatVersion!==1)reject("Version");width(m.logicalJobId,16);width(m.retryLineageId,16);if(m.slots.length>LEGACY_MAX_BRANCHES)reject("Bounds");m.slots.forEach((s,i)=>{width(s.signedOperationDigest,32);width(s.resultingFrontierDigest,32);branchRef(s.refName);if(s.resultBytes<=0n||s.resultBytes>=(1n<<64n))reject("Bounds");const p=m.slots[i-1];if(p&&(compareRefs(p.refName,s.refName)>0||(p.refName===s.refName&&p.slotId>=s.slotId)))reject("Canonical");});}
 
 export function checkImportSlotReplay(m:api.ImportResultManifestV1,signed:api.SignedDelegatedImportOperationV1):boolean{validateImportManifest(m);const o=signed.body;if(!o)reject("Canonical");if(!equal(m.logicalJobId,o.logicalJobId)||!equal(m.retryLineageId,o.retryLineageId))reject("Scope");const s=m.slots.find(s=>s.refName===o.refName&&s.slotId===o.slotId);if(!s)return false;if(!equal(s.signedOperationDigest,signedOperationDigest(signed))||!equal(s.resultingFrontierDigest,o.resultingFrontierDigest)||s.resultBytes!==o.resultBytes)reject("SlotConflict");return true;}
 export function requireHybridPeer(protocol:ProtocolCompatibility|undefined):void{if(!protocol||protocol.protocolVersion!==2||!protocol.mandatoryFeatures.includes(1)||protocol.mandatoryFeatures.some((f,i)=>f===0||!MandatoryProtocolFeatureSchema.values.some(v=>v.number===f)||(i>0&&protocol.mandatoryFeatures[i-1]>=f)))reject("Protocol");}
@@ -582,7 +632,8 @@ export function publicationPayload(operation:api.SignedDelegatedImportOperationV
 export function validatePublicBundle(b:api.ImportPublicProofBundleV1):void { validateBundle(b,true); }
 function validateBundleBounds(b:api.ImportPublicProofBundleV1):void {
   validateOwnerHistories(b.ownerHistories);
-  if(b.formatVersion!==1)reject("Version");if(toBinary(api.ImportPublicProofBundleV1Schema,b).length>MAX_BUNDLE_BYTES||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.delegations.length!==1||b.manifests.length>256||b.operations.length>256||b.genesisAuthorities.length>256||b.originalGeneses.length>256||b.creatorAuthorityEnvelopes.length>256||b.statements.length>1024||b.historyProofs.length>1024||b.policies.length>256||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256)reject("Bounds");
+  if(![1,2].includes(b.formatVersion))reject("Version");if(toBinary(api.ImportPublicProofBundleV1Schema,b).length>bundleByteLimit(b.formatVersion)||b.ownerHistories.length>64||b.ownershipTransfers.length>64||b.delegations.length!==1||b.manifests.length>256||b.operations.length>256||b.genesisAuthorities.length>(b.formatVersion===2?MAX_BRANCHES:LEGACY_MAX_BRANCHES)||b.originalGeneses.length>(b.formatVersion===2?MAX_BRANCHES:LEGACY_MAX_BRANCHES)||b.creatorAuthorityEnvelopes.length>(b.formatVersion===2?MAX_BRANCHES:LEGACY_MAX_BRANCHES)||b.statements.length>1024||b.historyProofs.length>1024||b.policies.length>256||b.genesisWitnesses.length>256||b.authorityWitnesses.length>256||b.landingWitnesses.length>256)reject("Bounds");
+  if(b.formatVersion===2){validateCreatorAuthorityTable(b);if(b.memberPermission&&(b.memberPermission.body?.scope??reject("Canonical")).branches.length>MAX_BRANCHES)reject("Bounds");if(b.delegations.some(d=>(d.body?.scope??reject("Canonical")).branches.length>MAX_BRANCHES))reject("Bounds");}
 }
 function validateBundle(b:api.ImportPublicProofBundleV1,requireAdmissions:boolean):void{
   validateBundleBounds(b);
@@ -870,7 +921,9 @@ function cloneImportWitnessSnapshot(s:ImportWitnessSnapshot):ImportWitnessSnapsh
 
 /** Enforce decoded protobuf sizes; transports also bound the uncompressed payload. */
 export function validateImportCommitRequestBounds(request:CommitImportJobRequest):void {
-  if(toBinary(CommitImportJobRequestSchema,request).length>MAX_COMMIT_REQUEST_BYTES||toBinary(api.ImportPublicProofBundleV1Schema,request.proof??reject("Canonical")).length>MAX_BUNDLE_BYTES)reject("Bounds");
+  const proof=request.proof??reject("Canonical"),limit=bundleByteLimit(proof.formatVersion);
+  if(toBinary(CommitImportJobRequestSchema,request).length>2*limit||toBinary(api.ImportPublicProofBundleV1Schema,proof).length>limit)reject("Bounds");
+  if(proof.formatVersion===2){const context=clone(api.ImportPublicProofBundleV1Schema,proof);context.memberPermission=undefined;context.delegations=[];context.genesisAuthorities=[];context.originalGeneses=[];context.creatorAuthorityEnvelopes=[];if(toBinary(api.ImportPublicProofBundleV1Schema,context).length>MAX_COMMIT_CONTEXT_BYTES)reject("Bounds");}
 }
 
 export interface ImportControlCaller {

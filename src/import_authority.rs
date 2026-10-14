@@ -12,10 +12,14 @@ pub const DELEGATION_DOMAIN: &str = "heddle-import-job-delegation-v1";
 pub const OPERATION_DOMAIN: &str = "heddle-delegated-import-operation-v1";
 pub const MANIFEST_DOMAIN: &str = "heddle-import-result-manifest-v1";
 pub const PUBLICATION_DOMAIN: &str = "heddle-import-publication-payload-v1";
-pub const MAX_BRANCHES: usize = 256;
+/// New format-2 jobs; legacy signed scopes retain their frozen 256-entry ceiling.
+pub const MAX_BRANCHES: usize = 25;
+pub const LEGACY_MAX_BRANCHES: usize = 256;
 pub const MAX_REF_BYTES: usize = 1024;
 pub const MAX_RECORD_BYTES: usize = 64 * 1024;
-pub const MAX_BUNDLE_BYTES: usize = 1024 * 1024;
+pub const LEGACY_MAX_BUNDLE_BYTES: usize = 1024 * 1024;
+pub const MAX_BUNDLE_BYTES: usize = 4 * 1024 * 1024;
+pub const MAX_COMMIT_CONTEXT_BYTES: usize = 64 * 1024;
 pub const MAX_DELEGATION_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
 pub const MAX_COMMIT_REQUEST_BYTES: usize = 2 * MAX_BUNDLE_BYTES;
 /// Refs in one `ResolveImportSource`/`ProviderRefsRequest` page (proto: max 512).
@@ -25,6 +29,175 @@ pub const MAX_IMPORT_SOURCE_REF_PAGE: usize = 512;
 pub const MAX_IMPORT_SOURCE_REFS: usize = 1_048_576;
 pub const DISCOVERY_DOMAIN: &str = "heddle-import-discovery-v1";
 pub const CANCELLATION_NAMESPACE: &str = "heddle-import-cancel-v1";
+
+fn bundle_byte_limit(version: u32) -> Result<usize, Reject> {
+    match version {
+        1 => Ok(LEGACY_MAX_BUNDLE_BYTES),
+        2 => Ok(MAX_BUNDLE_BYTES),
+        _ => Err(Reject::Version),
+    }
+}
+
+/// Resolve the exact bytes committed by the signed genesis authority.
+pub fn resolve_creator_authority_envelope<'a>(
+    bundle: &'a ImportPublicProofBundleV1,
+    digest: &[u8],
+) -> Result<&'a [u8], Reject> {
+    width(digest, 32)?;
+    bundle
+        .creator_authority_envelopes
+        .iter()
+        .find(|e| hash(&[e]) == digest)
+        .map(Vec::as_slice)
+        .ok_or(Reject::GenesisBinding)
+}
+
+fn validate_creator_authority_table(bundle: &ImportPublicProofBundleV1) -> Result<(), Reject> {
+    let mut previous = None;
+    for envelope in &bundle.creator_authority_envelopes {
+        if envelope.is_empty() || envelope.len() > MAX_RECORD_BYTES {
+            return Err(Reject::Bounds);
+        }
+        let digest = hash(&[envelope]);
+        if previous.as_ref().is_some_and(|p| p >= &digest) {
+            return Err(Reject::Canonical);
+        }
+        if !bundle.genesis_authorities.iter().any(|g| {
+            g.body
+                .as_ref()
+                .is_some_and(|g| g.creator_authority_envelope_digest == digest)
+        }) {
+            return Err(Reject::GenesisBinding);
+        }
+        previous = Some(digest);
+    }
+    for g in &bundle.genesis_authorities {
+        resolve_creator_authority_envelope(
+            bundle,
+            &g.body
+                .as_ref()
+                .ok_or(Reject::Canonical)?
+                .creator_authority_envelope_digest,
+        )?;
+    }
+    Ok(())
+}
+
+/// Limits may only narrow the format-2 ceilings. The builder supplies complete
+/// candidate proof material (including signatures or exact-width placeholders)
+/// because permission scopes, genesis bindings and envelopes depend on the job.
+pub struct ImportPartitionLimits<F> {
+    pub max_branches: usize,
+    pub max_record_bytes: usize,
+    pub max_bundle_bytes: usize,
+    pub build_job: F,
+}
+
+/// Preserve exact UTF-8 ref order; greedily append until count, canonical signed
+/// record bytes or protobuf Commit proof bytes would exceed an inclusive limit.
+/// No normalization, estimates, signing or fallback to another format occurs.
+pub fn partition_import_branches(
+    selection: &[ImportBranchLimitV1],
+    limits: &ImportPartitionLimits<
+        impl Fn(&[ImportBranchLimitV1]) -> Result<ImportPublicProofBundleV1, Reject>,
+    >,
+) -> Result<Vec<ImportPublicProofBundleV1>, Reject> {
+    use prost::Message;
+    if limits.max_branches == 0
+        || limits.max_branches > MAX_BRANCHES
+        || limits.max_record_bytes == 0
+        || limits.max_record_bytes > MAX_RECORD_BYTES
+        || limits.max_bundle_bytes == 0
+        || limits.max_bundle_bytes > MAX_BUNDLE_BYTES
+    {
+        return Err(Reject::Bounds);
+    }
+    for (i, b) in selection.iter().enumerate() {
+        branch(b)?;
+        if i > 0 && selection[i - 1].ref_name.as_bytes() >= b.ref_name.as_bytes() {
+            return Err(Reject::Canonical);
+        }
+        if selection[..i].iter().any(|p| {
+            p.genesis_digest == b.genesis_digest || p.target_thread_id == b.target_thread_id
+        }) {
+            return Err(Reject::Scope);
+        }
+    }
+    let fits = |branches: &[ImportBranchLimitV1]| -> Result<ImportPublicProofBundleV1, Reject> {
+        let proof = (limits.build_job)(branches)?;
+        if proof.format_version != 2 {
+            return Err(Reject::Version);
+        }
+        validate_bundle_bounds(&proof)?;
+        let signed = &proof.delegations[0];
+        let body = signed.body.as_ref().ok_or(Reject::Canonical)?;
+        if body.scope.as_ref().ok_or(Reject::Canonical)?.branches != branches
+            || body.branch_manifest.len() != branches.len()
+            || proof.genesis_authorities.len() != branches.len()
+            || proof.original_geneses.len() != branches.len()
+            || !proof.operations.is_empty()
+            || proof.terminal_manifest.is_some()
+            || !proof.manifests.is_empty()
+        {
+            return Err(Reject::Scope);
+        }
+        validate_scope(body.scope.as_ref().ok_or(Reject::Canonical)?)?;
+        if canonical(signed)?.len() > limits.max_record_bytes
+            || proof
+                .member_permission
+                .as_ref()
+                .map(canonical)
+                .transpose()?
+                .is_some_and(|p| p.len() > limits.max_record_bytes)
+            || proof.encoded_len() > limits.max_bundle_bytes
+        {
+            return Err(Reject::Bounds);
+        }
+        for binding in &proof.genesis_authorities {
+            if canonical(binding)?.len() > limits.max_record_bytes {
+                return Err(Reject::Bounds);
+            }
+        }
+        for original in &proof.original_geneses {
+            if original.canonical_record.is_empty()
+                || original.canonical_record.len() > MAX_RECORD_BYTES
+                || original.signatures.is_empty()
+                || original.signatures.len() > 16
+            {
+                return Err(Reject::Bounds);
+            }
+        }
+        let request = CommitImportJobRequest {
+            proof: Some(proof.clone()),
+            ..Default::default()
+        };
+        validate_commit_request_bounds(&request)?;
+        Ok(proof)
+    };
+    let mut jobs = Vec::new();
+    let mut start = 0;
+    let mut accepted = None;
+    for end in 1..=selection.len() {
+        let candidate = if end - start > limits.max_branches {
+            Err(Reject::Bounds)
+        } else {
+            fits(&selection[start..end])
+        };
+        match candidate {
+            Ok(proof) => accepted = Some(proof),
+            Err(Reject::Bounds) if accepted.is_some() => {
+                jobs.push(accepted.take().ok_or(Reject::Bounds)?);
+                start = end - 1;
+                accepted = Some(fits(&selection[start..end])?);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    if let Some(proof) = accepted {
+        jobs.push(proof);
+    }
+    Ok(jobs)
+}
 
 record!(AuthorizationSignature, signer_key_id:b, signature:b);
 record!(RecordSignature, public_key:b, signature:b);
@@ -354,7 +527,7 @@ pub fn validate_resolve_import_source_response(
     connection_provider: Option<&str>,
 ) -> Result<(), Reject> {
     use prost::Message;
-    if response.encoded_len() > MAX_BUNDLE_BYTES {
+    if response.encoded_len() > LEGACY_MAX_BUNDLE_BYTES {
         return Err(Reject::Bounds);
     }
     let selected = request.source.as_ref().ok_or(Reject::SourceSelection)?;
@@ -508,7 +681,7 @@ fn discovery_source_binding(source: &ProviderRepository) -> Result<Vec<u8>, Reje
 
 fn discovery_selection_binding(selected: &[ImportBranchLimitV1]) -> Result<Vec<u8>, Reject> {
     use sha2::{Digest, Sha256};
-    if selected.len() > MAX_BRANCHES {
+    if selected.len() > LEGACY_MAX_BRANCHES {
         return Err(Reject::Bounds);
     }
     let mut digest = Sha256::new();
@@ -821,7 +994,10 @@ fn validate_provider_support(
 
 pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Result<(), Reject> {
     use prost::Message;
-    if v.encoded_len() > MAX_BUNDLE_BYTES || v.converters.is_empty() || v.converters.len() > 32 {
+    if v.encoded_len() > LEGACY_MAX_BUNDLE_BYTES
+        || v.converters.is_empty()
+        || v.converters.len() > 32
+    {
         return Err(Reject::Bounds);
     }
     for (i, c) in v.converters.iter().enumerate() {
@@ -866,11 +1042,19 @@ pub fn validate_import_configuration(v: &GetImportConfigurationResponse) -> Resu
     {
         return Err(Reject::Canonical);
     }
+    if !matches!(v.import_proof_bundle_format_version, 0..=2) {
+        return Err(Reject::Version);
+    }
     let l = v.limits.as_ref().ok_or(Reject::Canonical)?;
     if l.max_branches == 0
-        || l.max_branches as usize > MAX_BRANCHES
+        || l.max_branches as usize
+            > if v.import_proof_bundle_format_version == 2 {
+                MAX_BRANCHES
+            } else {
+                LEGACY_MAX_BRANCHES
+            }
         || l.max_operations == 0
-        || l.max_operations as usize > MAX_BRANCHES
+        || l.max_operations as usize > LEGACY_MAX_BRANCHES
         || l.max_result_bytes == 0
     {
         return Err(Reject::Bounds);
@@ -1057,15 +1241,21 @@ pub fn validate_preparation_response(
 /// Transport must also bound the whole uncompressed payload before decoding.
 pub fn validate_commit_request_bounds(request: &CommitImportJobRequest) -> Result<(), Reject> {
     use prost::Message;
-    if request.encoded_len() > MAX_COMMIT_REQUEST_BYTES
-        || request
-            .proof
-            .as_ref()
-            .ok_or(Reject::Canonical)?
-            .encoded_len()
-            > MAX_BUNDLE_BYTES
-    {
+    let proof = request.proof.as_ref().ok_or(Reject::Canonical)?;
+    let limit = bundle_byte_limit(proof.format_version)?;
+    if request.encoded_len() > 2 * limit || proof.encoded_len() > limit {
         return Err(Reject::Bounds);
+    }
+    if proof.format_version == 2 {
+        let mut context = proof.clone();
+        context.member_permission = None;
+        context.delegations.clear();
+        context.genesis_authorities.clear();
+        context.original_geneses.clear();
+        context.creator_authority_envelopes.clear();
+        if context.encoded_len() > MAX_COMMIT_CONTEXT_BYTES {
+            return Err(Reject::Bounds);
+        }
     }
     Ok(())
 }
@@ -1123,8 +1313,8 @@ fn validate_commit_request_inner(
     if request.initial_base_state.len() > 4096 || proof.encoded_len() > MAX_BUNDLE_BYTES {
         return Err(Reject::Bounds);
     }
-    if proof.format_version != 1
-        || proof.delegations.len() != 1
+    validate_bundle_bounds(proof)?;
+    if proof.delegations.len() != 1
         || !proof.operations.is_empty()
         || proof.terminal_manifest.is_some()
         || !proof.manifests.is_empty()
@@ -1137,6 +1327,12 @@ fn validate_commit_request_inner(
         .ok_or(Reject::Canonical)?;
     let scope = d.scope.as_ref().ok_or(Reject::Canonical)?;
     validate_scope(scope)?;
+    if proof.format_version == 2
+        && (scope.branches.len() > MAX_BRANCHES
+            || configuration.import_proof_bundle_format_version != 2)
+    {
+        return Err(Reject::Version);
+    }
     let id = d.identity.as_ref().ok_or(Reject::Canonical)?;
     identity(id)?;
     let uuid = hex::encode(&id.spool_uuid);
@@ -1203,7 +1399,8 @@ fn validate_commit_request_inner(
     // Current converter/options/budget support is also rechecked at activation.
     prepare_scope(scope, configuration, &scope.destination_version)?;
     if proof.original_geneses.len() != scope.branches.len()
-        || proof.creator_authority_envelopes.len() != scope.branches.len()
+        || (proof.format_version == 1
+            && proof.creator_authority_envelopes.len() != scope.branches.len())
         || proof.genesis_authorities.len() != scope.branches.len()
         || d.branch_manifest.len() != scope.branches.len()
     {
@@ -1216,13 +1413,18 @@ fn validate_commit_request_inner(
         let binding = &proof.genesis_authorities[i];
         let g = binding.body.as_ref().ok_or(Reject::GenesisBinding)?;
         let m = &d.branch_manifest[i];
+        let envelope = if proof.format_version == 1 {
+            &proof.creator_authority_envelopes[i]
+        } else {
+            resolve_creator_authority_envelope(proof, &g.creator_authority_envelope_digest)?
+        };
         if native_id(original) != b.genesis_digest
             || g.genesis_digest != b.genesis_digest
             || m.limit.as_ref() != Some(b)
             || m.genesis_authority_digest != signed_genesis_digest(binding)?
-            || g.creator_authority_envelope_digest != hash(&[&proof.creator_authority_envelopes[i]])
-            || proof.creator_authority_envelopes[i].is_empty()
-            || proof.creator_authority_envelopes[i].len() > MAX_RECORD_BYTES
+            || g.creator_authority_envelope_digest != hash(&[envelope])
+            || envelope.is_empty()
+            || envelope.len() > MAX_RECORD_BYTES
             || !original.signatures.iter().any(|s| {
                 s.public_key == g.creator_public_key && s.signature == g.original_creator_signature
             })
@@ -1369,9 +1571,9 @@ pub fn validate_scope(value: &ImportPermissionScopeV1) -> Result<(), Reject> {
     width(&value.destination_version, 32)?;
     width(&value.options_digest, 32)?;
     if value.branches.is_empty()
-        || value.branches.len() > MAX_BRANCHES
+        || value.branches.len() > LEGACY_MAX_BRANCHES
         || value.max_operations == 0
-        || value.max_operations as usize > MAX_BRANCHES
+        || value.max_operations as usize > LEGACY_MAX_BRANCHES
         || value.max_result_bytes == 0
     {
         return Err(Reject::Bounds);
@@ -1902,7 +2104,7 @@ pub fn validate_manifest(m: &ImportResultManifestV1) -> Result<(), Reject> {
     }
     width(&m.logical_job_id, 16)?;
     width(&m.retry_lineage_id, 16)?;
-    if m.slots.len() > MAX_BRANCHES {
+    if m.slots.len() > LEGACY_MAX_BRANCHES {
         return Err(Reject::Bounds);
     }
     for (i, s) in m.slots.iter().enumerate() {
@@ -2060,26 +2262,62 @@ pub fn validate_public_bundle(bundle: &ImportPublicProofBundleV1) -> Result<(), 
 fn validate_bundle_bounds(bundle: &ImportPublicProofBundleV1) -> Result<(), Reject> {
     crate::writer_authority::validate_owner_histories(&bundle.owner_histories)?;
     use prost::Message;
-    if bundle.format_version != 1 {
+    if !matches!(bundle.format_version, 1 | 2) {
         return Err(Reject::Version);
     }
-    if bundle.encoded_len() > MAX_BUNDLE_BYTES
+    let max_branches = if bundle.format_version == 2 {
+        MAX_BRANCHES
+    } else {
+        LEGACY_MAX_BRANCHES
+    };
+    if bundle.encoded_len() > bundle_byte_limit(bundle.format_version)?
         || bundle.owner_histories.len() > 64
         || bundle.ownership_transfers.len() > 64
-        || bundle.genesis_authorities.len() > MAX_BRANCHES
+        || bundle.genesis_authorities.len() > max_branches
         || bundle.delegations.len() != 1
-        || bundle.operations.len() > MAX_BRANCHES
+        || bundle.operations.len() > LEGACY_MAX_BRANCHES
         || bundle.statements.len() > 1024
         || bundle.history_proofs.len() > 1024
         || bundle.policies.len() > 256
-        || bundle.original_geneses.len() > MAX_BRANCHES
-        || bundle.creator_authority_envelopes.len() > MAX_BRANCHES
-        || bundle.manifests.len() > MAX_BRANCHES
+        || bundle.original_geneses.len() > max_branches
+        || bundle.creator_authority_envelopes.len() > max_branches
+        || bundle.manifests.len() > LEGACY_MAX_BRANCHES
         || bundle.genesis_witnesses.len() > 256
         || bundle.authority_witnesses.len() > 256
         || bundle.landing_witnesses.len() > 256
     {
         return Err(Reject::Bounds);
+    }
+    if bundle.format_version == 2 {
+        validate_creator_authority_table(bundle)?;
+        if let Some(permission) = &bundle.member_permission
+            && permission
+                .body
+                .as_ref()
+                .ok_or(Reject::Canonical)?
+                .scope
+                .as_ref()
+                .ok_or(Reject::Canonical)?
+                .branches
+                .len()
+                > MAX_BRANCHES
+        {
+            return Err(Reject::Bounds);
+        }
+        for d in &bundle.delegations {
+            if d.body
+                .as_ref()
+                .ok_or(Reject::Canonical)?
+                .scope
+                .as_ref()
+                .ok_or(Reject::Canonical)?
+                .branches
+                .len()
+                > MAX_BRANCHES
+            {
+                return Err(Reject::Bounds);
+            }
+        }
     }
     Ok(())
 }

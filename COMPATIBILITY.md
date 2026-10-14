@@ -1,3 +1,13 @@
+`0.31.0-alpha.49` adds explicitly advertised import proof carrier format 2
+(api#413): unique digest-addressed creator envelopes, 25-branch jobs and shared
+Rust/TS partitioning by real canonical record/protobuf proof bytes. Existing
+signed bytes and format-1 verification remain frozen; unknown formats reject
+without fallback. Records remain 64 KiB; format 2 uses a 4 MiB proof / 8 MiB
+request cap and a 64 KiB initial-Commit context reserve. Format 1 retains its
+1 MiB / 2 MiB caps. Cargo and npm advance together. Buf changes are additive;
+no override is needed. See [the release note](breaking/0.31.0-alpha.49.md)
+and [the arithmetic and partition contract](docs/alpha-v2/import-partition.md).
+
 # Compatibility policy
 
 `0.31.0-alpha.48` adds endpoint-advertised variant support (api#410):

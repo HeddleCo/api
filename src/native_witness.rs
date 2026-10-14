@@ -177,7 +177,7 @@ pub fn validate_public_bundle(b: &api::NativePublicProofBundleV1) -> Result<(), 
     if b.format_version != 1 {
         return Err(Reject::Version);
     }
-    if b.encoded_len() > import::MAX_BUNDLE_BYTES
+    if b.encoded_len() > import::LEGACY_MAX_BUNDLE_BYTES
         || b.owner_histories.len() > 64
         || b.ownership_transfers.len() > 64
         || b.owner_chains.is_empty()

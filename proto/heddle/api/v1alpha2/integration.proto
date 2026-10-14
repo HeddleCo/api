@@ -219,9 +219,10 @@ message SetRemoteLinkRequest {
 // Prepare -> sign -> Commit is sufficient for a new HYBRID import. Defined here
 // to reuse ProviderRepository without an import cycle. Proof originals and the
 // signed ordered branch manifest are the ONLY branch carrier.
-// Maximum decoded protobuf request size: 2 MiB (2097152 bytes), inclusive;
-// proof <=1 MiB (1048576 bytes), inclusive. Enforce the whole uncompressed
-// payload bound before decoding, and the decoded message bound before admission.
+// Inclusive decoded protobuf bounds: proof format 1 uses a 2 MiB request /
+// 1 MiB proof; format 2 uses an 8 MiB request / 4 MiB proof and <=64 KiB proof
+// context. See import-partition.md. Enforce the whole uncompressed payload bound
+// before decoding, and the version-selected decoded bound before admission.
 message CommitImportJobRequest {
   string client_operation_id = 1;
   SpoolRef destination = 2;

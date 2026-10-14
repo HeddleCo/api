@@ -28,10 +28,10 @@ export function buildJob(branches,materials,worst=false){
  const jobSeed=hash(join(utf8.encode('partition-job\0'),branches[0].genesisDigest));
  const jobPrivate=createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),jobSeed]),format:'der',type:'pkcs8'});
  const jobPublic=new Uint8Array(createPublicKey(jobPrivate).export({format:'der',type:'spki'}).subarray(-32));
- const parent=vector('permission').body;parent.scope=scope;parent.logicalJobId=jobSeed.slice(0,16);parent.retryLineageId=jobSeed.slice(16);
+ const parent=vector('permission').body;parent.scope=clone(api.ImportPermissionScopeV1Schema,scope);parent.logicalJobId=jobSeed.slice(0,16);parent.retryLineageId=jobSeed.slice(16);
  const permission=signed(api.ImportMemberPermissionV1Schema,api.SignedImportMemberPermissionV1Schema,parent,'ownerSignature','owner',a.PERMISSION_DOMAIN);
  const envelope=join(utf8.encode('heddle-signed-import-member-permission-v1\0'),a.canonicalHybridV1(api.SignedImportMemberPermissionV1Schema,permission));
- const originals=branches.map(b=>materials.find(m=>m.limit.refName===b.refName).original);
+ const originals=branches.map(b=>clone(api.SignedRecordSchema,materials.find(m=>m.limit.refName===b.refName).original));
  const bindings=branches.map((b,i)=>{const body=clone(api.ImportGenesisAuthorityV1Schema,vector('genesis_dev').body);body.genesisDigest=b.genesisDigest;body.originalCreatorSignature=originals[i].signatures[0].signature;body.parentPermissionDigest=a.signedPermissionDigest(permission);body.creatorAuthorityEnvelopeDigest=hash(envelope);return signed(api.ImportGenesisAuthorityV1Schema,api.SignedImportGenesisAuthorityV1Schema,body,'creatorSignature','device',a.GENESIS_DOMAIN);});
  const body=vector('delegation').body;body.logicalJobId=parent.logicalJobId;body.retryLineageId=parent.retryLineageId;body.delegationId=hash(jobSeed).slice(0,16);body.jobPublicKey=jobPublic;body.jobKeyId=keyId(jobPublic);body.scope=scope;body.parentPermissionDigest=a.signedPermissionDigest(permission);body.branchManifest=branches.map((b,i)=>create(api.ImportBranchManifestV1Schema,{limit:b,genesisAuthorityDigest:a.signedGenesisDigest(bindings[i])}));
  const delegation=signed(api.ImportJobDelegationV1Schema,api.SignedImportJobDelegationV1Schema,body,'delegatingSignature','device',a.DELEGATION_DOMAIN);

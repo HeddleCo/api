@@ -262,7 +262,8 @@ heads are source-side evidence only; signed scopes, manifests and every
 non-discovery verification path reject `refs/pull/...` selections. There is no
 native pull-ref destination namespace; a later step maps these heads to native
 threads. Signed layouts and existing fixture bytes do not change; at most
-`MAX_BRANCHES` (256) selections enter the signed scope.
+`LEGACY_MAX_BRANCHES` (256) selections enter frozen scopes; format-2 jobs use
+`MAX_BRANCHES` (25) and the partition helper.
 
 The standalone discovery identifier is SHA-256 over ASCII
 `heddle-import-discovery-v1`, the 32-byte source binding, a BE u32 option (0/1),
@@ -331,8 +332,9 @@ ordinary Developer/Admin role, mint-root attachment and KeyBinding self-PoP
 cannot satisfy this permission. Existing capability versions/domains do not
 change. Authority from an online role is still checked separately for RPC access.
 
-Permission bounds are explicitly **one logical import**, at most **256 branches
-and 256 converted operations/slots**. Branch limits
+Permission bounds are explicitly **one logical import**: **25 branches** for
+format-2 jobs, **256 branches** for frozen format-1 scopes, and at most **256
+converted operations/slots**. Branch limits
 are sorted unique full refs, with one stable slot per branch in this first format.
 There are **no per-branch byte budgets**. `max_result_bytes` is ONE positive
 u64 result-byte total, and `max_operations` is the operation total. This signed
@@ -482,7 +484,9 @@ the first or latest-looking version. Alternatives remain explicitly selectable.
 The selected entry's exact `default_options` octets retain their existing digest
 rules; this marker does not change any signed HYBRID layout or domain.
 
-Positive advertised branches/operations cannot exceed 256. The host byte maximum
+Positive advertised branches cannot exceed 25 when
+`import_proof_bundle_format_version = 2`; frozen format-1 advertisements retain
+256. Operations cannot exceed 256 in either format. The host byte maximum
 is a positive operator-configurable u64, with no fixed protocol byte ceiling.
 Prepare and Commit refuse a total above the CURRENT maximum, including a decrease
 after Prepare. Once activated, the signed job budget and durable consumption stay
@@ -525,8 +529,10 @@ Public sources have no connection/installation and cannot claim to be private;
 their repository ID is empty or the exact clone URL. Connected sources carry an
 account-scoped connection and exact repository/installation IDs.
 
-The proof's `original_geneses`, `creator_authority_envelopes` and
-`genesis_authorities` are ordered one-to-one with the signed branch manifest,
+The proof's `original_geneses` and `genesis_authorities` are ordered one-to-one
+with the signed branch manifest. Format 1 orders `creator_authority_envelopes`
+the same way; format 2 resolves them from its unique digest-sorted table through
+the signed genesis authority. In either format,
 with exactly one initial delegation and its exact parent permission (or direct
 owner). This is the single branch carrier. Preserve each original creator
 signature and verify native IDs, envelope commitments and manifest bindings.
@@ -1135,7 +1141,8 @@ preflight enforce the same bound. Hosts MUST support advertising 86400 seconds
 
 A client MAY Prepare and Commit sibling jobs sequentially, including preparing the
 next after an earlier job completes, or concurrently. Each has its own logical job,
-key, signature, cancellation ID and cumulative budget, with at most 256 branches.
+key, signature, cancellation ID and cumulative budget, with at most 25 branches
+for format 2 (256 in frozen format 1), subject to actual record and proof byte caps.
 There is no spool-wide 256-branch limit. Imports do not advance destination_version;
 configuration, policy and ownership changes do. Stale Prepare tokens refuse
 DESTINATION_CONFLICT, and stale activation tokens refuse StaleContext.

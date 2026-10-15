@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package heddle.api.v1alpha2;
+
+import "heddle/api/v1alpha2/common.proto";
+
+// Opt-in immutable SOURCE delivery. Existing Fetch remains available.
+// See docs/alpha-v2/immutable-objects.md for canonical bindings, TTL and errors.
+enum ImmutableObjectKind {
+  IMMUTABLE_OBJECT_KIND_UNSPECIFIED = 0;
+  IMMUTABLE_OBJECT_KIND_TREE = 1;
+  IMMUTABLE_OBJECT_KIND_BLOB = 2;
+}
+
+// Format 1 supports algorithm "blake3" and codec "identity" only. The digest
+// identifies canonical native object bytes (including tree salt), never a path.
+message ImmutableObjectId {
+  ImmutableObjectKind kind = 1;
+  string algorithm = 2;
+  bytes digest = 3; // Exactly 32 bytes.
+}
+
+// All limits are positive and may only narrow format-1 ceilings. Zero is invalid.
+message ImmutableObjectLimits {
+  uint32 max_batch_objects = 1; // <= 512.
+  uint32 max_response_bytes = 2; // <= 4 MiB encoded protobuf response.
+  uint32 max_chunk_bytes = 3; // <= 512 KiB chunk data.
+  uint32 max_in_flight_batches = 4; // <= 4, shared byte budget required.
+  uint32 max_inventory_objects = 5; // <= 4096.
+  uint64 max_snapshot_bytes = 6; // <= 256 MiB decoded admitted objects.
+}
+
+message ImmutableObjectInventoryEntry {
+  ImmutableObjectId id = 1;
+  uint64 decoded_length = 2; // <= max_snapshot_bytes; checked before allocation.
+}
+
+// A bounded complete inventory of exactly the permitted projection. Hosts
+// authenticate this record through the session handle; a caller-supplied record
+// or a digest alone never grants access. No implied history/other-Thread rights.
+message ImmutableObjectSnapshot {
+  uint32 format_version = 1; // Exactly 1.
+  bytes host_public_key = 2; // 32 bytes; public endpoint authority identity.
+  bytes user_id = 3; // 16-byte stable account UUID, never a handle.
+  bytes principal_sha256 = 4; // 32-byte digest of authenticated signing identity.
+  bytes spool_id = 5; // 16-byte stable Spool UUID.
+  bytes thread_id = 6; // 32 bytes.
+  bytes state_id = 7; // 32 bytes; exact native State, never a mutable head.
+  bytes view_digest = 8; // 32 bytes; includes audience/visibility projection.
+  uint64 authorization_epoch = 9;
+  uint64 visibility_epoch = 10;
+  ImmutableObjectId root_tree = 11;
+  // Strict (kind, digest) ascending order, unique, includes root_tree.
+  repeated ImmutableObjectInventoryEntry inventory = 12;
+  ImmutableObjectLimits limits = 13;
+  uint64 authorized_at_unix_seconds = 14; // Last LIVE authority check.
+  uint64 expires_at_unix_seconds = 15; // Exclusive; <= authorized_at + TTL.
+  // Host-configurable maximum cache TTL after revocation; default 60 seconds.
+  // Positive, explicitly advertised. Hits MUST NOT renew this window.
+  uint32 max_cache_ttl_seconds = 16;
+}
+
+message OpenObjectSnapshotRequest {
+  ThreadRef thread = 1;
+  RevisionRef revision = 2; // Same Spool, exact native State only; SOURCE only.
+  ImmutableObjectLimits limits = 3; // Explicit requested ceilings.
+}
+
+message OpenObjectSnapshotResponse {
+  ImmutableObjectSnapshot snapshot = 1;
+  bytes authority_binding = 2; // 32-byte canonical snapshot SHA-256.
+  bytes session_handle = 3; // 1..256 opaque bytes, bound to user AND principal.
+}
+
+message ImmutableObjectRange {
+  ImmutableObjectId id = 1;
+  uint64 offset = 2;
+  uint32 length = 3; // <= max_chunk_bytes; zero only for an empty object.
+}
+
+message ReadObjectsRequest {
+  ThreadRef thread = 1; // Must equal the authenticated snapshot Thread.
+  bytes authority_binding = 2;
+  bytes session_handle = 3;
+  // 1..max_batch_objects, ordered; no duplicate typed IDs in one batch.
+  repeated ImmutableObjectRange objects = 4;
+}
+
+message ImmutableObjectChunk {
+  ImmutableObjectId id = 1;
+  string codec = 2; // Exactly "identity" in format 1.
+  uint64 decoded_length = 3; // Must equal inventory length.
+  uint64 offset = 4; // Must equal the requested offset.
+  bytes data = 5; // Exact requested length, <= max_chunk_bytes.
+  bytes chunk_sha256 = 6; // SHA-256(data), exactly 32 bytes.
+}
+
+// Complete ordered prefix of the request. Each chunk completes one range.
+// next_object_index == chunks.size; complete iff it equals request.objects.size.
+// Resume remaining ranges at that index; larger objects use subsequent offsets.
+// Bound the entire protobuf envelope before decoding/allocating. Never cache
+// a batch envelope under one object's key. Verify full native IDs before install.
+message ReadObjectsResponse {
+  bytes authority_binding = 1;
+  repeated ImmutableObjectChunk chunks = 2;
+  uint32 next_object_index = 3;
+  bool complete = 4;
+}

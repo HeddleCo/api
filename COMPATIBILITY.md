@@ -1,3 +1,14 @@
+`0.31.0-alpha.50` adds opt-in immutable SOURCE snapshot/object reads (api#415):
+bounded complete inventories, exact typed tree/blob ranges, resumable prefixes,
+and canonical authority/cache keys scoped to both user and signing principal.
+Revocation permits the host-advertised maximum cache TTL (default 60 seconds);
+cache hits never renew it and no synchronous edge revocation gate is required.
+Existing Fetch and signed formats remain unchanged. Rust and TS share golden
+vectors and enforce count, wire-byte, decoded-byte and expiry limits. Cargo/npm
+advance together above current main's untagged alpha.49. Buf is additive, with
+no override. See [the release note](breaking/0.31.0-alpha.50.md) and
+[the contract](docs/alpha-v2/immutable-objects.md).
+
 `0.31.0-alpha.49` adds explicitly advertised import proof carrier format 2
 (api#413): unique digest-addressed creator envelopes, 25-branch jobs and shared
 Rust/TS partitioning by real canonical record/protobuf proof bytes. Existing

@@ -5,6 +5,7 @@ mod failure;
 mod foreign_dependencies;
 pub mod framing;
 pub mod hybrid_codec;
+pub mod immutable_objects;
 pub mod import_authority;
 pub mod mint_root_association;
 pub mod native_witness;

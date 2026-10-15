@@ -13,6 +13,7 @@ import "heddle/api/v1alpha2/content.proto";
 import "heddle/api/v1alpha2/device.proto";
 import "heddle/api/v1alpha2/endpoint.proto";
 import "heddle/api/v1alpha2/identity.proto";
+import "heddle/api/v1alpha2/immutable_objects.proto";
 import "heddle/api/v1alpha2/import_authority.proto";
 import "heddle/api/v1alpha2/integration.proto";
 import "heddle/api/v1alpha2/ownership.proto";
@@ -2465,6 +2466,44 @@ service SyncService {
       authorization_request_targets: {
         path: "open.thread.spool"
         role: AUTHORIZATION_ROLE_RESOURCE_WRITER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Immutable SOURCE mode; advertise only when implemented. Authenticate the
+  // session and principal before serving; cached authority obeys its TTL.
+  rpc OpenObjectSnapshot(OpenObjectSnapshotRequest) returns (OpenObjectSnapshotResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
+      }
+      authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
+    };
+  }
+  // Immutable SOURCE mode; advertise only when implemented. Authenticate the
+  // session and principal before serving; cached authority obeys its TTL.
+  rpc ReadObjects(ReadObjectsRequest) returns (ReadObjectsResponse) {
+    option (heddle.api.common.rpc_contract) = {
+      signing_identity: STABLE_SIGNING_IDENTITY_AUTHENTICATED_PRINCIPAL
+      signing_tier: SIGNING_TIER_PROOF_OF_POSSESSION
+      effect: RPC_EFFECT_READ_ONLY
+      retry_behavior: RETRY_BEHAVIOR_SAFE
+      capability: CAPABILITY_AREA_SYNCHRONIZATION
+      authorization_access: AUTHORIZATION_ACCESS_AUTHENTICATED_PRINCIPAL
+      authorization_role: AUTHORIZATION_ROLE_RESOURCE_READER
+      authorization_scope_source: AUTHORIZATION_SCOPE_SOURCE_REQUEST_RESOURCE
+      authorization_request_targets: {
+        path: "thread.spool"
+        role: AUTHORIZATION_ROLE_RESOURCE_READER
       }
       authorization_existence: AUTHORIZATION_EXISTENCE_HIDE
     };

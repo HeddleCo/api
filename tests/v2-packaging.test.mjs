@@ -23,6 +23,7 @@ const barrelOnlyModules = new Set([
   'endpoint_pb.js',
   'identity_pb.js',
   'import_authority_pb.js',
+  'immutable_objects_pb.js',
   'integration_pb.js',
   'native_witness_pb.js',
   'owner_records_pb.js',

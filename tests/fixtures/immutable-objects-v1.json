@@ -1,0 +1,282 @@
+{
+  "format": 1,
+  "authorityBinding": "fada2db66c3b3f345f8322de0de5e162dd65bbfcd62ba9ee46e6c2513ccf20e1",
+  "cacheKeys": [
+    "7c0564b8cf4f5d5d1be20e98eb8bb408012f70f9e7d5ac31f63d36192c7c2b2f",
+    "481695944e18a5328ef4914b8f6533af37818c4ec0dd2f22b4a5f9abbbe7aea1"
+  ],
+  "vectors": [
+    {
+      "name": "snapshot",
+      "json": {
+        "formatVersion": 1,
+        "hostPublicKey": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "userId": "AgICAgICAgICAgICAgICAg==",
+        "principalSha256": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+        "spoolId": "BAQEBAQEBAQEBAQEBAQEBA==",
+        "threadId": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+        "stateId": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=",
+        "viewDigest": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+        "authorizationEpoch": "8",
+        "visibilityEpoch": "9",
+        "rootTree": {
+          "kind": "IMMUTABLE_OBJECT_KIND_TREE",
+          "algorithm": "blake3",
+          "digest": "5+A5Czab2IEdRlGl/d82Bsn9m/QVaL3GvXurml4w7p8="
+        },
+        "inventory": [
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_TREE",
+              "algorithm": "blake3",
+              "digest": "5+A5Czab2IEdRlGl/d82Bsn9m/QVaL3GvXurml4w7p8="
+            },
+            "decodedLength": "21"
+          },
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_BLOB",
+              "algorithm": "blake3",
+              "digest": "1x7Gusjhyn9uO8AKAKD8zPhidVycm0iN7v5YEi6rwG4="
+            },
+            "decodedLength": "21"
+          }
+        ],
+        "limits": {
+          "maxBatchObjects": 512,
+          "maxResponseBytes": 4194304,
+          "maxChunkBytes": 524288,
+          "maxInFlightBatches": 4,
+          "maxInventoryObjects": 4096,
+          "maxSnapshotBytes": "268435456"
+        },
+        "authorizedAtUnixSeconds": "1800000000",
+        "expiresAtUnixSeconds": "1800000060",
+        "maxCacheTtlSeconds": 60
+      },
+      "protobufHex": "0801122001010101010101010101010101010101010101010101010101010101010101011a1002020202020202020202020202020202222003030303030303030303030303030303030303030303030303030303030303032a1004040404040404040404040404040404322005050505050505050505050505050505050505050505050505050505050505053a20060606060606060606060606060606060606060606060606060606060606060642200707070707070707070707070707070707070707070707070707070707070707480850095a2c08011206626c616b65331a20e7e0390b369bd8811d4651a5fddf3606c9fd9bf41568bdc6bd7bab9a5e30ee9f62300a2c08011206626c616b65331a20e7e0390b369bd8811d4651a5fddf3606c9fd9bf41568bdc6bd7bab9a5e30ee9f101562300a2c08021206626c616b65331a20d71ec6bac8e1ca7f6e3bc00a00a0fcccf862755c9c9b488deefe58122eabc06e10156a1708800410808080021880802020042880203080808080017080a4a7da0678bca4a7da0680013c"
+    },
+    {
+      "name": "openRequest",
+      "json": {
+        "thread": {
+          "spool": {
+            "id": "04040404-0404-0404-0404-040404040404"
+          },
+          "id": {
+            "value": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU="
+          }
+        },
+        "revision": {
+          "spool": {
+            "id": "04040404-0404-0404-0404-040404040404"
+          },
+          "state": {
+            "value": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY="
+          }
+        },
+        "limits": {
+          "maxBatchObjects": 512,
+          "maxResponseBytes": 4194304,
+          "maxChunkBytes": 524288,
+          "maxInFlightBatches": 4,
+          "maxInventoryObjects": 4096,
+          "maxSnapshotBytes": "268435456"
+        }
+      },
+      "protobufHex": "0a4c0a260a2430343034303430342d303430342d303430342d303430342d30343034303430343034303412220a200505050505050505050505050505050505050505050505050505050505050505124c0a260a2430343034303430342d303430342d303430342d303430342d30343034303430343034303412220a2006060606060606060606060606060606060606060606060606060606060606061a170880041080808002188080202004288020308080808001"
+    },
+    {
+      "name": "openResponse",
+      "json": {
+        "snapshot": {
+          "formatVersion": 1,
+          "hostPublicKey": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+          "userId": "AgICAgICAgICAgICAgICAg==",
+          "principalSha256": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+          "spoolId": "BAQEBAQEBAQEBAQEBAQEBA==",
+          "threadId": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+          "stateId": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=",
+          "viewDigest": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+          "authorizationEpoch": "8",
+          "visibilityEpoch": "9",
+          "rootTree": {
+            "kind": "IMMUTABLE_OBJECT_KIND_TREE",
+            "algorithm": "blake3",
+            "digest": "5+A5Czab2IEdRlGl/d82Bsn9m/QVaL3GvXurml4w7p8="
+          },
+          "inventory": [
+            {
+              "id": {
+                "kind": "IMMUTABLE_OBJECT_KIND_TREE",
+                "algorithm": "blake3",
+                "digest": "5+A5Czab2IEdRlGl/d82Bsn9m/QVaL3GvXurml4w7p8="
+              },
+              "decodedLength": "21"
+            },
+            {
+              "id": {
+                "kind": "IMMUTABLE_OBJECT_KIND_BLOB",
+                "algorithm": "blake3",
+                "digest": "1x7Gusjhyn9uO8AKAKD8zPhidVycm0iN7v5YEi6rwG4="
+              },
+              "decodedLength": "21"
+            }
+          ],
+          "limits": {
+            "maxBatchObjects": 512,
+            "maxResponseBytes": 4194304,
+            "maxChunkBytes": 524288,
+            "maxInFlightBatches": 4,
+            "maxInventoryObjects": 4096,
+            "maxSnapshotBytes": "268435456"
+          },
+          "authorizedAtUnixSeconds": "1800000000",
+          "expiresAtUnixSeconds": "1800000060",
+          "maxCacheTtlSeconds": 60
+        },
+        "authorityBinding": "+tottmw7PzRfgyLeDeXhYt1lu/zWK6nuRubCUTzPIOE=",
+        "sessionHandle": "CgoKCgoKCgoKCgoKCgoKCg=="
+      },
+      "protobufHex": "0a8e030801122001010101010101010101010101010101010101010101010101010101010101011a1002020202020202020202020202020202222003030303030303030303030303030303030303030303030303030303030303032a1004040404040404040404040404040404322005050505050505050505050505050505050505050505050505050505050505053a20060606060606060606060606060606060606060606060606060606060606060642200707070707070707070707070707070707070707070707070707070707070707480850095a2c08011206626c616b65331a20e7e0390b369bd8811d4651a5fddf3606c9fd9bf41568bdc6bd7bab9a5e30ee9f62300a2c08011206626c616b65331a20e7e0390b369bd8811d4651a5fddf3606c9fd9bf41568bdc6bd7bab9a5e30ee9f101562300a2c08021206626c616b65331a20d71ec6bac8e1ca7f6e3bc00a00a0fcccf862755c9c9b488deefe58122eabc06e10156a1708800410808080021880802020042880203080808080017080a4a7da0678bca4a7da0680013c1220fada2db66c3b3f345f8322de0de5e162dd65bbfcd62ba9ee46e6c2513ccf20e11a100a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+    },
+    {
+      "name": "request",
+      "json": {
+        "thread": {
+          "spool": {
+            "id": "04040404-0404-0404-0404-040404040404"
+          },
+          "id": {
+            "value": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU="
+          }
+        },
+        "authorityBinding": "+tottmw7PzRfgyLeDeXhYt1lu/zWK6nuRubCUTzPIOE=",
+        "sessionHandle": "CgoKCgoKCgoKCgoKCgoKCg==",
+        "objects": [
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_TREE",
+              "algorithm": "blake3",
+              "digest": "5+A5Czab2IEdRlGl/d82Bsn9m/QVaL3GvXurml4w7p8="
+            },
+            "length": 21
+          },
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_BLOB",
+              "algorithm": "blake3",
+              "digest": "1x7Gusjhyn9uO8AKAKD8zPhidVycm0iN7v5YEi6rwG4="
+            },
+            "length": 21
+          }
+        ]
+      },
+      "protobufHex": "0a4c0a260a2430343034303430342d303430342d303430342d303430342d30343034303430343034303412220a2005050505050505050505050505050505050505050505050505050505050505051220fada2db66c3b3f345f8322de0de5e162dd65bbfcd62ba9ee46e6c2513ccf20e11a100a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a22300a2c08011206626c616b65331a20e7e0390b369bd8811d4651a5fddf3606c9fd9bf41568bdc6bd7bab9a5e30ee9f181522300a2c08021206626c616b65331a20d71ec6bac8e1ca7f6e3bc00a00a0fcccf862755c9c9b488deefe58122eabc06e1815"
+    },
+    {
+      "name": "partialResponse",
+      "json": {
+        "authorityBinding": "+tottmw7PzRfgyLeDeXhYt1lu/zWK6nuRubCUTzPIOE=",
+        "chunks": [
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_TREE",
+              "algorithm": "blake3",
+              "digest": "5+A5Czab2IEdRlGl/d82Bsn9m/QVaL3GvXurml4w7p8="
+            },
+            "codec": "identity",
+            "decodedLength": "21",
+            "data": "aW1tdXRhYmxlLXRyZWUtdmVjdG9y",
+            "chunkSha256": "TovAMGefI2JVROHsi36JoWP8myJcc7rICghI6oovo6U="
+          }
+        ],
+        "nextObjectIndex": 1
+      },
+      "protobufHex": "0a20fada2db66c3b3f345f8322de0de5e162dd65bbfcd62ba9ee46e6c2513ccf20e112730a2c08011206626c616b65331a20e7e0390b369bd8811d4651a5fddf3606c9fd9bf41568bdc6bd7bab9a5e30ee9f12086964656e7469747918152a15696d6d757461626c652d747265652d766563746f7232204e8bc030679f23625544e1ec8b7e89a163fc9b225c73bac80a0848ea8a2fa3a51801"
+    },
+    {
+      "name": "response",
+      "json": {
+        "authorityBinding": "+tottmw7PzRfgyLeDeXhYt1lu/zWK6nuRubCUTzPIOE=",
+        "chunks": [
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_TREE",
+              "algorithm": "blake3",
+              "digest": "5+A5Czab2IEdRlGl/d82Bsn9m/QVaL3GvXurml4w7p8="
+            },
+            "codec": "identity",
+            "decodedLength": "21",
+            "data": "aW1tdXRhYmxlLXRyZWUtdmVjdG9y",
+            "chunkSha256": "TovAMGefI2JVROHsi36JoWP8myJcc7rICghI6oovo6U="
+          },
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_BLOB",
+              "algorithm": "blake3",
+              "digest": "1x7Gusjhyn9uO8AKAKD8zPhidVycm0iN7v5YEi6rwG4="
+            },
+            "codec": "identity",
+            "decodedLength": "21",
+            "data": "aW1tdXRhYmxlLWJsb2ItdmVjdG9y",
+            "chunkSha256": "23IX8grDIp41plXhZlCKrIQ1oWuvgYopmFuBIx2gIcM="
+          }
+        ],
+        "nextObjectIndex": 2,
+        "complete": true
+      },
+      "protobufHex": "0a20fada2db66c3b3f345f8322de0de5e162dd65bbfcd62ba9ee46e6c2513ccf20e112730a2c08011206626c616b65331a20e7e0390b369bd8811d4651a5fddf3606c9fd9bf41568bdc6bd7bab9a5e30ee9f12086964656e7469747918152a15696d6d757461626c652d747265652d766563746f7232204e8bc030679f23625544e1ec8b7e89a163fc9b225c73bac80a0848ea8a2fa3a512730a2c08021206626c616b65331a20d71ec6bac8e1ca7f6e3bc00a00a0fcccf862755c9c9b488deefe58122eabc06e12086964656e7469747918152a15696d6d757461626c652d626c6f622d766563746f723220db7217f20ac3229e35a655e166508aac8435a16baf818a29985b81231da021c318022001"
+    },
+    {
+      "name": "rangeRequest",
+      "json": {
+        "thread": {
+          "spool": {
+            "id": "04040404-0404-0404-0404-040404040404"
+          },
+          "id": {
+            "value": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU="
+          }
+        },
+        "authorityBinding": "+tottmw7PzRfgyLeDeXhYt1lu/zWK6nuRubCUTzPIOE=",
+        "sessionHandle": "CgoKCgoKCgoKCgoKCgoKCg==",
+        "objects": [
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_BLOB",
+              "algorithm": "blake3",
+              "digest": "1x7Gusjhyn9uO8AKAKD8zPhidVycm0iN7v5YEi6rwG4="
+            },
+            "offset": "10",
+            "length": 11
+          }
+        ]
+      },
+      "protobufHex": "0a4c0a260a2430343034303430342d303430342d303430342d303430342d30343034303430343034303412220a2005050505050505050505050505050505050505050505050505050505050505051220fada2db66c3b3f345f8322de0de5e162dd65bbfcd62ba9ee46e6c2513ccf20e11a100a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a22320a2c08021206626c616b65331a20d71ec6bac8e1ca7f6e3bc00a00a0fcccf862755c9c9b488deefe58122eabc06e100a180b"
+    },
+    {
+      "name": "rangeResponse",
+      "json": {
+        "authorityBinding": "+tottmw7PzRfgyLeDeXhYt1lu/zWK6nuRubCUTzPIOE=",
+        "chunks": [
+          {
+            "id": {
+              "kind": "IMMUTABLE_OBJECT_KIND_BLOB",
+              "algorithm": "blake3",
+              "digest": "1x7Gusjhyn9uO8AKAKD8zPhidVycm0iN7v5YEi6rwG4="
+            },
+            "codec": "identity",
+            "decodedLength": "21",
+            "offset": "10",
+            "data": "YmxvYi12ZWN0b3I=",
+            "chunkSha256": "8cF1AHc4icj8DKLjT7h6Wlh+kbvJv7BgctMK7NqWwQ4="
+          }
+        ],
+        "nextObjectIndex": 1,
+        "complete": true
+      },
+      "protobufHex": "0a20fada2db66c3b3f345f8322de0de5e162dd65bbfcd62ba9ee46e6c2513ccf20e1126b0a2c08021206626c616b65331a20d71ec6bac8e1ca7f6e3bc00a00a0fcccf862755c9c9b488deefe58122eabc06e12086964656e746974791815200a2a0b626c6f622d766563746f723220f1c17500773889c8fc0ca2e34fb87a5a587e91bbc9bfb06072d30aecda96c10e18012001"
+    }
+  ]
+}

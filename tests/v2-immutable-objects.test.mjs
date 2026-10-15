@@ -137,3 +137,13 @@ test('opening selection is validated before data lookup', () => {
   rejects('Malformed',()=>c.validateObjectOpenRequest(malformed));
   const zero=vector('openRequest');zero.limits.maxBatchObjects=0;rejects('Limits',()=>c.validateObjectOpenRequest(zero));
 });
+test('bounded decoders discard unknown fields without retaining a per-field allocation', () => {
+  for(const [name,decode] of [['request',c.decodeObjectReadRequest],['snapshot',c.decodeObjectSnapshot],
+    ['response',bytes=>c.decodeObjectReadResponse(bytes,vector('snapshot').limits)]]) {
+    const original=toBinary(schemas[name],vector(name));
+    // Unknown field 31 repeated 4096 times, below each wire byte cap.
+    const bytes=new Uint8Array(original.length+3*4096);bytes.set(original);
+    for(let i=original.length;i<bytes.length;i+=3)bytes.set([0xfa,0x01,0],i);
+    assert.equal(hex(toBinary(schemas[name],decode(bytes))),hex(original));
+  }
+});

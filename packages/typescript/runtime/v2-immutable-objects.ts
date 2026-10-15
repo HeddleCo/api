@@ -119,19 +119,19 @@ export function objectCacheKey(binding: Uint8Array, range: ImmutableObjectRange)
 export function decodeObjectReadRequest(bytes: Uint8Array): ReadObjectsRequest {
   if (bytes.length > MAX_REQUEST_WIRE_BYTES) fail("Limits");
   preflightCount(bytes, 4, OBJECT_LIMITS.maxBatchObjects);
-  try { return fromBinary(ReadObjectsRequestSchema, bytes); } catch { return fail("Malformed"); }
+  try { return fromBinary(ReadObjectsRequestSchema, bytes, { readUnknownFields: false }); } catch { return fail("Malformed"); }
 }
 export function decodeObjectReadResponse(bytes: Uint8Array, limits: ImmutableObjectLimits): ReadObjectsResponse {
   validateObjectLimits(limits); if (bytes.length > limits.maxResponseBytes) fail("Limits");
   preflightCount(bytes, 2, limits.maxBatchObjects);
-  try { return fromBinary(ReadObjectsResponseSchema, bytes); } catch { return fail("Malformed"); }
+  try { return fromBinary(ReadObjectsResponseSchema, bytes, { readUnknownFields: false }); } catch { return fail("Malformed"); }
 }
 
 export function decodeObjectSnapshot(bytes: Uint8Array): ImmutableObjectSnapshot {
   if (bytes.length > MAX_SNAPSHOT_WIRE_BYTES) fail("Limits");
   preflightCount(bytes, 12, OBJECT_LIMITS.maxInventoryObjects);
   let snapshot: ImmutableObjectSnapshot;
-  try { snapshot = fromBinary(ImmutableObjectSnapshotSchema, bytes); } catch { return fail("Malformed"); }
+  try { snapshot = fromBinary(ImmutableObjectSnapshotSchema, bytes, { readUnknownFields: false }); } catch { return fail("Malformed"); }
   validateObjectSnapshot(snapshot); return snapshot;
 }
 

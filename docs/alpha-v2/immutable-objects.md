@@ -59,7 +59,8 @@ Hosts validate limits before traversing or reading objects. Adapters enforce
 wire byte caps before protobuf decoding, using bounded readers; public bounded
 decoders are provided for snapshots and object read requests/responses. They
 also cap repeated-message counts with existing protobuf wire readers before
-decoding, then run semantic validation before allocating from declared lengths. No
+decoding, discard unknown protobuf fields without retaining them, then run
+semantic validation before allocating from declared lengths. No
 allocation may use an unchecked object size, range end, or count. Clients and
 hosts bound concurrent batches and share a byte budget across them. Transport
 adapters fragment envelopes under their existing frame limits; a chunk's data
